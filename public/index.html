@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { background: #0A0B0D; }
+  .cluster-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .cluster-card:hover { transform: translateY(-4px); }
+  .status-dot { box-shadow: 0 0 8px currentColor; }
+  #chatMessages::-webkit-scrollbar { width: 6px; }
+  #chatMessages::-webkit-scrollbar-thumb { background: #2A2E35; border-radius: 3px; }
+</style>
+</head>
+<body class="min-h-screen font-sans text-ink">
+  <div class="max-w-7xl mx-auto px-6 py-10">
+    <header class="mb-10 flex items-end justify-between">
+      <div>
+        <h1 class="font-display font-800 text-3xl tracking-tight text-ink">COMMAND CENTER</h1>
+        <p class="text-sub text-sm mt-1 font-mono">Jack Scanlon — every project, one view</p>
+      </div>
+      <div id="summaryCounts" class="text-right text-xs font-mono text-sub"></div>
+    </header>
+
+    <div id="clusterGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </div>
+
+  <!-- Detail / Chat Modal -->
+  <div id="modalOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
+    <div class="bg-panel border border-border rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div class="flex items-center gap-3">
+          <div id="modalDot" class="w-3 h-3 rounded-full status-dot"></div>
+          <h2 id="modalTitle" class="font-display font-700 text-lg"></h2>
+        </div>
+        <button id="closeModal" class="text-sub hover:text-ink text-xl leading-none">&times;</button>
+      </div>
+      <div class="px-6 py-4 border-b border-border">
+        <div class="flex items-center justify-between mb-2">
+          <span id="modalStatusPill" class="text-xs font-mono px-2 py-1 rounded"></span>
+          <span id="modalUpdated" class="text-xs text-faint font-mono"></span>
+        </div>
+        <p id="modalSummary" class="text-sm text-sub leading-relaxed"></p>
+        <div id="toggleRow" class="hidden mt-3 flex items-center gap-2">
+          <label class="text-xs font-mono text-sub">Automation:</label>
+          <button id="toggleBtn" class="text-xs font-mono px-3 py-1 rounded border border-border"></button>
+        </div>
+      </div>
+      <div id="chatMessages" class="flex-1 overflow-y-auto px-6 py-4 space-y-3 text-sm"></div>
+      <div class="px-6 py-4 border-t border-border flex gap-2">
+        <input id="chatInput" type="text" placeholder="Ask about this project..."
+          class="flex-1 bg-panelLight border border-border rounded-lg px-3 py-2 text-sm text-ink placeholder-faint focus:outline-none focus:border-sub">
+        <button id="sendChat" class="bg-ink text-void font-medium text-sm px-4 py-2 rounded-lg">Send</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let clusters = [];
+let activeCluster = null;
+let chatHistory = [];
+
+function statusColor(status) {
+  return {
+    active: '#3DDC84', done: '#4A9EDB', stalled: '#E0A030',
+    broken: '#E04A4A', unknown: '#565B64'
+  }[status] || '#565B64';
+}
+
+function pillStyle(status) {
+  const c = statusColor(status);
+  return `background: ${c}20; color: ${c};`;
+}
+
+async function loadClusters() {
+  const res = await fetch('/api/clusters');
+  const data = await res.json();
+  clusters = data.clusters.sort((a, b) => {
+    const order = { top: 0, normal: 1, low: 2 };
+    return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
+  });
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('clusterGrid');
+  grid.innerHTML = clusters.map(c => `
+    <div class="cluster-card cursor-pointer bg-panel border rounded-xl p-5" style="border-color: ${c.color}40" data-id="${c.id}">
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-2.5 h-2.5 rounded-full status-dot" style="background: ${statusColor(c.status)}; color: ${statusColor(c.status)}"></div>
+        ${c.priority === 'top' ? '<span class="text-[10px] font-mono text-faint tracking-wider">TOP PRIORITY</span>' : ''}
+      </div>
+      <h3 class="font-display font-700 text-base mb-1" style="color: ${c.color}">${c.name}</h3>
+      <p class="text-xs text-sub leading-snug line-clamp-3">${c.summary}</p>
+      <div class="mt-3 flex items-center justify-between">
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="${pillStyle(c.status)}">${c.status}</span>
+        ${c.toggleable ? `<span class="text-[10px] font-mono" style="color: ${c.enabled ? '#3DDC84' : '#565B64'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.cluster-card').forEach(el => {
+    el.addEventListener('click', () => openModal(el.dataset.id));
+  });
+
+  const active = clusters.filter(c => c.status === 'active').length;
+  document.getElementById('summaryCounts').textContent =
+    `${clusters.length} projects — ${active} active`;
+}
+
+function openModal(id) {
+  activeCluster = clusters.find(c => c.id === id);
+  chatHistory = [];
+  document.getElementById('modalDot').style.background = statusColor(activeCluster.status);
+  document.getElementById('modalDot').style.color = statusColor(activeCluster.status);
+  document.getElementById('modalTitle').textContent = activeCluster.name;
+  document.getElementById('modalTitle').style.color = activeCluster.color;
+  document.getElementById('modalStatusPill').textContent = activeCluster.status;
+  document.getElementById('modalStatusPill').className = 'text-xs font-mono px-2 py-1 rounded';
+  document.getElementById('modalStatusPill').setAttribute('style', pillStyle(activeCluster.status));
+  document.getElementById('modalUpdated').textContent = activeCluster.lastUpdate ? `Updated ${activeCluster.lastUpdate}` : '';
+  document.getElementById('modalSummary').textContent = activeCluster.summary;
+  document.getElementById('chatMessages').innerHTML = '';
+
+  const toggleRow = document.getElementById('toggleRow');
+  if (activeCluster.toggleable) {
+    toggleRow.classList.remove('hidden');
+    toggleRow.classList.add('flex');
+    updateToggleBtn();
+  } else {
+    toggleRow.classList.add('hidden');
+    toggleRow.classList.remove('flex');
+  }
+
+  document.getElementById('modalOverlay').classList.remove('hidden');
+  document.getElementById('modalOverlay').classList.add('flex');
+}
+
+function updateToggleBtn() {
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = activeCluster.enabled ? 'ON — click to disable' : 'OFF — click to enable';
+  btn.style.color = activeCluster.enabled ? '#3DDC84' : '#8B909A';
+}
+
+document.getElementById('toggleBtn').addEventListener('click', async () => {
+  const newState = !activeCluster.enabled;
+  const res = await fetch(`/api/toggles/${activeCluster.toggleId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: newState })
+  });
+  const data = await res.json();
+  activeCluster.enabled = data.enabled;
+  updateToggleBtn();
+  loadClusters();
+});
+
+document.getElementById('closeModal').addEventListener('click', () => {
+  document.getElementById('modalOverlay').classList.add('hidden');
+  document.getElementById('modalOverlay').classList.remove('flex');
+});
+
+function appendMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = role === 'user'
+    ? 'text-right'
+    : 'text-left';
+  div.innerHTML = `<span class="inline-block px-3 py-2 rounded-lg max-w-[85%] ${role === 'user' ? 'bg-ink text-void' : 'bg-panelLight text-ink'}">${text}</span>`;
+  document.getElementById('chatMessages').appendChild(div);
+  document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !activeCluster) return;
+  input.value = '';
+  appendMessage('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  try {
+    const res = await fetch(`/api/clusters/${activeCluster.id}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHistory })
+    });
+    const data = await res.json();
+    if (data.text) {
+      appendMessage('assistant', data.text);
+      chatHistory.push({ role: 'assistant', content: data.text });
+    } else {
+      appendMessage('assistant', 'Error reaching the assistant.');
+    }
+  } catch (e) {
+    appendMessage('assistant', 'Error reaching the assistant.');
+  }
+}
+
+document.getElementById('sendChat').addEventListener('click', sendChat);
+document.getElementById('chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendChat();
+});
+
+loadClusters();
+</script>
+</body>
+</html>

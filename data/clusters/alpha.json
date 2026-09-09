@@ -1,0 +1,10 @@
+{
+  "id": "alpha",
+  "name": "Alpha (Trading Bot)",
+  "color": "#2E8B57",
+  "priority": "normal",
+  "lastUpdate": "2026-09-07",
+  "summary": "Trading daemon running on the Mac at port 3847. 33 evolved agents, regime/drawdown/robustness position sizing, kill switch, debate panel (pending an API key), genealogy wall. Stays running on the Mac, not moving to the PC (would need to stay on 24/7). This cluster shows a status view only.",
+  "status": "active",
+  "sessionTitle": "Alpha App"
+}

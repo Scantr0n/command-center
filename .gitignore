@@ -1,0 +1,4 @@
+node_modules/
+.env
+credentials/drive_token.json
+credentials/drive_client_secret.json

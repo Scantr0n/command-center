@@ -1,0 +1,10 @@
+{
+  "id": "pin-board",
+  "name": "Pin Board",
+  "color": "#8C4A4A",
+  "priority": "normal",
+  "lastUpdate": "2026-08-27",
+  "summary": "The nightly ping/build scheduled-task pair is broken (send_message is blocked in scheduled-task runs). Needs a redesign call from Jack, 3 options already logged in that session.",
+  "status": "broken",
+  "sessionTitle": "Pin Board"
+}
