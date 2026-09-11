@@ -67,6 +67,8 @@
   }
   .corner-notch::before { top: -1px; left: -1px; border-top: 1.5px solid; border-left: 1.5px solid; }
   .corner-notch::after { bottom: -1px; right: -1px; border-bottom: 1.5px solid; border-right: 1.5px solid; }
+  .skeleton-pulse { animation: skeletonPulse 1.4s ease-in-out infinite; }
+  @keyframes skeletonPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
 </style>
 </head>
 <body class="min-h-screen font-sans" style="color: var(--ink)">
@@ -103,8 +105,13 @@
       <span>Closer to hub = higher priority &middot; Dashed ring = top priority &middot; Grouped by category</span>
     </div>
 
-    <div id="graphView" class="flex items-center justify-center py-4">
+    <div id="graphView" class="flex items-center justify-center py-4" style="position: relative;">
       <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"></svg>
+      <div id="graphSkeleton" class="flex items-center justify-center" style="position: absolute; inset: 0;">
+        <div style="width: 130px; height: 130px; border-radius: 999px; border: 1.5px solid var(--hairlineHover); background: var(--panel); display: flex; align-items: center; justify-content: center;" class="skeleton-pulse">
+          <span class="text-[10px] font-mono" style="color: var(--faint)">LOADING</span>
+        </div>
+      </div>
     </div>
 
     <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
@@ -192,6 +199,7 @@ async function loadClusters() {
       return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
     });
     errBox.classList.add('hidden');
+    document.getElementById('graphSkeleton').classList.add('hidden');
     renderStats();
     renderAttention();
     renderGraph();
