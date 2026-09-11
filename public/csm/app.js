@@ -62,17 +62,19 @@
     }
 
     nudgeEl.innerHTML = withDates.map(({ p, days }) => {
-      let when;
-      if (days < 0) when = Math.abs(days) + 'd overdue';
-      else if (days === 0) when = 'today';
-      else when = 'in ' + days + 'd';
+      let when, urgency;
+      if (days < 0) { when = Math.abs(days) + 'd overdue'; urgency = 'overdue'; }
+      else if (days === 0) { when = 'today'; urgency = 'today'; }
+      else if (days <= 2) { when = 'in ' + days + 'd'; urgency = 'soon'; }
+      else { when = 'in ' + days + 'd'; urgency = 'later'; }
       const notBefore = p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore
         ? ' &middot; do not nudge before ' + fmtDate(p.nudgeSchedule.doNotNudgeBefore)
         : '';
-      return '<div class="nudge-row">' +
+      return '<div class="nudge-row nudge-' + urgency + '">' +
+        '<span class="nudge-urgency-dot"></span>' +
         '<strong>' + escapeHtml(p.name) + '</strong>' +
         '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
-        '<span class="font-mono" style="margin-left:auto;color:var(--dim)">' +
+        '<span class="font-mono nudge-when">' +
         fmtDate(p.nextNudgeDate) + ' (' + when + ')' + notBefore +
         '</span></div>';
     }).join('');
