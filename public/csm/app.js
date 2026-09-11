@@ -143,9 +143,12 @@
 
   searchInput.addEventListener('input', applyFilter);
 
+  let lastFocusedEl = null;
+
   function openModal(id) {
     const p = byId[id];
     if (!p) return;
+    lastFocusedEl = document.activeElement;
     modalName.textContent = p.name;
     modalCompany.textContent = p.company || 'Company not logged';
 
@@ -189,12 +192,42 @@
 
     modalBody.innerHTML = rows.join('');
     modalOverlay.hidden = false;
+    modalClose.focus();
   }
 
-  function closeModal() { modalOverlay.hidden = true; }
+  function closeModal() {
+    modalOverlay.hidden = true;
+    if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
+      lastFocusedEl.focus();
+    }
+    lastFocusedEl = null;
+  }
+
+  function getFocusable() {
+    return Array.from(document.getElementById('modal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled'));
+  }
+
   modalClose.addEventListener('click', closeModal);
   modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  document.addEventListener('keydown', e => {
+    if (modalOverlay.hidden) return;
+    if (e.key === 'Escape') { closeModal(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
 
   Promise.all([
     fetch('/csm/data/stages.json').then(r => r.json()),
