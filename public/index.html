@@ -70,6 +70,8 @@
   .corner-notch::after { bottom: -1px; right: -1px; border-bottom: 1.5px solid; border-right: 1.5px solid; }
   .skeleton-pulse { animation: skeletonPulse 1.4s ease-in-out infinite; }
   @keyframes skeletonPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+  #linkRow { text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease; }
+  #linkRow:hover { background: rgba(255,255,255,0.06); border-color: var(--hairlineHover) !important; }
 </style>
 </head>
 <body class="min-h-screen font-sans" style="color: var(--ink)">
@@ -145,6 +147,9 @@
           <label class="text-xs font-mono" style="color: var(--sub)">Automation:</label>
           <button id="toggleBtn" class="text-xs font-mono px-3 py-1 rounded border hairline"></button>
         </div>
+        <a id="linkRow" class="hidden mt-3 text-xs font-mono px-3 py-1.5 rounded border hairline items-center gap-1.5 w-fit" style="color: var(--ink)">
+          <span id="linkRowLabel"></span><span aria-hidden="true">&rarr;</span>
+        </a>
       </div>
       <div id="chatMessages" class="flex-1 overflow-y-auto px-6 py-4 space-y-3 text-sm"></div>
       <div class="px-6 py-4 border-t hairline flex gap-2">
@@ -546,6 +551,17 @@ function openModal(id) {
   } else {
     toggleRow.classList.add('hidden');
     toggleRow.classList.remove('flex');
+  }
+
+  const linkRow = document.getElementById('linkRow');
+  if (activeCluster.link) {
+    linkRow.href = activeCluster.link;
+    document.getElementById('linkRowLabel').textContent = activeCluster.linkLabel || 'Open';
+    linkRow.classList.remove('hidden');
+    linkRow.classList.add('flex');
+  } else {
+    linkRow.classList.add('hidden');
+    linkRow.classList.remove('flex');
   }
 
   document.getElementById('modalOverlay').classList.remove('hidden');
