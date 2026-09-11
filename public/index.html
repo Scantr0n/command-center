@@ -452,7 +452,7 @@ function applyFilters() {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
     if (!c) return;
-    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term);
+    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
     const matchesCategory = !activeCategory || c.category === activeCategory;
     const matches = matchesSearch && matchesCategory;
     const anyFilterActive = !!term || !!activeCategory;
