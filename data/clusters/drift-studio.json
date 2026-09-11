@@ -1,6 +1,7 @@
 {
   "id": "drift-studio",
   "name": "Drift Studio",
+  "category": "Content",
   "color": "#6B5CA5",
   "priority": "low",
   "lastUpdate": "2026-08-22",

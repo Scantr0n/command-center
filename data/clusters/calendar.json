@@ -1,6 +1,7 @@
 {
   "id": "calendar",
   "name": "Calendar",
+  "category": "Personal & Infra",
   "color": "#4A7C8C",
   "priority": "low",
   "lastUpdate": "2026-09-07",

@@ -28,6 +28,8 @@
   .view-toggle-btn { transition: all 0.15s ease; }
   .view-toggle-btn.active { background: #E8E9EB; color: #0A0B0D; }
   .view-toggle-btn:not(.active) { background: transparent; color: #8B909A; }
+  .attn-pill { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 4px 10px; border-radius: 999px; border-width: 1px; border-style: solid; background: rgba(255,255,255,0.03); cursor: pointer; display: inline-flex; align-items: center; transition: background 0.15s ease; }
+  .attn-pill:hover { background: rgba(255,255,255,0.08); }
 </style>
 </head>
 <body class="min-h-screen font-sans text-ink">
@@ -46,8 +48,20 @@
       </div>
     </header>
 
+    <div id="needsAttention" class="hidden flex-wrap items-center gap-2 mb-4"></div>
+
+    <div class="flex items-center gap-4 text-[10px] font-mono text-faint mb-2 flex-wrap">
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#3DDC84"></span>Active</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#4A9EDB"></span>Done</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#E0A030"></span>Stalled</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#E04A4A"></span>Broken</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#565B64"></span>Unknown</span>
+      <span class="text-border">|</span>
+      <span>Closer to hub = higher priority &middot; Dashed ring = top priority &middot; Grouped by category</span>
+    </div>
+
     <div id="graphView" class="flex items-center justify-center py-4">
-      <svg id="graphSvg" viewBox="0 0 800 800" class="w-full max-w-[720px] h-auto"></svg>
+      <svg id="graphSvg" viewBox="0 0 900 900" class="w-full max-w-[720px] h-auto"></svg>
     </div>
 
     <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
@@ -109,8 +123,33 @@ async function loadClusters() {
     return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
   });
   renderStats();
+  renderNeedsAttention();
   renderGraph();
   renderGrid();
+}
+
+function renderNeedsAttention() {
+  const strip = document.getElementById('needsAttention');
+  const flagged = clusters.filter(c => c.status === 'stalled' || c.status === 'broken');
+  if (!flagged.length) {
+    strip.classList.add('hidden');
+    strip.classList.remove('flex');
+    strip.innerHTML = '';
+    return;
+  }
+  strip.classList.remove('hidden');
+  strip.classList.add('flex');
+  strip.innerHTML = `
+    <span class="text-[10px] font-mono text-faint tracking-wide mr-1">NEEDS ATTENTION</span>
+    ${flagged.map(c => `
+      <button class="attn-pill" data-id="${c.id}" style="border-color:${statusColor(c.status)}66; color:${statusColor(c.status)}">
+        <span class="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style="background:${statusColor(c.status)}"></span>${c.name}
+      </button>
+    `).join('')}
+  `;
+  strip.querySelectorAll('.attn-pill').forEach(el => {
+    el.addEventListener('click', () => openModal(el.dataset.id));
+  });
 }
 
 function renderStats() {
@@ -130,58 +169,97 @@ function truncateLabel(name, max = 16) {
   return name.length > max ? name.slice(0, max - 1) + '…' : name;
 }
 
+const CATEGORY_ORDER = ['Ventures & Business', 'Trading', 'Content', 'Reselling', 'Personal & Infra', 'Uncategorized'];
+
+function groupByCategory(list) {
+  const map = {};
+  list.forEach(c => {
+    const cat = c.category || 'Uncategorized';
+    (map[cat] = map[cat] || []).push(c);
+  });
+  const keys = [
+    ...CATEGORY_ORDER.filter(k => map[k]),
+    ...Object.keys(map).filter(k => !CATEGORY_ORDER.includes(k))
+  ];
+  return keys.map(k => ({ category: k, items: map[k] }));
+}
+
+function priorityOrbit(priority) {
+  return priority === 'top' ? 250 : priority === 'low' ? 350 : 305;
+}
+
 function renderGraph() {
   const svg = document.getElementById('graphSvg');
-  const cx = 400, cy = 400, hubR = 62, orbitR = 290;
-  const n = clusters.length;
-  const angleStep = n ? (2 * Math.PI) / n : 0;
-  const startAngle = -Math.PI / 2;
+  const cx = 450, cy = 450, hubR = 65;
+  const groups = groupByCategory(clusters);
+  const totalWeight = groups.reduce((s, g) => s + g.items.length, 0) || 1;
 
-  let html = '';
+  let sectorHtml = '', spokesHtml = '', nodesHtml = '';
+  let angleCursor = -Math.PI / 2;
 
-  // Spokes first (render under nodes)
-  clusters.forEach((c, i) => {
-    const angle = startAngle + i * angleStep;
-    const nx = cx + orbitR * Math.cos(angle);
-    const ny = cy + orbitR * Math.sin(angle);
-    const hx = cx + hubR * Math.cos(angle);
-    const hy = cy + hubR * Math.sin(angle);
-    html += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${c.color}" stroke-opacity="0.35" stroke-width="1.5" />`;
+  groups.forEach(g => {
+    const span = (2 * Math.PI) * (g.items.length / totalWeight);
+    const wedgeStart = angleCursor;
+    const wedgeEnd = angleCursor + span;
+    const midAngle = (wedgeStart + wedgeEnd) / 2;
+
+    // Sector divider (from just outside hub to near the outer edge)
+    const divX = cx + 420 * Math.cos(wedgeStart);
+    const divY = cy + 420 * Math.sin(wedgeStart);
+    const divHx = cx + hubR * Math.cos(wedgeStart);
+    const divHy = cy + hubR * Math.sin(wedgeStart);
+    sectorHtml += `<line x1="${divHx.toFixed(1)}" y1="${divHy.toFixed(1)}" x2="${divX.toFixed(1)}" y2="${divY.toFixed(1)}" stroke="#2A2E35" stroke-width="1" stroke-dasharray="3,5" opacity="0.5" />`;
+
+    // Category label along the outer edge of its wedge
+    const labelR = 395;
+    const labX = cx + labelR * Math.cos(midAngle);
+    const labY = cy + labelR * Math.sin(midAngle);
+    sectorHtml += `<text x="${labX.toFixed(1)}" y="${labY.toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#565B64" letter-spacing="1" opacity="0.85">${g.category.toUpperCase()}</text>`;
+
+    // Nodes distributed within the wedge, inset from its edges
+    const innerStart = g.items.length > 1 ? wedgeStart + span * 0.18 : midAngle;
+    const innerEnd = g.items.length > 1 ? wedgeEnd - span * 0.18 : midAngle;
+    const itemStep = g.items.length > 1 ? (innerEnd - innerStart) / (g.items.length - 1) : 0;
+
+    g.items.forEach((c, idx) => {
+      const angle = g.items.length > 1 ? innerStart + idx * itemStep : midAngle;
+      const orbitR = priorityOrbit(c.priority);
+      const nx = cx + orbitR * Math.cos(angle);
+      const ny = cy + orbitR * Math.sin(angle);
+      const hx = cx + hubR * Math.cos(angle);
+      const hy = cy + hubR * Math.sin(angle);
+      spokesHtml += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${c.color}" stroke-opacity="0.35" stroke-width="1.5" />`;
+
+      const r = c.priority === 'top' ? 38 : c.priority === 'low' ? 26 : 32;
+      const sColor = statusColor(c.status);
+      const dotAngle = angle - 0.6;
+      const dx = nx + (r + 3) * Math.cos(dotAngle);
+      const dy = ny + (r + 3) * Math.sin(dotAngle);
+      const labelY = ny + r + 16;
+
+      nodesHtml += `
+        <g class="graph-node" data-id="${c.id}">
+          <title>${c.name} — ${c.status}${c.lastUpdate ? ' — updated ' + c.lastUpdate : ''}</title>
+          <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${c.color}" opacity="0.18" />
+          <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${c.color}22" stroke="${c.color}" stroke-width="1.75" />
+          <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="5" fill="${sColor}" stroke="#0A0B0D" stroke-width="1.5" />
+          ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${c.color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
+          <text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#E8E9EB" font-weight="500">${truncateLabel(c.name.split(' ')[0], 10)}</text>
+          <text x="${nx.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10.5" fill="#8B909A">${truncateLabel(c.name)}</text>
+        </g>
+      `;
+    });
+
+    angleCursor = wedgeEnd;
   });
 
-  // Hub
-  html += `
+  const hubHtml = `
     <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="#14161A" stroke="#2A2E35" stroke-width="1.5" class="hub-node" />
     <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="#E8E9EB" letter-spacing="0.5">COMMAND</text>
     <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="#E8E9EB" letter-spacing="0.5">CENTER</text>
   `;
 
-  // Cluster nodes
-  clusters.forEach((c, i) => {
-    const angle = startAngle + i * angleStep;
-    const nx = cx + orbitR * Math.cos(angle);
-    const ny = cy + orbitR * Math.sin(angle);
-    const r = c.priority === 'top' ? 38 : c.priority === 'low' ? 26 : 32;
-    const sColor = statusColor(c.status);
-    const dotAngle = angle - 0.6;
-    const dx = nx + (r + 3) * Math.cos(dotAngle);
-    const dy = ny + (r + 3) * Math.sin(dotAngle);
-    const labelY = ny + r + 16;
-
-    html += `
-      <g class="graph-node" data-id="${c.id}">
-        <title>${c.name} — ${c.status}${c.lastUpdate ? ' — updated ' + c.lastUpdate : ''}</title>
-        <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${c.color}" opacity="0.18" />
-        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${c.color}22" stroke="${c.color}" stroke-width="1.75" />
-        <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="5" fill="${sColor}" stroke="#0A0B0D" stroke-width="1.5" />
-        ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${c.color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
-        <text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#E8E9EB" font-weight="500">${truncateLabel(c.name.split(' ')[0], 10)}</text>
-        <text x="${nx.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10.5" fill="#8B909A">${truncateLabel(c.name)}</text>
-      </g>
-    `;
-  });
-
-  svg.innerHTML = html;
+  svg.innerHTML = sectorHtml + spokesHtml + hubHtml + nodesHtml;
   svg.querySelectorAll('.graph-node').forEach(el => {
     el.addEventListener('click', () => openModal(el.dataset.id));
   });
@@ -313,6 +391,7 @@ document.getElementById('chatInput').addEventListener('keydown', (e) => {
 });
 
 loadClusters();
+setInterval(loadClusters, 30000);
 </script>
 </body>
 </html>

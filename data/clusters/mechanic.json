@@ -1,6 +1,7 @@
 {
   "id": "mechanic",
   "name": "The Mechanic",
+  "category": "Uncategorized",
   "color": "#5A5A5A",
   "priority": "normal",
   "lastUpdate": null,
