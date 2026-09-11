@@ -88,6 +88,10 @@ function main() {
     if (ns.doNotNudgeBefore && ns.nudgePoint && ns.doNotNudgeBefore > ns.nudgePoint) {
       errors.push(where + ': nudgeSchedule.doNotNudgeBefore is after nudgeSchedule.nudgePoint.');
     }
+    if (ns.doNotNudgeBefore && p.nextNudgeDate && p.nextNudgeDate < ns.doNotNudgeBefore) {
+      errors.push(where + ': nextNudgeDate (' + p.nextNudgeDate + ') is before nudgeSchedule.doNotNudgeBefore (' +
+        ns.doNotNudgeBefore + '). The nudge queue would surface this prospect before it is supposed to be nudged.');
+    }
 
     const snap = p.socialSnapshot || {};
     if (!isDateOrNull(snap.asOfDate)) {
