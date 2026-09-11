@@ -1,0 +1,11 @@
+{
+  "id": "things-to-do",
+  "name": "Things To Do Calendar App",
+  "category": "Personal & Infra",
+  "color": "#5C7A8C",
+  "priority": "low",
+  "lastUpdate": null,
+  "summary": "Session exists, ties into the same Calendar infrastructure (Google Calendar as single source of truth). No detailed status captured yet — placeholder until real data is pulled in, same as Garage/Mechanic.",
+  "status": "unknown",
+  "sessionTitle": "Things to do calendar app"
+}
