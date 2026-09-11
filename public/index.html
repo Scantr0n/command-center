@@ -46,6 +46,27 @@
   .attn-card { transition: border-color 0.15s ease, transform 0.15s ease; cursor: pointer; }
   .attn-card:hover { transform: translateX(2px); }
   .tag-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: 0.3px; }
+
+  /* Atmosphere: faint radar grid + vignette behind the graph, restrained not gimmicky */
+  #graphView {
+    position: relative;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 48px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 48px),
+      radial-gradient(circle at center, rgba(255,255,255,0.04) 0%, transparent 65%);
+    border-radius: 16px;
+  }
+  .search-input { transition: border-color 0.15s ease, background 0.15s ease; }
+  .search-input:focus { border-color: var(--hairlineHover) !important; }
+  .graph-node.dimmed, .cluster-card.dimmed { opacity: 0.16; }
+  .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
+  .cat-label { cursor: pointer; }
+  .corner-notch { position: relative; }
+  .corner-notch::before, .corner-notch::after {
+    content: ''; position: absolute; width: 10px; height: 10px; border-color: var(--hairlineHover); pointer-events: none;
+  }
+  .corner-notch::before { top: -1px; left: -1px; border-top: 1.5px solid; border-left: 1.5px solid; }
+  .corner-notch::after { bottom: -1px; right: -1px; border-bottom: 1.5px solid; border-right: 1.5px solid; }
 </style>
 </head>
 <body class="min-h-screen font-sans" style="color: var(--ink)">
@@ -55,7 +76,10 @@
         <h1 class="font-display font-800 text-3xl" style="letter-spacing: -0.02em; color: var(--ink)">COMMAND CENTER</h1>
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
-      <div class="flex items-center gap-6">
+      <div class="flex items-center gap-4">
+        <input id="searchInput" type="text" placeholder="Search projects..."
+          class="search-input text-xs font-mono rounded-lg px-3 py-1.5 border hairline focus:outline-none"
+          style="background: var(--panelLight); color: var(--ink); width: 160px">
         <div id="statsRow" class="flex items-center gap-5 text-right"></div>
         <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5">Graph</button>
@@ -86,7 +110,7 @@
 
   <!-- Detail / Chat Modal -->
   <div id="modalOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
-    <div class="rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)">
+    <div class="corner-notch rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)">
       <div class="flex items-center justify-between px-6 py-4 border-b hairline">
         <div class="flex items-center gap-3">
           <div id="modalDot" class="w-3 h-3 rounded-full status-dot"></div>
@@ -303,7 +327,7 @@ function renderGraph() {
     sectorHtml += `<line x1="${divHx.toFixed(1)}" y1="${divHy.toFixed(1)}" x2="${divX.toFixed(1)}" y2="${divY.toFixed(1)}" stroke="var(--hairline)" stroke-width="1" stroke-dasharray="3,5" />`;
     const labX = cx + 400 * Math.cos(s.mid);
     const labY = cy + 400 * Math.sin(s.mid);
-    sectorHtml += `<text x="${labX.toFixed(1)}" y="${labY.toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="var(--faint)" letter-spacing="1" opacity="0.85">${s.category.toUpperCase()}</text>`;
+    sectorHtml += `<text class="cat-label" data-category="${s.category}" x="${labX.toFixed(1)}" y="${labY.toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="var(--faint)" letter-spacing="1" opacity="0.85">${s.category.toUpperCase()}</text>`;
   });
 
   simNodes.forEach(c => {
@@ -320,7 +344,7 @@ function renderGraph() {
 
     nodesHtml += `
       <g class="graph-node" data-id="${c.id}">
-        <title>${c.name}, ${c.status}${c.lastUpdate ? ', updated ' + c.lastUpdate : ''}</title>
+        <title>${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}</title>
         <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${color}" opacity="0.16" />
         <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}20" stroke="${color}" stroke-width="1.5" />
         <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" />
@@ -340,6 +364,50 @@ function renderGraph() {
   svg.selectAll('.graph-node').on('click', function() {
     openModal(this.getAttribute('data-id'));
   });
+  svg.selectAll('.cat-label').on('click', function() {
+    const cat = this.getAttribute('data-category');
+    activeCategory = activeCategory === cat ? null : cat;
+    applyFilters();
+  });
+  applyFilters();
+}
+
+let searchTerm = '';
+let activeCategory = null;
+
+function applyFilters() {
+  const term = searchTerm.trim().toLowerCase();
+  document.querySelectorAll('.graph-node, .cluster-card').forEach(el => {
+    const id = el.dataset.id;
+    const c = clusters.find(x => x.id === id);
+    if (!c) return;
+    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term);
+    const matchesCategory = !activeCategory || c.category === activeCategory;
+    const matches = matchesSearch && matchesCategory;
+    const anyFilterActive = !!term || !!activeCategory;
+    el.classList.toggle('dimmed', anyFilterActive && !matches);
+    el.classList.toggle('matched', anyFilterActive && matches);
+  });
+  document.querySelectorAll('.cat-label').forEach(el => {
+    const isActive = activeCategory === el.getAttribute('data-category');
+    el.setAttribute('fill', isActive ? 'var(--ink)' : 'var(--faint)');
+    el.setAttribute('opacity', !activeCategory || isActive ? '1' : '0.4');
+  });
+}
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  searchTerm = e.target.value;
+  applyFilters();
+});
+
+function relativeTime(dateStr) {
+  if (!dateStr) return 'no date on record';
+  const days = Math.floor((Date.now() - new Date(dateStr + 'T00:00:00')) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
 function renderGrid() {
@@ -392,7 +460,7 @@ function openModal(id) {
   document.getElementById('modalCategoryPill').textContent = (activeCluster.category || 'Uncategorized').toUpperCase();
   document.getElementById('modalCategoryPill').setAttribute('style', `background:${color}1F; color:${color}`);
   document.getElementById('modalPriorityPill').classList.toggle('hidden', activeCluster.priority !== 'top');
-  document.getElementById('modalUpdated').textContent = activeCluster.lastUpdate ? `Updated ${activeCluster.lastUpdate}` : '';
+  document.getElementById('modalUpdated').textContent = activeCluster.lastUpdate ? `${activeCluster.lastUpdate} (${relativeTime(activeCluster.lastUpdate)})` : 'no date on record';
   document.getElementById('modalSummary').textContent = activeCluster.summary;
   document.getElementById('chatMessages').innerHTML = '';
 
