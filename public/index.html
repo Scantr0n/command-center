@@ -356,6 +356,9 @@ function renderGraph() {
     sectorHtml += `<text class="cat-label" data-category="${s.category}" x="${labX.toFixed(1)}" y="${labY.toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="var(--faint)" letter-spacing="1" opacity="0.85">${s.category.toUpperCase()}</text>`;
   });
 
+  let relationsHtml = '';
+  const seenPairs = new Set();
+
   simNodes.forEach(c => {
     const nx = c.x, ny = c.y;
     const hx = cx + hubR * ((nx - cx) / Math.hypot(nx - cx, ny - cy) || 0);
@@ -363,17 +366,32 @@ function renderGraph() {
     const color = categoryColor(c.category);
     spokesHtml += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
 
+    // Real cross-project relationships only (e.g. Lifting Tracker relays into
+    // Macro Tracker) — not decorative, only drawn when a cluster's own data
+    // actually declares a relatedTo link.
+    (c.relatedTo || []).forEach(otherId => {
+      const pairKey = [c.id, otherId].sort().join('|');
+      if (seenPairs.has(pairKey)) return;
+      seenPairs.add(pairKey);
+      const other = simNodes.find(n => n.id === otherId);
+      if (!other) return;
+      const midX = (nx + other.x) / 2 + (ny - other.y) * 0.12;
+      const midY = (ny + other.y) / 2 + (other.x - nx) * 0.12;
+      relationsHtml += `<path d="M${nx.toFixed(1)},${ny.toFixed(1)} Q${midX.toFixed(1)},${midY.toFixed(1)} ${other.x.toFixed(1)},${other.y.toFixed(1)}" fill="none" stroke="var(--sub)" stroke-width="1" stroke-dasharray="1,4" opacity="0.5" />`;
+    });
+
     const r = c.radius;
     const sColor = statusColor(c.status);
     const dx = nx + (r + 3) * 0.7;
     const dy = ny - (r + 3) * 0.7;
+    const stale = c.lastUpdate && (Date.now() - new Date(c.lastUpdate + 'T00:00:00')) / 86400000 > 30;
 
     nodesHtml += `
       <g class="graph-node" data-id="${c.id}">
-        <title>${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}</title>
+        <title>${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}${stale ? ' (stale, over a month untouched)' : ''}</title>
         <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${color}" opacity="0.16" />
-        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}20" stroke="${color}" stroke-width="1.5" />
-        <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" />
+        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}20" stroke="${color}" stroke-width="1.5" ${stale ? 'stroke-dasharray="4,3"' : ''} />
+        <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" opacity="${stale ? 0.45 : 1}" />
         ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
         <text x="${nx.toFixed(1)}" y="${(ny + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${truncateLabel(c.name.split(' ')[0], 9)}</text>
       </g>
@@ -386,7 +404,7 @@ function renderGraph() {
     <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">CENTER</text>
   `;
 
-  svg.html(sectorHtml + spokesHtml + hubHtml + nodesHtml);
+  svg.html(sectorHtml + spokesHtml + relationsHtml + hubHtml + nodesHtml);
   svg.selectAll('.graph-node').on('click', function() {
     openModal(this.getAttribute('data-id'));
   });
@@ -566,6 +584,19 @@ async function sendChat() {
 document.getElementById('sendChat').addEventListener('click', sendChat);
 document.getElementById('chatInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') sendChat();
+});
+
+document.addEventListener('keydown', (e) => {
+  const modalOpen = !document.getElementById('modalOverlay').classList.contains('hidden');
+  if (e.key === 'Escape' && modalOpen) {
+    document.getElementById('modalOverlay').classList.add('hidden');
+    document.getElementById('modalOverlay').classList.remove('flex');
+    return;
+  }
+  if (e.key === '/' && document.activeElement.id !== 'searchInput' && document.activeElement.id !== 'chatInput') {
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
 });
 
 loadClusters();

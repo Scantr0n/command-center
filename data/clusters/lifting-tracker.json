@@ -7,5 +7,6 @@
   "lastUpdate": null,
   "summary": "Logs each workout and relays it to the Macro/Weight Tracker session. Built around real hip-injury constraints. Phone-friendly artifact lives in workout-log/.",
   "status": "active",
-  "sessionTitle": "Lifting tracker"
+  "sessionTitle": "Lifting tracker",
+  "relatedTo": ["macro-tracker"]
 }

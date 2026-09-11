@@ -7,5 +7,6 @@
   "lastUpdate": "2026-09-01",
   "summary": "Artifact + workflow tracking food/macros and weight. College move-in disrupted consistency temporarily. Missed weigh-ins or heavier eating around that period isn't real backsliding, just the transition.",
   "status": "active",
-  "sessionTitle": "Macro and weight tracker"
+  "sessionTitle": "Macro and weight tracker",
+  "relatedTo": ["lifting-tracker"]
 }
