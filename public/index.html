@@ -14,19 +14,41 @@
   .status-dot { box-shadow: 0 0 8px currentColor; }
   #chatMessages::-webkit-scrollbar { width: 6px; }
   #chatMessages::-webkit-scrollbar-thumb { background: #2A2E35; border-radius: 3px; }
+
+  /* Radial graph */
+  .graph-node { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform 0.18s ease; }
+  .graph-node:hover { transform: scale(1.1); }
+  .graph-node:hover .node-glow { opacity: 0.9; }
+  .node-glow { opacity: 0.45; transition: opacity 0.18s ease; }
+  .spoke-line { transition: stroke-opacity 0.18s ease; }
+  .graph-node:hover ~ .spoke-line { stroke-opacity: 1; }
+  .hub-node text, .graph-node text { pointer-events: none; user-select: none; }
+  .view-toggle-btn { transition: all 0.15s ease; }
+  .view-toggle-btn.active { background: #E8E9EB; color: #0A0B0D; }
+  .view-toggle-btn:not(.active) { background: transparent; color: #8B909A; }
 </style>
 </head>
 <body class="min-h-screen font-sans text-ink">
   <div class="max-w-7xl mx-auto px-6 py-10">
-    <header class="mb-10 flex items-end justify-between">
+    <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 class="font-display font-800 text-3xl tracking-tight text-ink">COMMAND CENTER</h1>
         <p class="text-sub text-sm mt-1 font-mono">Jack Scanlon — every project, one view</p>
       </div>
-      <div id="summaryCounts" class="text-right text-xs font-mono text-sub"></div>
+      <div class="flex items-center gap-6">
+        <div id="statsRow" class="flex items-center gap-5 text-right"></div>
+        <div class="flex items-center border border-border rounded-lg overflow-hidden font-mono text-xs">
+          <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5">Graph</button>
+          <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5">Grid</button>
+        </div>
+      </div>
     </header>
 
-    <div id="clusterGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="graphView" class="flex items-center justify-center py-4">
+      <svg id="graphSvg" viewBox="0 0 800 800" class="w-full max-w-[720px] h-auto"></svg>
+    </div>
+
+    <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
   </div>
 
   <!-- Detail / Chat Modal -->
@@ -63,6 +85,7 @@
 let clusters = [];
 let activeCluster = null;
 let chatHistory = [];
+let currentView = 'graph';
 
 function statusColor(status) {
   return {
@@ -83,7 +106,82 @@ async function loadClusters() {
     const order = { top: 0, normal: 1, low: 2 };
     return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
   });
+  renderStats();
+  renderGraph();
   renderGrid();
+}
+
+function renderStats() {
+  const active = clusters.filter(c => c.status === 'active').length;
+  const attention = clusters.filter(c => c.status === 'stalled' || c.status === 'broken').length;
+  const dated = clusters.filter(c => c.lastUpdate).map(c => c.lastUpdate).sort().reverse();
+  const lastSync = dated[0] || '—';
+  document.getElementById('statsRow').innerHTML = `
+    <div><div class="font-display font-700 text-lg text-ink leading-none">${clusters.length}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">PROJECTS</div></div>
+    <div><div class="font-display font-700 text-lg leading-none" style="color:${statusColor('active')}">${active}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">ACTIVE</div></div>
+    <div><div class="font-display font-700 text-lg leading-none" style="color:${attention ? statusColor('broken') : '#565B64'}">${attention}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">NEEDS ATTN</div></div>
+    <div><div class="font-display font-700 text-lg text-sub leading-none">${lastSync}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">LAST SYNC</div></div>
+  `;
+}
+
+function truncateLabel(name, max = 16) {
+  return name.length > max ? name.slice(0, max - 1) + '…' : name;
+}
+
+function renderGraph() {
+  const svg = document.getElementById('graphSvg');
+  const cx = 400, cy = 400, hubR = 62, orbitR = 290;
+  const n = clusters.length;
+  const angleStep = n ? (2 * Math.PI) / n : 0;
+  const startAngle = -Math.PI / 2;
+
+  let html = '';
+
+  // Spokes first (render under nodes)
+  clusters.forEach((c, i) => {
+    const angle = startAngle + i * angleStep;
+    const nx = cx + orbitR * Math.cos(angle);
+    const ny = cy + orbitR * Math.sin(angle);
+    const hx = cx + hubR * Math.cos(angle);
+    const hy = cy + hubR * Math.sin(angle);
+    html += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${c.color}" stroke-opacity="0.35" stroke-width="1.5" />`;
+  });
+
+  // Hub
+  html += `
+    <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="#14161A" stroke="#2A2E35" stroke-width="1.5" class="hub-node" />
+    <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="#E8E9EB" letter-spacing="0.5">COMMAND</text>
+    <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="#E8E9EB" letter-spacing="0.5">CENTER</text>
+  `;
+
+  // Cluster nodes
+  clusters.forEach((c, i) => {
+    const angle = startAngle + i * angleStep;
+    const nx = cx + orbitR * Math.cos(angle);
+    const ny = cy + orbitR * Math.sin(angle);
+    const r = c.priority === 'top' ? 38 : c.priority === 'low' ? 26 : 32;
+    const sColor = statusColor(c.status);
+    const dotAngle = angle - 0.6;
+    const dx = nx + (r + 3) * Math.cos(dotAngle);
+    const dy = ny + (r + 3) * Math.sin(dotAngle);
+    const labelY = ny + r + 16;
+
+    html += `
+      <g class="graph-node" data-id="${c.id}">
+        <circle class="node-glow" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${c.color}" opacity="0.18" />
+        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${c.color}22" stroke="${c.color}" stroke-width="1.75" />
+        <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="5" fill="${sColor}" stroke="#0A0B0D" stroke-width="1.5" />
+        ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${c.color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
+        <text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#E8E9EB" font-weight="500">${truncateLabel(c.name.split(' ')[0], 10)}</text>
+        <text x="${nx.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10.5" fill="#8B909A">${truncateLabel(c.name)}</text>
+      </g>
+    `;
+  });
+
+  svg.innerHTML = html;
+  svg.querySelectorAll('.graph-node').forEach(el => {
+    el.addEventListener('click', () => openModal(el.dataset.id));
+  });
 }
 
 function renderGrid() {
@@ -106,11 +204,17 @@ function renderGrid() {
   document.querySelectorAll('.cluster-card').forEach(el => {
     el.addEventListener('click', () => openModal(el.dataset.id));
   });
-
-  const active = clusters.filter(c => c.status === 'active').length;
-  document.getElementById('summaryCounts').textContent =
-    `${clusters.length} projects — ${active} active`;
 }
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('graphView').classList.toggle('hidden', view !== 'graph');
+  document.getElementById('clusterGrid').classList.toggle('hidden', view !== 'grid');
+  document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
+  document.getElementById('viewGridBtn').classList.toggle('active', view === 'grid');
+}
+document.getElementById('viewGraphBtn').addEventListener('click', () => setView('graph'));
+document.getElementById('viewGridBtn').addEventListener('click', () => setView('grid'));
 
 function openModal(id) {
   activeCluster = clusters.find(c => c.id === id);
