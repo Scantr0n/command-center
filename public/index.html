@@ -7,61 +7,78 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
+<script src="/vendor/d3.min.js"></script>
 <style>
-  body { background: #0A0B0D; }
-  .cluster-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
-  .cluster-card:hover { transform: translateY(-4px); }
+  :root {
+    --void: #08090A;
+    --panel: #101215;
+    --panelLight: #16181C;
+    --hairline: rgba(255,255,255,0.07);
+    --hairlineHover: rgba(255,255,255,0.14);
+    --ink: #F5F6F7;
+    --sub: #9A9FA6;
+    --faint: #565B62;
+  }
+  body { background: var(--void); }
+  .hairline { border-color: var(--hairline) !important; }
+  .hairline:hover { border-color: var(--hairlineHover) !important; }
+  .cluster-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+  .cluster-card:hover { transform: translateY(-3px); }
   .status-dot { box-shadow: 0 0 8px currentColor; }
   #chatMessages::-webkit-scrollbar { width: 6px; }
-  #chatMessages::-webkit-scrollbar-thumb { background: #2A2E35; border-radius: 3px; }
+  #chatMessages::-webkit-scrollbar-thumb { background: #23262b; border-radius: 3px; }
 
-  /* Radial graph */
+  /* Graph */
+  #graphSvg { aspect-ratio: 1 / 1; }
   .graph-node { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform 0.18s ease; }
-  .graph-node:hover { transform: scale(1.1); }
-  .graph-node:hover .node-glow { opacity: 0.9; }
-  .node-glow { opacity: 0.45; transition: opacity 0.18s ease; }
-  .node-glow-active { animation: pulseGlow 2.6s ease-in-out infinite; }
-  @keyframes pulseGlow { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
-  .spoke-line { transition: stroke-opacity 0.18s ease; }
-  .graph-node:hover ~ .spoke-line { stroke-opacity: 1; }
+  .graph-node:hover { transform: scale(1.12); }
+  .graph-node:hover .node-glow { opacity: 0.95; }
+  .node-glow { opacity: 0.4; transition: opacity 0.18s ease; }
+  .node-glow-active { animation: pulseGlow 2.8s ease-in-out infinite; }
+  @keyframes pulseGlow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+  .spoke-line { opacity: 0.5; }
   .hub-node text, .graph-node text { pointer-events: none; user-select: none; }
   .view-toggle-btn { transition: all 0.15s ease; }
-  .view-toggle-btn.active { background: #E8E9EB; color: #0A0B0D; }
-  .view-toggle-btn:not(.active) { background: transparent; color: #8B909A; }
+  .view-toggle-btn.active { background: var(--ink); color: var(--void); }
+  .view-toggle-btn:not(.active) { background: transparent; color: var(--sub); }
   .attn-pill { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 4px 10px; border-radius: 999px; border-width: 1px; border-style: solid; background: rgba(255,255,255,0.03); cursor: pointer; display: inline-flex; align-items: center; transition: background 0.15s ease; }
   .attn-pill:hover { background: rgba(255,255,255,0.08); }
+  .attn-card { transition: border-color 0.15s ease, transform 0.15s ease; cursor: pointer; }
+  .attn-card:hover { transform: translateX(2px); }
+  .tag-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: 0.3px; }
 </style>
 </head>
-<body class="min-h-screen font-sans text-ink">
+<body class="min-h-screen font-sans" style="color: var(--ink)">
   <div class="max-w-7xl mx-auto px-6 py-10">
-    <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <header class="mb-7 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display font-800 text-3xl tracking-tight text-ink">COMMAND CENTER</h1>
-        <p class="text-sub text-sm mt-1 font-mono">Jack Scanlon — every project, one view</p>
+        <h1 class="font-display font-800 text-3xl" style="letter-spacing: -0.02em; color: var(--ink)">COMMAND CENTER</h1>
+        <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
       <div class="flex items-center gap-6">
         <div id="statsRow" class="flex items-center gap-5 text-right"></div>
-        <div class="flex items-center border border-border rounded-lg overflow-hidden font-mono text-xs">
+        <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5">Graph</button>
           <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5">Grid</button>
         </div>
       </div>
     </header>
 
-    <div id="needsAttention" class="hidden flex-wrap items-center gap-2 mb-4"></div>
+    <div id="attnCompact" class="hidden flex-wrap items-center gap-2 mb-4"></div>
+    <div id="attnCards" class="hidden flex-col gap-2 mb-6"></div>
 
-    <div class="flex items-center gap-4 text-[10px] font-mono text-faint mb-2 flex-wrap">
+    <div class="flex items-center gap-4 text-[10px] font-mono mb-2 flex-wrap" style="color: var(--faint)">
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#3DDC84"></span>Active</span>
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#4A9EDB"></span>Done</span>
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#E0A030"></span>Stalled</span>
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#E04A4A"></span>Broken</span>
-      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#565B64"></span>Unknown</span>
-      <span class="text-border">|</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#565B62"></span>Unknown</span>
+      <span style="color: var(--hairlineHover)">|</span>
       <span>Closer to hub = higher priority &middot; Dashed ring = top priority &middot; Grouped by category</span>
     </div>
 
     <div id="graphView" class="flex items-center justify-center py-4">
-      <svg id="graphSvg" viewBox="0 0 900 900" class="w-full max-w-[720px] h-auto"></svg>
+      <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"></svg>
     </div>
 
     <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
@@ -69,30 +86,33 @@
 
   <!-- Detail / Chat Modal -->
   <div id="modalOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
-    <div class="bg-panel border border-border rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-border">
+    <div class="rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)">
+      <div class="flex items-center justify-between px-6 py-4 border-b hairline">
         <div class="flex items-center gap-3">
           <div id="modalDot" class="w-3 h-3 rounded-full status-dot"></div>
           <h2 id="modalTitle" class="font-display font-700 text-lg"></h2>
         </div>
-        <button id="closeModal" class="text-sub hover:text-ink text-xl leading-none">&times;</button>
+        <button id="closeModal" class="text-xl leading-none" style="color: var(--sub)">&times;</button>
       </div>
-      <div class="px-6 py-4 border-b border-border">
-        <div class="flex items-center justify-between mb-2">
-          <span id="modalStatusPill" class="text-xs font-mono px-2 py-1 rounded"></span>
-          <span id="modalUpdated" class="text-xs text-faint font-mono"></span>
+      <div class="px-6 py-4 border-b hairline">
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+          <span id="modalStatusPill" class="tag-chip"></span>
+          <span id="modalCategoryPill" class="tag-chip" style="background: rgba(255,255,255,0.05); color: var(--sub)"></span>
+          <span id="modalPriorityPill" class="tag-chip hidden" style="background: rgba(255,255,255,0.05); color: var(--sub)">TOP PRIORITY</span>
+          <span id="modalUpdated" class="text-xs font-mono ml-auto" style="color: var(--faint)"></span>
         </div>
-        <p id="modalSummary" class="text-sm text-sub leading-relaxed"></p>
+        <p id="modalSummary" class="text-sm leading-relaxed" style="color: var(--sub)"></p>
         <div id="toggleRow" class="hidden mt-3 flex items-center gap-2">
-          <label class="text-xs font-mono text-sub">Automation:</label>
-          <button id="toggleBtn" class="text-xs font-mono px-3 py-1 rounded border border-border"></button>
+          <label class="text-xs font-mono" style="color: var(--sub)">Automation:</label>
+          <button id="toggleBtn" class="text-xs font-mono px-3 py-1 rounded border hairline"></button>
         </div>
       </div>
       <div id="chatMessages" class="flex-1 overflow-y-auto px-6 py-4 space-y-3 text-sm"></div>
-      <div class="px-6 py-4 border-t border-border flex gap-2">
+      <div class="px-6 py-4 border-t hairline flex gap-2">
         <input id="chatInput" type="text" placeholder="Ask about this project..."
-          class="flex-1 bg-panelLight border border-border rounded-lg px-3 py-2 text-sm text-ink placeholder-faint focus:outline-none focus:border-sub">
-        <button id="sendChat" class="bg-ink text-void font-medium text-sm px-4 py-2 rounded-lg">Send</button>
+          class="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none border hairline"
+          style="background: var(--panelLight); color: var(--ink)">
+        <button id="sendChat" class="font-medium text-sm px-4 py-2 rounded-lg" style="background: var(--ink); color: var(--void)">Send</button>
       </div>
     </div>
   </div>
@@ -103,16 +123,31 @@ let activeCluster = null;
 let chatHistory = [];
 let currentView = 'graph';
 
+const CATEGORY_ORDER = ['Ventures & Business', 'Trading', 'Content', 'Reselling', 'School & Career', 'Health & Personal', 'Travel & Logistics', 'Personal & Infra', 'Uncategorized'];
+const CATEGORY_COLOR = {
+  'Ventures & Business': '#D9A441',
+  'Trading': '#3DDC84',
+  'Content': '#8B7FD9',
+  'Reselling': '#D97B41',
+  'School & Career': '#4F9FD9',
+  'Health & Personal': '#D9527A',
+  'Travel & Logistics': '#41C9C2',
+  'Personal & Infra': '#8A93A6',
+  'Uncategorized': '#565B62'
+};
+
+function categoryColor(cat) { return CATEGORY_COLOR[cat] || CATEGORY_COLOR['Uncategorized']; }
+
 function statusColor(status) {
   return {
     active: '#3DDC84', done: '#4A9EDB', stalled: '#E0A030',
-    broken: '#E04A4A', unknown: '#565B64'
-  }[status] || '#565B64';
+    broken: '#E04A4A', unknown: '#565B62'
+  }[status] || '#565B62';
 }
 
 function pillStyle(status) {
   const c = statusColor(status);
-  return `background: ${c}20; color: ${c};`;
+  return `background: ${c}1F; color: ${c};`;
 }
 
 async function loadClusters() {
@@ -123,53 +158,75 @@ async function loadClusters() {
     return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
   });
   renderStats();
-  renderNeedsAttention();
+  renderAttention();
   renderGraph();
   renderGrid();
-}
-
-function renderNeedsAttention() {
-  const strip = document.getElementById('needsAttention');
-  const flagged = clusters.filter(c => c.status === 'stalled' || c.status === 'broken');
-  if (!flagged.length) {
-    strip.classList.add('hidden');
-    strip.classList.remove('flex');
-    strip.innerHTML = '';
-    return;
-  }
-  strip.classList.remove('hidden');
-  strip.classList.add('flex');
-  strip.innerHTML = `
-    <span class="text-[10px] font-mono text-faint tracking-wide mr-1">NEEDS ATTENTION</span>
-    ${flagged.map(c => `
-      <button class="attn-pill" data-id="${c.id}" style="border-color:${statusColor(c.status)}66; color:${statusColor(c.status)}">
-        <span class="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style="background:${statusColor(c.status)}"></span>${c.name}
-      </button>
-    `).join('')}
-  `;
-  strip.querySelectorAll('.attn-pill').forEach(el => {
-    el.addEventListener('click', () => openModal(el.dataset.id));
-  });
 }
 
 function renderStats() {
   const active = clusters.filter(c => c.status === 'active').length;
   const attention = clusters.filter(c => c.status === 'stalled' || c.status === 'broken').length;
   const dated = clusters.filter(c => c.lastUpdate).map(c => c.lastUpdate).sort().reverse();
-  const lastSync = dated[0] || '—';
+  const lastSync = dated[0] || 'n/a';
   document.getElementById('statsRow').innerHTML = `
-    <div><div class="font-display font-700 text-lg text-ink leading-none">${clusters.length}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">PROJECTS</div></div>
-    <div><div class="font-display font-700 text-lg leading-none" style="color:${statusColor('active')}">${active}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">ACTIVE</div></div>
-    <div><div class="font-display font-700 text-lg leading-none" style="color:${attention ? statusColor('broken') : '#565B64'}">${attention}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">NEEDS ATTN</div></div>
-    <div><div class="font-display font-700 text-lg text-sub leading-none">${lastSync}</div><div class="text-[10px] font-mono text-faint mt-1 tracking-wide">LAST SYNC</div></div>
+    <div><div class="font-display font-700 text-lg leading-none">${clusters.length}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">PROJECTS</div></div>
+    <div><div class="font-display font-700 text-lg leading-none" style="color:${statusColor('active')}">${active}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">ACTIVE</div></div>
+    <div><div class="font-display font-700 text-lg leading-none" style="color:${attention ? statusColor('broken') : 'var(--faint)'}">${attention}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">NEEDS ATTN</div></div>
+    <div><div class="font-display font-700 text-lg leading-none" style="color:var(--sub)">${lastSync}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">LAST SYNC</div></div>
   `;
+}
+
+function renderAttention() {
+  const flagged = clusters.filter(c => c.status === 'stalled' || c.status === 'broken');
+  const compact = document.getElementById('attnCompact');
+  const cards = document.getElementById('attnCards');
+
+  if (!flagged.length) {
+    compact.classList.add('hidden'); compact.classList.remove('flex'); compact.innerHTML = '';
+    cards.classList.add('hidden'); cards.classList.remove('flex'); cards.innerHTML = '';
+    return;
+  }
+
+  compact.innerHTML = `
+    <span class="text-[10px] font-mono tracking-wide mr-1" style="color:var(--faint)">NEEDS ATTENTION</span>
+    ${flagged.map(c => `
+      <button class="attn-pill" data-id="${c.id}" style="border-color:${statusColor(c.status)}66; color:${statusColor(c.status)}">
+        <span class="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style="background:${statusColor(c.status)}"></span>${c.name}
+      </button>
+    `).join('')}
+  `;
+  cards.innerHTML = flagged.map(c => `
+    <div class="attn-card flex items-center gap-3 rounded-lg px-4 py-3 border" data-id="${c.id}" style="border-color:${statusColor(c.status)}40; background: rgba(255,255,255,0.02)">
+      <div class="w-2 h-2 rounded-full flex-shrink-0 status-dot" style="background:${statusColor(c.status)}; color:${statusColor(c.status)}"></div>
+      <div class="min-w-0 flex-1">
+        <div class="font-display font-700 text-sm" style="color: var(--ink)">${c.name}</div>
+        <div class="text-xs truncate" style="color: var(--sub)">${c.summary}</div>
+      </div>
+      <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${c.status}</span>
+    </div>
+  `).join('');
+
+  [...compact.querySelectorAll('.attn-pill'), ...cards.querySelectorAll('.attn-card')].forEach(el => {
+    el.addEventListener('click', () => openModal(el.dataset.id));
+  });
+
+  updateAttentionVisibility();
+}
+
+function updateAttentionVisibility() {
+  const flagged = clusters.some(c => c.status === 'stalled' || c.status === 'broken');
+  const compact = document.getElementById('attnCompact');
+  const cards = document.getElementById('attnCards');
+  if (!flagged) return;
+  compact.classList.toggle('hidden', currentView !== 'graph');
+  compact.classList.toggle('flex', currentView === 'graph');
+  cards.classList.toggle('hidden', currentView !== 'grid');
+  cards.classList.toggle('flex', currentView === 'grid');
 }
 
 function truncateLabel(name, max = 16) {
   return name.length > max ? name.slice(0, max - 1) + '…' : name;
 }
-
-const CATEGORY_ORDER = ['Ventures & Business', 'Trading', 'Content', 'Reselling', 'School & Career', 'Health & Personal', 'Travel & Logistics', 'Personal & Infra', 'Uncategorized'];
 
 function groupByCategory(list) {
   const map = {};
@@ -185,102 +242,125 @@ function groupByCategory(list) {
 }
 
 function priorityOrbit(priority) {
-  return priority === 'top' ? 250 : priority === 'low' ? 350 : 305;
+  return priority === 'top' ? 235 : priority === 'low' ? 345 : 295;
+}
+
+function nodeRadius(priority) {
+  return priority === 'top' ? 34 : priority === 'low' ? 22 : 28;
 }
 
 function renderGraph() {
-  const svg = document.getElementById('graphSvg');
+  const svg = d3.select('#graphSvg');
   const cx = 450, cy = 450, hubR = 65;
   const groups = groupByCategory(clusters);
   const totalWeight = groups.reduce((s, g) => s + g.items.length, 0) || 1;
 
-  let sectorHtml = '', spokesHtml = '', nodesHtml = '';
+  // Compute each node's *target* position (sector angle + priority-based radius),
+  // then let a short-lived D3 force simulation nudge nodes apart so none overlap,
+  // while staying pulled toward that target. This is the actual fix for nodes
+  // crowding into each other at 20+ projects instead of hand-tuned angle math.
+  const simNodes = [];
   let angleCursor = -Math.PI / 2;
+  const sectorMeta = [];
 
   groups.forEach(g => {
     const span = (2 * Math.PI) * (g.items.length / totalWeight);
     const wedgeStart = angleCursor;
     const wedgeEnd = angleCursor + span;
-    const midAngle = (wedgeStart + wedgeEnd) / 2;
+    sectorMeta.push({ category: g.category, wedgeStart, wedgeEnd, mid: (wedgeStart + wedgeEnd) / 2 });
 
-    // Sector divider (from just outside hub to near the outer edge)
-    const divX = cx + 420 * Math.cos(wedgeStart);
-    const divY = cy + 420 * Math.sin(wedgeStart);
-    const divHx = cx + hubR * Math.cos(wedgeStart);
-    const divHy = cy + hubR * Math.sin(wedgeStart);
-    sectorHtml += `<line x1="${divHx.toFixed(1)}" y1="${divHy.toFixed(1)}" x2="${divX.toFixed(1)}" y2="${divY.toFixed(1)}" stroke="#2A2E35" stroke-width="1" stroke-dasharray="3,5" opacity="0.5" />`;
-
-    // Category label along the outer edge of its wedge
-    const labelR = 395;
-    const labX = cx + labelR * Math.cos(midAngle);
-    const labY = cy + labelR * Math.sin(midAngle);
-    sectorHtml += `<text x="${labX.toFixed(1)}" y="${labY.toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#565B64" letter-spacing="1" opacity="0.85">${g.category.toUpperCase()}</text>`;
-
-    // Nodes distributed within the wedge, inset from its edges
-    const innerStart = g.items.length > 1 ? wedgeStart + span * 0.18 : midAngle;
-    const innerEnd = g.items.length > 1 ? wedgeEnd - span * 0.18 : midAngle;
-    const itemStep = g.items.length > 1 ? (innerEnd - innerStart) / (g.items.length - 1) : 0;
+    const innerStart = g.items.length > 1 ? wedgeStart + span * 0.16 : sectorMeta[sectorMeta.length - 1].mid;
+    const innerEnd = g.items.length > 1 ? wedgeEnd - span * 0.16 : innerStart;
+    const step = g.items.length > 1 ? (innerEnd - innerStart) / (g.items.length - 1) : 0;
 
     g.items.forEach((c, idx) => {
-      const angle = g.items.length > 1 ? innerStart + idx * itemStep : midAngle;
-      const orbitR = priorityOrbit(c.priority);
-      const nx = cx + orbitR * Math.cos(angle);
-      const ny = cy + orbitR * Math.sin(angle);
-      const hx = cx + hubR * Math.cos(angle);
-      const hy = cy + hubR * Math.sin(angle);
-      spokesHtml += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${c.color}" stroke-opacity="0.35" stroke-width="1.5" />`;
-
-      const r = c.priority === 'top' ? 38 : c.priority === 'low' ? 26 : 32;
-      const sColor = statusColor(c.status);
-      const dotAngle = angle - 0.6;
-      const dx = nx + (r + 3) * Math.cos(dotAngle);
-      const dy = ny + (r + 3) * Math.sin(dotAngle);
-      const labelY = ny + r + 16;
-
-      nodesHtml += `
-        <g class="graph-node" data-id="${c.id}">
-          <title>${c.name} — ${c.status}${c.lastUpdate ? ' — updated ' + c.lastUpdate : ''}</title>
-          <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${c.color}" opacity="0.18" />
-          <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${c.color}22" stroke="${c.color}" stroke-width="1.75" />
-          <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="5" fill="${sColor}" stroke="#0A0B0D" stroke-width="1.5" />
-          ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${c.color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
-          <text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#E8E9EB" font-weight="500">${truncateLabel(c.name.split(' ')[0], 10)}</text>
-          <text x="${nx.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10.5" fill="#8B909A">${truncateLabel(c.name)}</text>
-        </g>
-      `;
+      const angle = g.items.length > 1 ? innerStart + idx * step : sectorMeta[sectorMeta.length - 1].mid;
+      const r = priorityOrbit(c.priority);
+      simNodes.push({
+        ...c,
+        targetX: cx + r * Math.cos(angle),
+        targetY: cy + r * Math.sin(angle),
+        radius: nodeRadius(c.priority)
+      });
     });
-
     angleCursor = wedgeEnd;
   });
 
+  const sim = d3.forceSimulation(simNodes)
+    .force('x', d3.forceX(d => d.targetX).strength(0.35))
+    .force('y', d3.forceY(d => d.targetY).strength(0.35))
+    .force('collide', d3.forceCollide(d => d.radius + 22).strength(1))
+    .stop();
+  for (let i = 0; i < 220; i++) sim.tick();
+
+  let sectorHtml = '', spokesHtml = '', nodesHtml = '';
+
+  sectorMeta.forEach(s => {
+    const divX = cx + 420 * Math.cos(s.wedgeStart);
+    const divY = cy + 420 * Math.sin(s.wedgeStart);
+    const divHx = cx + hubR * Math.cos(s.wedgeStart);
+    const divHy = cy + hubR * Math.sin(s.wedgeStart);
+    sectorHtml += `<line x1="${divHx.toFixed(1)}" y1="${divHy.toFixed(1)}" x2="${divX.toFixed(1)}" y2="${divY.toFixed(1)}" stroke="var(--hairline)" stroke-width="1" stroke-dasharray="3,5" />`;
+    const labX = cx + 400 * Math.cos(s.mid);
+    const labY = cy + 400 * Math.sin(s.mid);
+    sectorHtml += `<text x="${labX.toFixed(1)}" y="${labY.toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="var(--faint)" letter-spacing="1" opacity="0.85">${s.category.toUpperCase()}</text>`;
+  });
+
+  simNodes.forEach(c => {
+    const nx = c.x, ny = c.y;
+    const hx = cx + hubR * ((nx - cx) / Math.hypot(nx - cx, ny - cy) || 0);
+    const hy = cy + hubR * ((ny - cy) / Math.hypot(nx - cx, ny - cy) || 0);
+    const color = categoryColor(c.category);
+    spokesHtml += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
+
+    const r = c.radius;
+    const sColor = statusColor(c.status);
+    const dx = nx + (r + 3) * 0.7;
+    const dy = ny - (r + 3) * 0.7;
+
+    nodesHtml += `
+      <g class="graph-node" data-id="${c.id}">
+        <title>${c.name}, ${c.status}${c.lastUpdate ? ', updated ' + c.lastUpdate : ''}</title>
+        <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${color}" opacity="0.16" />
+        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}20" stroke="${color}" stroke-width="1.5" />
+        <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" />
+        ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
+        <text x="${nx.toFixed(1)}" y="${(ny + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${truncateLabel(c.name.split(' ')[0], 9)}</text>
+      </g>
+    `;
+  });
+
   const hubHtml = `
-    <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="#14161A" stroke="#2A2E35" stroke-width="1.5" class="hub-node" />
-    <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="#E8E9EB" letter-spacing="0.5">COMMAND</text>
-    <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="#E8E9EB" letter-spacing="0.5">CENTER</text>
+    <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="var(--panel)" stroke="var(--hairlineHover)" stroke-width="1.5" class="hub-node" />
+    <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">COMMAND</text>
+    <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">CENTER</text>
   `;
 
-  svg.innerHTML = sectorHtml + spokesHtml + hubHtml + nodesHtml;
-  svg.querySelectorAll('.graph-node').forEach(el => {
-    el.addEventListener('click', () => openModal(el.dataset.id));
+  svg.html(sectorHtml + spokesHtml + hubHtml + nodesHtml);
+  svg.selectAll('.graph-node').on('click', function() {
+    openModal(this.getAttribute('data-id'));
   });
 }
 
 function renderGrid() {
   const grid = document.getElementById('clusterGrid');
-  grid.innerHTML = clusters.map(c => `
-    <div class="cluster-card cursor-pointer bg-panel border rounded-xl p-5" style="border-color: ${c.color}40" data-id="${c.id}">
+  grid.innerHTML = clusters.map(c => {
+    const color = categoryColor(c.category);
+    return `
+    <div class="cluster-card cursor-pointer rounded-xl p-5 border hairline" style="background: var(--panel)" data-id="${c.id}">
       <div class="flex items-center justify-between mb-3">
+        <span class="tag-chip" style="background:${color}1F; color:${color}">${(c.category || 'Uncategorized').toUpperCase()}</span>
         <div class="w-2.5 h-2.5 rounded-full status-dot" style="background: ${statusColor(c.status)}; color: ${statusColor(c.status)}"></div>
-        ${c.priority === 'top' ? '<span class="text-[10px] font-mono text-faint tracking-wider">TOP PRIORITY</span>' : ''}
       </div>
-      <h3 class="font-display font-700 text-base mb-1" style="color: ${c.color}">${c.name}</h3>
-      <p class="text-xs text-sub leading-snug line-clamp-3">${c.summary}</p>
+      <h3 class="font-display font-700 text-base mb-1" style="color: var(--ink)">${c.name}${c.priority === 'top' ? ' <span style=\'font-size:9px;color:var(--faint);font-family:monospace;letter-spacing:0.5px;vertical-align:middle\'>&nbsp;TOP</span>' : ''}</h3>
+      <p class="text-xs leading-snug line-clamp-3" style="color: var(--sub)">${c.summary}</p>
       <div class="mt-3 flex items-center justify-between">
-        <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="${pillStyle(c.status)}">${c.status}</span>
-        ${c.toggleable ? `<span class="text-[10px] font-mono" style="color: ${c.enabled ? '#3DDC84' : '#565B64'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
+        <span class="tag-chip" style="${pillStyle(c.status)}">${c.status}</span>
+        ${c.toggleable ? `<span class="text-[10px] font-mono" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   document.querySelectorAll('.cluster-card').forEach(el => {
     el.addEventListener('click', () => openModal(el.dataset.id));
@@ -293,6 +373,7 @@ function setView(view) {
   document.getElementById('clusterGrid').classList.toggle('hidden', view !== 'grid');
   document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
   document.getElementById('viewGridBtn').classList.toggle('active', view === 'grid');
+  updateAttentionVisibility();
 }
 document.getElementById('viewGraphBtn').addEventListener('click', () => setView('graph'));
 document.getElementById('viewGridBtn').addEventListener('click', () => setView('grid'));
@@ -300,13 +381,17 @@ document.getElementById('viewGridBtn').addEventListener('click', () => setView('
 function openModal(id) {
   activeCluster = clusters.find(c => c.id === id);
   chatHistory = [];
+  const color = categoryColor(activeCluster.category);
   document.getElementById('modalDot').style.background = statusColor(activeCluster.status);
   document.getElementById('modalDot').style.color = statusColor(activeCluster.status);
   document.getElementById('modalTitle').textContent = activeCluster.name;
-  document.getElementById('modalTitle').style.color = activeCluster.color;
+  document.getElementById('modalTitle').style.color = color;
   document.getElementById('modalStatusPill').textContent = activeCluster.status;
-  document.getElementById('modalStatusPill').className = 'text-xs font-mono px-2 py-1 rounded';
+  document.getElementById('modalStatusPill').className = 'tag-chip';
   document.getElementById('modalStatusPill').setAttribute('style', pillStyle(activeCluster.status));
+  document.getElementById('modalCategoryPill').textContent = (activeCluster.category || 'Uncategorized').toUpperCase();
+  document.getElementById('modalCategoryPill').setAttribute('style', `background:${color}1F; color:${color}`);
+  document.getElementById('modalPriorityPill').classList.toggle('hidden', activeCluster.priority !== 'top');
   document.getElementById('modalUpdated').textContent = activeCluster.lastUpdate ? `Updated ${activeCluster.lastUpdate}` : '';
   document.getElementById('modalSummary').textContent = activeCluster.summary;
   document.getElementById('chatMessages').innerHTML = '';
@@ -327,8 +412,8 @@ function openModal(id) {
 
 function updateToggleBtn() {
   const btn = document.getElementById('toggleBtn');
-  btn.textContent = activeCluster.enabled ? 'ON — click to disable' : 'OFF — click to enable';
-  btn.style.color = activeCluster.enabled ? '#3DDC84' : '#8B909A';
+  btn.textContent = activeCluster.enabled ? 'ON, click to disable' : 'OFF, click to enable';
+  btn.style.color = activeCluster.enabled ? '#3DDC84' : 'var(--sub)';
 }
 
 document.getElementById('toggleBtn').addEventListener('click', async () => {
@@ -351,10 +436,9 @@ document.getElementById('closeModal').addEventListener('click', () => {
 
 function appendMessage(role, text) {
   const div = document.createElement('div');
-  div.className = role === 'user'
-    ? 'text-right'
-    : 'text-left';
-  div.innerHTML = `<span class="inline-block px-3 py-2 rounded-lg max-w-[85%] ${role === 'user' ? 'bg-ink text-void' : 'bg-panelLight text-ink'}">${text}</span>`;
+  div.className = role === 'user' ? 'text-right' : 'text-left';
+  const bg = role === 'user' ? 'background: var(--ink); color: var(--void);' : 'background: var(--panelLight); color: var(--ink);';
+  div.innerHTML = `<span class="inline-block px-3 py-2 rounded-lg max-w-[85%]" style="${bg}">${text}</span>`;
   document.getElementById('chatMessages').appendChild(div);
   document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
 }

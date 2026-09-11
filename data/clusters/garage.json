@@ -5,7 +5,7 @@
   "color": "#5A5A5A",
   "priority": "normal",
   "lastUpdate": null,
-  "summary": "No detailed status captured yet in memory for this session — placeholder cluster until real data is pulled in.",
+  "summary": "No detailed status captured yet in memory for this session. Placeholder cluster until real data is pulled in.",
   "status": "unknown",
   "sessionTitle": "The Garage"
 }

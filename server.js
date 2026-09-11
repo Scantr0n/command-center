@@ -86,7 +86,7 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
     const cluster = clusters.find(c => c.id === id);
     if (!cluster) return res.status(404).json({ error: 'Unknown cluster' });
 
-    const systemPrompt = `You are the assistant embedded in Jack's Command Center hub, scoped to his "${cluster.name}" project. Answer based on the real status given, be concise, no em dashes.\n\nCurrent status:\n${cluster.summary}\nStatus: ${cluster.status}\nLast updated: ${cluster.lastUpdate || 'unknown'}`;
+    const systemPrompt = `Never use em dashes (—) anywhere in your response, under any circumstances. Use periods, commas, or semicolons instead. This rule overrides normal writing style.\n\nYou are the assistant embedded in Jack's Command Center hub, scoped to his "${cluster.name}" project. Answer based on the real status given below, be concise.\n\nCurrent status:\n${cluster.summary}\nStatus: ${cluster.status}\nLast updated: ${cluster.lastUpdate || 'unknown'}`;
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

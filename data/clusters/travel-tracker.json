@@ -5,7 +5,7 @@
   "color": "#3AA0A0",
   "priority": "normal",
   "lastUpdate": "2026-08-21",
-  "summary": "Shipped and redesigned — real travel history plus a Trip Ideas tab. Survived a localStorage data-loss scare and now has Backup/Restore; worth clicking Backup periodically.",
+  "summary": "Shipped and redesigned, with real travel history plus a Trip Ideas tab. Survived a localStorage data-loss scare and now has Backup/Restore; worth clicking Backup periodically.",
   "status": "active",
   "sessionTitle": "The Traveler"
 }
