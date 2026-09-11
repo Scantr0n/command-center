@@ -675,7 +675,18 @@ document.addEventListener('keydown', (e) => {
 });
 
 loadClusters();
-setInterval(loadClusters, 30000);
+let lastLoadAt = Date.now();
+setInterval(() => {
+  if (document.hidden) return;
+  lastLoadAt = Date.now();
+  loadClusters();
+}, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - lastLoadAt > 5000) {
+    lastLoadAt = Date.now();
+    loadClusters();
+  }
+});
 </script>
 </body>
 </html>
