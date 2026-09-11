@@ -78,11 +78,11 @@
         <h1 class="font-display font-800 text-3xl" style="letter-spacing: -0.02em; color: var(--ink)">COMMAND CENTER</h1>
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
         <input id="searchInput" type="text" placeholder="Search projects..."
-          class="search-input text-xs font-mono rounded-lg px-3 py-1.5 border hairline focus:outline-none"
-          style="background: var(--panelLight); color: var(--ink); width: 160px">
-        <div id="statsRow" class="flex items-center gap-5 text-right"></div>
+          class="search-input text-xs font-mono rounded-lg px-3 py-1.5 border hairline focus:outline-none w-[130px] sm:w-[160px]"
+          style="background: var(--panelLight); color: var(--ink)">
+        <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
         <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5">Graph</button>
           <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5">Grid</button>
