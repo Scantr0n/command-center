@@ -111,6 +111,44 @@ header.page-head .sub {
 }
 .nudge-row:first-of-type { border-top: none; }
 
+.board-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.stats-bar {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+.stats-bar strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.search-input {
+  margin-left: auto;
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  min-width: 200px;
+  transition: border-color 0.15s ease;
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--hairlineHover);
+}
+.search-input::placeholder { color: var(--dim); }
+
 /* Board */
 .board {
   display: grid;

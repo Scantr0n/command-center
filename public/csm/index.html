@@ -33,7 +33,16 @@
   </section>
 
   <section>
-    <h2 class="section-title">Pipeline</h2>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Pipeline</h2>
+      <div class="stats-bar" id="statsBar" aria-live="polite"></div>
+      <input
+        type="search"
+        id="searchInput"
+        class="search-input font-mono"
+        placeholder="Filter by name or company..."
+        aria-label="Filter prospects by name or company">
+    </div>
     <div class="board" id="board"></div>
   </section>
 

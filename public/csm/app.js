@@ -1,6 +1,8 @@
 (function () {
   const boardEl = document.getElementById('board');
   const nudgeEl = document.getElementById('nudgeQueue');
+  const statsEl = document.getElementById('statsBar');
+  const searchInput = document.getElementById('searchInput');
   const modalOverlay = document.getElementById('modalOverlay');
   const modalName = document.getElementById('modalName');
   const modalCompany = document.getElementById('modalCompany');
@@ -76,12 +78,19 @@
     }).join('');
   }
 
-  function renderBoard(stages, prospects) {
+  function renderBoard(stages, prospects, allProspects, query) {
+    const filtering = !!query;
     boardEl.innerHTML = stages.map(stage => {
       const inStage = prospects.filter(p => p.stage === stage.id);
-      const cards = inStage.length
-        ? inStage.map(p => renderCard(p)).join('')
-        : '<div class="column-empty">No prospects in this stage yet.</div>';
+      const totalInStage = allProspects.filter(p => p.stage === stage.id).length;
+      let cards;
+      if (inStage.length) {
+        cards = inStage.map(p => renderCard(p)).join('');
+      } else if (filtering && totalInStage > 0) {
+        cards = '<div class="column-empty">No matches for "' + escapeHtml(query) + '" in this stage.</div>';
+      } else {
+        cards = '<div class="column-empty">No prospects in this stage yet.</div>';
+      }
       return '<div class="column">' +
         '<div class="column-head">' +
         '<span class="stage-dot" style="background:' + stage.color + '"></span>' +
@@ -98,6 +107,18 @@
     });
   }
 
+  function renderStats(stages, prospects) {
+    const total = prospects.length;
+    const parts = ['<span><strong>' + total + '</strong> total</span>'];
+    stages.forEach(stage => {
+      const count = prospects.filter(p => p.stage === stage.id).length;
+      if (count > 0) {
+        parts.push('<span><strong>' + count + '</strong> ' + escapeHtml(stage.shortLabel.toLowerCase()) + '</span>');
+      }
+    });
+    statsEl.innerHTML = parts.join('');
+  }
+
   function renderCard(p) {
     return '<button class="card" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
@@ -107,6 +128,20 @@
   }
 
   let byId = {};
+  let allStages = [];
+  let allProspects = [];
+
+  function applyFilter() {
+    const query = searchInput.value.trim().toLowerCase();
+    const filtered = query
+      ? allProspects.filter(p =>
+          (p.name || '').toLowerCase().includes(query) ||
+          (p.company || '').toLowerCase().includes(query))
+      : allProspects;
+    renderBoard(allStages, filtered, allProspects, query);
+  }
+
+  searchInput.addEventListener('input', applyFilter);
 
   function openModal(id) {
     const p = byId[id];
@@ -165,11 +200,12 @@
     fetch('/csm/data/stages.json').then(r => r.json()),
     fetch('/csm/data/prospects.json').then(r => r.json())
   ]).then(([stagesData, prospectsData]) => {
-    const stages = stagesData.stages;
-    const prospects = prospectsData.prospects;
-    byId = Object.fromEntries(prospects.map(p => [p.id, p]));
-    renderNudgeQueue(prospects);
-    renderBoard(stages, prospects);
+    allStages = stagesData.stages;
+    allProspects = prospectsData.prospects;
+    byId = Object.fromEntries(allProspects.map(p => [p.id, p]));
+    renderNudgeQueue(allProspects);
+    renderStats(allStages, allProspects);
+    renderBoard(allStages, allProspects, allProspects, '');
   }).catch(err => {
     boardEl.innerHTML = '<div class="column-empty">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
     nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
