@@ -31,6 +31,10 @@
       <p>Edit <code>public/csm/data/prospects.json</code> by hand and add an object to the
         <code>prospects</code> array. Leave any field you do not have a real answer for as <code>null</code> or
         <code>[]</code>, do not fill it in with a guess.</p>
+      <p><strong>Run <code>node public/csm/data/validate.js</code> after every edit.</strong> A typo in
+        <code>stage</code> does not throw an error, it just makes the prospect silently vanish from the board.
+        The validator catches that, plus duplicate ids, bad dates, an invalid <code>contactChannel.type</code>,
+        and social numbers logged without an <code>asOfDate</code>.</p>
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"company-person-name"</code></td></tr>
