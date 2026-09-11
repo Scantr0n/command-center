@@ -72,6 +72,15 @@
   @keyframes skeletonPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
   #linkRow { text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease; }
   #linkRow:hover { background: rgba(255,255,255,0.06); border-color: var(--hairlineHover) !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .node-glow-active { animation: none; opacity: 0.7; }
+    .skeleton-pulse { animation: none; opacity: 0.7; }
+    .graph-node, .cluster-card, .attn-card, .view-toggle-btn, .search-input, #linkRow, .node-glow {
+      transition: none !important;
+    }
+    .graph-node:hover, .cluster-card:hover { transform: none; }
+  }
 </style>
 </head>
 <body class="min-h-screen font-sans" style="color: var(--ink)">
