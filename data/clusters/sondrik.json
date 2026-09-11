@@ -7,5 +7,6 @@
   "lastUpdate": "2026-09-07",
   "summary": "v0.3.7 shipped 9/7 night, fixed the default CRM seed data bug affecting every fresh install. First real outside engagement landed: a r/IMadeThis commenter offered lifetime access in exchange for testing. A DM to that lead is drafted and waiting on Jack's approval before sending.",
   "status": "active",
-  "sessionTitle": "Sondrik"
+  "sessionTitle": "Sondrik",
+  "relatedTo": ["csm"]
 }

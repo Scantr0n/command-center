@@ -7,5 +7,6 @@
   "lastUpdate": null,
   "summary": "Session exists, ties into the same Calendar infrastructure (Google Calendar as single source of truth). No detailed status captured yet. Placeholder until real data is pulled in, same as Garage/Mechanic.",
   "status": "unknown",
-  "sessionTitle": "Things to do calendar app"
+  "sessionTitle": "Things to do calendar app",
+  "relatedTo": ["calendar"]
 }

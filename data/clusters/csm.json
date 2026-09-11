@@ -7,5 +7,6 @@
   "lastUpdate": "2026-09-06",
   "summary": "n8n + Airtable + Claude/Perplexity pipeline is live for prospect research and draft outreach. JT Ops Hub app (separate local dashboard) covers this specifically. Sondrik-side automation for this pipeline not built yet.",
   "status": "active",
-  "sessionTitle": "Chinese Social Media"
+  "sessionTitle": "Chinese Social Media",
+  "relatedTo": ["sondrik"]
 }

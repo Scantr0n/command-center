@@ -7,5 +7,6 @@
   "lastUpdate": "2026-09-07",
   "summary": "Google Calendar is the single source of truth. Cleanup finished 9/7: duplicate Home calendar deleted, iCloud calendar sync turned off, Google set as default.",
   "status": "done",
-  "sessionTitle": null
+  "sessionTitle": null,
+  "relatedTo": ["things-to-do"]
 }
