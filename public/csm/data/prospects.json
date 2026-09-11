@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "note": "Real pipeline data only. Fields left null are genuinely unlogged, not unknown-on-purpose placeholders. Fill them in as real records are found, do not invent values to make a row look complete.",
+  "prospects": [
+    {
+      "id": "city-bound-david-fraga",
+      "name": "David Fraga",
+      "company": "City Bound",
+      "category": null,
+      "stage": "in-exploration",
+      "verifiedHook": null,
+      "contactChannel": {
+        "type": null,
+        "detail": null
+      },
+      "sendDate": null,
+      "nextNudgeDate": null,
+      "nudgeSchedule": {
+        "doNotNudgeBefore": null,
+        "nudgePoint": null
+      },
+      "replyStatus": "In active exploration, real ongoing conversation.",
+      "socialSnapshot": {
+        "platform": null,
+        "followers": null,
+        "engagementRate": null,
+        "asOfDate": null
+      },
+      "contentIdeas": [],
+      "notes": "Only verified contact currently past outreach. Historical send date, channel type, and hook were not carried into this structured log yet, backfill from real records instead of guessing."
+    }
+  ]
+}

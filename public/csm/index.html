@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSM Pipeline / Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/csm/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">CSM PIPELINE</h1>
+      <p class="sub font-mono">China social media / business-development outreach, Jack Scanlon</p>
+    </div>
+    <a href="/" class="back-link">&larr; Command Center</a>
+  </header>
+
+  <div class="callout">
+    <strong>Planning tool, not a send tool.</strong> Nothing on this page contacts anyone. There is no live backend
+    connected yet, so every number here is either a real logged fact or an honest empty state, never a filled-in
+    guess. Social stats are one-time manual research snapshots, not live analytics.
+  </div>
+
+  <section>
+    <h2 class="section-title">Nudge queue</h2>
+    <div class="nudge-queue" id="nudgeQueue">
+      <p class="nudge-empty">Loading...</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Pipeline</h2>
+    <div class="board" id="board"></div>
+  </section>
+
+  <footer class="page-foot font-mono">
+    Data source: <code>/csm/data/prospects.json</code> and <code>/csm/data/stages.json</code>, edited by hand until a
+    real backend is wired in.
+  </footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalName">
+    <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+    <h3 id="modalName" class="font-display"></h3>
+    <div class="modal-company font-mono" id="modalCompany"></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="/csm/app.js"></script>
+</body>
+</html>

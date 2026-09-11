@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "stages": [
+    {
+      "id": "researched",
+      "label": "Researched",
+      "shortLabel": "Researched",
+      "description": "Identified as a real fit. No outreach sent yet.",
+      "color": "#565B62"
+    },
+    {
+      "id": "outreach-sent",
+      "label": "Outreach Sent",
+      "shortLabel": "Sent",
+      "description": "First message sent. Waiting on a reply.",
+      "color": "#4A9EDB"
+    },
+    {
+      "id": "silent-replied",
+      "label": "Silent / Replied",
+      "shortLabel": "Silent / Replied",
+      "description": "Either no response after the nudge window, or a reply came in that has not moved to active exploration.",
+      "color": "#E0A030"
+    },
+    {
+      "id": "in-exploration",
+      "label": "In Exploration",
+      "shortLabel": "Exploring",
+      "description": "Active back and forth about a real partnership or deal.",
+      "color": "#3DDC84"
+    },
+    {
+      "id": "client",
+      "label": "Client",
+      "shortLabel": "Client",
+      "description": "Signed / working relationship in place.",
+      "color": "#B084E0"
+    }
+  ]
+}
