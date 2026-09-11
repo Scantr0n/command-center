@@ -88,6 +88,8 @@
       </div>
     </header>
 
+    <div id="errorBanner" class="hidden text-xs font-mono px-3 py-2 rounded-lg mb-4" style="background: #E04A4A1A; color: #E0807A; border: 1px solid #E04A4A40"></div>
+
     <div id="attnCompact" class="hidden flex-wrap items-center gap-2 mb-4"></div>
     <div id="attnCards" class="hidden flex-col gap-2 mb-6"></div>
 
@@ -180,17 +182,25 @@ function pillStyle(status) {
 }
 
 async function loadClusters() {
-  const res = await fetch('/api/clusters');
-  const data = await res.json();
-  clusters = data.clusters.sort((a, b) => {
-    const order = { top: 0, normal: 1, low: 2 };
-    return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
-  });
-  renderStats();
-  renderAttention();
-  renderGraph();
-  renderGrid();
-  renderActivityFeed();
+  const errBox = document.getElementById('errorBanner');
+  try {
+    const res = await fetch('/api/clusters');
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    clusters = data.clusters.sort((a, b) => {
+      const order = { top: 0, normal: 1, low: 2 };
+      return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
+    });
+    errBox.classList.add('hidden');
+    renderStats();
+    renderAttention();
+    renderGraph();
+    renderGrid();
+    renderActivityFeed();
+  } catch (e) {
+    errBox.textContent = `Couldn't load project data: ${e.message}. Retrying in 30s.`;
+    errBox.classList.remove('hidden');
+  }
 }
 
 function renderActivityFeed() {
@@ -405,9 +415,18 @@ function renderGraph() {
   `;
 
   svg.html(sectorHtml + spokesHtml + relationsHtml + hubHtml + nodesHtml);
-  svg.selectAll('.graph-node').on('click', function() {
-    openModal(this.getAttribute('data-id'));
-  });
+  svg.selectAll('.graph-node')
+    .attr('tabindex', 0)
+    .attr('role', 'button')
+    .on('click', function() {
+      openModal(this.getAttribute('data-id'));
+    })
+    .on('keydown', function(event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openModal(this.getAttribute('data-id'));
+      }
+    });
   svg.selectAll('.cat-label').on('click', function() {
     const cat = this.getAttribute('data-category');
     activeCategory = activeCategory === cat ? null : cat;
