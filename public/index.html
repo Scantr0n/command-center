@@ -160,6 +160,7 @@ let clusters = [];
 let activeCluster = null;
 let chatHistory = [];
 let currentView = 'graph';
+let lastFocusedEl = null;
 
 const CATEGORY_ORDER = ['Ventures & Business', 'Trading', 'Content', 'Reselling', 'School & Career', 'Health & Personal', 'Travel & Logistics', 'Personal & Infra', 'Uncategorized'];
 const CATEGORY_COLOR = {
@@ -519,6 +520,7 @@ document.getElementById('viewGridBtn').addEventListener('click', () => setView('
 
 function openModal(id) {
   activeCluster = clusters.find(c => c.id === id);
+  lastFocusedEl = document.activeElement;
   chatHistory = [];
   const color = categoryColor(activeCluster.category);
   document.getElementById('modalDot').style.background = statusColor(activeCluster.status);
@@ -547,6 +549,22 @@ function openModal(id) {
 
   document.getElementById('modalOverlay').classList.remove('hidden');
   document.getElementById('modalOverlay').classList.add('flex');
+  document.getElementById('closeModal').focus();
+}
+
+function getModalFocusable() {
+  return Array.from(document.getElementById('modalOverlay').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function closeModalAndReturnFocus() {
+  document.getElementById('modalOverlay').classList.add('hidden');
+  document.getElementById('modalOverlay').classList.remove('flex');
+  if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
+    lastFocusedEl.focus();
+  }
+  lastFocusedEl = null;
 }
 
 function updateToggleBtn() {
@@ -568,9 +586,9 @@ document.getElementById('toggleBtn').addEventListener('click', async () => {
   loadClusters();
 });
 
-document.getElementById('closeModal').addEventListener('click', () => {
-  document.getElementById('modalOverlay').classList.add('hidden');
-  document.getElementById('modalOverlay').classList.remove('flex');
+document.getElementById('closeModal').addEventListener('click', closeModalAndReturnFocus);
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modalOverlay') closeModalAndReturnFocus();
 });
 
 function appendMessage(role, text) {
@@ -615,12 +633,25 @@ document.getElementById('chatInput').addEventListener('keydown', (e) => {
 
 document.addEventListener('keydown', (e) => {
   const modalOpen = !document.getElementById('modalOverlay').classList.contains('hidden');
-  if (e.key === 'Escape' && modalOpen) {
-    document.getElementById('modalOverlay').classList.add('hidden');
-    document.getElementById('modalOverlay').classList.remove('flex');
+  if (modalOpen && e.key === 'Escape') {
+    closeModalAndReturnFocus();
     return;
   }
-  if (e.key === '/' && document.activeElement.id !== 'searchInput' && document.activeElement.id !== 'chatInput') {
+  if (modalOpen && e.key === 'Tab') {
+    const focusable = getModalFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+    return;
+  }
+  if (!modalOpen && e.key === '/' && document.activeElement.id !== 'searchInput' && document.activeElement.id !== 'chatInput') {
     e.preventDefault();
     document.getElementById('searchInput').focus();
   }
