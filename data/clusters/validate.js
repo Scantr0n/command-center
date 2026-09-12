@@ -47,6 +47,10 @@ function main() {
   });
 
   const seenIds = new Set();
+  // Keyed only by toggleId, not by cluster id, because that's how
+  // server.js's toggles.json store actually works: two clusters sharing a
+  // toggleId would silently flip each other's automation switch.
+  const seenToggleIds = new Set();
   clusters.forEach(({ file, data: c }) => {
     const where = file + (c.id ? ' (' + c.id + ')' : '');
 
@@ -84,6 +88,12 @@ function main() {
 
     if (c.toggleable && !c.toggleId) {
       errors.push(where + ': "toggleable" is true but "toggleId" is missing, the automation toggle has nothing to key on');
+    } else if (c.toggleId) {
+      if (seenToggleIds.has(c.toggleId)) {
+        errors.push(where + ': duplicate toggleId "' + c.toggleId + '", flipping one of these two clusters\' automation switch would silently flip the other\'s too');
+      } else {
+        seenToggleIds.add(c.toggleId);
+      }
     }
 
     if (c.relatedTo !== undefined && !Array.isArray(c.relatedTo)) {
