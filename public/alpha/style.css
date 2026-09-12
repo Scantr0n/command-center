@@ -92,6 +92,60 @@ header.page-head .sub {
 }
 .scope-banner strong { color: #F2B8B8; }
 
+.schema-help {
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  margin-bottom: 24px;
+  background: rgba(255,255,255,0.015);
+}
+.schema-help summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  font-size: 0.8rem;
+  color: var(--sub);
+  list-style: none;
+}
+.schema-help summary::-webkit-details-marker { display: none; }
+.schema-help summary::before {
+  content: '+ ';
+  color: var(--dim);
+  font-family: 'JetBrains Mono', monospace;
+}
+.schema-help[open] summary::before { content: '- '; }
+.schema-help-body {
+  padding: 0 16px 16px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--sub);
+}
+.schema-help-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.05);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--ink);
+}
+.schema-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.78rem;
+}
+.schema-table th, .schema-table td {
+  text-align: left;
+  padding: 7px 10px 7px 0;
+  border-top: 1px solid var(--hairline);
+  vertical-align: top;
+}
+.schema-table th {
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+}
+
 .section-title {
   font-family: 'Manrope', sans-serif;
   font-weight: 700;

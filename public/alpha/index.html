@@ -37,6 +37,31 @@
     invented. A future session with real read access to Alpha wires live values into this same layout.
   </div>
 
+  <details class="schema-help">
+    <summary>How a live connection would wire in (for whoever builds it)</summary>
+    <div class="schema-help-body">
+      <p>This page reads <code>public/alpha/data/status.json</code> and nothing else. It has no API route, no
+        websocket, and no write path, on purpose: wiring in real data means a future session writes a fresh
+        <code>live</code> block into that file (for example, a small read-only export job on Alpha's own host
+        that this Command Center pulls or receives), never adding a control endpoint here.</p>
+      <p><strong>Run <code>node public/alpha/data/validate.js</code> after any edit.</strong> It rejects a
+        <code>live</code> value set without <code>live.asOf</code>, and rejects any key that looks like real
+        P&amp;L, balance, win rate, or trade-count data, since this sandbox has no legitimate way to know one.</p>
+      <table class="schema-table">
+        <tbody>
+          <tr><th>system.*</th><td>Static architectural facts (agent count, feature list). Real, does not change with market conditions, safe to hand-edit only when the architecture itself changes.</td></tr>
+          <tr><th>connection.connected</th><td><code>true</code> once a real feed exists and is currently reachable, otherwise <code>false</code>.</td></tr>
+          <tr><th>connection.checkedAt</th><td>ISO datetime of the last time connectivity was actually checked, or <code>null</code>.</td></tr>
+          <tr><th>live.asOf</th><td><strong>Required whenever any field below it is set.</strong> ISO datetime the live reading was actually taken at.</td></tr>
+          <tr><th>live.regime</th><td>Current detected market regime label, or <code>null</code>.</td></tr>
+          <tr><th>live.killSwitch.engaged</th><td><code>true</code> / <code>false</code> / <code>null</code> if unknown.</td></tr>
+          <tr><th>live.positionSizing.activeMode</th><td>Which sizing rule is currently driving position size (e.g. <code>"drawdown-based"</code>), or <code>null</code>.</td></tr>
+          <tr><th>live.genealogy.*</th><td>Current generation, count of active lineages, and last breeding event, or <code>null</code> until known.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Connection</h2>
     <div class="conn-strip" id="connStrip">
