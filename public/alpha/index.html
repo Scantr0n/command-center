@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alpha / Command Center</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/alpha/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">ALPHA</h1>
+      <p class="sub font-mono">Live trading system, status overview only, Jack Scanlon</p>
+    </div>
+    <a href="/" class="back-link">&larr; Command Center</a>
+  </header>
+
+  <main>
+  <div class="scope-banner">
+    <strong>Read-only, on purpose.</strong> Alpha is a real, live, money-trading daemon running on a separate
+    machine. This page can only ever display its status, never start, stop, configure, or otherwise influence it.
+    There is no control surface here and there never will be, if that is ever what you are looking for, it is not
+    on this page.
+  </div>
+
+  <div class="callout">
+    <strong>No live feed wired in yet.</strong> This Command Center sandbox has no network path to Jack's Mac, where
+    Alpha actually runs. Everything below is the real structure an overview would show, seeded honestly with
+    "awaiting live connection" wherever a real reading belongs. Nothing on this page is a guessed number, if a
+    field would normally show a dollar amount, win rate, or trade count, it is left out entirely rather than
+    invented. A future session with real read access to Alpha wires live values into this same layout.
+  </div>
+
+  <section>
+    <h2 class="section-title">Connection</h2>
+    <div class="conn-strip" id="connStrip">
+      <span class="conn-dot down" id="connDot"></span>
+      <span class="conn-label font-mono" id="connLabel">Loading...</span>
+      <span class="conn-sub" id="connSub"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Summary</h2>
+    <div class="stat-row" id="statRow"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Architecture</h2>
+    <div class="arch-grid" id="archGrid"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Genealogy wall</h2>
+    <div class="empty-panel" id="genealogyPanel">
+      <div class="empty-panel-title font-mono">AWAITING LIVE CONNECTION</div>
+      <div class="empty-panel-sub">
+        Once wired in, this section shows the agent breeding / lineage summary: current generation, how many
+        lineages are actively trading, and when the most recent breeding event ran. None of that is available
+        from this sandbox yet.
+      </div>
+    </div>
+  </section>
+  </main>
+
+  <footer class="page-foot font-mono">
+    Data source: <code>/alpha/data/status.json</code>. Structural fields (agent count, feature list) are real and
+    static. Everything under "live" is a placeholder until a future session wires in an actual status export from
+    Alpha itself; run <code>node public/alpha/data/validate.js</code> after any edit to that file, it rejects a
+    live value with no timestamp and rejects anything that looks like fabricated P&amp;L, balance, or trade data.
+    This page has no write path back to Alpha, by design.
+  </footer>
+</div>
+
+<script src="/alpha/app.js"></script>
+</body>
+</html>

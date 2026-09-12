@@ -1,0 +1,44 @@
+{
+  "system": {
+    "name": "Alpha",
+    "kind": "Live trading daemon, real money, runs on Jack's Mac",
+    "host": "Jack's Mac, port 3847 (separate machine and process, not reachable from Command Center)",
+    "agentCount": 33,
+    "agentKind": "Evolved trading agents",
+    "features": [
+      { "id": "regime-detection", "label": "Regime detection", "note": null },
+      { "id": "drawdown-sizing", "label": "Drawdown-based position sizing", "note": null },
+      { "id": "robustness-sizing", "label": "Robustness-based position sizing", "note": null },
+      { "id": "kill-switch", "label": "Kill switch", "note": null },
+      { "id": "debate-panel", "label": "Debate panel", "note": "Pending an API key, not fully active yet" },
+      { "id": "genealogy-wall", "label": "Genealogy wall", "note": "Agent breeding / lineage history" }
+    ]
+  },
+  "connection": {
+    "connected": false,
+    "checkedAt": null,
+    "note": "This Command Center sandbox has no network path to Jack's Mac. Every field under \"live\" below is a structural placeholder, not a real reading, until a future session with real access to Alpha wires in an actual status feed."
+  },
+  "live": {
+    "asOf": null,
+    "regime": null,
+    "killSwitch": {
+      "engaged": null,
+      "lastTriggeredAt": null
+    },
+    "positionSizing": {
+      "activeMode": null,
+      "currentDrawdownPct": null
+    },
+    "debatePanel": {
+      "active": false,
+      "blockedOn": "API key"
+    },
+    "genealogy": {
+      "generation": null,
+      "activeLineages": null,
+      "lastBreedingEventAt": null,
+      "lastBreedingEventNote": null
+    }
+  }
+}
