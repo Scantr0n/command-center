@@ -146,8 +146,10 @@ function renderStats() {
   const real = cards.filter(c => !isExample(c));
   const priced = real.filter(c => c.estimatedValue != null);
   const totalValue = priced.reduce((s, c) => s + c.estimatedValue, 0);
-  const bySale = priced.filter(c => c.valuationBasis === 'recent-sale').length;
-  const byComp = priced.filter(c => c.valuationBasis === 'comp-estimate').length;
+  const saleCards = priced.filter(c => c.valuationBasis === 'recent-sale');
+  const compCards = priced.filter(c => c.valuationBasis === 'comp-estimate');
+  const saleValue = saleCards.reduce((s, c) => s + c.estimatedValue, 0);
+  const compValue = compCards.reduce((s, c) => s + c.estimatedValue, 0);
   const stale = priced.filter(isStale).length;
   const bySport = { hockey: 0, baseball: 0, football: 0 };
   real.forEach(c => { if (bySport[c.sport] != null) bySport[c.sport]++; });
@@ -155,8 +157,11 @@ function renderStats() {
   const tiles = [
     { value: real.length, label: 'Cards logged', sub: cards.length !== real.length ? '+ 1 example row' : null },
     { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
-    { value: bySale, label: 'Recent-sale priced', sub: null },
-    { value: byComp, label: 'Comp-estimate priced', sub: null },
+    // Splitting the dollar total by basis, not just the card count, makes the
+    // "how much of this is a real sale vs. an estimate" question answerable
+    // at a glance, which is the whole point of never blending the two silently.
+    { value: saleCards.length, label: 'Recent-sale priced', sub: saleCards.length ? formatUsd(saleValue) : null },
+    { value: compCards.length, label: 'Comp-estimate priced', sub: compCards.length ? formatUsd(compValue) : null },
     { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
     { value: bySport.hockey + ' / ' + bySport.baseball + ' / ' + bySport.football, label: 'Hockey / baseball / football', sub: null }
   ];
