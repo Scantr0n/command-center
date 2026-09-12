@@ -131,6 +131,7 @@ async function loadCards() {
     const data = await res.json();
     cards = data.cards || [];
     renderStats();
+    renderValueBreakdown();
     renderPricingActivity();
     renderBatchFilter();
     applyFiltersAndRender();
@@ -174,6 +175,55 @@ function renderStats() {
       ${t.sub ? `<div class="stat-tile-sub">${escapeHtml(t.sub)}</div>` : ''}
     </div>
   `).join('');
+}
+
+// Groups real priced cards' estimatedValue by one field (sport or
+// gradingCompany) and renders it as a horizontal bar list, widest first. This
+// is the "portfolio value by category" breakdown that CollX/Card Ladder-style
+// trackers lead with; it reads straight off each card's own real fields, so an
+// empty or single-example dataset just renders the honest empty state below
+// rather than a chart with nothing in it.
+function buildValueGroups(field) {
+  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c[field]);
+  const totals = new Map();
+  priced.forEach(c => totals.set(c[field], (totals.get(c[field]) || 0) + c.estimatedValue));
+  return [...totals.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function renderBreakdownList(title, groups) {
+  if (!groups.length) {
+    return `
+      <div class="breakdown-card">
+        <h3 class="breakdown-title font-mono">${escapeHtml(title)}</h3>
+        <p class="breakdown-empty">No priced real cards yet.</p>
+      </div>
+    `;
+  }
+  const max = Math.max(...groups.map(g => g.value));
+  const rows = groups.map(g => `
+    <div class="breakdown-row">
+      <span class="breakdown-label">${escapeHtml(g.label)}</span>
+      <span class="breakdown-bar-track">
+        <span class="breakdown-bar-fill" style="width:${max ? (g.value / max * 100) : 0}%"></span>
+      </span>
+      <span class="breakdown-value font-mono">${formatUsd(g.value)}</span>
+    </div>
+  `).join('');
+  return `
+    <div class="breakdown-card">
+      <h3 class="breakdown-title font-mono">${escapeHtml(title)}</h3>
+      <div class="breakdown-list">${rows}</div>
+    </div>
+  `;
+}
+
+function renderValueBreakdown() {
+  const el = document.getElementById('breakdownGrid');
+  el.innerHTML =
+    renderBreakdownList('By sport', buildValueGroups('sport')) +
+    renderBreakdownList('By grading company', buildValueGroups('gradingCompany'));
 }
 
 // Pulls "what got priced when" out of every card's own datePriced/backlogBatch

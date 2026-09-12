@@ -206,6 +206,67 @@ header.page-head .sub {
   margin-top: 4px;
 }
 
+/* Value breakdown: horizontal bar lists grouping real priced cards' value by
+   sport / grading company. Single accent hue since these bars encode
+   magnitude only, categories are already identified by their text label. */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.breakdown-card {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.breakdown-title {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0 0 12px;
+}
+.breakdown-empty {
+  font-size: 0.82rem;
+  color: var(--dim);
+  margin: 0;
+}
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.breakdown-label {
+  font-size: 0.78rem;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.breakdown-bar-track {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.04);
+  overflow: hidden;
+}
+.breakdown-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: 5px;
+  background: rgba(155,140,255,0.75);
+}
+.breakdown-value {
+  font-size: 0.75rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
 /* Pricing activity feed, same shape as the Recent Activity feed in
    CSM/Garage/Sondrik. */
 .activity-feed {
@@ -491,6 +552,12 @@ footer.page-foot {
 
   .stat-tile { background: none; border: 1px solid #ccc; }
   .stat-tile-value, .stat-tile-label, .stat-tile-sub { color: #111 !important; }
+
+  .breakdown-card { background: none; border: 1px solid #ccc; }
+  .breakdown-title, .breakdown-empty { color: #333 !important; }
+  .breakdown-label, .breakdown-value { color: #111 !important; }
+  .breakdown-bar-track { background: #eee; }
+  .breakdown-bar-fill { background: #888 !important; }
 
   .activity-feed { background: none; border-color: #bbb; }
   .activity-row { border-color: #ddd; }
