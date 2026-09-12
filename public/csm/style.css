@@ -299,6 +299,15 @@ header.page-head .sub {
 .chip-generic[aria-pressed="true"] { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
 .chip-unknown[aria-pressed="true"] { background: rgba(255,255,255,0.06); color: var(--ink); border-color: var(--hairlineHover); }
 
+.category-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.category-filter[hidden] { display: none; }
+
 /* Board */
 .board {
   display: grid;
@@ -509,7 +518,7 @@ footer.page-foot {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .search-input, .channel-filter, .schema-help,
+  .print-btn, .back-link, .search-input, .channel-filter, .category-filter, .schema-help,
   .modal-overlay {
     display: none !important;
   }

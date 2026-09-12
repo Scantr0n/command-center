@@ -4,6 +4,7 @@
   const statsEl = document.getElementById('statsBar');
   const searchInput = document.getElementById('searchInput');
   const channelFilterEl = document.getElementById('channelFilter');
+  const categoryFilterEl = document.getElementById('categoryFilter');
   const modalOverlay = document.getElementById('modalOverlay');
   const modalName = document.getElementById('modalName');
   const modalCompany = document.getElementById('modalCompany');
@@ -219,6 +220,7 @@
   let allStages = [];
   let allProspects = [];
   let channelFilter = 'all';
+  let categoryFilter = 'all';
 
   function matchesChannel(p, key) {
     if (key === 'all') return true;
@@ -227,14 +229,51 @@
     return type === key;
   }
 
+  function matchesCategory(p, key) {
+    if (key === 'all') return true;
+    return (p.category || null) === key;
+  }
+
+  function renderCategoryFilter(prospects) {
+    const categories = Array.from(new Set(
+      prospects.map(p => p.category).filter(Boolean)
+    )).sort();
+
+    if (categories.length === 0) {
+      categoryFilterEl.hidden = true;
+      return;
+    }
+    categoryFilterEl.hidden = false;
+
+    const keys = ['all', ...categories];
+    const chipsHtml = keys.map(key => {
+      const label = key === 'all' ? 'All' : key;
+      const count = prospects.filter(p => matchesCategory(p, key)).length;
+      return '<button type="button" class="chip" data-category="' + escapeHtml(key) +
+        '" aria-pressed="' + (key === 'all') + '">' + escapeHtml(label) + ' (' + count + ')</button>';
+    }).join('');
+    categoryFilterEl.innerHTML = '<span class="channel-filter-label font-mono">CATEGORY</span>' + chipsHtml;
+
+    categoryFilterEl.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        categoryFilter = chip.getAttribute('data-category');
+        categoryFilterEl.querySelectorAll('.chip').forEach(c =>
+          c.setAttribute('aria-pressed', String(c === chip)));
+        applyFilter();
+      });
+    });
+  }
+
   function applyFilter() {
     const query = searchInput.value.trim().toLowerCase();
     const filtered = allProspects.filter(p =>
       matchesChannel(p, channelFilter) &&
+      matchesCategory(p, categoryFilter) &&
       (!query ||
         (p.name || '').toLowerCase().includes(query) ||
         (p.company || '').toLowerCase().includes(query)));
-    renderBoard(allStages, filtered, allProspects, query, !!query || channelFilter !== 'all');
+    renderBoard(allStages, filtered, allProspects, query,
+      !!query || channelFilter !== 'all' || categoryFilter !== 'all');
   }
 
   searchInput.addEventListener('input', applyFilter);
@@ -351,6 +390,7 @@
     renderNudgeQueue(allProspects);
     renderStats(allStages, allProspects);
     renderChannelFilterCounts(allProspects);
+    renderCategoryFilter(allProspects);
     renderStalled(allStages, allProspects);
     renderDataQuality(allStages, allProspects);
     applyFilter();
