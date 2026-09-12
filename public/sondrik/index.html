@@ -28,6 +28,27 @@
     empty state, never a filled-in guess.
   </div>
 
+  <details class="schema-help">
+    <summary>How to log a real update (until a backend is wired in)</summary>
+    <div class="schema-help-body">
+      <p>Edit the JSON files by hand under <code>public/sondrik/data/</code>, then run
+        <code>node public/sondrik/data/validate.js</code>. Leave any field you don't have a real answer for as
+        <code>null</code>, do not fill it in with a guess.</p>
+      <table class="schema-table">
+        <tbody>
+          <tr><th>releases.json</th><td>Append to the <code>releases</code> array on every real shipped version.
+            <code>date</code> is the actual ship date, <code>summary</code> is what actually changed.</td></tr>
+          <tr><th>downloads.json</th><td>Append a new object to <code>metric.checks</code> each time you actually
+            pull a fresh count. Never edit past checks, they are a record of what was true on that date. Always
+            state <code>metric.source</code> so a reader knows this isn't an estimate.</td></tr>
+          <tr><th>leads.json</th><td>One object per real lead. <code>outreach.sent</code> must stay
+            <code>false</code> until the message has actually been sent by a human. The validator refuses a
+            <code>sent: true</code> entry unless <code>approvalStatus</code> is also <code>"approved"</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Latest release</h2>
     <div id="releaseSection"></div>
