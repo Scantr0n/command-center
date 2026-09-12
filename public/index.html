@@ -87,6 +87,40 @@
     }
     .graph-node:hover, .cluster-card:hover { transform: none; }
   }
+
+  /* Below ~768px, shrinking the 900x900 viewBox to fit the screen makes node
+     labels a few px tall and unreadable. Keep the graph at a legible fixed
+     size instead and let #graphScroll (not #graphView, so the hint below
+     keeps its own containing block and does not scroll off with the graph)
+     pan it horizontally, centered on the hub. */
+  .graph-scroll-hint { display: none; }
+  @media (max-width: 767px) {
+    #graphScroll {
+      overflow-x: auto;
+      justify-content: flex-start;
+      -webkit-overflow-scrolling: touch;
+    }
+    #graphSvg {
+      width: 640px !important;
+      max-width: none !important;
+      flex-shrink: 0;
+    }
+    .graph-scroll-hint {
+      display: block;
+      position: absolute;
+      left: 50%;
+      top: 10px;
+      transform: translateX(-50%);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--faint);
+      background: var(--panel);
+      border: 1px solid var(--hairline);
+      padding: 3px 9px;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+  }
 </style>
 </head>
 <body class="min-h-screen font-sans" style="color: var(--ink)">
@@ -130,13 +164,16 @@
       <span>Closer to hub = higher priority &middot; Dashed ring = top priority &middot; Grouped by category</span>
     </div>
 
-    <div id="graphView" class="flex items-center justify-center py-4" style="position: relative;">
-      <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"></svg>
-      <div id="graphSkeleton" class="flex items-center justify-center" style="position: absolute; inset: 0;">
-        <div style="width: 130px; height: 130px; border-radius: 999px; border: 1.5px solid var(--hairlineHover); background: var(--panel); display: flex; align-items: center; justify-content: center;" class="skeleton-pulse">
-          <span class="text-[10px] font-mono" style="color: var(--faint)">LOADING</span>
+    <div id="graphView" style="position: relative;">
+      <div id="graphScroll" class="flex items-center justify-center py-4">
+        <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"></svg>
+        <div id="graphSkeleton" class="flex items-center justify-center" style="position: absolute; inset: 0;">
+          <div style="width: 130px; height: 130px; border-radius: 999px; border: 1.5px solid var(--hairlineHover); background: var(--panel); display: flex; align-items: center; justify-content: center;" class="skeleton-pulse">
+            <span class="text-[10px] font-mono" style="color: var(--faint)">LOADING</span>
+          </div>
         </div>
       </div>
+      <span class="graph-scroll-hint" aria-hidden="true">&larr; scroll &rarr;</span>
     </div>
 
     <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
@@ -523,6 +560,18 @@ function renderGraph() {
       }
     });
   applyFilters();
+  centerGraphScroll();
+}
+
+// Below 768px the graph renders at a fixed, legible pixel size wider than
+// the screen (see the matching media query) and scrolls horizontally, so
+// start that scroll centered on the hub instead of showing its left edge.
+function centerGraphScroll() {
+  if (window.innerWidth > 767) return;
+  const scroller = document.getElementById('graphScroll');
+  requestAnimationFrame(() => {
+    scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+  });
 }
 
 let searchTerm = '';
