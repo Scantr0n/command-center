@@ -623,8 +623,17 @@ function applyFilters() {
     const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
     const matchesCategory = !activeCategory || c.category === activeCategory;
     const matches = matchesSearch && matchesCategory;
-    el.classList.toggle('dimmed', anyFilterActive && !matches);
+    const isDimmed = anyFilterActive && !matches;
+    el.classList.toggle('dimmed', isDimmed);
     el.classList.toggle('matched', anyFilterActive && matches);
+    // Faded to 16% opacity, a dimmed card/node fails WCAG contrast for
+    // sighted users and, worse, reads to a screen reader exactly like a
+    // real match since aria-hidden/tabindex aren't affected by opacity.
+    // Pull it out of both the accessibility tree and tab order instead of
+    // just fading it, so it's excluded the same way for every user, not
+    // just visually.
+    el.setAttribute('aria-hidden', String(isDimmed));
+    el.setAttribute('tabindex', isDimmed ? '-1' : '0');
     if (matches && !countedIds.has(id)) {
       countedIds.add(id);
       matchCount++;
