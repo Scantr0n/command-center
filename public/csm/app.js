@@ -494,7 +494,7 @@
     renderDataQuality(allStages, allProspects);
     applyFilter();
   }).catch(err => {
-    boardEl.innerHTML = '<div class="column-empty">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
+    boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
     nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
   });
 })();

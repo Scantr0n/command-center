@@ -43,6 +43,7 @@ async function loadData() {
     listings = [];
     document.getElementById('listingTableBody').innerHTML = '';
     errBox.hidden = false;
+    errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load Garage data: " + e.message;
   }
 }
@@ -140,6 +141,7 @@ function applyFiltersAndRender() {
   if (!filtered.length) {
     tbody.innerHTML = '';
     empty.hidden = false;
+    empty.setAttribute('role', 'status');
     empty.textContent = listings.length ? 'No live listings match the current filters.' : 'No live listings logged yet.';
     return;
   }

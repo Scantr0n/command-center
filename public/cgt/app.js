@@ -81,6 +81,7 @@ async function loadCards() {
     cards = [];
     document.getElementById('cardTableBody').innerHTML = '';
     errBox.hidden = false;
+    errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load cards.json: " + e.message;
   }
 }
@@ -174,6 +175,7 @@ function applyFiltersAndRender() {
   if (!filtered.length) {
     tbody.innerHTML = '';
     empty.hidden = false;
+    empty.setAttribute('role', 'status');
     empty.textContent = cards.length ? 'No cards match the current filters.' : 'No cards logged yet.';
     return;
   }
