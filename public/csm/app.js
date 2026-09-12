@@ -345,7 +345,9 @@
       matchesCategory(p, categoryFilter) &&
       (!query ||
         (p.name || '').toLowerCase().includes(query) ||
-        (p.company || '').toLowerCase().includes(query)));
+        (p.company || '').toLowerCase().includes(query) ||
+        (p.category || '').toLowerCase().includes(query) ||
+        (p.verifiedHook || '').toLowerCase().includes(query)));
     lastFiltered = filtered;
     renderBoard(allStages, filtered, allProspects, query,
       !!query || channelFilter !== 'all' || categoryFilter !== 'all');
