@@ -251,12 +251,40 @@ function closeModal() {
   lastFocusedEl = null;
 }
 
+function getModalFocusable() {
+  return Array.from(document.getElementById('modal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('modalOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'modalOverlay') closeModal();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !document.getElementById('modalOverlay').hidden) closeModal();
+  const modalOpen = !document.getElementById('modalOverlay').hidden;
+  if (!modalOpen) return;
+  if (e.key === 'Escape') {
+    closeModal();
+    return;
+  }
+  // Without this, Tab from the last focusable element in the modal (or
+  // Shift+Tab from the first) escapes into the table underneath, which a
+  // screen reader user or keyboard-only user can't easily tell happened
+  // since the modal overlay still visually covers everything.
+  if (e.key === 'Tab') {
+    const focusable = getModalFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 });
 
 document.getElementById('searchInput').addEventListener('input', (e) => {
