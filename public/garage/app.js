@@ -206,4 +206,36 @@ document.querySelectorAll('th.sortable').forEach(th => {
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
 
+function csvField(v) {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+const CSV_COLUMNS = [
+  ['title', 'Item'], ['price', 'Price'], ['platforms', 'Platforms'],
+  ['status', 'Status'], ['datePublished', 'Published'], ['notes', 'Notes']
+];
+
+// Exports exactly what the table currently shows (same search, platform
+// filter, and sort applied), not the full dataset, so the file matches
+// what's on screen.
+document.getElementById('csvBtn').addEventListener('click', () => {
+  const rows = sortRows(listings.filter(matchesFilters)).map(l => ({
+    ...l,
+    platforms: (l.platforms || []).map(p => PLATFORM_LABELS[p] || p).join('; ')
+  }));
+  const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(l => CSV_COLUMNS.map(([key]) => csvField(l[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-listings-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
 loadData();
