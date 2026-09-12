@@ -45,6 +45,11 @@
       <p>A priced card gets a <code>stale</code> badge once its <code>datePriced</code> is more than 180 days old.
         That is not an error, card market prices just drift over months, and it is a nudge to re-check the price
         next time you are in this hub, not something to fix immediately.</p>
+      <p>If <code>gradingCompany</code> is <code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>,
+        or <code>KSA</code>, the card's detail view links out to that company's real cert-verification tool
+        (PSA and BGS link straight to the cert when <code>certNumber</code> is filled in, the others open the
+        lookup tool for you to enter it by hand since they don't expose a direct-link URL). HGA has no public
+        lookup tool as of this writing, so no link is shown for it.</p>
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"2021-topps-chrome-julio-rodriguez-psa10"</code></td></tr>

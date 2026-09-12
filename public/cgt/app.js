@@ -35,6 +35,33 @@ function daysSince(isoDate) {
   return Math.floor((now - then) / 86400000);
 }
 
+// Real official verification tools, checked directly against each grader's
+// site. Only PSA and Beckett (BGS) confirmed a URL pattern that deep-links
+// straight to a specific cert; SGC, CGC, and KSA have a public lookup tool
+// but it is a form you fill in by hand, no confirmed direct-link format, so
+// those just open the tool rather than guessing a query param. HGA has no
+// public cert lookup as of this writing, so it is left out entirely rather
+// than link to something that doesn't exist.
+const CERT_LOOKUP = {
+  PSA: { deepLink: cert => 'https://www.psacard.com/cert/' + encodeURIComponent(cert) },
+  BGS: { deepLink: cert => 'https://www.beckett.com/grading/card-lookup?item_id=' + encodeURIComponent(cert) + '&item_type=BGS' },
+  SGC: { landing: 'https://www.gosgc.com/auth-code' },
+  CGC: { landing: 'https://www.cgccards.com/verify' },
+  KSA: { landing: 'https://www.ksagrading.com/pages/card-serial-number-verification' }
+};
+
+function certLookupLink(c) {
+  const entry = c.gradingCompany && CERT_LOOKUP[c.gradingCompany];
+  if (!entry) return null;
+  if (entry.deepLink && c.certNumber) {
+    return { url: entry.deepLink(c.certNumber), text: 'Verify cert on ' + c.gradingCompany + '.com' };
+  }
+  if (entry.landing) {
+    return { url: entry.landing, text: 'Open ' + c.gradingCompany + ' cert lookup (enter cert by hand)' };
+  }
+  return null;
+}
+
 function isStale(c) {
   if (c.estimatedValue == null || !c.datePriced) return false;
   const age = daysSince(c.datePriced);
@@ -186,6 +213,10 @@ function openModal(id) {
 
   let body = '';
   body += field('Cert number', activeCard.certNumber, !activeCard.certNumber);
+  const lookup = certLookupLink(activeCard);
+  if (lookup) {
+    body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
+  }
   body += field('Estimated value', activeCard.estimatedValue != null ? formatUsd(activeCard.estimatedValue) : null, activeCard.estimatedValue == null);
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
   body += field('Comp note', activeCard.compNote, !activeCard.compNote);

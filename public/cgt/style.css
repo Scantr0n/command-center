@@ -397,6 +397,18 @@ table.card-table {
 }
 .field-value.empty { color: var(--dim); font-style: italic; }
 
+.cert-link {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: var(--sub);
+  text-decoration: none;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 5px 12px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.cert-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
+
 footer.page-foot {
   margin-top: 40px;
   font-size: 0.72rem;
