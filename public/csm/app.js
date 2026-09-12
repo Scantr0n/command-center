@@ -318,7 +318,9 @@
       socialFollowers: p.socialSnapshot && p.socialSnapshot.followers,
       socialEngagementRate: p.socialSnapshot && p.socialSnapshot.engagementRate,
       socialAsOfDate: p.socialSnapshot && p.socialSnapshot.asOfDate,
-      contentIdeas: (p.contentIdeas || []).join('; '),
+      contentIdeas: (p.contentIdeas || [])
+        .map(entry => (entry.date ? entry.date + ': ' : '') + entry.idea)
+        .join('; '),
       notes: p.notes
     }));
     const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
@@ -392,9 +394,11 @@
     }
     rows.push(fieldRow('Social snapshot', snapHtml, !(snap.platform || snap.followers != null)));
 
-    const ideas = p.contentIdeas || [];
+    const ideas = (p.contentIdeas || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const ideasHtml = ideas.length
-      ? '<ul class="ideas-list">' + ideas.map(i => '<li>' + escapeHtml(i) + '</li>').join('') + '</ul>'
+      ? '<ul class="ideas-list">' + ideas.map(entry =>
+          '<li><span class="idea-date font-mono">' + (entry.date ? escapeHtml(fmtDate(entry.date)) : 'NO DATE') +
+          '</span>' + escapeHtml(entry.idea) + '</li>').join('') + '</ul>'
       : 'No content ideas logged yet.';
     rows.push(fieldRow('Content ideas log', ideasHtml, ideas.length === 0));
 

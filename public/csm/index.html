@@ -50,6 +50,7 @@
           <tr><th>contactChannel.type</th><td><code>"named-decision-maker"</code> or <code>"generic-inbox"</code>, this is the field with the biggest real effect on reply rate, always fill it in as soon as it is known</td></tr>
           <tr><th>socialSnapshot.asOfDate</th><td>The date the follower/engagement numbers were actually pulled, never today's date by default</td></tr>
           <tr><th>nudgeSchedule</th><td><code>doNotNudgeBefore</code> and <code>nudgePoint</code>, both ISO dates (<code>YYYY-MM-DD</code>)</td></tr>
+          <tr><th>contentIdeas</th><td>Array of <code>{ "date": "YYYY-MM-DD", "idea": "..." }</code>. This is a dated log, not a wishlist: <code>date</code> is when the idea was actually logged, not when you might use it. Shown newest first.</td></tr>
         </tbody>
       </table>
       <pre class="schema-example font-mono">{
@@ -66,7 +67,9 @@
   "nudgeSchedule": { "doNotNudgeBefore": null, "nudgePoint": null },
   "replyStatus": null,
   "socialSnapshot": { "platform": null, "followers": null, "engagementRate": null, "asOfDate": null },
-  "contentIdeas": [],
+  "contentIdeas": [
+    { "date": "2026-09-12", "idea": "..." }
+  ],
   "notes": null
 }</pre>
     </div>

@@ -117,6 +117,22 @@ function main() {
 
     if (!Array.isArray(p.contentIdeas || [])) {
       errors.push(where + ': "contentIdeas" must be an array.');
+    } else {
+      (p.contentIdeas || []).forEach((entry, ideaIdx) => {
+        const ideaWhere = where + '.contentIdeas[' + ideaIdx + ']';
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+          errors.push(ideaWhere + ': must be an object like { "date": "YYYY-MM-DD", "idea": "..." }, not ' +
+            JSON.stringify(entry));
+          return;
+        }
+        if (!entry.idea || typeof entry.idea !== 'string') {
+          errors.push(ideaWhere + ': missing or non-string "idea"');
+        }
+        if (!isDateOrNull(entry.date) || entry.date == null) {
+          errors.push(ideaWhere + ': "date" must be a YYYY-MM-DD date (when the idea was actually logged): ' +
+            JSON.stringify(entry.date));
+        }
+      });
     }
   });
 
