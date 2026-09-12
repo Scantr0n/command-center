@@ -45,6 +45,9 @@ function main() {
 
   const cards = cardsData.cards || [];
   const seenIds = new Set();
+  // Keyed by grading company since cert numbers are only guaranteed unique
+  // within one company's own numbering, not across PSA/BGS/SGC/etc.
+  const seenCerts = new Map();
 
   cards.forEach((c, idx) => {
     const where = 'cards[' + idx + ']' + (c && c.id ? ' (' + c.id + ')' : '');
@@ -52,6 +55,16 @@ function main() {
     if (!c.id) errors.push(where + ': missing "id"');
     else if (seenIds.has(c.id)) errors.push(where + ': duplicate id "' + c.id + '"');
     else seenIds.add(c.id);
+
+    if (c.certNumber && c.gradingCompany) {
+      const certKey = c.gradingCompany + ':' + c.certNumber;
+      if (seenCerts.has(certKey)) {
+        errors.push(where + ': cert number "' + c.certNumber + '" for ' + c.gradingCompany +
+          ' is already used by "' + seenCerts.get(certKey) + '". Same physical card logged twice, or a typo\'d cert.');
+      } else {
+        seenCerts.set(certKey, c.id);
+      }
+    }
 
     if (!c.cardName) errors.push(where + ': missing "cardName"');
 
