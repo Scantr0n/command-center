@@ -364,6 +364,9 @@ header.page-head .sub {
 }
 .chip:hover { border-color: var(--hairlineHover); color: var(--ink); }
 .chip[aria-pressed="true"] { color: var(--ink); background: rgba(255,255,255,0.06); border-color: var(--hairlineHover); }
+.chip-count { color: var(--dim); }
+.chip[aria-pressed="true"] .chip-count { color: var(--sub); }
+.chip-zero { opacity: 0.45; }
 .chip-sale[aria-pressed="true"] { background: rgba(61,220,132,0.12); color: #3DDC84; border-color: rgba(61,220,132,0.4); }
 .chip-comp[aria-pressed="true"] { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
 

@@ -287,8 +287,8 @@ function renderBatchFilter() {
 
   container.hidden = false;
   container.innerHTML = '<span class="filter-row-label font-mono">BATCH</span>' +
-    `<button type="button" class="chip" data-batch="all" aria-pressed="${activeBatch === 'all'}">All</button>` +
-    batches.map(b => `<button type="button" class="chip" data-batch="${escapeHtml(b)}" aria-pressed="${activeBatch === b}">${escapeHtml(b)}</button>`).join('');
+    `<button type="button" class="chip" data-batch="all" aria-pressed="${activeBatch === 'all'}">All<span class="chip-count"></span></button>` +
+    batches.map(b => `<button type="button" class="chip" data-batch="${escapeHtml(b)}" aria-pressed="${activeBatch === b}">${escapeHtml(b)}<span class="chip-count"></span></button>`).join('');
 
   wireChipGroup('batchFilter', 'data-batch', (v) => { activeBatch = v; });
 }
@@ -300,19 +300,77 @@ function basisBadge(c) {
   return '<span class="badge badge-comp">unlabeled</span>';
 }
 
-function matchesFilters(c) {
-  const term = searchTerm.trim().toLowerCase();
-  const matchesSearch = !term
+// Each predicate takes the filter value explicitly (rather than reading the
+// active* globals) so the same functions drive both the real applied filters
+// below and the per-chip facet counts in facetCount(), instead of keeping
+// two copies of this logic in sync by hand.
+function matchesSearchTerm(c, term) {
+  term = term.trim().toLowerCase();
+  return !term
     || (c.cardName || '').toLowerCase().includes(term)
     || (c.certNumber || '').toLowerCase().includes(term)
     || String(c.year ?? '').includes(term);
-  const matchesSport = activeSport === 'all' || c.sport === activeSport;
-  const matchesGrader = activeGrader === 'all' || c.gradingCompany === activeGrader;
-  const matchesBatch = activeBatch === 'all' || c.backlogBatch === activeBatch;
-  let matchesBasis = true;
-  if (activeBasis === 'unpriced') matchesBasis = c.estimatedValue == null;
-  else if (activeBasis !== 'all') matchesBasis = c.valuationBasis === activeBasis;
-  return matchesSearch && matchesSport && matchesGrader && matchesBatch && matchesBasis;
+}
+function matchesSportValue(c, sport) { return sport === 'all' || c.sport === sport; }
+function matchesGraderValue(c, grader) { return grader === 'all' || c.gradingCompany === grader; }
+function matchesBatchValue(c, batch) { return batch === 'all' || c.backlogBatch === batch; }
+function matchesBasisValue(c, basis) {
+  if (basis === 'all') return true;
+  if (basis === 'unpriced') return c.estimatedValue == null;
+  return c.valuationBasis === basis;
+}
+
+function matchesFilters(c) {
+  return matchesSearchTerm(c, searchTerm)
+    && matchesSportValue(c, activeSport)
+    && matchesGraderValue(c, activeGrader)
+    && matchesBatchValue(c, activeBatch)
+    && matchesBasisValue(c, activeBasis);
+}
+
+// Counts how many cards would match if this one dimension's chip were set to
+// `value`, holding every other active filter (search included) as-is. This
+// is the standard faceted-search convention (each chip shows what picking it
+// would leave you with), so switching sport doesn't make the grader counts
+// lie about what's actually reachable from here.
+function facetCount(dimension, value) {
+  return cards.filter(c => {
+    if (!matchesSearchTerm(c, searchTerm)) return false;
+    if (dimension !== 'sport' && !matchesSportValue(c, activeSport)) return false;
+    if (dimension !== 'grader' && !matchesGraderValue(c, activeGrader)) return false;
+    if (dimension !== 'batch' && !matchesBatchValue(c, activeBatch)) return false;
+    if (dimension !== 'basis' && !matchesBasisValue(c, activeBasis)) return false;
+    if (dimension === 'sport') return matchesSportValue(c, value);
+    if (dimension === 'grader') return matchesGraderValue(c, value);
+    if (dimension === 'batch') return matchesBatchValue(c, value);
+    if (dimension === 'basis') return matchesBasisValue(c, value);
+    return true;
+  }).length;
+}
+
+const FACET_DIMENSIONS = [
+  ['sportFilter', 'data-sport', 'sport'],
+  ['basisFilter', 'data-basis', 'basis'],
+  ['graderFilter', 'data-grader', 'grader'],
+  ['batchFilter', 'data-batch', 'batch']
+];
+
+function updateChipCounts() {
+  FACET_DIMENSIONS.forEach(([containerId, dataAttr, dimension]) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.chip').forEach(chip => {
+      const countEl = chip.querySelector('.chip-count');
+      if (!countEl) return;
+      const value = chip.getAttribute(dataAttr);
+      const count = facetCount(dimension, value);
+      countEl.textContent = ' ' + count;
+      // Dimmed, not disabled: a 0-count facet is still worth being able to
+      // click (e.g. to confirm "yep, no football cards logged yet"), it just
+      // shouldn't visually compete with facets that actually narrow anything.
+      chip.classList.toggle('chip-zero', count === 0 && chip.getAttribute('aria-pressed') !== 'true');
+    });
+  });
 }
 
 function sortRows(rows) {
@@ -367,6 +425,7 @@ function applyFiltersAndRender() {
   const tbody = document.getElementById('cardTableBody');
   const empty = document.getElementById('tableEmpty');
   updateSortHeaders();
+  updateChipCounts();
   announceFilterStatus(filtered.length);
 
   if (!filtered.length) {
