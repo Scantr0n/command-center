@@ -4,6 +4,8 @@ let lastFocusedEl = null;
 let searchTerm = '';
 let activeSport = 'all';
 let activeBasis = 'all';
+let sortKey = null;
+let sortDir = 'asc';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -79,10 +81,34 @@ function matchesFilters(c) {
   return matchesSearch && matchesSport && matchesBasis;
 }
 
+function sortRows(rows) {
+  if (!sortKey) return rows;
+  const dir = sortDir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const av = a[sortKey];
+    const bv = b[sortKey];
+    // Cards with no value on the sort key always sink to the bottom
+    // regardless of direction, since "unknown" is not meaningfully high or low.
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    const key = th.getAttribute('data-sort');
+    th.setAttribute('aria-sort', key === sortKey ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none');
+  });
+}
+
 function applyFiltersAndRender() {
-  const filtered = cards.filter(matchesFilters);
+  const filtered = sortRows(cards.filter(matchesFilters));
   const tbody = document.getElementById('cardTableBody');
   const empty = document.getElementById('tableEmpty');
+  updateSortHeaders();
 
   if (!filtered.length) {
     tbody.innerHTML = '';
@@ -183,6 +209,26 @@ function wireChipGroup(containerId, dataAttr, setter) {
 }
 wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
+
+function handleSortHeaderActivate(th) {
+  const key = th.getAttribute('data-sort');
+  if (sortKey === key) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortKey = key;
+    sortDir = 'asc';
+  }
+  applyFiltersAndRender();
+}
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.addEventListener('click', () => handleSortHeaderActivate(th));
+  th.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSortHeaderActivate(th);
+    }
+  });
+});
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
 
