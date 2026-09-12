@@ -365,7 +365,7 @@ table.card-table {
 .badge-vinted { background: rgba(43,196,138,0.12); color: #2BC48A; border-color: rgba(43,196,138,0.35); }
 .badge-poshmark { background: rgba(194,24,91,0.14); color: #E0568F; border-color: rgba(194,24,91,0.4); }
 .badge-depop { background: rgba(255,107,53,0.14); color: #FF8A5C; border-color: rgba(255,107,53,0.4); }
-.badge-bug-fix { background: rgba(224,80,80,0.12); color: #E05050; border-color: rgba(224,80,80,0.35); }
+.badge-bug-fix { background: rgba(224,80,80,0.12); color: #E56464; border-color: rgba(224,80,80,0.35); }
 .badge-photo-audit { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
 
 .table-empty {
