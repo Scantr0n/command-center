@@ -28,6 +28,26 @@ function freshnessClass(iso) {
   return 'down';
 }
 
+// Glance indicators: this is a page Jack checks without switching to its tab,
+// so the tab itself (favicon dot + title) should carry the same connection
+// state as the on-page dot, using the same colors, rather than only being
+// visible after clicking in.
+const GLANCE_COLORS = { live: '#3DDC84', stale: '#E0A030', down: '#7B8188', error: '#E05050' };
+const GLANCE_TEXT = {
+  live: 'connected', stale: 'connected, stale', down: 'awaiting connection', error: 'error'
+};
+
+function updateGlanceIndicators(cls) {
+  const favicon = document.getElementById('pageFavicon');
+  if (favicon) {
+    const color = GLANCE_COLORS[cls] || GLANCE_COLORS.down;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +
+      `<circle cx="16" cy="16" r="13" fill="${color}"/></svg>`;
+    favicon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  document.title = `Alpha (${GLANCE_TEXT[cls] || cls}) / Command Center`;
+}
+
 function renderConnection(data) {
   const dot = document.getElementById('connDot');
   const label = document.getElementById('connLabel');
@@ -38,6 +58,7 @@ function renderConnection(data) {
     dot.className = 'conn-dot down';
     label.textContent = 'Not connected';
     sub.textContent = data.connection.note || 'No live feed configured yet.';
+    updateGlanceIndicators('down');
     return;
   }
 
@@ -48,6 +69,7 @@ function renderConnection(data) {
     ? 'Connected, but last reading is old'
     : 'Connected';
   sub.textContent = 'Last reading: ' + (age || asOf);
+  updateGlanceIndicators(cls);
 }
 
 function statTile(value, label, sub, awaiting) {
@@ -145,11 +167,14 @@ async function loadStatus() {
     renderArchitecture(data);
     renderGenealogy(data);
   } catch (e) {
-    // A failed refresh must not leave a stale "live" or "stale" dot showing,
-    // that would visually claim a fresher connection than we actually have.
-    document.getElementById('connDot').className = 'conn-dot down';
+    // Distinct from "down" (Alpha has no live feed yet, an expected,
+    // unremarkable state): this is the page itself failing to read its own
+    // status.json, a real problem worth standing out from the everyday
+    // "awaiting connection" gray, not blending into it.
+    document.getElementById('connDot').className = 'conn-dot error';
     document.getElementById('connLabel').textContent = "Couldn't load status.json";
     document.getElementById('connSub').textContent = e.message;
+    updateGlanceIndicators('error');
   }
 }
 

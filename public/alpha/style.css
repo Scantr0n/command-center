@@ -177,6 +177,9 @@ header.page-head .sub {
 .conn-dot.live { background: #3DDC84; box-shadow: 0 0 0 3px rgba(61,220,132,0.18); }
 .conn-dot.stale { background: #E0A030; box-shadow: 0 0 0 3px rgba(224,160,48,0.18); }
 .conn-dot.down { background: #7B8188; box-shadow: 0 0 0 3px rgba(123,129,136,0.18); }
+/* Distinct from "down" (Alpha has no live feed yet, expected): this hub's own
+   fetch of status.json failed, a real problem with the page, not with Alpha. */
+.conn-dot.error { background: #E05050; box-shadow: 0 0 0 3px rgba(224,80,80,0.22); }
 .conn-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.78rem;
