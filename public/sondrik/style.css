@@ -67,6 +67,25 @@ header.page-head .sub {
 }
 .back-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
 
+.page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.print-btn {
+  font-size: 0.75rem;
+  color: var(--sub);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.print-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
+
 .callout {
   border: 1px solid var(--hairline);
   background: rgba(255,255,255,0.02);
@@ -345,4 +364,40 @@ footer.page-foot {
   color: var(--dim);
   border-top: 1px solid var(--hairline);
   padding-top: 16px;
+}
+
+/* Print / export to PDF: a plain, light, single-column handout.
+   Interactive-only controls (print button, back link, schema help) are
+   dropped since they do nothing on paper. */
+@media print {
+  body { background: #fff; color: #111; }
+  .wrap { max-width: none; padding: 0.4in 0.5in; }
+
+  .print-btn, .back-link, .schema-help {
+    display: none !important;
+  }
+
+  .callout {
+    border-color: #bbb;
+    background: none;
+    color: #333;
+  }
+  .callout strong { color: #111; }
+
+  .release-card, .stat-tile, .lead-card {
+    background: none;
+    border: 1px solid #ccc;
+    break-inside: avoid;
+  }
+  .release-summary, .stat-label, .lead-summary { color: #333; }
+  .release-date, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date { color: #555; }
+  .stat-delta { color: #111; }
+  .release-badge { border-color: #999; background: none; color: #111; }
+  .compare-bar { border-color: #ccc; }
+  .compare-bar-fill { background: #888; }
+  .compare-bar-count, .stat-number { color: #111; }
+  .status-pill, .status-pill-sent { border-color: #999; background: none; color: #111; }
+
+  .empty-state { border-color: #ccc; color: #555; }
+  footer.page-foot { border-color: #ccc; color: #555; }
 }
