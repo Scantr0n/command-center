@@ -40,5 +40,6 @@
       "lastBreedingEventAt": null,
       "lastBreedingEventNote": null
     }
-  }
+  },
+  "events": []
 }

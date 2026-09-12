@@ -187,6 +187,50 @@ function renderGenealogy(data) {
   `;
 }
 
+// A status-only page loses the "what changed and when" that makes a status
+// page trustworthy over time, not just at the instant you look at it. This
+// renders an honest activity log: kill-switch triggers, regime changes,
+// connection state changes, whatever a future live feed appends to
+// data.events. Empty today since this sandbox has no real history yet, not
+// because the feature is unfinished.
+function eventItem(evt) {
+  const tone = ['good', 'alert'].includes(evt.tone) ? evt.tone : 'neutral';
+  const age = timeAgo(evt.at);
+  return `
+    <li class="event-item">
+      <span class="event-tag event-tag-${tone} font-mono">${escapeHtml(evt.type || 'event')}</span>
+      <div class="event-body">
+        <div class="event-label">${escapeHtml(evt.label)}</div>
+        ${evt.detail ? `<div class="event-detail">${escapeHtml(evt.detail)}</div>` : ''}
+      </div>
+      <time class="event-time font-mono" datetime="${escapeHtml(evt.at)}">${escapeHtml(age || evt.at)}</time>
+    </li>
+  `;
+}
+
+function renderEventLog(data) {
+  const log = document.getElementById('eventLog');
+  const events = Array.isArray(data.events) ? data.events : [];
+
+  if (!events.length) {
+    log.classList.add('event-log-empty');
+    log.innerHTML = `
+      <li class="empty-panel">
+        <div class="empty-panel-title font-mono">NO EVENTS RECORDED YET</div>
+        <div class="empty-panel-sub">
+          Once wired in, this logs kill-switch triggers, regime changes, and connection state changes as they
+          happen, oldest at the bottom. Nothing to show from this sandbox yet.
+        </div>
+      </li>
+    `;
+    return;
+  }
+
+  log.classList.remove('event-log-empty');
+  const sorted = [...events].sort((a, b) => new Date(b.at) - new Date(a.at));
+  log.innerHTML = sorted.map(eventItem).join('');
+}
+
 async function loadStatus() {
   try {
     // Cache-bust: this file is meant to change out from under the page
@@ -200,6 +244,7 @@ async function loadStatus() {
     renderPositionSizing(data);
     renderArchitecture(data);
     renderGenealogy(data);
+    renderEventLog(data);
   } catch (e) {
     // Distinct from "down" (Alpha has no live feed yet, an expected,
     // unremarkable state): this is the page itself failing to read its own

@@ -102,6 +102,32 @@ function main() {
     errors.push('system.features: missing or not an array');
   }
 
+  if ('events' in data) {
+    if (!Array.isArray(data.events)) {
+      errors.push('events: must be an array (empty is fine, it starts that way honestly)');
+    } else {
+      data.events.forEach((evt, i) => {
+        const where = `events[${i}]`;
+        if (!evt || typeof evt !== 'object') {
+          errors.push(where + ': must be an object');
+          return;
+        }
+        if (!isIsoDatetimeOrNull(evt.at) || evt.at == null) {
+          errors.push(where + '.at: required, must be a valid ISO datetime (every event needs a real timestamp)');
+        }
+        if (typeof evt.type !== 'string' || !evt.type) {
+          errors.push(where + '.type: required, must be a non-empty string');
+        }
+        if (typeof evt.label !== 'string' || !evt.label) {
+          errors.push(where + '.label: required, must be a non-empty string');
+        }
+        if (evt.tone != null && !['neutral', 'good', 'alert'].includes(evt.tone)) {
+          errors.push(where + '.tone: must be "neutral", "good", or "alert" if set');
+        }
+      });
+    }
+  }
+
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
     warnings.forEach(w => console.warn('  - ' + w));
