@@ -42,6 +42,9 @@
       <p><strong>Run <code>node public/cgt/data/validate.js</code> after every edit.</strong> It catches
         duplicate ids, a missing or unlabeled <code>valuationBasis</code> on a priced card, a
         <code>comp-estimate</code> with no <code>compNote</code> explaining what it is based on, and bad dates.</p>
+      <p>A priced card gets a <code>stale</code> badge once its <code>datePriced</code> is more than 180 days old.
+        That is not an error, card market prices just drift over months, and it is a nudge to re-check the price
+        next time you are in this hub, not something to fix immediately.</p>
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"2021-topps-chrome-julio-rodriguez-psa10"</code></td></tr>

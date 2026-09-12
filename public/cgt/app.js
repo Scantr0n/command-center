@@ -21,6 +21,26 @@ function isExample(c) {
   return c.id === 'example-row-not-real';
 }
 
+// Card market prices drift over months, not days, so this is a much longer
+// window than the 7-day staleness check used elsewhere in Command Center
+// (e.g. the Sondrik download tracker). It just means "worth a re-check
+// before relying on this number," not that the price is wrong.
+const PRICE_STALE_AFTER_DAYS = 180;
+
+function daysSince(isoDate) {
+  if (!isoDate) return null;
+  const then = new Date(isoDate + 'T00:00:00Z').getTime();
+  if (Number.isNaN(then)) return null;
+  const now = Date.now();
+  return Math.floor((now - then) / 86400000);
+}
+
+function isStale(c) {
+  if (c.estimatedValue == null || !c.datePriced) return false;
+  const age = daysSince(c.datePriced);
+  return age != null && age > PRICE_STALE_AFTER_DAYS;
+}
+
 async function loadCards() {
   const errBox = document.getElementById('tableEmpty');
   try {
@@ -44,6 +64,7 @@ function renderStats() {
   const totalValue = priced.reduce((s, c) => s + c.estimatedValue, 0);
   const bySale = priced.filter(c => c.valuationBasis === 'recent-sale').length;
   const byComp = priced.filter(c => c.valuationBasis === 'comp-estimate').length;
+  const stale = priced.filter(isStale).length;
   const bySport = { hockey: 0, baseball: 0, football: 0 };
   real.forEach(c => { if (bySport[c.sport] != null) bySport[c.sport]++; });
 
@@ -52,6 +73,7 @@ function renderStats() {
     { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
     { value: bySale, label: 'Recent-sale priced', sub: null },
     { value: byComp, label: 'Comp-estimate priced', sub: null },
+    { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
     { value: bySport.hockey + ' / ' + bySport.baseball + ' / ' + bySport.football, label: 'Hockey / baseball / football', sub: null }
   ];
 
@@ -129,7 +151,7 @@ function applyFiltersAndRender() {
       <td class="cell-muted">${c.grade != null ? escapeHtml(String(c.grade)) : '<span class="cell-value empty">unknown</span>'}</td>
       <td class="cell-value${c.estimatedValue == null ? ' empty' : ''}">${c.estimatedValue != null ? formatUsd(c.estimatedValue) : 'not priced'}</td>
       <td>${basisBadge(c)}</td>
-      <td class="cell-muted">${c.datePriced ? escapeHtml(c.datePriced) : '<span class="cell-value empty">n/a</span>'}</td>
+      <td class="cell-muted">${c.datePriced ? escapeHtml(c.datePriced) : '<span class="cell-value empty">n/a</span>'}${isStale(c) ? ' <span class="badge badge-stale" title="Priced more than 180 days ago, worth a re-check">stale</span>' : ''}</td>
     </tr>
   `).join('');
 
@@ -168,7 +190,10 @@ function openModal(id) {
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
   body += field('Comp note', activeCard.compNote, !activeCard.compNote);
   body += field('Source', activeCard.sourceNote, !activeCard.sourceNote);
-  body += field('Date priced', activeCard.datePriced, !activeCard.datePriced);
+  const datePricedDisplay = activeCard.datePriced && isStale(activeCard)
+    ? activeCard.datePriced + ' (180+ days ago, worth a re-check)'
+    : activeCard.datePriced;
+  body += field('Date priced', datePricedDisplay, !activeCard.datePriced);
   body += field('Backlog batch', activeCard.backlogBatch, !activeCard.backlogBatch);
   body += field('Notes', activeCard.notes, !activeCard.notes);
 
