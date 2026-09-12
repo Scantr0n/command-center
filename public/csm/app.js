@@ -12,6 +12,7 @@
   const modalClose = document.getElementById('modalClose');
   const printBtn = document.getElementById('printBtn');
   const csvBtn = document.getElementById('csvBtn');
+  const copyLinkBtn = document.getElementById('copyLinkBtn');
   const dataQualitySection = document.getElementById('dataQualitySection');
   const dataQualityList = document.getElementById('dataQualityList');
 
@@ -257,6 +258,32 @@
   let categoryFilter = 'all';
   let lastFiltered = [];
 
+  // Filter/search state is mirrored into the URL so a specific slice of the
+  // pipeline (e.g. "named decision-makers in the outreach-sent stage") can be
+  // bookmarked or shared as a link, same convention as the CGT hub.
+  const VALID_CHANNELS = ['named-decision-maker', 'generic-inbox', 'unlogged'];
+
+  function restoreStateFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q');
+    const channel = params.get('channel');
+    const category = params.get('category');
+    if (q) searchInput.value = q;
+    if (channel && VALID_CHANNELS.includes(channel)) channelFilter = channel;
+    if (category) categoryFilter = category;
+  }
+
+  function syncUrl() {
+    const params = new URLSearchParams();
+    const query = searchInput.value.trim();
+    if (query) params.set('q', query);
+    if (channelFilter !== 'all') params.set('channel', channelFilter);
+    if (categoryFilter !== 'all') params.set('category', categoryFilter);
+    const qs = params.toString();
+    const url = location.pathname + (qs ? '?' + qs : '');
+    history.replaceState(null, '', url);
+  }
+
   function matchesChannel(p, key) {
     if (key === 'all') return true;
     const type = p.contactChannel && p.contactChannel.type;
@@ -280,12 +307,16 @@
     }
     categoryFilterEl.hidden = false;
 
+    if (categoryFilter !== 'all' && !categories.includes(categoryFilter)) {
+      categoryFilter = 'all';
+    }
+
     const keys = ['all', ...categories];
     const chipsHtml = keys.map(key => {
       const label = key === 'all' ? 'All' : key;
       const count = prospects.filter(p => matchesCategory(p, key)).length;
       return '<button type="button" class="chip" data-category="' + escapeHtml(key) +
-        '" aria-pressed="' + (key === 'all') + '">' + escapeHtml(label) + ' (' + count + ')</button>';
+        '" aria-pressed="' + (key === categoryFilter) + '">' + escapeHtml(label) + ' (' + count + ')</button>';
     }).join('');
     categoryFilterEl.innerHTML = '<span class="channel-filter-label font-mono">CATEGORY</span>' + chipsHtml;
 
@@ -310,6 +341,7 @@
     lastFiltered = filtered;
     renderBoard(allStages, filtered, allProspects, query,
       !!query || channelFilter !== 'all' || categoryFilter !== 'all');
+    syncUrl();
   }
 
   function csvField(v) {
@@ -478,6 +510,25 @@
       }
     }
   });
+
+  restoreStateFromUrl();
+  channelFilterEl.querySelectorAll('.chip').forEach(chip => {
+    chip.setAttribute('aria-pressed', String(chip.getAttribute('data-channel') === channelFilter));
+  });
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    const COPY_LINK_LABEL = copyLinkBtn.textContent;
+    copyLinkBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(location.href)
+        .then(() => { copyLinkBtn.textContent = 'Link copied'; })
+        .catch(() => { copyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
+        .finally(() => {
+          setTimeout(() => { copyLinkBtn.textContent = COPY_LINK_LABEL; }, 1800);
+        });
+    });
+  } else {
+    copyLinkBtn.hidden = true;
+  }
 
   Promise.all([
     fetch('/csm/data/stages.json').then(r => r.json()),
