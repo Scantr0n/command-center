@@ -408,6 +408,12 @@ section { margin-bottom: 36px; }
   text-align: center;
   line-height: 1.6;
 }
+.empty-state.file-error {
+  margin-bottom: 12px;
+  border-style: solid;
+  border-color: rgba(224,160,48,0.35);
+  color: #E0A030;
+}
 
 /* Lead / engagement queue */
 .lead-card {

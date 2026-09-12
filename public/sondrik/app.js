@@ -237,22 +237,67 @@
     URL.revokeObjectURL(url);
   }
 
-  Promise.all([
-    fetch('/sondrik/data/releases.json').then(r => r.json()),
-    fetch('/sondrik/data/downloads.json').then(r => r.json()),
-    fetch('/sondrik/data/leads.json').then(r => r.json())
-  ]).then(([releasesData, downloadsData, leadsData]) => {
-    renderTimeline(releasesData, downloadsData, leadsData);
-    renderReleases(releasesData);
-    renderTraction(downloadsData);
-    renderLeads(leadsData);
-    renderAttentionPill(leadsData);
-    csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
-  }).catch(err => {
-    timelineSection.innerHTML = '<div class="empty-state" role="alert">Failed to load timeline data: ' + escapeHtml(err.message) + '</div>';
-    releaseSection.innerHTML = '<div class="empty-state" role="alert">Failed to load release data: ' + escapeHtml(err.message) + '</div>';
-    tractionSection.innerHTML = '<div class="empty-state">Failed to load.</div>';
-    leadsSection.innerHTML = '<div class="empty-state">Failed to load.</div>';
-    csvBtn.disabled = true;
+  function loadDataFile(name) {
+    return fetch('/sondrik/data/' + name + '.json').then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  // Each of the three files is a hand-edited record Jack can typo at any
+  // time (that's the whole point of validate.js). One bad edit should only
+  // degrade the section(s) that actually depend on that file, the same way
+  // server.js's readLocalClusters skips one broken cluster file instead of
+  // taking the whole dashboard down. Promise.all would fail all four
+  // sections over a single JSON typo in, say, leads.json alone.
+  Promise.allSettled([
+    loadDataFile('releases'),
+    loadDataFile('downloads'),
+    loadDataFile('leads')
+  ]).then(([releasesResult, downloadsResult, leadsResult]) => {
+    const releasesData = releasesResult.status === 'fulfilled' ? releasesResult.value : null;
+    const downloadsData = downloadsResult.status === 'fulfilled' ? downloadsResult.value : null;
+    const leadsData = leadsResult.status === 'fulfilled' ? leadsResult.value : null;
+
+    const failures = [];
+    if (releasesResult.status === 'rejected') failures.push('releases.json: ' + releasesResult.reason.message);
+    if (downloadsResult.status === 'rejected') failures.push('downloads.json: ' + downloadsResult.reason.message);
+    if (leadsResult.status === 'rejected') failures.push('leads.json: ' + leadsResult.reason.message);
+
+    if (releasesData || downloadsData || leadsData) {
+      renderTimeline(releasesData || {}, downloadsData || {}, leadsData || {});
+      if (failures.length) {
+        timelineSection.insertAdjacentHTML('afterbegin',
+          '<div class="empty-state file-error" role="alert">Showing partial data, failed to load: ' +
+          failures.map(escapeHtml).join('; ') + '</div>');
+      }
+    } else {
+      timelineSection.innerHTML = '<div class="empty-state" role="alert">Failed to load timeline data: ' +
+        failures.map(escapeHtml).join('; ') + '</div>';
+    }
+
+    if (releasesData) {
+      renderReleases(releasesData);
+    } else {
+      releaseSection.innerHTML = '<div class="empty-state" role="alert">Failed to load release data: ' +
+        escapeHtml(releasesResult.reason.message) + '</div>';
+    }
+
+    if (downloadsData) {
+      renderTraction(downloadsData);
+      csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
+    } else {
+      tractionSection.innerHTML = '<div class="empty-state" role="alert">Failed to load traction data: ' +
+        escapeHtml(downloadsResult.reason.message) + '</div>';
+      csvBtn.disabled = true;
+    }
+
+    if (leadsData) {
+      renderLeads(leadsData);
+      renderAttentionPill(leadsData);
+    } else {
+      leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
+        escapeHtml(leadsResult.reason.message) + '</div>';
+    }
   });
 })();
