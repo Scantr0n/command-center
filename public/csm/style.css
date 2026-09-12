@@ -393,7 +393,7 @@ header.page-head .sub {
 }
 .badge-dm { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
 .badge-generic { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
-.badge-unknown { background: rgba(255,255,255,0.03); color: var(--dim); }
+.badge-unknown { background: rgba(255,255,255,0.03); color: var(--sub); }
 
 .column-empty {
   font-size: 0.72rem;
