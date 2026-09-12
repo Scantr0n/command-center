@@ -103,6 +103,16 @@ function main() {
     if (!isDateOrNull(c.datePriced)) {
       errors.push(where + ': "datePriced" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.datePriced));
     }
+
+    // The batch filter chip list (public/cgt/app.js, renderBatchFilter) sorts
+    // batches by a plain string sort on the label, newest first. That only
+    // produces newest-first order when every label leads with an ISO date, so
+    // a batch that doesn't follow the convention would silently sort out of
+    // order in the UI instead of erroring anywhere.
+    if (c.backlogBatch && !DATE_RE.test(c.backlogBatch.slice(0, 10))) {
+      warnings.push(where + ': "backlogBatch" ("' + c.backlogBatch + '") does not start with a YYYY-MM-DD date. ' +
+        'The batch filter sorts by this label as a plain string, so it needs an ISO-date prefix to sort newest-first.');
+    }
   });
 
   if (warnings.length) {
