@@ -7,5 +7,7 @@
   "lastUpdate": "2026-08-08",
   "summary": "Entire hockey/baseball/football backlog fully priced via a 7-agent parallel research sweep. Standing rule: every card gets individually researched, missing grade tiers get a labeled comp-based estimate rather than being left blank.",
   "status": "active",
-  "sessionTitle": "CGT (Card grader tracker)"
+  "sessionTitle": "CGT (Card grader tracker)",
+  "link": "/cgt/",
+  "linkLabel": "Open grading tracker"
 }
