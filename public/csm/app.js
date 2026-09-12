@@ -10,6 +10,8 @@
   const modalBody = document.getElementById('modalBody');
   const modalClose = document.getElementById('modalClose');
   const printBtn = document.getElementById('printBtn');
+  const dataQualitySection = document.getElementById('dataQualitySection');
+  const dataQualityList = document.getElementById('dataQualityList');
 
   printBtn.addEventListener('click', () => window.print());
 
@@ -89,6 +91,27 @@
     if (a.nextNudgeDate) return -1;
     if (b.nextNudgeDate) return 1;
     return (a.name || '').localeCompare(b.name || '');
+  }
+
+  function renderDataQuality(stages, prospects) {
+    const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
+    const needsChannel = prospects.filter(p =>
+      p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type));
+
+    if (needsChannel.length === 0) {
+      dataQualitySection.hidden = true;
+      return;
+    }
+
+    dataQualitySection.hidden = false;
+    dataQualityList.innerHTML = needsChannel.map(p =>
+      '<div class="data-quality-row">' +
+      '<strong>' + escapeHtml(p.name) + '</strong>' +
+      '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+      '<span class="dq-why">' + escapeHtml(stageLabel[p.stage] || p.stage) +
+      ', NO CONTACT CHANNEL TYPE LOGGED YET</span>' +
+      '</div>'
+    ).join('');
   }
 
   function renderBoard(stages, prospects, allProspects, query, filtering) {
@@ -277,6 +300,7 @@
     renderNudgeQueue(allProspects);
     renderStats(allStages, allProspects);
     renderChannelFilterCounts(allProspects);
+    renderDataQuality(allStages, allProspects);
     applyFilter();
   }).catch(err => {
     boardEl.innerHTML = '<div class="column-empty">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';

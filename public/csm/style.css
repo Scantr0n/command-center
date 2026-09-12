@@ -205,6 +205,30 @@ header.page-head .sub {
 .nudge-today .nudge-when { color: #E0A030; font-weight: 500; }
 .nudge-soon .nudge-urgency-dot { background: #E0A030; opacity: 0.6; }
 
+.data-quality-list {
+  border: 1px solid rgba(224,160,48,0.3);
+  background: rgba(224,160,48,0.04);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 36px;
+}
+.data-quality-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(224,160,48,0.15);
+  font-size: 0.85rem;
+}
+.data-quality-row:first-of-type { border-top: none; }
+.data-quality-row .dq-why {
+  margin-left: auto;
+  color: #E0A030;
+  font-size: 0.72rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
 .board-toolbar {
   display: flex;
   align-items: center;
@@ -515,6 +539,10 @@ footer.page-foot {
   .nudge-queue { background: none; border-color: #ccc; }
   .nudge-row { border-color: #ddd; }
   .nudge-when { color: #444; }
+
+  .data-quality-list { background: none; border-color: #bbb; }
+  .data-quality-row { border-color: #ddd; }
+  .data-quality-row .dq-why { color: #555; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }
