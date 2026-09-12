@@ -186,14 +186,21 @@ header.page-head .sub {
 }
 .nudge-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   padding: 10px 0;
   border-top: 1px solid var(--hairline);
   font-size: 0.85rem;
 }
 .nudge-row:first-of-type { border-top: none; }
+.nudge-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .nudge-when { margin-left: auto; color: var(--dim); }
+.nudge-action {
+  margin-left: 19px;
+  color: var(--sub);
+  font-size: 0.8rem;
+}
+.nudge-action-missing { color: #E0A030; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
 
 .nudge-urgency-dot {
   width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0;
@@ -608,6 +615,8 @@ footer.page-foot {
   .nudge-queue { background: none; border-color: #ccc; }
   .nudge-row { border-color: #ddd; }
   .nudge-when { color: #444; }
+  .nudge-action { color: #444; }
+  .nudge-action-missing { color: #111; }
 
   .data-quality-list { background: none; border-color: #bbb; }
   .data-quality-row { border-color: #ddd; }

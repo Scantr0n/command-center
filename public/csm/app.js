@@ -123,13 +123,19 @@
       const notBefore = p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore
         ? ' &middot; do not nudge before ' + fmtDate(p.nudgeSchedule.doNotNudgeBefore)
         : '';
+      const actionLine = p.nextAction
+        ? '<div class="nudge-action">' + escapeHtml(p.nextAction) + '</div>'
+        : '<div class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</div>';
       return '<div class="nudge-row nudge-' + urgency + '">' +
+        '<div class="nudge-top">' +
         '<span class="nudge-urgency-dot"></span>' +
         '<strong>' + escapeHtml(p.name) + '</strong>' +
         '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
         '<span class="font-mono nudge-when">' +
         fmtDate(p.nextNudgeDate) + ' (' + when + ')' + notBefore +
-        '</span></div>';
+        '</span></div>' +
+        actionLine +
+        '</div>';
     }).join('');
   }
 
@@ -364,7 +370,7 @@
     ['stage', 'Stage'], ['stageEnteredDate', 'Stage Entered'],
     ['verifiedHook', 'Verified Hook'],
     ['channelType', 'Contact Channel Type'], ['channelDetail', 'Contact Channel Detail'],
-    ['sendDate', 'Send Date'], ['nextNudgeDate', 'Next Nudge Date'],
+    ['sendDate', 'Send Date'], ['nextNudgeDate', 'Next Nudge Date'], ['nextAction', 'Next Action'],
     ['doNotNudgeBefore', 'Do Not Nudge Before'], ['nudgePoint', 'Nudge Point'],
     ['replyStatus', 'Reply Status'],
     ['socialPlatform', 'Social Platform'], ['socialFollowers', 'Social Followers'],
@@ -386,6 +392,7 @@
       channelDetail: p.contactChannel && p.contactChannel.detail,
       sendDate: p.sendDate,
       nextNudgeDate: p.nextNudgeDate,
+      nextAction: p.nextAction,
       doNotNudgeBefore: p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore,
       nudgePoint: p.nudgeSchedule && p.nudgeSchedule.nudgePoint,
       replyStatus: p.replyStatus,
@@ -440,6 +447,7 @@
     rows.push(fieldRow('Reply status', p.replyStatus ? escapeHtml(p.replyStatus) : 'Not logged yet', !p.replyStatus));
     rows.push(fieldRow('Send date', p.sendDate ? fmtDate(p.sendDate) : 'Not logged yet', !p.sendDate));
     rows.push(fieldRow('Next nudge date', p.nextNudgeDate ? fmtDate(p.nextNudgeDate) : 'Not scheduled yet', !p.nextNudgeDate));
+    rows.push(fieldRow('Next action', p.nextAction ? escapeHtml(p.nextAction) : 'Not logged yet', !p.nextAction));
 
     const stallEntry = stallInfo(p, Object.fromEntries(allStages.map(s => [s.id, s])));
     const stageText = p.stageEnteredDate

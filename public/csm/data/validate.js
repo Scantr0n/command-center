@@ -110,6 +110,10 @@ function main() {
       errors.push(where + ': nextNudgeDate (' + p.nextNudgeDate + ') is before nudgeSchedule.doNotNudgeBefore (' +
         ns.doNotNudgeBefore + '). The nudge queue would surface this prospect before it is supposed to be nudged.');
     }
+    if (p.nextNudgeDate && !p.nextAction) {
+      warnings.push(where + ': nextNudgeDate is set but nextAction is not logged. A due date with no concrete ' +
+        'next step is a common way real deals quietly stall, backfill what actually needs to happen.');
+    }
 
     const snap = p.socialSnapshot || {};
     if (!isDateOrNull(snap.asOfDate)) {

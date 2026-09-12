@@ -50,6 +50,7 @@
           <tr><th>stageEnteredDate</th><td>ISO date this prospect moved into its current <code>stage</code>. Update it every time <code>stage</code> changes. Once logged, the board flags the card as stalled if it sits past that stage's stall threshold in <code>data/stages.json</code>.</td></tr>
           <tr><th>contactChannel.type</th><td><code>"named-decision-maker"</code> or <code>"generic-inbox"</code>, this is the field with the biggest real effect on reply rate, always fill it in as soon as it is known</td></tr>
           <tr><th>socialSnapshot.asOfDate</th><td>The date the follower/engagement numbers were actually pulled, never today's date by default</td></tr>
+          <tr><th>nextAction</th><td>Plain text describing what actually needs to happen at the next touchpoint (e.g. <code>"Follow up referencing their latest Douyin post"</code>), not just a date. A due date with no concrete next step is one of the most common ways real pipeline deals quietly stall.</td></tr>
           <tr><th>nudgeSchedule</th><td><code>doNotNudgeBefore</code> and <code>nudgePoint</code>, both ISO dates (<code>YYYY-MM-DD</code>)</td></tr>
           <tr><th>contentIdeas</th><td>Array of <code>{ "date": "YYYY-MM-DD", "idea": "..." }</code>. This is a dated log, not a wishlist: <code>date</code> is when the idea was actually logged, not when you might use it. Shown newest first.</td></tr>
           <tr><th>stageHistory</th><td>Array of <code>{ "date": "YYYY-MM-DD", "stage": "outreach-sent" }</code>, oldest first, logged each time the prospect actually moves to a new stage. This is how real time-in-stage and pipeline velocity get tracked instead of only knowing the current stage. The last entry's <code>stage</code> should match the prospect's current <code>stage</code>, the validator warns if they drift apart. Leave it as <code>[]</code> until you start logging moves going forward, do not backfill guessed dates for past moves.</td></tr>
@@ -66,6 +67,7 @@
   "contactChannel": { "type": null, "detail": null },
   "sendDate": null,
   "nextNudgeDate": null,
+  "nextAction": null,
   "nudgeSchedule": { "doNotNudgeBefore": null, "nudgePoint": null },
   "replyStatus": null,
   "socialSnapshot": { "platform": null, "followers": null, "engagementRate": null, "asOfDate": null },

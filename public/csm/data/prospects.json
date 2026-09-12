@@ -16,6 +16,7 @@
       },
       "sendDate": null,
       "nextNudgeDate": null,
+      "nextAction": null,
       "nudgeSchedule": {
         "doNotNudgeBefore": null,
         "nudgePoint": null
