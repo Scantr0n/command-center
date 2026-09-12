@@ -122,7 +122,10 @@ function basisBadge(c) {
 
 function matchesFilters(c) {
   const term = searchTerm.trim().toLowerCase();
-  const matchesSearch = !term || (c.cardName || '').toLowerCase().includes(term);
+  const matchesSearch = !term
+    || (c.cardName || '').toLowerCase().includes(term)
+    || (c.certNumber || '').toLowerCase().includes(term)
+    || String(c.year ?? '').includes(term);
   const matchesSport = activeSport === 'all' || c.sport === activeSport;
   let matchesBasis = true;
   if (activeBasis === 'unpriced') matchesBasis = c.estimatedValue == null;
