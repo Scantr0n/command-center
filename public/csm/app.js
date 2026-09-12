@@ -9,6 +9,9 @@
   const modalCompany = document.getElementById('modalCompany');
   const modalBody = document.getElementById('modalBody');
   const modalClose = document.getElementById('modalClose');
+  const printBtn = document.getElementById('printBtn');
+
+  printBtn.addEventListener('click', () => window.print());
 
   function fmtDate(iso) {
     if (!iso) return null;

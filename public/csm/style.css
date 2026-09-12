@@ -66,6 +66,25 @@ header.page-head .sub {
 }
 .back-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
 
+.page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.print-btn {
+  font-size: 0.75rem;
+  color: var(--sub);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.print-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
+
 .callout {
   border: 1px solid var(--hairline);
   background: rgba(255,255,255,0.02);
@@ -443,4 +462,59 @@ footer.page-foot {
   color: var(--dim);
   border-top: 1px solid var(--hairline);
   padding-top: 16px;
+}
+
+/* Print / export to PDF: a plain, light, single-column handout.
+   Interactive-only controls (search, chips, links, the schema editor
+   help, the modal) are dropped since they do nothing on paper. */
+@media print {
+  body { background: #fff; color: #111; }
+  .wrap { max-width: none; padding: 0.4in 0.5in; }
+
+  .print-btn, .back-link, .search-input, .channel-filter, .schema-help,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  .callout {
+    border-color: #bbb;
+    background: none;
+    color: #333;
+  }
+  .callout strong { color: #111; }
+
+  .board-toolbar { margin-bottom: 10px; }
+  .stats-bar, .stats-bar strong { color: #333; }
+
+  .board {
+    display: block;
+    overflow: visible;
+  }
+  .column {
+    background: none;
+    border: 1px solid #ccc;
+    break-inside: avoid;
+    margin-bottom: 14px;
+  }
+  .column-head h2, .column-count, .column-desc { color: #111; }
+  .column-desc { color: #555; }
+
+  .card {
+    background: none;
+    border: 1px solid #ccc;
+    break-inside: avoid;
+  }
+  .card:hover { border-color: #ccc; }
+  .card-company { color: #444; }
+
+  .badge { border-color: #999; background: none !important; }
+  .badge-dm, .badge-generic, .badge-unknown { color: #111 !important; }
+
+  .column-empty { border-color: #ccc; color: #555; }
+
+  .nudge-queue { background: none; border-color: #ccc; }
+  .nudge-row { border-color: #ddd; }
+  .nudge-when { color: #444; }
+
+  footer.page-foot { border-color: #ccc; color: #555; }
 }
