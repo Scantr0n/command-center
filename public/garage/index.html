@@ -87,14 +87,15 @@
         class="search-input font-mono"
         placeholder="Filter by item name..."
         aria-label="Filter listings by name">
+      <button type="button" id="clearFiltersBtn" class="print-btn font-mono" hidden>Clear filters</button>
     </div>
     <div class="filter-row" id="platformFilter" role="group" aria-label="Filter by platform">
       <span class="filter-row-label font-mono">PLATFORM</span>
-      <button type="button" class="chip" data-platform="all" aria-pressed="true">All</button>
-      <button type="button" class="chip" data-platform="ebay" aria-pressed="false">eBay</button>
-      <button type="button" class="chip" data-platform="vinted" aria-pressed="false">Vinted</button>
-      <button type="button" class="chip" data-platform="poshmark" aria-pressed="false">Poshmark</button>
-      <button type="button" class="chip" data-platform="depop" aria-pressed="false">Depop</button>
+      <button type="button" class="chip" data-platform="all" aria-pressed="true">All<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-platform="ebay" aria-pressed="false">eBay<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-platform="vinted" aria-pressed="false">Vinted<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-platform="poshmark" aria-pressed="false">Poshmark<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-platform="depop" aria-pressed="false">Depop<span class="chip-count"></span></button>
     </div>
     <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
     <div class="table-wrap">

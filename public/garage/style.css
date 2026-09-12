@@ -302,6 +302,9 @@ section { margin-bottom: 36px; }
 }
 .chip:hover { border-color: var(--hairlineHover); color: var(--ink); }
 .chip[aria-pressed="true"] { color: var(--ink); background: rgba(255,255,255,0.06); border-color: var(--hairlineHover); }
+.chip-count { color: var(--dim); }
+.chip[aria-pressed="true"] .chip-count { color: var(--sub); }
+.chip-zero { opacity: 0.45; }
 
 /* Table */
 .table-wrap {

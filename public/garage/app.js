@@ -160,11 +160,42 @@ function platformBadges(platforms, soldOn) {
   }).join('');
 }
 
+function matchesSearchTerm(l, term) {
+  term = term.trim().toLowerCase();
+  return !term || (l.title || '').toLowerCase().includes(term);
+}
+function matchesPlatformValue(l, platform) {
+  return platform === 'all' || (l.platforms || []).includes(platform);
+}
+
 function matchesFilters(l) {
-  const term = searchTerm.trim().toLowerCase();
-  const matchesSearch = !term || (l.title || '').toLowerCase().includes(term);
-  const matchesPlatform = activePlatform === 'all' || (l.platforms || []).includes(activePlatform);
-  return l.status === 'live' && matchesSearch && matchesPlatform;
+  return l.status === 'live' && matchesSearchTerm(l, searchTerm) && matchesPlatformValue(l, activePlatform);
+}
+
+// Counts how many live listings would match if the platform chip were set to
+// `value`, holding search as-is, so each chip shows what picking it would
+// actually leave on the table (same faceted-search convention as CGT).
+function facetCount(value) {
+  return listings.filter(l => l.status === 'live' && matchesSearchTerm(l, searchTerm) && matchesPlatformValue(l, value)).length;
+}
+
+function anyFilterActive() {
+  return !!searchTerm.trim() || activePlatform !== 'all';
+}
+
+function updateChipCounts() {
+  const container = document.getElementById('platformFilter');
+  container.querySelectorAll('.chip').forEach(chip => {
+    const countEl = chip.querySelector('.chip-count');
+    if (!countEl) return;
+    const value = chip.getAttribute('data-platform');
+    const count = facetCount(value);
+    countEl.textContent = ' ' + count;
+    // Dimmed, not disabled: a 0-count facet is still worth being able to
+    // click, it just shouldn't visually compete with facets that actually
+    // narrow anything.
+    chip.classList.toggle('chip-zero', count === 0 && chip.getAttribute('aria-pressed') !== 'true');
+  });
 }
 
 function sortRows(rows) {
@@ -193,9 +224,8 @@ function updateSortHeaders() {
 // same live region the main Command Center dashboard already uses for its
 // own search/category filter.
 function announceFilterStatus(matchCount) {
-  const anyFilterActive = !!searchTerm.trim() || activePlatform !== 'all';
   const status = document.getElementById('filterStatus');
-  status.textContent = anyFilterActive
+  status.textContent = anyFilterActive()
     ? matchCount + ' listing' + (matchCount === 1 ? '' : 's') + ' match' + (matchCount === 1 ? 'es' : '')
       + (activePlatform !== 'all' ? ' on ' + (PLATFORM_LABELS[activePlatform] || activePlatform) : '')
       + (searchTerm.trim() ? ' for "' + searchTerm.trim() + '"' : '')
@@ -208,6 +238,8 @@ function applyFiltersAndRender() {
   const empty = document.getElementById('tableEmpty');
   updateSortHeaders();
   announceFilterStatus(filtered.length);
+  updateChipCounts();
+  document.getElementById('clearFiltersBtn').hidden = !anyFilterActive();
 
   if (!filtered.length) {
     tbody.innerHTML = '';
@@ -316,6 +348,17 @@ restoreStateFromUrl();
 document.getElementById('searchInput').value = searchTerm;
 setInitialChipState('platformFilter', 'data-platform', activePlatform);
 wireChipGroup('platformFilter', 'data-platform', (v) => { activePlatform = v; });
+
+// Resets search and the platform chip back to "All" plus the address bar
+// back to the bare /garage/ URL in one action, same "Clear filters" pattern
+// as the CGT and main Command Center dashboards.
+document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+  searchTerm = '';
+  activePlatform = 'all';
+  document.getElementById('searchInput').value = '';
+  setInitialChipState('platformFilter', 'data-platform', activePlatform);
+  applyFiltersAndRender();
+});
 
 function handleSortHeaderActivate(th) {
   const key = th.getAttribute('data-sort');
