@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "build:css": "tailwindcss -i ./src/input.css -o ./public/style.css --minify",
-    "start": "node server.js"
+    "start": "node server.js",
+    "validate": "node data/clusters/validate.js && node public/cgt/data/validate.js && node public/csm/data/validate.js && node public/garage/data/validate.js && node public/alpha/data/validate.js && node public/sondrik/data/validate.js"
   },
   "license": "ISC",
   "type": "commonjs",
