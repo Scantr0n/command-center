@@ -232,4 +232,34 @@ document.querySelectorAll('th.sortable').forEach(th => {
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
 
+function csvField(v) {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+const CSV_COLUMNS = [
+  ['cardName', 'Card'], ['year', 'Year'], ['sport', 'Sport'], ['gradingCompany', 'Grading company'],
+  ['grade', 'Grade'], ['certNumber', 'Cert number'], ['estimatedValue', 'Estimated value'],
+  ['valuationBasis', 'Valuation basis'], ['compNote', 'Comp note'], ['sourceNote', 'Source'],
+  ['datePriced', 'Date priced'], ['backlogBatch', 'Backlog batch'], ['notes', 'Notes']
+];
+
+// Exports exactly what the table currently shows (same filters and sort
+// applied), not the full dataset, so the file matches what's on screen.
+document.getElementById('csvBtn').addEventListener('click', () => {
+  const rows = sortRows(cards.filter(matchesFilters));
+  const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(c => CSV_COLUMNS.map(([key]) => csvField(c[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cgt-inventory-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
 loadCards();
