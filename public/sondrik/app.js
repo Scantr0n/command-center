@@ -121,10 +121,12 @@
     });
     if (pending.length === 0) {
       attentionPill.hidden = true;
+      document.title = 'Sondrik / Command Center';
       return;
     }
     attentionPill.hidden = false;
     attentionPill.textContent = pending.length + (pending.length === 1 ? ' draft awaiting your approval' : ' drafts awaiting your approval');
+    document.title = '(' + pending.length + ') Sondrik / Command Center';
   }
 
   function renderLeads(data) {
