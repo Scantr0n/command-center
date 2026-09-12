@@ -134,7 +134,10 @@ function renderGenealogy(data) {
 
 async function loadStatus() {
   try {
-    const res = await fetch('/alpha/data/status.json');
+    // Cache-bust: this file is meant to change out from under the page
+    // (a future session or export job rewrites it), a cached 304 would
+    // make the glance view lie about how fresh the data is.
+    const res = await fetch('/alpha/data/status.json?t=' + Date.now());
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     renderConnection(data);
@@ -146,5 +149,16 @@ async function loadStatus() {
     document.getElementById('connSub').textContent = e.message;
   }
 }
+
+document.getElementById('refreshBtn').addEventListener('click', loadStatus);
+
+// This is a glance-at-status page Jack checks without leaving Command
+// Center, so it re-reads status.json on its own rather than requiring a
+// manual reload. Purely a re-fetch of the same read-only file, paused
+// while the tab is hidden so it never runs pointlessly in the background.
+const REFRESH_INTERVAL_MS = 30000;
+setInterval(() => {
+  if (document.visibilityState === 'visible') loadStatus();
+}, REFRESH_INTERVAL_MS);
 
 loadStatus();

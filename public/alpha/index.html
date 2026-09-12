@@ -68,6 +68,7 @@
       <span class="conn-dot down" id="connDot"></span>
       <span class="conn-label font-mono" id="connLabel">Loading...</span>
       <span class="conn-sub" id="connSub"></span>
+      <button type="button" id="refreshBtn" class="refresh-btn font-mono">Refresh</button>
     </div>
   </section>
 
@@ -99,7 +100,9 @@
     static. Everything under "live" is a placeholder until a future session wires in an actual status export from
     Alpha itself; run <code>node public/alpha/data/validate.js</code> after any edit to that file, it rejects a
     live value with no timestamp and rejects anything that looks like fabricated P&amp;L, balance, or trade data.
-    This page has no write path back to Alpha, by design.
+    This page has no write path back to Alpha, by design. The page re-reads that file every 30 seconds on its own
+    while the tab is visible, or immediately via the Refresh button, so a future live update shows up without a
+    manual reload.
   </footer>
 </div>
 

@@ -189,6 +189,19 @@ header.page-head .sub {
   margin-left: auto;
 }
 
+.refresh-btn {
+  font-size: 0.72rem;
+  color: var(--sub);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.refresh-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
+
 /* Stat tiles */
 .stat-row {
   display: grid;
