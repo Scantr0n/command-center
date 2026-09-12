@@ -168,6 +168,20 @@ function main() {
     }
   });
 
+  const byNormalizedCategory = {};
+  prospects.forEach(p => {
+    if (!p.category) return;
+    const norm = p.category.trim().toLowerCase();
+    (byNormalizedCategory[norm] = byNormalizedCategory[norm] || new Set()).add(p.category);
+  });
+  Object.values(byNormalizedCategory).forEach(variants => {
+    if (variants.size > 1) {
+      warnings.push('category has inconsistent casing/spacing across prospects: ' +
+        Array.from(variants).map(v => JSON.stringify(v)).join(' vs. ') +
+        '. These render as separate filter chips instead of one, pick one spelling.');
+    }
+  });
+
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
     warnings.forEach(w => console.warn('  - ' + w));
