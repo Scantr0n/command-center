@@ -114,7 +114,8 @@
     </header>
 
     <main>
-    <div id="errorBanner" class="hidden text-xs font-mono px-3 py-2 rounded-lg mb-4" style="background: #E04A4A1A; color: #E0807A; border: 1px solid #E04A4A40"></div>
+    <div id="errorBanner" class="hidden text-xs font-mono px-3 py-2 rounded-lg mb-4" role="alert" style="background: #E04A4A1A; color: #E0807A; border: 1px solid #E04A4A40"></div>
+    <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
 
     <div id="attnCompact" class="hidden flex-wrap items-center gap-2 mb-4"></div>
     <div id="attnCards" class="hidden flex-col gap-2 mb-6"></div>
@@ -529,6 +530,12 @@ let activeCategory = null;
 
 function applyFilters() {
   const term = searchTerm.trim().toLowerCase();
+  const anyFilterActive = !!term || !!activeCategory;
+  let matchCount = 0;
+  // Only count against one element type (graph-node) even though both graph
+  // and grid nodes get the dimmed/matched classes below, so the announced
+  // count reflects distinct projects, not double the real total.
+  const countedIds = new Set();
   document.querySelectorAll('.graph-node, .cluster-card').forEach(el => {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
@@ -536,9 +543,12 @@ function applyFilters() {
     const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
     const matchesCategory = !activeCategory || c.category === activeCategory;
     const matches = matchesSearch && matchesCategory;
-    const anyFilterActive = !!term || !!activeCategory;
     el.classList.toggle('dimmed', anyFilterActive && !matches);
     el.classList.toggle('matched', anyFilterActive && matches);
+    if (matches && !countedIds.has(id)) {
+      countedIds.add(id);
+      matchCount++;
+    }
   });
   document.querySelectorAll('.cat-label').forEach(el => {
     const isActive = activeCategory === el.getAttribute('data-category');
@@ -547,6 +557,9 @@ function applyFilters() {
     el.setAttribute('opacity', !activeCategory || isActive ? '1' : '0.4');
   });
   document.getElementById('searchClearBtn').classList.toggle('hidden', !term);
+  document.getElementById('filterStatus').textContent = anyFilterActive
+    ? `${matchCount} project${matchCount === 1 ? '' : 's'} match${matchCount === 1 ? 'es' : ''}${activeCategory ? ` in ${activeCategory}` : ''}${term ? ` for "${term}"` : ''}`
+    : '';
 }
 
 const searchInputEl = document.getElementById('searchInput');
