@@ -208,6 +208,11 @@ section { margin-bottom: 36px; }
   color: var(--sub);
   margin-top: 4px;
 }
+.stat-tile-warn {
+  border-color: rgba(224,160,48,0.4);
+  background: rgba(224,160,48,0.06);
+}
+.stat-tile-warn .stat-tile-value { color: #E0A030; }
 
 /* Pipeline stages */
 .pipeline-row {
@@ -367,6 +372,13 @@ table.card-table {
 .badge-depop { background: rgba(255,107,53,0.14); color: #FF8A5C; border-color: rgba(255,107,53,0.4); }
 .badge-bug-fix { background: rgba(224,80,80,0.12); color: #E56464; border-color: rgba(224,80,80,0.35); }
 .badge-photo-audit { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
+.badge-sold-elsewhere {
+  background: rgba(224,80,80,0.12);
+  color: #E56464;
+  border-color: rgba(224,80,80,0.4);
+  text-decoration: line-through;
+  text-decoration-color: rgba(229,100,100,0.6);
+}
 
 .table-empty {
   padding: 40px 20px;
@@ -433,6 +445,7 @@ footer.page-foot {
   .callout strong { color: #111; }
 
   .stat-tile, .pipeline-stage, .activity-item { background: none; border: 1px solid #ccc; }
+  .stat-tile-warn { border-color: #999; }
   .stat-tile-value, .stat-tile-label, .stat-tile-sub,
   .pipeline-stage-name, .pipeline-stage-count, .pipeline-stage-note,
   .activity-item-title, .activity-item-detail, .activity-item-meta { color: #111 !important; }

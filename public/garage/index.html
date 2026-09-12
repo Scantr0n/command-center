@@ -46,6 +46,7 @@
           <tr><th>title</th><td>Item name as it appears in the listing</td></tr>
           <tr><th>price</th><td>USD asking price, a number or <code>null</code></td></tr>
           <tr><th>platforms</th><td>Array of any of: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, <code>depop</code></td></tr>
+          <tr><th>soldOn</th><td>Array, subset of <code>platforms</code>, marking which of them the item has actually sold on so it can be manually delisted from the rest. Leave <code>[]</code> until a real sale happens on one platform while the item is still live on others.</td></tr>
           <tr><th>status</th><td>One of: <code>draft</code>, <code>ready-to-post</code>, <code>live</code>, <code>sold</code></td></tr>
           <tr><th>datePublished</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
           <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
@@ -58,6 +59,7 @@
   "title": null,
   "price": null,
   "platforms": [],
+  "soldOn": [],
   "status": "draft",
   "datePublished": null,
   "notes": null

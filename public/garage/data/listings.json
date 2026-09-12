@@ -5,6 +5,7 @@
       "title": "Black Boots",
       "price": 85,
       "platforms": ["ebay", "vinted", "poshmark", "depop"],
+      "soldOn": [],
       "status": "live",
       "datePublished": null,
       "notes": null
@@ -14,6 +15,7 @@
       "title": "White Boots",
       "price": 75,
       "platforms": ["ebay", "vinted", "poshmark", "depop"],
+      "soldOn": [],
       "status": "live",
       "datePublished": null,
       "notes": null
@@ -23,6 +25,7 @@
       "title": "Softball Swing Analyzer",
       "price": 95,
       "platforms": ["ebay"],
+      "soldOn": [],
       "status": "live",
       "datePublished": null,
       "notes": null

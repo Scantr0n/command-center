@@ -4,9 +4,10 @@
  * field rules documented in public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
- * platforms and a non-negative price, every pipeline stage count is a real
- * whole number, and every activity log entry is labeled with a type so a
- * bug fix and a photo audit are never mixed up.
+ * platforms and a non-negative price, any platform marked sold in "soldOn"
+ * is actually one of the listing's own platforms, every pipeline stage
+ * count is a real whole number, and every activity log entry is labeled
+ * with a type so a bug fix and a photo audit are never mixed up.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -71,6 +72,20 @@ function main() {
           errors.push(where + ': platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
         }
       });
+    }
+
+    if (l.soldOn !== undefined) {
+      if (!Array.isArray(l.soldOn)) {
+        errors.push(where + ': "soldOn" must be an array');
+      } else {
+        l.soldOn.forEach(p => {
+          if (!PLATFORMS.includes(p)) {
+            errors.push(where + ': soldOn platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
+          } else if (Array.isArray(l.platforms) && !l.platforms.includes(p)) {
+            errors.push(where + ': soldOn platform "' + p + '" is not in this listing\'s "platforms"');
+          }
+        });
+      }
     }
 
     if (!l.status) {

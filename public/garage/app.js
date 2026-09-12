@@ -47,25 +47,32 @@ async function loadData() {
   }
 }
 
+function remainingPlatforms(l) {
+  const soldOn = l.soldOn || [];
+  return (l.platforms || []).filter(p => !soldOn.includes(p));
+}
+
 function renderStats(listings, stages) {
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
   const platformCounts = {};
-  live.forEach(l => (l.platforms || []).forEach(p => { platformCounts[p] = (platformCounts[p] || 0) + 1; }));
+  live.forEach(l => remainingPlatforms(l).forEach(p => { platformCounts[p] = (platformCounts[p] || 0) + 1; }));
   const activePlatforms = Object.keys(platformCounts).length;
-  const listingInstances = live.reduce((s, l) => s + (l.platforms || []).length, 0);
+  const listingInstances = live.reduce((s, l) => s + remainingPlatforms(l).length, 0);
   const readyStage = stages.find(s => s.stage === 'ready-to-post');
+  const atRiskCount = live.filter(l => (l.soldOn || []).length > 0 && remainingPlatforms(l).length > 0).length;
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
     { value: live.length, label: 'Unique items live', sub: null },
     { value: activePlatforms, label: 'Platforms active', sub: Object.keys(platformCounts).map(p => PLATFORM_LABELS[p] || p).join(', ') || null },
     { value: formatUsd(totalValue), label: 'Total live asking value', sub: null },
-    { value: readyStage ? readyStage.count : 0, label: 'Drafts ready to post', sub: readyStage && readyStage.note ? readyStage.note : null }
+    { value: readyStage ? readyStage.count : 0, label: 'Drafts ready to post', sub: readyStage && readyStage.note ? readyStage.note : null },
+    { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
-    <div class="stat-tile">
+    <div class="stat-tile${t.warn ? ' stat-tile-warn' : ''}">
       <div class="stat-tile-value font-display">${escapeHtml(String(t.value))}</div>
       <div class="stat-tile-label">${escapeHtml(t.label)}</div>
       ${t.sub ? `<div class="stat-tile-sub">${escapeHtml(t.sub)}</div>` : ''}
@@ -86,10 +93,14 @@ function renderPipeline(stages) {
   `).join('');
 }
 
-function platformBadges(platforms) {
-  return (platforms || []).map(p =>
-    `<span class="badge badge-${escapeHtml(p)}">${escapeHtml(PLATFORM_LABELS[p] || p)}</span>`
-  ).join('');
+function platformBadges(platforms, soldOn) {
+  const sold = soldOn || [];
+  return (platforms || []).map(p => {
+    const isSold = sold.includes(p);
+    const cls = isSold ? 'badge badge-sold-elsewhere' : `badge badge-${escapeHtml(p)}`;
+    const label = escapeHtml(PLATFORM_LABELS[p] || p) + (isSold ? ' (sold)' : '');
+    return `<span class="${cls}">${label}</span>`;
+  }).join('');
 }
 
 function matchesFilters(l) {
@@ -141,7 +152,7 @@ function applyFiltersAndRender() {
         ${l.notes ? `<div class="cell-card-meta">${escapeHtml(l.notes)}</div>` : ''}
       </td>
       <td class="cell-value${l.price == null ? ' empty' : ''}">${l.price != null ? formatUsd(l.price) : 'not set'}</td>
-      <td class="cell-platforms">${platformBadges(l.platforms)}</td>
+      <td class="cell-platforms">${platformBadges(l.platforms, l.soldOn)}</td>
       <td class="cell-muted">${l.datePublished ? escapeHtml(l.datePublished) : '<span class="cell-value empty">not logged</span>'}</td>
     </tr>
   `).join('');
@@ -212,7 +223,7 @@ function csvField(v) {
 }
 
 const CSV_COLUMNS = [
-  ['title', 'Item'], ['price', 'Price'], ['platforms', 'Platforms'],
+  ['title', 'Item'], ['price', 'Price'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
   ['status', 'Status'], ['datePublished', 'Published'], ['notes', 'Notes']
 ];
 
@@ -222,7 +233,8 @@ const CSV_COLUMNS = [
 document.getElementById('csvBtn').addEventListener('click', () => {
   const rows = sortRows(listings.filter(matchesFilters)).map(l => ({
     ...l,
-    platforms: (l.platforms || []).map(p => PLATFORM_LABELS[p] || p).join('; ')
+    platforms: (l.platforms || []).map(p => PLATFORM_LABELS[p] || p).join('; '),
+    soldOn: (l.soldOn || []).map(p => PLATFORM_LABELS[p] || p).join('; ')
   }));
   const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(l => CSV_COLUMNS.map(([key]) => csvField(l[key])).join(','));
