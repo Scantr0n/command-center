@@ -1,0 +1,12 @@
+{
+  "metric": {
+    "label": "v0.3.7 DMG downloads",
+    "source": "GitHub releases API (gh api), confirmed count, not an estimate",
+    "scope": "GitHub release downloads only. Does not include Reddit or Product Hunt engagement, which is not wired into tracking yet.",
+    "liveBackend": false,
+    "checks": [
+      { "date": "2026-09-04", "count": 0, "note": "Baseline, 3 days before the next check" },
+      { "date": "2026-09-07", "count": 8, "note": "Confirmed via gh api" }
+    ]
+  }
+}

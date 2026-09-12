@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sondrik / Command Center</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/sondrik/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">SONDRIK</h1>
+      <p class="sub font-mono">Product / traction hub, Jack Scanlon</p>
+    </div>
+    <a href="/" class="back-link">&larr; Command Center</a>
+  </header>
+
+  <main>
+  <div class="callout">
+    <strong>Display tool, not a send tool.</strong> Nothing on this page contacts anyone. There is no live backend
+    connected yet, so every number here is either a real logged fact with a cited source and date, or an honest
+    empty state, never a filled-in guess.
+  </div>
+
+  <section>
+    <h2 class="section-title">Latest release</h2>
+    <div id="releaseSection"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Traction</h2>
+    <div id="tractionSection"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Engagement queue</h2>
+    <div id="leadsSection"></div>
+  </section>
+  </main>
+
+  <footer class="page-foot font-mono">
+    Data source: <code>/sondrik/data/releases.json</code>, <code>/sondrik/data/downloads.json</code>, and
+    <code>/sondrik/data/leads.json</code>, edited by hand until a real backend is wired in.
+    Run <code>node public/sondrik/data/validate.js</code> after any edit.
+  </footer>
+</div>
+
+<script src="/sondrik/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "leads": [
+    {
+      "id": "reddit-imadethis-tester-offer",
+      "source": "Reddit",
+      "sourceDetail": "Commenter on r/IMadeThis",
+      "type": "beta-tester-offer",
+      "summary": "Offered to test the product in exchange for lifetime access.",
+      "loggedDate": null,
+      "outreach": {
+        "draftStatus": "drafted",
+        "approvalStatus": "awaiting-approval",
+        "sent": false,
+        "note": "DM drafted. Waiting on Jack's direct approval before sending. Has not been sent."
+      }
+    }
+  ]
+}

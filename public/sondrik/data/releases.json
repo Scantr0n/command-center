@@ -1,0 +1,12 @@
+{
+  "product": "Sondrik",
+  "releases": [
+    {
+      "version": "0.3.7",
+      "date": "2026-09-07",
+      "type": "bugfix",
+      "summary": "Fixed default CRM seed data shipping in every fresh install.",
+      "notes": null
+    }
+  ]
+}
