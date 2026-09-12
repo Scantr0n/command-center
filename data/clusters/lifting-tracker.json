@@ -2,7 +2,6 @@
   "id": "lifting-tracker",
   "name": "Lifting Tracker",
   "category": "Health & Personal",
-  "color": "#B23A6B",
   "priority": "normal",
   "lastUpdate": null,
   "summary": "Logs each workout and relays it to the Macro/Weight Tracker session. Built around real hip-injury constraints. Phone-friendly artifact lives in workout-log/.",

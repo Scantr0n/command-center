@@ -2,7 +2,6 @@
   "id": "flight-finder",
   "name": "Flight Finder",
   "category": "Travel & Logistics",
-  "color": "#2E8FA0",
   "priority": "normal",
   "lastUpdate": "2026-08-15",
   "summary": "Live since 8/15, pulling real prices via RapidAPI's Sky-Scrapper after Amadeus killed its free tier and forced a pivot.",

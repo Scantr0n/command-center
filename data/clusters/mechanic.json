@@ -2,7 +2,6 @@
   "id": "mechanic",
   "name": "The Mechanic",
   "category": "Uncategorized",
-  "color": "#5A5A5A",
   "priority": "normal",
   "lastUpdate": null,
   "summary": "No detailed status captured yet in memory for this session. Placeholder cluster until real data is pulled in.",

@@ -2,7 +2,6 @@
   "id": "csm",
   "name": "CSM / JT Ops Hub",
   "category": "Ventures & Business",
-  "color": "#3B4C8C",
   "priority": "normal",
   "lastUpdate": "2026-09-06",
   "summary": "n8n + Airtable + Claude/Perplexity pipeline is live for prospect research and draft outreach. JT Ops Hub app (separate local dashboard) covers this specifically. Sondrik-side automation for this pipeline not built yet.",

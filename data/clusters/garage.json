@@ -2,7 +2,6 @@
   "id": "garage",
   "name": "The Garage",
   "category": "Reselling",
-  "color": "#A0522D",
   "priority": "normal",
   "lastUpdate": "2026-09-12",
   "summary": "The real, active reselling workflow, multi-platform (eBay, Vinted, Poshmark, Depop). Recently published 9 live listings across all four, plus a full photo audit of 48 Depop drafts that caught and fixed a real bad cover photo and a return-policy bug blocking eBay publishes. Supersedes the old standalone Reselling cluster, which tracked a manual spreadsheet workflow Jack has since moved off of.",
