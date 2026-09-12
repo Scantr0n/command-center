@@ -211,7 +211,7 @@
       if (inStage.length) {
         cards = inStage.map(p => renderCard(p, stageById)).join('');
       } else if (filtering && totalInStage > 0) {
-        cards = '<div class="column-empty">No matches' +
+        cards = '<div class="column-empty" role="status">No matches' +
           (query ? ' for "' + escapeHtml(query) + '"' : '') + ' in this stage.</div>';
       } else {
         cards = '<div class="column-empty">No prospects in this stage yet.</div>';
