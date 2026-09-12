@@ -7,7 +7,12 @@
  * platforms and a non-negative price, any platform marked sold in "soldOn"
  * is actually one of the listing's own platforms, every pipeline stage
  * count is a real whole number, and every activity log entry is labeled
- * with a type so a bug fix and a photo audit are never mixed up.
+ * with a type so a bug fix and a photo audit are never mixed up. It also
+ * cross-checks pipeline.json's "draft"/"live"/"sold" stage counts against
+ * what listings.json actually contains, since the two files are hand-edited
+ * separately and can drift out of sync (the "ready-to-post" stage is left
+ * alone: those items, e.g. the 48 Depop drafts, aren't itemized individually
+ * in listings.json yet).
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -137,6 +142,38 @@ function main() {
       errors.push(where + ': "date" is not a YYYY-MM-DD date or null: ' + JSON.stringify(e.date));
     }
   });
+
+  // Cross-check pipeline.json's stage counts against listings.json for the
+  // stages that are fully itemized there (draft, live, sold). "Live" is
+  // counted as listing instances (one per platform still active, same as
+  // the "Live listing instances" stat tile on the page), since that's what
+  // the pipeline's "live" count has always represented.
+  const stageCount = {};
+  stages.forEach(s => { stageCount[s.stage] = s.count; });
+
+  const draftListingCount = listings.filter(l => l.status === 'draft').length;
+  if (stageCount['draft'] !== undefined && stageCount['draft'] !== draftListingCount) {
+    warnings.push('pipeline "draft" count is ' + stageCount['draft'] + ' but listings.json has ' +
+      draftListingCount + ' listing(s) with status "draft"');
+  }
+
+  const soldListingCount = listings.filter(l => l.status === 'sold').length;
+  if (stageCount['sold'] !== undefined && stageCount['sold'] !== soldListingCount) {
+    warnings.push('pipeline "sold" count is ' + stageCount['sold'] + ' but listings.json has ' +
+      soldListingCount + ' listing(s) with status "sold"');
+  }
+
+  const liveInstanceCount = listings
+    .filter(l => l.status === 'live')
+    .reduce((sum, l) => {
+      const soldOn = Array.isArray(l.soldOn) ? l.soldOn : [];
+      const platforms = Array.isArray(l.platforms) ? l.platforms : [];
+      return sum + platforms.filter(p => !soldOn.includes(p)).length;
+    }, 0);
+  if (stageCount['live'] !== undefined && stageCount['live'] !== liveInstanceCount) {
+    warnings.push('pipeline "live" count is ' + stageCount['live'] + ' but listings.json implies ' +
+      liveInstanceCount + ' live listing instance(s) (platforms minus soldOn, across status:"live" items)');
+  }
 
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
