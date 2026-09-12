@@ -4,8 +4,56 @@ let lastFocusedEl = null;
 let searchTerm = '';
 let activeSport = 'all';
 let activeBasis = 'all';
+let activeGrader = 'all';
 let sortKey = null;
 let sortDir = 'asc';
+
+// Filters, search, and sort are mirrored into the URL query string so a
+// specific view (e.g. "PSA hockey cards sorted by value") can be bookmarked
+// or shared as a link, the way collectibles trackers like collecto.rs do.
+// Restored once on load, then kept in sync via history.replaceState so
+// typing in the search box doesn't spam the browser's back/forward history.
+const VALID_BASES = ['recent-sale', 'comp-estimate', 'unpriced'];
+const VALID_GRADERS = ['PSA', 'BGS', 'SGC', 'CGC', 'HGA', 'KSA'];
+const VALID_SPORTS = ['hockey', 'baseball', 'football'];
+
+function restoreStateFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const q = params.get('q');
+  const sport = params.get('sport');
+  const basis = params.get('basis');
+  const grader = params.get('grader');
+  const sort = params.get('sort');
+  const dir = params.get('dir');
+  if (q) searchTerm = q;
+  if (sport && VALID_SPORTS.includes(sport)) activeSport = sport;
+  if (basis && VALID_BASES.includes(basis)) activeBasis = basis;
+  if (grader && VALID_GRADERS.includes(grader)) activeGrader = grader;
+  if (sort) sortKey = sort;
+  if (dir === 'desc') sortDir = 'desc';
+}
+
+function setInitialChipState(containerId, dataAttr, value) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.setAttribute('aria-pressed', chip.getAttribute(dataAttr) === value ? 'true' : 'false');
+  });
+}
+
+function syncUrl() {
+  const params = new URLSearchParams();
+  if (searchTerm.trim()) params.set('q', searchTerm.trim());
+  if (activeSport !== 'all') params.set('sport', activeSport);
+  if (activeBasis !== 'all') params.set('basis', activeBasis);
+  if (activeGrader !== 'all') params.set('grader', activeGrader);
+  if (sortKey) {
+    params.set('sort', sortKey);
+    if (sortDir === 'desc') params.set('dir', 'desc');
+  }
+  const qs = params.toString();
+  const url = location.pathname + (qs ? '?' + qs : '');
+  history.replaceState(null, '', url);
+}
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -128,10 +176,11 @@ function matchesFilters(c) {
     || (c.certNumber || '').toLowerCase().includes(term)
     || String(c.year ?? '').includes(term);
   const matchesSport = activeSport === 'all' || c.sport === activeSport;
+  const matchesGrader = activeGrader === 'all' || c.gradingCompany === activeGrader;
   let matchesBasis = true;
   if (activeBasis === 'unpriced') matchesBasis = c.estimatedValue == null;
   else if (activeBasis !== 'all') matchesBasis = c.valuationBasis === activeBasis;
-  return matchesSearch && matchesSport && matchesBasis;
+  return matchesSearch && matchesSport && matchesGrader && matchesBasis;
 }
 
 function sortRows(rows) {
@@ -167,6 +216,7 @@ function updateSortHeaders() {
 }
 
 function applyFiltersAndRender() {
+  syncUrl();
   const filtered = sortRows(cards.filter(matchesFilters));
   const tbody = document.getElementById('cardTableBody');
   const empty = document.getElementById('tableEmpty');
@@ -305,8 +355,15 @@ function wireChipGroup(containerId, dataAttr, setter) {
     });
   });
 }
+restoreStateFromUrl();
+document.getElementById('searchInput').value = searchTerm;
+setInitialChipState('sportFilter', 'data-sport', activeSport);
+setInitialChipState('basisFilter', 'data-basis', activeBasis);
+setInitialChipState('graderFilter', 'data-grader', activeGrader);
+
 wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
+wireChipGroup('graderFilter', 'data-grader', (v) => { activeGrader = v; });
 
 function handleSortHeaderActivate(th) {
   const key = th.getAttribute('data-sort');
