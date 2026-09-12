@@ -106,14 +106,6 @@ function renderStats(data) {
     !live.regime
   ));
 
-  const mode = live.positionSizing && live.positionSizing.activeMode;
-  tiles.push(statTile(
-    mode ? escapeHtml(mode) : awaiting,
-    'Position sizing mode',
-    'Drawdown-based + robustness-based',
-    !mode
-  ));
-
   const debateActive = live.debatePanel && live.debatePanel.active;
   tiles.push(statTile(
     debateActive ? 'Active' : 'Pending',
@@ -123,6 +115,46 @@ function renderStats(data) {
   ));
 
   document.getElementById('statRow').innerHTML = tiles.join('');
+}
+
+// Position sizing gets its own section rather than a stat tile because a
+// drawdown reading is a magnitude on a fixed 0-100 scale, exactly what a
+// meter communicates and a bare number doesn't: how much of the range is
+// used up, at a glance. No color-coded thresholds here since this sandbox
+// doesn't know Alpha's real risk thresholds, only the percentage itself.
+function renderPositionSizing(data) {
+  const ps = data.live.positionSizing || {};
+  const panel = document.getElementById('positionSizingPanel');
+  const mode = ps.activeMode;
+  const pct = ps.currentDrawdownPct;
+  const validPct = typeof pct === 'number' && Number.isFinite(pct) && pct >= 0 && pct <= 100;
+
+  const modeHtml = `
+    <div class="ps-mode">
+      <div class="ps-field-label font-mono">ACTIVE MODE</div>
+      <div class="ps-mode-value${mode ? '' : ' awaiting'}">${mode ? escapeHtml(mode) : 'awaiting connection'}</div>
+      <div class="ps-mode-sub">Drawdown-based + robustness-based</div>
+    </div>
+  `;
+
+  const meterHtml = validPct ? `
+    <div class="ps-meter">
+      <div class="ps-field-label font-mono">CURRENT DRAWDOWN</div>
+      <div class="meter-track" role="meter" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
+        aria-label="Current drawdown, percent of range used">
+        <div class="meter-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="meter-value font-mono">${escapeHtml(String(pct))}%</div>
+    </div>
+  ` : `
+    <div class="ps-meter">
+      <div class="ps-field-label font-mono">CURRENT DRAWDOWN</div>
+      <div class="meter-track meter-track-empty" role="meter" aria-valuetext="awaiting connection"></div>
+      <div class="meter-value awaiting font-mono">awaiting connection</div>
+    </div>
+  `;
+
+  panel.innerHTML = modeHtml + meterHtml;
 }
 
 function renderArchitecture(data) {
@@ -164,6 +196,7 @@ async function loadStatus() {
     const data = await res.json();
     renderConnection(data);
     renderStats(data);
+    renderPositionSizing(data);
     renderArchitecture(data);
     renderGenealogy(data);
   } catch (e) {

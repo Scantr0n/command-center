@@ -56,6 +56,7 @@
           <tr><th>live.regime</th><td>Current detected market regime label, or <code>null</code>.</td></tr>
           <tr><th>live.killSwitch.engaged</th><td><code>true</code> / <code>false</code> / <code>null</code> if unknown.</td></tr>
           <tr><th>live.positionSizing.activeMode</th><td>Which sizing rule is currently driving position size (e.g. <code>"drawdown-based"</code>), or <code>null</code>.</td></tr>
+          <tr><th>live.positionSizing.currentDrawdownPct</th><td>Current drawdown as a number from 0 to 100, or <code>null</code>. Drives the drawdown meter, never a dollar figure.</td></tr>
           <tr><th>live.genealogy.*</th><td>Current generation, count of active lineages, and last breeding event, or <code>null</code> until known.</td></tr>
         </tbody>
       </table>
@@ -75,6 +76,11 @@
   <section>
     <h2 class="section-title">Summary</h2>
     <div class="stat-row" id="statRow"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Position sizing</h2>
+    <div class="ps-panel" id="positionSizingPanel"></div>
   </section>
 
   <section>

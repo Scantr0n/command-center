@@ -241,6 +241,65 @@ header.page-head .sub {
   margin-top: 4px;
 }
 
+/* Position sizing */
+.ps-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 32px;
+}
+.ps-mode, .ps-meter {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.ps-field-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.ps-mode-value {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.ps-mode-value.awaiting { color: var(--dim); font-size: 0.95rem; font-weight: 600; font-style: italic; }
+.ps-mode-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--sub);
+  margin-top: 4px;
+}
+.meter-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+.meter-track-empty {
+  background: repeating-linear-gradient(
+    135deg, var(--panelLight), var(--panelLight) 6px, rgba(255,255,255,0.03) 6px, rgba(255,255,255,0.03) 12px
+  );
+}
+.meter-fill {
+  height: 100%;
+  background: var(--ink);
+  opacity: 0.55;
+  border-radius: 999px;
+}
+.meter-value {
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin-top: 8px;
+}
+.meter-value.awaiting { color: var(--dim); font-style: italic; font-size: 0.78rem; }
+
 /* Architecture cards */
 .arch-grid {
   display: grid;

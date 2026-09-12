@@ -87,6 +87,13 @@ function main() {
     errors.push('live.genealogy.lastBreedingEventAt: not a valid ISO datetime or null');
   }
 
+  const drawdownPct = live.positionSizing && live.positionSizing.currentDrawdownPct;
+  if (drawdownPct != null && !(typeof drawdownPct === 'number' && Number.isFinite(drawdownPct) && drawdownPct >= 0 && drawdownPct <= 100)) {
+    errors.push('live.positionSizing.currentDrawdownPct: must be null or a finite number from 0 to 100 ' +
+      '(it drives a percentage meter on the page, an out-of-range value would render as a broken or misleading bar): ' +
+      JSON.stringify(drawdownPct));
+  }
+
   if (data.connection && data.connection.connected === true && !data.connection.checkedAt) {
     warnings.push('connection.connected is true but connection.checkedAt is empty. Backfill when known.');
   }
