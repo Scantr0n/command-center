@@ -145,6 +145,15 @@ function sortRows(rows) {
     if (av == null) return 1;
     if (bv == null) return -1;
     if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+    // Grades are stored as label strings ("10", "9.5") since that's what's
+    // printed on the slab, but a plain string sort would rank "10" before
+    // "9". Compare numerically whenever both sides parse as a number, and
+    // only fall back to string order for non-numeric labels (e.g. "AUTHENTIC").
+    if (sortKey === 'grade') {
+      const an = parseFloat(av);
+      const bn = parseFloat(bv);
+      if (!Number.isNaN(an) && !Number.isNaN(bn)) return (an - bn) * dir;
+    }
     return String(av).localeCompare(String(bv)) * dir;
   });
 }
