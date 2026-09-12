@@ -1,4 +1,5 @@
 (function () {
+  const timelineSection = document.getElementById('timelineSection');
   const releaseSection = document.getElementById('releaseSection');
   const tractionSection = document.getElementById('tractionSection');
   const leadsSection = document.getElementById('leadsSection');
@@ -20,6 +21,56 @@
 
   function daysBetween(a, b) {
     return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+  }
+
+  // Merges the three data files into one chronological narrative. Indie/solo
+  // founder dashboards commonly surface a unified activity timeline rather
+  // than making a reader cross-reference separate per-topic sections to
+  // reconstruct "what happened when"; this reuses the same real records,
+  // it does not add any new fact.
+  function renderTimeline(releasesData, downloadsData, leadsData) {
+    const KIND_LABEL = { release: 'RELEASE', check: 'DOWNLOAD CHECK', lead: 'LEAD' };
+    const events = [];
+    (releasesData.releases || []).forEach(r => {
+      events.push({ date: r.date, kind: 'release', title: 'v' + r.version + ' shipped', detail: r.summary || null });
+    });
+    const metric = downloadsData.metric || {};
+    (metric.checks || []).forEach(c => {
+      events.push({ date: c.date, kind: 'check', title: c.count + ' ' + (metric.label || 'downloads') + ' logged', detail: c.note || null });
+    });
+    (leadsData.leads || []).forEach(l => {
+      events.push({ date: l.loggedDate, kind: 'lead', title: l.sourceDetail || l.source || 'Lead logged', detail: l.summary || null });
+    });
+
+    const dated = events.filter(e => e.date).sort((a, b) => b.date.localeCompare(a.date));
+    const undated = events.filter(e => !e.date);
+
+    if (dated.length === 0 && undated.length === 0) {
+      timelineSection.innerHTML = '<div class="empty-state">No events logged yet.</div>';
+      return;
+    }
+
+    function itemHtml(e) {
+      return '<li class="timeline-item timeline-kind-' + e.kind + '">' +
+        '<div class="timeline-meta">' +
+        '<span class="timeline-badge font-mono">' + KIND_LABEL[e.kind] + '</span>' +
+        (e.date
+          ? '<span class="timeline-date font-mono">' + fmtDate(e.date) + '</span>'
+          : '<span class="timeline-date timeline-date-unknown font-mono">DATE NOT LOGGED</span>') +
+        '</div>' +
+        '<div class="timeline-title">' + escapeHtml(e.title) + '</div>' +
+        (e.detail ? '<div class="timeline-detail">' + escapeHtml(e.detail) + '</div>' : '') +
+        '</li>';
+    }
+
+    let html = '<ol class="timeline" aria-label="Chronological history of releases, download checks, and leads, most recent first">' +
+      dated.map(itemHtml).join('') + '</ol>';
+    if (undated.length > 0) {
+      html += '<div class="timeline-undated-label font-mono">Logged, no date on record</div>' +
+        '<ul class="timeline timeline-undated" aria-label="Events with no date logged yet">' +
+        undated.map(itemHtml).join('') + '</ul>';
+    }
+    timelineSection.innerHTML = html;
   }
 
   function renderReleases(data) {
@@ -183,12 +234,14 @@
     fetch('/sondrik/data/downloads.json').then(r => r.json()),
     fetch('/sondrik/data/leads.json').then(r => r.json())
   ]).then(([releasesData, downloadsData, leadsData]) => {
+    renderTimeline(releasesData, downloadsData, leadsData);
     renderReleases(releasesData);
     renderTraction(downloadsData);
     renderLeads(leadsData);
     renderAttentionPill(leadsData);
     csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
   }).catch(err => {
+    timelineSection.innerHTML = '<div class="empty-state" role="alert">Failed to load timeline data: ' + escapeHtml(err.message) + '</div>';
     releaseSection.innerHTML = '<div class="empty-state" role="alert">Failed to load release data: ' + escapeHtml(err.message) + '</div>';
     tractionSection.innerHTML = '<div class="empty-state">Failed to load.</div>';
     leadsSection.innerHTML = '<div class="empty-state">Failed to load.</div>';

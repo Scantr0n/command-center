@@ -299,6 +299,63 @@ section { margin-bottom: 36px; }
   overflow: hidden;
 }
 
+/* Timeline */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.timeline-item {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+.timeline-item:last-child { border-bottom: none; }
+.timeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.timeline-badge {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  color: var(--dim);
+}
+.timeline-kind-release .timeline-badge { border-color: rgba(224,160,48,0.35); background: rgba(224,160,48,0.1); color: #E0A030; }
+.timeline-kind-check .timeline-badge { border-color: rgba(91,140,255,0.35); background: rgba(91,140,255,0.1); color: var(--accent); }
+.timeline-kind-lead .timeline-badge { border-color: rgba(61,220,132,0.35); background: rgba(61,220,132,0.1); color: #3DDC84; }
+.timeline-date {
+  font-size: 0.7rem;
+  color: var(--dim);
+}
+.timeline-date-unknown { font-style: italic; }
+.timeline-title {
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.timeline-detail {
+  font-size: 0.78rem;
+  color: var(--sub);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.timeline-undated-label {
+  font-size: 0.68rem;
+  color: var(--dim);
+  margin: 14px 0 6px;
+  letter-spacing: 0.02em;
+}
+
 /* Release card */
 .release-card {
   border: 1px solid var(--hairline);
@@ -425,19 +482,24 @@ footer.page-foot {
   }
   .callout strong { color: #111; }
 
-  .release-card, .stat-tile, .lead-card {
+  .release-card, .stat-tile, .lead-card, .timeline {
     background: none;
     border: 1px solid #ccc;
     break-inside: avoid;
   }
-  .release-summary, .stat-label, .lead-summary { color: #333; }
-  .release-date, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge { color: #555; }
+  .release-summary, .stat-label, .lead-summary, .timeline-title { color: #333; }
+  .release-date, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
+  .timeline-date, .timeline-detail, .timeline-undated-label { color: #555; }
   .stat-delta { color: #111; }
-  .release-badge { border-color: #999; background: none; color: #111; }
+  .release-badge, .timeline-badge,
+  .timeline-kind-release .timeline-badge, .timeline-kind-check .timeline-badge, .timeline-kind-lead .timeline-badge {
+    border-color: #999; background: none; color: #111;
+  }
   .compare-bar { border-color: #ccc; }
   .compare-bar-fill { background: #888; }
   .compare-bar-count, .stat-number { color: #111; }
   .status-pill, .status-pill-sent { border-color: #999; background: none; color: #111; }
+  .timeline-item { border-color: #ddd; }
 
   .empty-state { border-color: #ccc; color: #555; }
   footer.page-foot { border-color: #ccc; color: #555; }
