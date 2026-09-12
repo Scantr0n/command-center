@@ -8,6 +8,7 @@
       "company": "City Bound",
       "category": null,
       "stage": "in-exploration",
+      "stageEnteredDate": null,
       "verifiedHook": null,
       "contactChannel": {
         "type": null,

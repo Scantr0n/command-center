@@ -29,6 +29,17 @@
     return Math.round((target - today) / 86400000);
   }
 
+  function daysSince(iso) {
+    return -daysUntil(iso);
+  }
+
+  function stallInfo(p, stageById) {
+    const stageDef = stageById[p.stage];
+    if (!stageDef || stageDef.staleAfterDays == null || !p.stageEnteredDate) return null;
+    const days = daysSince(p.stageEnteredDate);
+    return { days, staleAfterDays: stageDef.staleAfterDays, isStale: days > stageDef.staleAfterDays };
+  }
+
   function channelBadge(channel) {
     if (!channel || !channel.type) {
       return '<span class="badge badge-unknown">CHANNEL NOT LOGGED</span>';
@@ -93,6 +104,33 @@
     return (a.name || '').localeCompare(b.name || '');
   }
 
+  const stalledEl = document.getElementById('stalledList');
+  const stalledSection = document.getElementById('stalledSection');
+
+  function renderStalled(stages, prospects) {
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    const stalled = prospects
+      .map(p => ({ p, info: stallInfo(p, stageById) }))
+      .filter(x => x.info && x.info.isStale)
+      .sort((a, b) => b.info.days - a.info.days);
+
+    if (stalled.length === 0) {
+      stalledSection.hidden = true;
+      return;
+    }
+
+    stalledSection.hidden = false;
+    const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
+    stalledEl.innerHTML = stalled.map(({ p, info }) =>
+      '<div class="data-quality-row">' +
+      '<strong>' + escapeHtml(p.name) + '</strong>' +
+      '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+      '<span class="dq-why">' + escapeHtml(stageLabel[p.stage] || p.stage).toUpperCase() + ' &middot; ' +
+      info.days + 'D (OVER ' + info.staleAfterDays + 'D)</span>' +
+      '</div>'
+    ).join('');
+  }
+
   function renderDataQuality(stages, prospects) {
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
     const needsChannel = prospects.filter(p =>
@@ -115,12 +153,13 @@
   }
 
   function renderBoard(stages, prospects, allProspects, query, filtering) {
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
     boardEl.innerHTML = stages.map(stage => {
       const inStage = prospects.filter(p => p.stage === stage.id).sort(byUrgency);
       const totalInStage = allProspects.filter(p => p.stage === stage.id).length;
       let cards;
       if (inStage.length) {
-        cards = inStage.map(p => renderCard(p)).join('');
+        cards = inStage.map(p => renderCard(p, stageById)).join('');
       } else if (filtering && totalInStage > 0) {
         cards = '<div class="column-empty">No matches' +
           (query ? ' for "' + escapeHtml(query) + '"' : '') + ' in this stage.</div>';
@@ -163,11 +202,16 @@
     statsEl.innerHTML = parts.join('');
   }
 
-  function renderCard(p) {
-    return '<button class="card" data-prospect-id="' + escapeHtml(p.id) + '">' +
+  function renderCard(p, stageById) {
+    const info = stallInfo(p, stageById);
+    const stallBadge = info
+      ? '<span class="badge ' + (info.isStale ? 'badge-stale' : 'badge-age') + '">' +
+        info.days + 'D IN STAGE' + (info.isStale ? ' &middot; STALLED' : '') + '</span>'
+      : '';
+    return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
-      '<div class="card-meta">' + channelBadge(p.contactChannel) + '</div>' +
+      '<div class="card-meta">' + channelBadge(p.contactChannel) + stallBadge + '</div>' +
       '</button>';
   }
 
@@ -221,6 +265,13 @@
     rows.push(fieldRow('Reply status', p.replyStatus ? escapeHtml(p.replyStatus) : 'Not logged yet', !p.replyStatus));
     rows.push(fieldRow('Send date', p.sendDate ? fmtDate(p.sendDate) : 'Not logged yet', !p.sendDate));
     rows.push(fieldRow('Next nudge date', p.nextNudgeDate ? fmtDate(p.nextNudgeDate) : 'Not scheduled yet', !p.nextNudgeDate));
+
+    const stallEntry = stallInfo(p, Object.fromEntries(allStages.map(s => [s.id, s])));
+    const stageText = p.stageEnteredDate
+      ? 'Entered ' + fmtDate(p.stageEnteredDate) + ' &middot; ' + daysSince(p.stageEnteredDate) + ' days in this stage' +
+        (stallEntry && stallEntry.isStale ? ' <span class="stalled-inline">(past the ' + stallEntry.staleAfterDays + '-day stall threshold)</span>' : '')
+      : 'Not logged yet';
+    rows.push(fieldRow('Time in stage', stageText, !p.stageEnteredDate));
 
     const ns = p.nudgeSchedule || {};
     const nudgeText = (ns.doNotNudgeBefore || ns.nudgePoint)
@@ -300,6 +351,7 @@
     renderNudgeQueue(allProspects);
     renderStats(allStages, allProspects);
     renderChannelFilterCounts(allProspects);
+    renderStalled(allStages, allProspects);
     renderDataQuality(allStages, allProspects);
     applyFilter();
   }).catch(err => {

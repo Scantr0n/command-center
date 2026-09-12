@@ -44,8 +44,11 @@ function main() {
   }
 
   const stageIds = (stagesData.stages || []).map(s => s.id);
+  const stageById = Object.fromEntries((stagesData.stages || []).map(s => [s.id, s]));
   const prospects = prospectsData.prospects || [];
   const seenIds = new Set();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   prospects.forEach((p, idx) => {
     const where = 'prospects[' + idx + ']' + (p && p.id ? ' (' + p.id + ')' : '');
@@ -73,7 +76,17 @@ function main() {
         'This is the single biggest driver of real reply rate, backfill it when known.');
     }
 
-    ['sendDate', 'nextNudgeDate'].forEach(field => {
+    const stageDef = p.stage && stageById[p.stage];
+    if (stageDef && stageDef.staleAfterDays != null && p.stageEnteredDate && DATE_RE.test(p.stageEnteredDate)) {
+      const entered = new Date(p.stageEnteredDate + 'T00:00:00');
+      const daysInStage = Math.round((today - entered) / 86400000);
+      if (daysInStage > stageDef.staleAfterDays) {
+        warnings.push(where + ': ' + daysInStage + ' days in stage "' + p.stage + '", past the ' +
+          stageDef.staleAfterDays + '-day stall threshold. Worth a real check-in or a stage update.');
+      }
+    }
+
+    ['sendDate', 'nextNudgeDate', 'stageEnteredDate'].forEach(field => {
       if (!isDateOrNull(p[field])) {
         errors.push(where + ': "' + field + '" is not a YYYY-MM-DD date or null: ' + JSON.stringify(p[field]));
       }

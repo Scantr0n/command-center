@@ -45,6 +45,7 @@
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"company-person-name"</code></td></tr>
           <tr><th>stage</th><td>One of: <code>researched</code>, <code>outreach-sent</code>, <code>silent-replied</code>, <code>in-exploration</code>, <code>client</code> (see <code>data/stages.json</code>)</td></tr>
+          <tr><th>stageEnteredDate</th><td>ISO date this prospect moved into its current <code>stage</code>. Update it every time <code>stage</code> changes. Once logged, the board flags the card as stalled if it sits past that stage's stall threshold in <code>data/stages.json</code>.</td></tr>
           <tr><th>contactChannel.type</th><td><code>"named-decision-maker"</code> or <code>"generic-inbox"</code>, this is the field with the biggest real effect on reply rate, always fill it in as soon as it is known</td></tr>
           <tr><th>socialSnapshot.asOfDate</th><td>The date the follower/engagement numbers were actually pulled, never today's date by default</td></tr>
           <tr><th>nudgeSchedule</th><td><code>doNotNudgeBefore</code> and <code>nudgePoint</code>, both ISO dates (<code>YYYY-MM-DD</code>)</td></tr>
@@ -56,6 +57,7 @@
   "company": "Example Company",
   "category": null,
   "stage": "researched",
+  "stageEnteredDate": null,
   "verifiedHook": null,
   "contactChannel": { "type": null, "detail": null },
   "sendDate": null,
@@ -74,6 +76,11 @@
     <div class="nudge-queue" id="nudgeQueue">
       <p class="nudge-empty">Loading...</p>
     </div>
+  </section>
+
+  <section id="stalledSection" hidden>
+    <h2 class="section-title">Stalled in stage</h2>
+    <div class="data-quality-list data-quality-list-stale" id="stalledList"></div>
   </section>
 
   <section id="dataQualitySection" hidden>

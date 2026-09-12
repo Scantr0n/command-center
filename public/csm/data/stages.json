@@ -1,40 +1,46 @@
 {
   "schemaVersion": 1,
+  "note": "staleAfterDays is a stall threshold (days a prospect can sit in that stage before the board flags it), based on general sales-pipeline norms (mid-stage deals with no activity for 20+ days are commonly treated as stalled). It only fires when stageEnteredDate is actually logged on a prospect, never guessed.",
   "stages": [
     {
       "id": "researched",
       "label": "Researched",
       "shortLabel": "Researched",
       "description": "Identified as a real fit. No outreach sent yet.",
-      "color": "#565B62"
+      "color": "#565B62",
+      "staleAfterDays": 14
     },
     {
       "id": "outreach-sent",
       "label": "Outreach Sent",
       "shortLabel": "Sent",
       "description": "First message sent. Waiting on a reply.",
-      "color": "#4A9EDB"
+      "color": "#4A9EDB",
+      "staleAfterDays": 10
     },
     {
       "id": "silent-replied",
       "label": "Silent / Replied",
       "shortLabel": "Silent / Replied",
       "description": "Either no response after the nudge window, or a reply came in that has not moved to active exploration.",
-      "color": "#E0A030"
+      "color": "#E0A030",
+      "staleAfterDays": 21
     },
     {
       "id": "in-exploration",
       "label": "In Exploration",
       "shortLabel": "Exploring",
       "description": "Active back and forth about a real partnership or deal.",
-      "color": "#3DDC84"
+      "color": "#3DDC84",
+      "staleAfterDays": 30
     },
     {
       "id": "client",
       "label": "Client",
       "shortLabel": "Client",
       "description": "Signed / working relationship in place.",
-      "color": "#B084E0"
+      "color": "#B084E0",
+      "staleAfterDays": null
     }
   ]
 }
