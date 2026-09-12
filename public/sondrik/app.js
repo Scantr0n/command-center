@@ -2,6 +2,7 @@
   const releaseSection = document.getElementById('releaseSection');
   const tractionSection = document.getElementById('tractionSection');
   const leadsSection = document.getElementById('leadsSection');
+  const csvBtn = document.getElementById('csvBtn');
 
   function escapeHtml(s) {
     const div = document.createElement('div');
@@ -116,6 +117,30 @@
     }).join('');
   }
 
+  function csvField(v) {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  // Exports the real, logged download-check history only, one row per actual
+  // check that was run, never an interpolated or estimated in-between value.
+  function exportDownloadsCsv(downloadsData) {
+    const metric = downloadsData.metric || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const header = ['Date', 'Count', 'Metric', 'Source', 'Note'].map(csvField).join(',');
+    const lines = checks.map(c => [c.date, c.count, metric.label, metric.source, c.note].map(csvField).join(','));
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sondrik-download-checks-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   Promise.all([
     fetch('/sondrik/data/releases.json').then(r => r.json()),
     fetch('/sondrik/data/downloads.json').then(r => r.json()),
@@ -124,9 +149,11 @@
     renderReleases(releasesData);
     renderTraction(downloadsData);
     renderLeads(leadsData);
+    csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
   }).catch(err => {
     releaseSection.innerHTML = '<div class="empty-state">Failed to load release data: ' + escapeHtml(err.message) + '</div>';
     tractionSection.innerHTML = '<div class="empty-state">Failed to load.</div>';
     leadsSection.innerHTML = '<div class="empty-state">Failed to load.</div>';
+    csvBtn.disabled = true;
   });
 })();
