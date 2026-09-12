@@ -505,11 +505,21 @@ function renderGraph() {
         openModal(this.getAttribute('data-id'));
       }
     });
-  svg.selectAll('.cat-label').on('click', function() {
-    const cat = this.getAttribute('data-category');
+  function toggleCategoryFilter(el) {
+    const cat = el.getAttribute('data-category');
     activeCategory = activeCategory === cat ? null : cat;
     applyFilters();
-  });
+  }
+  svg.selectAll('.cat-label')
+    .attr('tabindex', 0)
+    .attr('role', 'button')
+    .on('click', function() { toggleCategoryFilter(this); })
+    .on('keydown', function(event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleCategoryFilter(this);
+      }
+    });
   applyFilters();
 }
 
@@ -531,6 +541,7 @@ function applyFilters() {
   });
   document.querySelectorAll('.cat-label').forEach(el => {
     const isActive = activeCategory === el.getAttribute('data-category');
+    el.setAttribute('aria-pressed', String(isActive));
     el.setAttribute('fill', isActive ? 'var(--ink)' : 'var(--faint)');
     el.setAttribute('opacity', !activeCategory || isActive ? '1' : '0.4');
   });
