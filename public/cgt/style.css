@@ -422,7 +422,7 @@ footer.page-foot {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .copy-link-status {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
