@@ -11,6 +11,7 @@
   const modalBody = document.getElementById('modalBody');
   const modalClose = document.getElementById('modalClose');
   const printBtn = document.getElementById('printBtn');
+  const csvBtn = document.getElementById('csvBtn');
   const dataQualitySection = document.getElementById('dataQualitySection');
   const dataQualityList = document.getElementById('dataQualityList');
 
@@ -221,6 +222,7 @@
   let allProspects = [];
   let channelFilter = 'all';
   let categoryFilter = 'all';
+  let lastFiltered = [];
 
   function matchesChannel(p, key) {
     if (key === 'all') return true;
@@ -272,9 +274,66 @@
       (!query ||
         (p.name || '').toLowerCase().includes(query) ||
         (p.company || '').toLowerCase().includes(query)));
+    lastFiltered = filtered;
     renderBoard(allStages, filtered, allProspects, query,
       !!query || channelFilter !== 'all' || categoryFilter !== 'all');
   }
+
+  function csvField(v) {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  const CSV_COLUMNS = [
+    ['name', 'Name'], ['company', 'Company'], ['category', 'Category'],
+    ['stage', 'Stage'], ['stageEnteredDate', 'Stage Entered'],
+    ['verifiedHook', 'Verified Hook'],
+    ['channelType', 'Contact Channel Type'], ['channelDetail', 'Contact Channel Detail'],
+    ['sendDate', 'Send Date'], ['nextNudgeDate', 'Next Nudge Date'],
+    ['doNotNudgeBefore', 'Do Not Nudge Before'], ['nudgePoint', 'Nudge Point'],
+    ['replyStatus', 'Reply Status'],
+    ['socialPlatform', 'Social Platform'], ['socialFollowers', 'Social Followers'],
+    ['socialEngagementRate', 'Social Engagement Rate'], ['socialAsOfDate', 'Social Snapshot As Of'],
+    ['contentIdeas', 'Content Ideas'], ['notes', 'Notes']
+  ];
+
+  // Exports exactly what the board currently shows (search + channel + category
+  // filters applied), not the full dataset, so the file matches what's on screen.
+  csvBtn.addEventListener('click', () => {
+    const rows = lastFiltered.map(p => ({
+      name: p.name,
+      company: p.company,
+      category: p.category,
+      stage: p.stage,
+      stageEnteredDate: p.stageEnteredDate,
+      verifiedHook: p.verifiedHook,
+      channelType: p.contactChannel && p.contactChannel.type,
+      channelDetail: p.contactChannel && p.contactChannel.detail,
+      sendDate: p.sendDate,
+      nextNudgeDate: p.nextNudgeDate,
+      doNotNudgeBefore: p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore,
+      nudgePoint: p.nudgeSchedule && p.nudgeSchedule.nudgePoint,
+      replyStatus: p.replyStatus,
+      socialPlatform: p.socialSnapshot && p.socialSnapshot.platform,
+      socialFollowers: p.socialSnapshot && p.socialSnapshot.followers,
+      socialEngagementRate: p.socialSnapshot && p.socialSnapshot.engagementRate,
+      socialAsOfDate: p.socialSnapshot && p.socialSnapshot.asOfDate,
+      contentIdeas: (p.contentIdeas || []).join('; '),
+      notes: p.notes
+    }));
+    const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+    const lines = rows.map(r => CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'csm-pipeline-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
 
   searchInput.addEventListener('input', applyFilter);
 
