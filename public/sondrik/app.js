@@ -56,6 +56,16 @@
         ' vs ' + fmtDate(first.date) + ' check (' + span + 'd earlier)</div>';
     }
 
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const ageDays = daysBetween(latest.date, todayIso);
+    const STALE_AFTER_DAYS = 7;
+    const isStale = ageDays > STALE_AFTER_DAYS;
+    const ageLabel = ageDays <= 0 ? 'checked today' : ageDays === 1 ? 'checked 1 day ago' : 'checked ' + ageDays + ' days ago';
+    const freshnessHtml = '<div class="freshness-badge ' + (isStale ? 'freshness-stale' : 'freshness-fresh') + ' font-mono">' +
+      (isStale ? 'STALE, ' : '') + ageLabel.toUpperCase() +
+      (isStale ? ', RE-CHECK GITHUB API' : '') +
+      '</div>';
+
     const barsHtml = checks.map(c => {
       const heightPct = c.count === 0 ? 0 : Math.max(4, Math.round((c.count / maxCount) * 100));
       return '<div class="compare-bar-col">' +
@@ -73,6 +83,7 @@
       '<div class="stat-number font-display">' + latest.count + '</div>' +
       '<div class="stat-label">' + escapeHtml(metric.label || 'downloads') + '</div>' +
       deltaHtml +
+      freshnessHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +
       '</div>' +
       '<div class="compare-bars">' + barsHtml + '</div>' +
