@@ -410,6 +410,18 @@
     });
   }
 
+  // Announces the live match count to screen-reader users, since the visual
+  // feedback (cards disappearing from columns) isn't perceivable
+  // non-visually, same live region the main Command Center dashboard already
+  // uses for its own search/category filter.
+  function announceFilterStatus(matchCount, query, anyFilterActive) {
+    const status = document.getElementById('filterStatus');
+    status.textContent = anyFilterActive
+      ? matchCount + ' prospect' + (matchCount === 1 ? '' : 's') + ' match' + (matchCount === 1 ? 'es' : '') +
+        (query ? ' for "' + query + '"' : '')
+      : '';
+  }
+
   function applyFilter() {
     const query = searchInput.value.trim().toLowerCase();
     const filtered = allProspects.filter(p =>
@@ -421,8 +433,9 @@
         (p.category || '').toLowerCase().includes(query) ||
         (p.verifiedHook || '').toLowerCase().includes(query)));
     lastFiltered = filtered;
-    renderBoard(allStages, filtered, allProspects, query,
-      !!query || channelFilter !== 'all' || categoryFilter !== 'all');
+    const anyFilterActive = !!query || channelFilter !== 'all' || categoryFilter !== 'all';
+    renderBoard(allStages, filtered, allProspects, query, anyFilterActive);
+    announceFilterStatus(filtered.length, query, anyFilterActive);
     syncUrl();
   }
 

@@ -297,12 +297,27 @@ function updateSortHeaders() {
   });
 }
 
+// Announces the live match count to screen-reader users, since the visual
+// feedback (the table simply shrinking) isn't perceivable non-visually,
+// same live region the main Command Center dashboard already uses for its
+// own search/category filter.
+function announceFilterStatus(matchCount) {
+  const anyFilterActive = !!searchTerm.trim() || activeSport !== 'all' || activeGrader !== 'all' ||
+    activeBatch !== 'all' || activeBasis !== 'all';
+  const status = document.getElementById('filterStatus');
+  status.textContent = anyFilterActive
+    ? matchCount + ' card' + (matchCount === 1 ? '' : 's') + ' match' + (matchCount === 1 ? 'es' : '') +
+      (searchTerm.trim() ? ' for "' + searchTerm.trim() + '"' : '')
+    : '';
+}
+
 function applyFiltersAndRender() {
   syncUrl();
   const filtered = sortRows(cards.filter(matchesFilters));
   const tbody = document.getElementById('cardTableBody');
   const empty = document.getElementById('tableEmpty');
   updateSortHeaders();
+  announceFilterStatus(filtered.length);
 
   if (!filtered.length) {
     tbody.innerHTML = '';

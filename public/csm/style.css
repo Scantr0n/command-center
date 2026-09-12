@@ -489,6 +489,21 @@ header.page-head .sub {
   text-align: center;
 }
 
+/* Visually hidden but still announced, for the live filter-match count,
+   same live-region pattern the main Command Center dashboard uses for its
+   own search/category filter. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed; inset: 0;
