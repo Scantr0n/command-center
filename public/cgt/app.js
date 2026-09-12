@@ -5,6 +5,7 @@ let searchTerm = '';
 let activeSport = 'all';
 let activeBasis = 'all';
 let activeGrader = 'all';
+let activeBatch = 'all';
 let sortKey = null;
 let sortDir = 'asc';
 
@@ -23,12 +24,17 @@ function restoreStateFromUrl() {
   const sport = params.get('sport');
   const basis = params.get('basis');
   const grader = params.get('grader');
+  const batch = params.get('batch');
   const sort = params.get('sort');
   const dir = params.get('dir');
   if (q) searchTerm = q;
   if (sport && VALID_SPORTS.includes(sport)) activeSport = sport;
   if (basis && VALID_BASES.includes(basis)) activeBasis = basis;
   if (grader && VALID_GRADERS.includes(grader)) activeGrader = grader;
+  // Not validated against a fixed list like sport/basis/grader, since batch
+  // labels are open-ended (one per real pricing session). An unknown batch
+  // in the URL just matches nothing once applied, same as a stale bookmark.
+  if (batch) activeBatch = batch;
   if (sort) sortKey = sort;
   if (dir === 'desc') sortDir = 'desc';
 }
@@ -46,6 +52,7 @@ function syncUrl() {
   if (activeSport !== 'all') params.set('sport', activeSport);
   if (activeBasis !== 'all') params.set('basis', activeBasis);
   if (activeGrader !== 'all') params.set('grader', activeGrader);
+  if (activeBatch !== 'all') params.set('batch', activeBatch);
   if (sortKey) {
     params.set('sort', sortKey);
     if (sortDir === 'desc') params.set('dir', 'desc');
@@ -124,6 +131,7 @@ async function loadCards() {
     const data = await res.json();
     cards = data.cards || [];
     renderStats();
+    renderBatchFilter();
     applyFiltersAndRender();
   } catch (e) {
     cards = [];
@@ -162,6 +170,29 @@ function renderStats() {
   `).join('');
 }
 
+// Batches aren't a fixed vocabulary like sport/basis/grader, they're one per
+// real pricing session (e.g. the 2026-08-08 full backlog pass), so the chip
+// row is built from whatever labels actually show up in the data instead of
+// a hardcoded list. Newest batch first; label sort works here because the
+// documented convention is to lead with an ISO date.
+function renderBatchFilter() {
+  const container = document.getElementById('batchFilter');
+  const batches = [...new Set(cards.map(c => c.backlogBatch).filter(Boolean))].sort().reverse();
+
+  if (!batches.length) {
+    container.hidden = true;
+    return;
+  }
+  if (activeBatch !== 'all' && !batches.includes(activeBatch)) activeBatch = 'all';
+
+  container.hidden = false;
+  container.innerHTML = '<span class="filter-row-label font-mono">BATCH</span>' +
+    `<button type="button" class="chip" data-batch="all" aria-pressed="${activeBatch === 'all'}">All</button>` +
+    batches.map(b => `<button type="button" class="chip" data-batch="${escapeHtml(b)}" aria-pressed="${activeBatch === b}">${escapeHtml(b)}</button>`).join('');
+
+  wireChipGroup('batchFilter', 'data-batch', (v) => { activeBatch = v; });
+}
+
 function basisBadge(c) {
   if (c.estimatedValue == null) return '<span class="cell-value empty">not priced</span>';
   if (c.valuationBasis === 'recent-sale') return '<span class="badge badge-sale">recent sale</span>';
@@ -177,10 +208,11 @@ function matchesFilters(c) {
     || String(c.year ?? '').includes(term);
   const matchesSport = activeSport === 'all' || c.sport === activeSport;
   const matchesGrader = activeGrader === 'all' || c.gradingCompany === activeGrader;
+  const matchesBatch = activeBatch === 'all' || c.backlogBatch === activeBatch;
   let matchesBasis = true;
   if (activeBasis === 'unpriced') matchesBasis = c.estimatedValue == null;
   else if (activeBasis !== 'all') matchesBasis = c.valuationBasis === activeBasis;
-  return matchesSearch && matchesSport && matchesGrader && matchesBasis;
+  return matchesSearch && matchesSport && matchesGrader && matchesBatch && matchesBasis;
 }
 
 function sortRows(rows) {
