@@ -234,18 +234,29 @@ function pillStyle(status) {
   return `background: ${c}1F; color: ${c};`;
 }
 
+let lastClustersRaw = null;
+
 async function loadClusters() {
   const errBox = document.getElementById('errorBanner');
   try {
     const res = await fetch('/api/clusters');
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
+    errBox.classList.add('hidden');
+    document.getElementById('graphSkeleton').classList.add('hidden');
+
+    // Skip the re-render on unchanged data (the 30s poll refetches even
+    // when nothing moved), since rebuilding the graph/grid DOM every time
+    // would drop keyboard focus mid-tab and restart the pulse animations
+    // on every active-status node.
+    const raw = JSON.stringify(data.clusters);
+    if (raw === lastClustersRaw) return;
+    lastClustersRaw = raw;
+
     clusters = data.clusters.sort((a, b) => {
       const order = { top: 0, normal: 1, low: 2 };
       return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
     });
-    errBox.classList.add('hidden');
-    document.getElementById('graphSkeleton').classList.add('hidden');
     renderStats();
     renderAttention();
     renderGraph();
