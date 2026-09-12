@@ -46,6 +46,11 @@
   .attn-pill:hover { background: rgba(255,255,255,0.08); }
   .attn-card { transition: border-color 0.15s ease, transform 0.15s ease; cursor: pointer; }
   .attn-card:hover { transform: translateX(2px); }
+  .cluster-card:focus-visible, .attn-card:focus-visible, .activity-row:focus-visible {
+    outline: 1.5px solid var(--hairlineHover);
+    outline-offset: 2px;
+  }
+  .activity-row { border-radius: 6px; }
   .tag-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: 0.3px; }
 
   /* Atmosphere: faint radar grid + vignette behind the graph, restrained not gimmicky */
@@ -192,6 +197,20 @@ const CATEGORY_COLOR = {
 
 function categoryColor(cat) { return CATEGORY_COLOR[cat] || CATEGORY_COLOR['Uncategorized']; }
 
+// Makes a click-to-open-modal element also operable from the keyboard,
+// matching the graph nodes (which already had tabindex/role/Enter-Space).
+function makeCardClickable(el) {
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('role', 'button');
+  el.addEventListener('click', () => openModal(el.dataset.id));
+  el.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openModal(el.dataset.id);
+    }
+  });
+}
+
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -240,7 +259,7 @@ function renderActivityFeed() {
   feed.innerHTML = dated.slice(0, 10).map(c => {
     const color = categoryColor(c.category);
     return `
-      <div class="flex items-center gap-3 py-1.5 cursor-pointer" data-id="${escapeHtml(c.id)}">
+      <div class="activity-row flex items-center gap-3 py-1.5 cursor-pointer" data-id="${escapeHtml(c.id)}">
         <span class="text-[10px] font-mono flex-shrink-0" style="color: var(--faint); width: 92px">${relativeTime(c.lastUpdate)}</span>
         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background: ${color}"></span>
         <span class="text-xs font-medium flex-shrink-0" style="color: var(--ink)">${escapeHtml(c.name)}</span>
@@ -248,9 +267,7 @@ function renderActivityFeed() {
       </div>
     `;
   }).join('');
-  feed.querySelectorAll('[data-id]').forEach(el => {
-    el.addEventListener('click', () => openModal(el.dataset.id));
-  });
+  feed.querySelectorAll('[data-id]').forEach(makeCardClickable);
 }
 
 function renderStats() {
@@ -296,9 +313,10 @@ function renderAttention() {
     </div>
   `).join('');
 
-  [...compact.querySelectorAll('.attn-pill'), ...cards.querySelectorAll('.attn-card')].forEach(el => {
+  compact.querySelectorAll('.attn-pill').forEach(el => {
     el.addEventListener('click', () => openModal(el.dataset.id));
   });
+  cards.querySelectorAll('.attn-card').forEach(makeCardClickable);
 
   updateAttentionVisibility();
 }
@@ -535,9 +553,7 @@ function renderGrid() {
   `;
   }).join('');
 
-  document.querySelectorAll('.cluster-card').forEach(el => {
-    el.addEventListener('click', () => openModal(el.dataset.id));
-  });
+  document.querySelectorAll('.cluster-card').forEach(makeCardClickable);
 }
 
 function setView(view) {
