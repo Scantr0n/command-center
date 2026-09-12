@@ -96,9 +96,14 @@
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
       <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
-        <input id="searchInput" type="text" placeholder="Search projects..."
-          class="search-input text-xs font-mono rounded-lg px-3 py-1.5 border hairline focus:outline-none w-[130px] sm:w-[160px]"
-          style="background: var(--panelLight); color: var(--ink)">
+        <div class="relative">
+          <input id="searchInput" type="text" placeholder="Search projects..."
+            class="search-input text-xs font-mono rounded-lg pl-3 pr-6 py-1.5 border hairline focus:outline-none w-[130px] sm:w-[160px]"
+            style="background: var(--panelLight); color: var(--ink)">
+          <button id="searchClearBtn" type="button" aria-label="Clear search" tabindex="-1"
+            class="hidden absolute inset-y-0 right-1.5 flex items-center text-sm leading-none"
+            style="color: var(--faint)">&times;</button>
+        </div>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
         <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5">Graph</button>
@@ -516,11 +521,27 @@ function applyFilters() {
     el.setAttribute('fill', isActive ? 'var(--ink)' : 'var(--faint)');
     el.setAttribute('opacity', !activeCategory || isActive ? '1' : '0.4');
   });
+  document.getElementById('searchClearBtn').classList.toggle('hidden', !term);
 }
 
-document.getElementById('searchInput').addEventListener('input', (e) => {
+const searchInputEl = document.getElementById('searchInput');
+searchInputEl.addEventListener('input', (e) => {
   searchTerm = e.target.value;
   applyFilters();
+});
+searchInputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && searchInputEl.value) {
+    e.stopPropagation();
+    searchInputEl.value = '';
+    searchTerm = '';
+    applyFilters();
+  }
+});
+document.getElementById('searchClearBtn').addEventListener('click', () => {
+  searchInputEl.value = '';
+  searchTerm = '';
+  applyFilters();
+  searchInputEl.focus();
 });
 
 function relativeTime(dateStr) {
