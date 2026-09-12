@@ -149,7 +149,8 @@ function renderPositionSizing(data) {
   ` : `
     <div class="ps-meter">
       <div class="ps-field-label font-mono">CURRENT DRAWDOWN</div>
-      <div class="meter-track meter-track-empty" role="meter" aria-valuetext="awaiting connection"></div>
+      <div class="meter-track meter-track-empty" role="meter" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
+        aria-valuetext="awaiting connection" aria-label="Current drawdown, percent of range used"></div>
       <div class="meter-value awaiting font-mono">awaiting connection</div>
     </div>
   `;
