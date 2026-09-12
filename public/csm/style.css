@@ -236,6 +236,61 @@ header.page-head .sub {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* Recent activity feed: merges stage moves and content ideas from every
+   prospect into one pipeline-wide, newest-first list. */
+.activity-feed {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 36px;
+  background: var(--panel);
+}
+.activity-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.activity-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.82rem;
+}
+.activity-row:first-child { border-top: none; }
+.activity-date {
+  color: var(--dim);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  width: 82px;
+}
+.activity-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  flex-shrink: 0;
+  color: var(--sub);
+}
+.activity-tag-idea { color: #4A9EDB; border-color: rgba(74,158,219,0.4); background: rgba(74,158,219,0.08); }
+.activity-who { flex-shrink: 0; }
+.activity-label { color: var(--sub); }
+.activity-list.is-collapsed .activity-row:nth-child(n+9) { display: none; }
+.activity-toggle {
+  display: block;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 10px 0 12px;
+}
+.activity-toggle:hover { color: var(--ink); }
+
 .board-toolbar {
   display: flex;
   align-items: center;
@@ -621,6 +676,13 @@ footer.page-foot {
   .data-quality-list { background: none; border-color: #bbb; }
   .data-quality-row { border-color: #ddd; }
   .data-quality-row .dq-why { color: #555; }
+
+  .activity-feed { background: none; border-color: #bbb; }
+  .activity-row { border-color: #ddd; }
+  .activity-date, .activity-label { color: #444; }
+  .activity-tag { border-color: #999; background: none !important; color: #111 !important; }
+  .activity-toggle { display: none !important; }
+  .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: flex !important; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }

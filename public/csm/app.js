@@ -15,6 +15,8 @@
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   const dataQualitySection = document.getElementById('dataQualitySection');
   const dataQualityList = document.getElementById('dataQualityList');
+  const activityFeedEl = document.getElementById('activityFeed');
+  const ACTIVITY_PREVIEW_COUNT = 8;
 
   printBtn.addEventListener('click', () => window.print());
 
@@ -200,6 +202,70 @@
       ', ' + reasons.join(' &middot; ') + '</span>' +
       '</div>'
     ).join('');
+  }
+
+  // Pulls stage moves and content-ideas entries out of every prospect's own
+  // record and merges them into one pipeline-wide feed, newest first. Both
+  // logs already exist per-prospect (in the modal), but there was no way to
+  // see what happened across the whole pipeline without opening each card.
+  function buildActivityEvents(prospects, stages) {
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    const events = [];
+    prospects.forEach(p => {
+      (p.stageHistory || []).forEach(entry => {
+        if (!entry.date) return;
+        const def = stageById[entry.stage];
+        events.push({
+          date: entry.date,
+          type: 'stage',
+          prospect: p,
+          label: 'Moved to ' + (def ? def.label : entry.stage),
+          color: def ? def.color : 'var(--dim)'
+        });
+      });
+      (p.contentIdeas || []).forEach(entry => {
+        if (!entry.date || !entry.idea) return;
+        events.push({ date: entry.date, type: 'idea', prospect: p, label: entry.idea });
+      });
+    });
+    events.sort((a, b) => b.date.localeCompare(a.date));
+    return events;
+  }
+
+  function renderActivityFeed(prospects, stages) {
+    const events = buildActivityEvents(prospects, stages);
+    if (events.length === 0) {
+      activityFeedEl.innerHTML = '<p class="activity-empty" role="status">No activity logged yet across the ' +
+        'pipeline. Once a stage move or a content idea is logged with a real date on any prospect, it shows up ' +
+        'here in one feed instead of only inside that prospect&rsquo;s own card.</p>';
+      return;
+    }
+    const needsToggle = events.length > ACTIVITY_PREVIEW_COUNT;
+    const rowsHtml = events.map(ev => {
+      const tag = ev.type === 'stage'
+        ? '<span class="activity-tag activity-tag-stage" style="color:' + ev.color + ';border-color:' + ev.color + '66">MOVED</span>'
+        : '<span class="activity-tag activity-tag-idea">IDEA</span>';
+      return '<div class="activity-row">' +
+        '<span class="activity-date font-mono">' + escapeHtml(fmtDate(ev.date)) + '</span>' +
+        tag +
+        '<span class="activity-who"><strong>' + escapeHtml(ev.prospect.name) + '</strong>' +
+        (ev.prospect.company ? ' <span style="color:var(--sub)">' + escapeHtml(ev.prospect.company) + '</span>' : '') +
+        '</span>' +
+        '<span class="activity-label">' + escapeHtml(ev.label) + '</span>' +
+        '</div>';
+    }).join('');
+    activityFeedEl.innerHTML =
+      '<div class="activity-list' + (needsToggle ? ' is-collapsed' : '') + '" id="activityList">' + rowsHtml + '</div>' +
+      (needsToggle ? '<button type="button" class="activity-toggle font-mono" id="activityToggle">Show all ' +
+        events.length + '</button>' : '');
+    const toggleBtn = document.getElementById('activityToggle');
+    const listEl = document.getElementById('activityList');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const collapsed = listEl.classList.toggle('is-collapsed');
+        toggleBtn.textContent = collapsed ? 'Show all ' + events.length : 'Show fewer';
+      });
+    }
   }
 
   function renderBoard(stages, prospects, allProspects, query, filtering) {
@@ -583,9 +649,11 @@
     renderCategoryFilter(allProspects);
     renderStalled(allStages, allProspects);
     renderDataQuality(allStages, allProspects);
+    renderActivityFeed(allProspects, allStages);
     applyFilter();
   }).catch(err => {
     boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
     nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
+    activityFeedEl.innerHTML = '<p class="activity-empty" role="alert">Failed to load.</p>';
   });
 })();
