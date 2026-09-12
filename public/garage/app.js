@@ -4,6 +4,43 @@ let activePlatform = 'all';
 let sortKey = null;
 let sortDir = 'asc';
 
+// Filters, search, and sort are mirrored into the URL query string so a
+// specific view (e.g. "eBay listings sorted by price") can be bookmarked or
+// shared as a link, same convention as the CSM and CGT hubs.
+const VALID_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+
+function restoreStateFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const q = params.get('q');
+  const platform = params.get('platform');
+  const sort = params.get('sort');
+  const dir = params.get('dir');
+  if (q) searchTerm = q;
+  if (platform && VALID_PLATFORMS.includes(platform)) activePlatform = platform;
+  if (sort) sortKey = sort;
+  if (dir === 'desc') sortDir = 'desc';
+}
+
+function setInitialChipState(containerId, dataAttr, value) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.setAttribute('aria-pressed', chip.getAttribute(dataAttr) === value ? 'true' : 'false');
+  });
+}
+
+function syncUrl() {
+  const params = new URLSearchParams();
+  if (searchTerm.trim()) params.set('q', searchTerm.trim());
+  if (activePlatform !== 'all') params.set('platform', activePlatform);
+  if (sortKey) {
+    params.set('sort', sortKey);
+    if (sortDir === 'desc') params.set('dir', 'desc');
+  }
+  const qs = params.toString();
+  const url = location.pathname + (qs ? '?' + qs : '');
+  history.replaceState(null, '', url);
+}
+
 const PLATFORM_LABELS = { ebay: 'eBay', vinted: 'Vinted', poshmark: 'Poshmark', depop: 'Depop' };
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
@@ -158,6 +195,7 @@ function applyFiltersAndRender() {
     empty.hidden = false;
     empty.setAttribute('role', 'status');
     empty.textContent = listings.length ? 'No live listings match the current filters.' : 'No live listings logged yet.';
+    syncUrl();
     return;
   }
   empty.hidden = true;
@@ -173,6 +211,7 @@ function applyFiltersAndRender() {
       <td class="cell-muted">${l.datePublished ? escapeHtml(l.datePublished) : '<span class="cell-value empty">not logged</span>'}</td>
     </tr>
   `).join('');
+  syncUrl();
 }
 
 function renderPayoutTable(listings) {
@@ -236,6 +275,9 @@ function wireChipGroup(containerId, dataAttr, setter) {
     });
   });
 }
+restoreStateFromUrl();
+document.getElementById('searchInput').value = searchTerm;
+setInitialChipState('platformFilter', 'data-platform', activePlatform);
 wireChipGroup('platformFilter', 'data-platform', (v) => { activePlatform = v; });
 
 function handleSortHeaderActivate(th) {
@@ -259,6 +301,39 @@ document.querySelectorAll('th.sortable').forEach(th => {
 });
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+// The current filters/search/sort are already mirrored into the address bar
+// by syncUrl(), but most people won't notice that on their own, so this
+// copies it explicitly. Falls back to a hidden textarea + execCommand for
+// browsers/contexts where the async Clipboard API isn't available.
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(ta);
+  }
+  return Promise.resolve();
+}
+
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const COPY_LINK_LABEL = copyLinkBtn.textContent;
+copyLinkBtn.addEventListener('click', () => {
+  copyText(location.href)
+    .then(() => { copyLinkBtn.textContent = 'Link copied'; })
+    .catch(() => { copyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
+    .finally(() => {
+      setTimeout(() => { copyLinkBtn.textContent = COPY_LINK_LABEL; }, 1800);
+    });
+});
 
 function csvField(v) {
   const s = v == null ? '' : String(v);
