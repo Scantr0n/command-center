@@ -112,6 +112,44 @@
   </section>
 
   <section>
+    <h2 class="section-title">Est. net payout by platform</h2>
+    <div class="callout">
+      <strong>Estimates only, not a live account connection.</strong> Computed from each platform's standard
+      published 2026 seller fee schedule against the asking price above. Actual payout can differ by item
+      category, seller level, active promotions, or a fee schedule change since this was last checked.
+    </div>
+    <details class="schema-help">
+      <summary>Fee formulas used</summary>
+      <div class="schema-help-body">
+        <table class="schema-table">
+          <tbody>
+            <tr><th>eBay</th><td>13.25% final value fee + 2.9% + $0.30 payment processing (standard rate, most categories)</td></tr>
+            <tr><th>Vinted</th><td>No seller fees, buyer pays a separate buyer protection fee</td></tr>
+            <tr><th>Poshmark</th><td>Flat $2.95 on sales under $15, otherwise 20% commission</td></tr>
+            <tr><th>Depop</th><td>3.3% + $0.45 Depop Payments processing fee, no seller commission (US/UK)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <div class="table-wrap">
+      <table class="card-table" id="payoutTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Price</th>
+            <th>eBay</th>
+            <th>Vinted</th>
+            <th>Poshmark</th>
+            <th>Depop</th>
+          </tr>
+        </thead>
+        <tbody id="payoutTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="payoutTableEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section>
     <h2 class="section-title">Quality &amp; fixes log</h2>
     <div class="activity-list" id="activityList"></div>
   </section>

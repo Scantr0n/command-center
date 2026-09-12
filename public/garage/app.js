@@ -7,6 +7,20 @@ let sortDir = 'asc';
 const PLATFORM_LABELS = { ebay: 'eBay', vinted: 'Vinted', poshmark: 'Poshmark', depop: 'Depop' };
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
+const PAYOUT_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+
+// Standard published 2026 seller fee schedules, not a live account connection.
+// See the "Fee formulas used" details on the page for the rate each case applies.
+function estimateNetPayout(platform, price) {
+  if (price == null) return null;
+  switch (platform) {
+    case 'ebay': return price - (price * 0.1325 + price * 0.029 + 0.30);
+    case 'vinted': return price;
+    case 'poshmark': return price < 15 ? price - 2.95 : price * 0.80;
+    case 'depop': return price - (price * 0.033 + 0.45);
+    default: return null;
+  }
+}
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -38,6 +52,7 @@ async function loadData() {
     renderStats(listings, pipelineData.stages || []);
     renderPipeline(pipelineData.stages || []);
     applyFiltersAndRender();
+    renderPayoutTable(listings);
     renderActivity(activityData.events || []);
   } catch (e) {
     listings = [];
@@ -156,6 +171,32 @@ function applyFiltersAndRender() {
       <td class="cell-value${l.price == null ? ' empty' : ''}">${l.price != null ? formatUsd(l.price) : 'not set'}</td>
       <td class="cell-platforms">${platformBadges(l.platforms, l.soldOn)}</td>
       <td class="cell-muted">${l.datePublished ? escapeHtml(l.datePublished) : '<span class="cell-value empty">not logged</span>'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderPayoutTable(listings) {
+  const tbody = document.getElementById('payoutTableBody');
+  const empty = document.getElementById('payoutTableEmpty');
+  const rows = listings.filter(l => l.status === 'live');
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No live listings to estimate payout for yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  tbody.innerHTML = rows.map(l => `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div></td>
+      <td class="cell-value${l.price == null ? ' empty' : ''}">${l.price != null ? formatUsd(l.price) : 'not set'}</td>
+      ${PAYOUT_PLATFORMS.map(p => {
+        if (!(l.platforms || []).includes(p)) return '<td class="cell-value empty">not listed</td>';
+        const net = estimateNetPayout(p, l.price);
+        return `<td class="cell-value">${net != null ? formatUsd(net) : 'not set'}</td>`;
+      }).join('')}
     </tr>
   `).join('');
 }
