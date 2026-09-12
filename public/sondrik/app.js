@@ -102,11 +102,18 @@
     const maxCount = Math.max(1, ...checks.map(c => c.count));
 
     let deltaHtml = '';
+    let rateHtml = '';
     if (checks.length > 1) {
       const delta = latest.count - first.count;
       const span = daysBetween(first.date, latest.date);
       deltaHtml = '<div class="stat-delta">' + (delta >= 0 ? '+' : '') + delta +
         ' vs ' + fmtDate(first.date) + ' check (' + span + 'd earlier)</div>';
+      // A derived helper metric, not a new fact: same two real checks, expressed as a
+      // rate so a reader isn't left doing the division themselves.
+      if (span > 0) {
+        const perDay = delta / span;
+        rateHtml = '<div class="stat-rate font-mono">~' + perDay.toFixed(1) + '/day over that span</div>';
+      }
     }
 
     const todayIso = new Date().toISOString().slice(0, 10);
@@ -145,6 +152,7 @@
       '<div class="stat-number font-display">' + latest.count + '</div>' +
       '<div class="stat-label">' + escapeHtml(metric.label || 'downloads') + '</div>' +
       deltaHtml +
+      rateHtml +
       freshnessHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +
       '</div>' +

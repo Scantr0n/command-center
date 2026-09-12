@@ -208,6 +208,11 @@ section { margin-bottom: 36px; }
   color: #3DDC84;
   margin-top: 8px;
 }
+.stat-rate {
+  font-size: 0.7rem;
+  color: var(--dim);
+  margin-top: 4px;
+}
 .stat-source {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.68rem;
@@ -489,7 +494,7 @@ footer.page-foot {
   }
   .release-summary, .stat-label, .lead-summary, .timeline-title { color: #333; }
   .release-date, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
-  .timeline-date, .timeline-detail, .timeline-undated-label { color: #555; }
+  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate { color: #555; }
   .stat-delta { color: #111; }
   .release-badge, .timeline-badge,
   .timeline-kind-release .timeline-badge, .timeline-kind-check .timeline-badge, .timeline-kind-lead .timeline-badge {
