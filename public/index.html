@@ -168,6 +168,11 @@
 
     <div id="categoryFilterRow" class="flex flex-wrap items-center gap-2 mb-4" role="group" aria-label="Filter by category"></div>
 
+    <div id="noResultsMsg" class="hidden items-center justify-between gap-3 rounded-lg px-4 py-3 border hairline mb-4 text-sm" style="background: rgba(255,255,255,0.02); color: var(--sub)">
+      <span id="noResultsText"></span>
+      <button type="button" id="clearFiltersBtn" class="text-xs font-mono px-3 py-1.5 rounded border hairline flex-shrink-0" style="color: var(--ink)">Clear filters</button>
+    </div>
+
     <div id="graphView" style="position: relative;">
       <div id="graphScroll" class="flex items-center justify-center py-4">
         <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"></svg>
@@ -635,7 +640,28 @@ function applyFilters() {
   document.getElementById('filterStatus').textContent = anyFilterActive
     ? `${matchCount} project${matchCount === 1 ? '' : 's'} match${matchCount === 1 ? 'es' : ''}${activeCategory ? ` in ${activeCategory}` : ''}${term ? ` for "${term}"` : ''}`
     : '';
+
+  // A dimmed-to-16%-opacity board with zero full-opacity cards reads as
+  // "broken" rather than "no results" to a sighted user, since nothing on
+  // screen actually says so (only the sr-only filterStatus above does).
+  const noResults = document.getElementById('noResultsMsg');
+  const showNoResults = anyFilterActive && matchCount === 0;
+  noResults.classList.toggle('hidden', !showNoResults);
+  noResults.classList.toggle('flex', showNoResults);
+  if (showNoResults) {
+    document.getElementById('noResultsText').textContent =
+      `No projects match${activeCategory ? ` in ${activeCategory}` : ''}${term ? ` for "${term}"` : ''}.`;
+  }
 }
+
+function clearAllFilters() {
+  searchTerm = '';
+  activeCategory = null;
+  document.getElementById('searchInput').value = '';
+  applyFilters();
+  renderCategoryFilter();
+}
+document.getElementById('clearFiltersBtn').addEventListener('click', clearAllFilters);
 
 const searchInputEl = document.getElementById('searchInput');
 searchInputEl.addEventListener('input', (e) => {
