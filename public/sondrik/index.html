@@ -44,7 +44,10 @@
             <code>date</code> is the actual ship date, <code>summary</code> is what actually changed.</td></tr>
           <tr><th>downloads.json</th><td>Append a new object to <code>metric.checks</code> each time you actually
             pull a fresh count. Never edit past checks, they are a record of what was true on that date. Always
-            state <code>metric.source</code> so a reader knows this isn't an estimate.</td></tr>
+            state <code>metric.source</code> so a reader knows this isn't an estimate. The traction stat marks
+            itself <code>STALE</code> once the latest check is more than 7 days old, that just means it is time
+            to pull a fresh count, not that anything is broken. Use "Export CSV" to get the full check history
+            as a spreadsheet.</td></tr>
           <tr><th>leads.json</th><td>One object per real lead. <code>outreach.sent</code> must stay
             <code>false</code> until the message has actually been sent by a human. The validator refuses a
             <code>sent: true</code> entry unless <code>approvalStatus</code> is also <code>"approved"</code>.</td></tr>
