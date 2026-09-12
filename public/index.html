@@ -318,6 +318,18 @@ function truncateLabel(name, max = 16) {
   return name.length > max ? name.slice(0, max - 1) + '…' : name;
 }
 
+const LABEL_STOPWORDS = new Set(['the', 'a', 'an']);
+
+// Picks the word that actually distinguishes a project on the graph, so
+// e.g. "The Garage" and "The Mechanic" don't both render as just "The".
+function nodeLabelWord(name) {
+  const words = name.split(' ');
+  if (LABEL_STOPWORDS.has(words[0].toLowerCase()) && words[1]) {
+    return words[1];
+  }
+  return words[0];
+}
+
 function groupByCategory(list) {
   const map = {};
   list.forEach(c => {
@@ -407,7 +419,7 @@ function renderGraph() {
     spokesHtml += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
 
     // Real cross-project relationships only (e.g. Lifting Tracker relays into
-    // Macro Tracker) — not decorative, only drawn when a cluster's own data
+    // Macro Tracker), not decorative, only drawn when a cluster's own data
     // actually declares a relatedTo link.
     (c.relatedTo || []).forEach(otherId => {
       const pairKey = [c.id, otherId].sort().join('|');
@@ -433,7 +445,7 @@ function renderGraph() {
         <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}20" stroke="${color}" stroke-width="1.5" ${stale ? 'stroke-dasharray="4,3"' : ''} />
         <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" opacity="${stale ? 0.45 : 1}" />
         ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
-        <text x="${nx.toFixed(1)}" y="${(ny + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${escapeHtml(truncateLabel(c.name.split(' ')[0], 9))}</text>
+        <text x="${nx.toFixed(1)}" y="${(ny + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${escapeHtml(truncateLabel(nodeLabelWord(c.name), 9))}</text>
       </g>
     `;
   });

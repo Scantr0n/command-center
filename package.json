@@ -1,7 +1,7 @@
 {
   "name": "command-center",
   "version": "0.1.0",
-  "description": "Jack's unified project command center — one hub, one cluster per project",
+  "description": "Jack's unified project command center, one hub, one cluster per project",
   "main": "server.js",
   "scripts": {
     "build:css": "tailwindcss -i ./src/input.css -o ./public/style.css --minify",
