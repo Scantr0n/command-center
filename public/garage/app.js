@@ -65,8 +65,12 @@ function escapeHtml(str) {
   }[c]));
 }
 
+// A net payout can go negative on a cheap Poshmark listing (its flat $2.95
+// fee under $15 exceeds the price), and '$' + (-1.95) renders as the
+// confusing "$-1.95" instead of "-$1.95", so the sign goes before the symbol.
 function formatUsd(n) {
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 async function loadData() {
