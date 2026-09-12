@@ -134,6 +134,38 @@ function main() {
         }
       });
     }
+
+    if (!Array.isArray(p.stageHistory || [])) {
+      errors.push(where + ': "stageHistory" must be an array.');
+    } else {
+      const history = p.stageHistory || [];
+      let prevDate = null;
+      history.forEach((entry, hIdx) => {
+        const hWhere = where + '.stageHistory[' + hIdx + ']';
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+          errors.push(hWhere + ': must be an object like { "date": "YYYY-MM-DD", "stage": "outreach-sent" }, not ' +
+            JSON.stringify(entry));
+          return;
+        }
+        if (!isDateOrNull(entry.date) || entry.date == null) {
+          errors.push(hWhere + ': "date" must be a YYYY-MM-DD date (when this stage move actually happened): ' +
+            JSON.stringify(entry.date));
+        }
+        if (!entry.stage || !stageIds.includes(entry.stage)) {
+          errors.push(hWhere + ': "stage" ("' + entry.stage + '") does not match any id in stages.json (' +
+            stageIds.join(', ') + ')');
+        }
+        if (entry.date && DATE_RE.test(entry.date) && prevDate && entry.date < prevDate) {
+          errors.push(hWhere + ': out of order, dated ' + entry.date + ' but the previous entry is dated ' +
+            prevDate + '. Keep stageHistory sorted oldest first.');
+        }
+        if (entry.date && DATE_RE.test(entry.date)) prevDate = entry.date;
+      });
+      if (history.length && p.stage && history[history.length - 1].stage !== p.stage) {
+        warnings.push(where + ': last stageHistory entry is "' + history[history.length - 1].stage +
+          '" but the prospect\'s current stage is "' + p.stage + '". Add the missing move or fix the mismatch.');
+      }
+    }
   });
 
   if (warnings.length) {

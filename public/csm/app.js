@@ -61,6 +61,39 @@
     return div.innerHTML;
   }
 
+  function renderStageHistory(p, stages) {
+    const history = p.stageHistory || [];
+    if (history.length === 0) {
+      return { html: 'No stage moves logged yet.', empty: true };
+    }
+    const stageDef = Object.fromEntries(stages.map(s => [s.id, s]));
+    const sorted = history.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const rowsHtml = sorted.map((entry, i) => {
+      const def = stageDef[entry.stage];
+      const label = def ? def.label : entry.stage;
+      const color = def ? def.color : 'var(--dim)';
+      const next = sorted[i + 1];
+      const dwellStart = entry.date;
+      const dwellEnd = next ? next.date : null;
+      let dwellText;
+      if (dwellStart && dwellEnd) {
+        dwellText = (daysUntil(dwellEnd) - daysUntil(dwellStart)) + 'd in stage';
+      } else if (dwellStart) {
+        dwellText = daysSince(dwellStart) + 'd in stage so far';
+      } else {
+        dwellText = '';
+      }
+      return '<li class="timeline-row">' +
+        '<span class="timeline-dot" style="background:' + color + '"></span>' +
+        '<span class="timeline-body">' +
+        '<span class="timeline-stage">' + escapeHtml(label) + '</span>' +
+        '<span class="timeline-date font-mono">' + (entry.date ? escapeHtml(fmtDate(entry.date)) : 'NO DATE') +
+        (dwellText ? ' &middot; ' + dwellText : '') + '</span>' +
+        '</span></li>';
+    }).join('');
+    return { html: '<ul class="timeline-list">' + rowsHtml + '</ul>', empty: false };
+  }
+
   function fieldRow(label, valueHtml, isEmpty) {
     return '<div class="field-row">' +
       '<div class="field-label">' + escapeHtml(label) + '</div>' +
@@ -393,6 +426,9 @@
       snapHtml = 'Not logged yet';
     }
     rows.push(fieldRow('Social snapshot', snapHtml, !(snap.platform || snap.followers != null)));
+
+    const historyHtml = renderStageHistory(p, allStages);
+    rows.push(fieldRow('Stage history', historyHtml.html, historyHtml.empty));
 
     const ideas = (p.contentIdeas || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const ideasHtml = ideas.length
