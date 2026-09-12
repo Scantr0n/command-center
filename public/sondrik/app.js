@@ -3,6 +3,7 @@
   const tractionSection = document.getElementById('tractionSection');
   const leadsSection = document.getElementById('leadsSection');
   const csvBtn = document.getElementById('csvBtn');
+  const attentionPill = document.getElementById('attentionPill');
 
   function escapeHtml(s) {
     const div = document.createElement('div');
@@ -109,6 +110,23 @@
       (metric.scope ? '<div class="scope-note">' + escapeHtml(metric.scope) + '</div>' : '');
   }
 
+  // Surfaces the single most actionable fact on the page, real drafted
+  // outreach sitting on a human approval, as a header pill rather than
+  // making a visitor read the whole engagement queue to find it.
+  function renderAttentionPill(data) {
+    const leads = data.leads || [];
+    const pending = leads.filter(l => {
+      const o = l.outreach || {};
+      return !o.sent && o.approvalStatus === 'awaiting-approval';
+    });
+    if (pending.length === 0) {
+      attentionPill.hidden = true;
+      return;
+    }
+    attentionPill.hidden = false;
+    attentionPill.textContent = pending.length + (pending.length === 1 ? ' draft awaiting your approval' : ' drafts awaiting your approval');
+  }
+
   function renderLeads(data) {
     const leads = data.leads || [];
     if (leads.length === 0) {
@@ -166,6 +184,7 @@
     renderReleases(releasesData);
     renderTraction(downloadsData);
     renderLeads(leadsData);
+    renderAttentionPill(leadsData);
     csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
   }).catch(err => {
     releaseSection.innerHTML = '<div class="empty-state">Failed to load release data: ' + escapeHtml(err.message) + '</div>';

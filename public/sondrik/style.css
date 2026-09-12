@@ -86,6 +86,20 @@ header.page-head .sub {
 }
 .print-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
 
+.attention-pill {
+  font-size: 0.75rem;
+  color: #E0A030;
+  text-decoration: none;
+  border: 1px solid rgba(224,160,48,0.35);
+  background: rgba(224,160,48,0.1);
+  padding: 6px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.attention-pill:hover { border-color: rgba(224,160,48,0.6); background: rgba(224,160,48,0.16); }
+
 .callout {
   border: 1px solid var(--hairline);
   background: rgba(255,255,255,0.02);
@@ -400,7 +414,7 @@ footer.page-foot {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .schema-help {
+  .print-btn, .back-link, .schema-help, .attention-pill {
     display: none !important;
   }
 
