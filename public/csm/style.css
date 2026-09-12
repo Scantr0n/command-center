@@ -497,7 +497,7 @@ header.page-head .sub {
 .idea-date {
   display: block;
   font-size: 0.65rem;
-  color: var(--dim);
+  color: var(--sub);
   margin-bottom: 3px;
 }
 
