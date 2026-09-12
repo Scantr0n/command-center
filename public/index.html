@@ -292,8 +292,18 @@ async function loadClusters() {
     const res = await fetch('/api/clusters');
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
-    errBox.classList.add('hidden');
     document.getElementById('graphSkeleton').classList.add('hidden');
+
+    // A cluster file that fails to parse (a hand-edit typo) is skipped
+    // server-side rather than taking the whole dashboard down with it, but
+    // it should still say so, not just silently show one fewer project.
+    if (data.brokenFiles && data.brokenFiles.length) {
+      const names = data.brokenFiles.map(b => b.file).join(', ');
+      errBox.textContent = `${data.brokenFiles.length} cluster file${data.brokenFiles.length === 1 ? '' : 's'} failed to load and ${data.brokenFiles.length === 1 ? 'was' : 'were'} skipped (invalid JSON): ${names}. Check the server log for details.`;
+      errBox.classList.remove('hidden');
+    } else {
+      errBox.classList.add('hidden');
+    }
 
     // Skip the re-render on unchanged data (the 30s poll refetches even
     // when nothing moved), since rebuilding the graph/grid DOM every time

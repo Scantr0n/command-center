@@ -12,15 +12,28 @@ const CLUSTERS_DIR = path.join(__dirname, 'data', 'clusters');
 const TOGGLES_FILE = path.join(__dirname, 'data', 'toggles.json');
 const { readSnapshot, listSnapshots } = require('./credentials/drive.js');
 
+// Skips and logs any cluster file that fails to parse instead of letting one
+// hand-edit typo take down every project on the dashboard, since these files
+// are meant to be edited by hand per each hub's own schema-help instructions.
 function readLocalClusters() {
   const files = fs.readdirSync(CLUSTERS_DIR).filter(f => f.endsWith('.json'));
-  return files.map(f => JSON.parse(fs.readFileSync(path.join(CLUSTERS_DIR, f), 'utf8')));
+  const clusters = [];
+  const brokenFiles = [];
+  for (const f of files) {
+    try {
+      clusters.push(JSON.parse(fs.readFileSync(path.join(CLUSTERS_DIR, f), 'utf8')));
+    } catch (err) {
+      console.error(`Skipping malformed cluster file ${f}: ${err.message}`);
+      brokenFiles.push({ file: f, error: err.message });
+    }
+  }
+  return { clusters, brokenFiles };
 }
 
 // Merges in live Drive snapshots where they exist, falls back to local-only
 // silently if Drive is unreachable (auth not set up yet, network down, etc.)
 async function readClusters() {
-  const localClusters = readLocalClusters();
+  const { clusters: localClusters, brokenFiles } = readLocalClusters();
   try {
     const driveFiles = await listSnapshots();
     const driveNames = new Set(driveFiles.map(f => f.name.replace(/\.json$/, '')));
@@ -33,10 +46,10 @@ async function readClusters() {
         return c;
       }
     }));
-    return merged;
+    return { clusters: merged, brokenFiles };
   } catch (err) {
     console.log('Drive unavailable, using local snapshots only:', err.message);
-    return localClusters;
+    return { clusters: localClusters, brokenFiles };
   }
 }
 
@@ -51,7 +64,7 @@ function writeToggles(toggles) {
 
 app.get('/api/clusters', async (req, res) => {
   try {
-    const clusters = await readClusters();
+    const { clusters, brokenFiles } = await readClusters();
     const toggles = readToggles();
     const withToggleState = clusters.map(c => {
       if (c.toggleable) {
@@ -59,7 +72,7 @@ app.get('/api/clusters', async (req, res) => {
       }
       return c;
     });
-    res.json({ clusters: withToggleState });
+    res.json({ clusters: withToggleState, brokenFiles });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -82,7 +95,7 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
   try {
     const { id } = req.params;
     const { messages } = req.body;
-    const clusters = await readClusters();
+    const { clusters } = await readClusters();
     const cluster = clusters.find(c => c.id === id);
     if (!cluster) return res.status(404).json({ error: 'Unknown cluster' });
 
