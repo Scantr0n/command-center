@@ -53,6 +53,8 @@
   }
   .activity-row { border-radius: 6px; }
   .tag-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: 0.3px; }
+  .cat-filter-chip { cursor: pointer; transition: opacity 0.15s ease; border: none; }
+  .cat-filter-chip:hover { opacity: 0.8; }
 
   /* Atmosphere: faint radar grid + vignette behind the graph, restrained not gimmicky */
   #graphView {
@@ -163,6 +165,8 @@
       <span style="color: var(--hairlineHover)">|</span>
       <span>Closer to hub = higher priority &middot; Dashed ring = top priority &middot; Grouped by category</span>
     </div>
+
+    <div id="categoryFilterRow" class="flex flex-wrap items-center gap-2 mb-4" role="group" aria-label="Filter by category"></div>
 
     <div id="graphView" style="position: relative;">
       <div id="graphScroll" class="flex items-center justify-center py-4">
@@ -300,6 +304,7 @@ async function loadClusters() {
     });
     renderStats();
     renderAttention();
+    renderCategoryFilter();
     renderGraph();
     renderGrid();
     renderActivityFeed();
@@ -544,11 +549,6 @@ function renderGraph() {
         openModal(this.getAttribute('data-id'));
       }
     });
-  function toggleCategoryFilter(el) {
-    const cat = el.getAttribute('data-category');
-    activeCategory = activeCategory === cat ? null : cat;
-    applyFilters();
-  }
   svg.selectAll('.cat-label')
     .attr('tabindex', 0)
     .attr('role', 'button')
@@ -576,6 +576,32 @@ function centerGraphScroll() {
 
 let searchTerm = '';
 let activeCategory = null;
+
+// Shared by the graph's sector labels and the standalone category filter
+// row, so clicking a category filters the whole board no matter which view
+// you're in.
+function toggleCategoryFilter(el) {
+  const cat = el.getAttribute('data-category');
+  activeCategory = activeCategory === cat ? null : cat;
+  applyFilters();
+  renderCategoryFilter();
+}
+
+// A view-independent category filter bar, since the graph's own clickable
+// sector labels have no equivalent in Grid view, so Grid had no way to
+// filter by category at all.
+function renderCategoryFilter() {
+  const row = document.getElementById('categoryFilterRow');
+  const categories = groupByCategory(clusters).map(g => g.category);
+  row.innerHTML = categories.map(cat => {
+    const color = categoryColor(cat);
+    const active = activeCategory === cat;
+    return `<button type="button" class="tag-chip cat-filter-chip" data-category="${escapeHtml(cat)}" aria-pressed="${active}" style="background:${color}1F; color:${color}; ${active ? `outline: 1.5px solid ${color};` : ''}">${escapeHtml(cat.toUpperCase())}</button>`;
+  }).join('');
+  row.querySelectorAll('.cat-filter-chip').forEach(el => {
+    el.addEventListener('click', () => toggleCategoryFilter(el));
+  });
+}
 
 function applyFilters() {
   const term = searchTerm.trim().toLowerCase();
@@ -662,6 +688,12 @@ function renderGrid() {
   }).join('');
 
   document.querySelectorAll('.cluster-card').forEach(makeCardClickable);
+  // Re-applies the live search/category filter to the freshly rendered cards.
+  // Without this, a poll re-render (renderGraph, then renderGrid) leaves the
+  // new grid cards unfiltered until the next keystroke, since renderGraph's
+  // own end-of-render applyFilters() call only touched the cards that
+  // existed before this innerHTML rebuild replaced them.
+  applyFilters();
 }
 
 function setView(view, persist = true) {
