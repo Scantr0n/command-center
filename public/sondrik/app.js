@@ -126,16 +126,26 @@
       (isStale ? ', RE-CHECK GITHUB API' : '') +
       '</div>';
 
-    const barsHtml = checks.map(c => {
+    // The gap note between two bars should reflect the real span between those
+    // two specific checks, not a fixed claim, since consecutive daily checks
+    // (gap of exactly 1 day) do have daily tracking between them.
+    const barsHtml = checks.map((c, i) => {
       const heightPct = c.count === 0 ? 0 : Math.max(4, Math.round((c.count / maxCount) * 100));
-      return '<div class="compare-bar-col">' +
+      let gapNote = '';
+      if (i > 0) {
+        const gap = daysBetween(checks[i - 1].date, c.date);
+        if (gap > 1) {
+          gapNote = '<span class="compare-gap-note" aria-hidden="true">' + gap + ' days between checks, no daily tracking</span>';
+        }
+      }
+      return gapNote + '<div class="compare-bar-col">' +
         '<span class="compare-bar-count font-mono">' + c.count + '</span>' +
         '<div class="compare-bar" style="height:70px">' +
         '<div class="compare-bar-fill" style="height:' + heightPct + '%"></div>' +
         '</div>' +
         '<span class="compare-bar-date">' + fmtDate(c.date) + '</span>' +
         '</div>';
-    }).join('<span class="compare-gap-note" aria-hidden="true">no daily tracking between checks</span>');
+    }).join('');
 
     // The bars are decorative only, aria-hidden, since a screen reader user
     // gets the same numbers (and the exact dates, which the bars round off
