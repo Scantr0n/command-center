@@ -664,16 +664,26 @@ function renderGrid() {
   document.querySelectorAll('.cluster-card').forEach(makeCardClickable);
 }
 
-function setView(view) {
+function setView(view, persist = true) {
   currentView = view;
   document.getElementById('graphView').classList.toggle('hidden', view !== 'graph');
   document.getElementById('clusterGrid').classList.toggle('hidden', view !== 'grid');
   document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
   document.getElementById('viewGridBtn').classList.toggle('active', view === 'grid');
   updateAttentionVisibility();
+  if (persist) {
+    try { localStorage.setItem('ccView', view); } catch {}
+  }
 }
 document.getElementById('viewGraphBtn').addEventListener('click', () => setView('graph'));
 document.getElementById('viewGridBtn').addEventListener('click', () => setView('grid'));
+
+// Remember Graph vs Grid across reloads, same as a browser remembering a
+// list/gallery toggle, so switching to Grid does not silently reset itself
+// on every visit.
+try {
+  if (localStorage.getItem('ccView') === 'grid') setView('grid', false);
+} catch {}
 
 function openModal(id) {
   activeCluster = clusters.find(c => c.id === id);
