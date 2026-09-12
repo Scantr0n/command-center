@@ -409,11 +409,14 @@ function updateSortHeaders() {
 // feedback (the table simply shrinking) isn't perceivable non-visually,
 // same live region the main Command Center dashboard already uses for its
 // own search/category filter.
-function announceFilterStatus(matchCount) {
-  const anyFilterActive = !!searchTerm.trim() || activeSport !== 'all' || activeGrader !== 'all' ||
+function anyFilterActive() {
+  return !!searchTerm.trim() || activeSport !== 'all' || activeGrader !== 'all' ||
     activeBatch !== 'all' || activeBasis !== 'all';
+}
+
+function announceFilterStatus(matchCount) {
   const status = document.getElementById('filterStatus');
-  status.textContent = anyFilterActive
+  status.textContent = anyFilterActive()
     ? matchCount + ' card' + (matchCount === 1 ? '' : 's') + ' match' + (matchCount === 1 ? 'es' : '') +
       (searchTerm.trim() ? ' for "' + searchTerm.trim() + '"' : '')
     : '';
@@ -427,6 +430,7 @@ function applyFiltersAndRender() {
   updateSortHeaders();
   updateChipCounts();
   announceFilterStatus(filtered.length);
+  document.getElementById('clearFiltersBtn').hidden = !anyFilterActive();
 
   if (!filtered.length) {
     tbody.innerHTML = '';
@@ -594,6 +598,26 @@ setInitialChipState('graderFilter', 'data-grader', activeGrader);
 wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
 wireChipGroup('graderFilter', 'data-grader', (v) => { activeGrader = v; });
+
+// Resets search, all four chip groups (batch included, even though its own
+// chips are rebuilt per-load rather than static markup like the others), and
+// the address bar back to the bare /cgt/ URL in one action, since with four
+// separate filter dimensions plus search, undoing them one at a time is
+// tedious. Same "Clear filters" pattern as the main Command Center dashboard.
+document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+  searchTerm = '';
+  activeSport = 'all';
+  activeBasis = 'all';
+  activeGrader = 'all';
+  activeBatch = 'all';
+  document.getElementById('searchInput').value = '';
+  setInitialChipState('sportFilter', 'data-sport', activeSport);
+  setInitialChipState('basisFilter', 'data-basis', activeBasis);
+  setInitialChipState('graderFilter', 'data-grader', activeGrader);
+  setInitialChipState('batchFilter', 'data-batch', activeBatch);
+  applyFiltersAndRender();
+  document.getElementById('searchInput').focus();
+});
 
 function handleSortHeaderActivate(th) {
   const key = th.getAttribute('data-sort');
