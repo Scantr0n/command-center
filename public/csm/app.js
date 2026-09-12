@@ -529,6 +529,13 @@
     }
   });
 
+  // Same "/" jumps to search shortcut as the main Command Center dashboard.
+  document.addEventListener('keydown', e => {
+    if (!modalOverlay.hidden || e.key !== '/' || document.activeElement.id === 'searchInput') return;
+    e.preventDefault();
+    searchInput.focus();
+  });
+
   restoreStateFromUrl();
   channelFilterEl.querySelectorAll('.chip').forEach(chip => {
     chip.setAttribute('aria-pressed', String(chip.getAttribute('data-channel') === channelFilter));

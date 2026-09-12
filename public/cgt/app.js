@@ -344,6 +344,15 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
   applyFiltersAndRender();
 });
 
+// Same "/" jumps to search shortcut as the main Command Center dashboard.
+document.addEventListener('keydown', (e) => {
+  const modalOpen = !document.getElementById('modalOverlay').hidden;
+  if (!modalOpen && e.key === '/' && document.activeElement.id !== 'searchInput') {
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
+});
+
 function wireChipGroup(containerId, dataAttr, setter) {
   const container = document.getElementById(containerId);
   container.querySelectorAll('.chip').forEach(chip => {
