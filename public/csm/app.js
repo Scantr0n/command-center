@@ -84,9 +84,16 @@
     }).join('');
   }
 
+  function byUrgency(a, b) {
+    if (a.nextNudgeDate && b.nextNudgeDate) return a.nextNudgeDate < b.nextNudgeDate ? -1 : 1;
+    if (a.nextNudgeDate) return -1;
+    if (b.nextNudgeDate) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  }
+
   function renderBoard(stages, prospects, allProspects, query, filtering) {
     boardEl.innerHTML = stages.map(stage => {
-      const inStage = prospects.filter(p => p.stage === stage.id);
+      const inStage = prospects.filter(p => p.stage === stage.id).sort(byUrgency);
       const totalInStage = allProspects.filter(p => p.stage === stage.id).length;
       let cards;
       if (inStage.length) {
