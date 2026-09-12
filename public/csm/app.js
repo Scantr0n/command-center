@@ -622,19 +622,36 @@
     chip.setAttribute('aria-pressed', String(chip.getAttribute('data-channel') === channelFilter));
   });
 
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    const COPY_LINK_LABEL = copyLinkBtn.textContent;
-    copyLinkBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(location.href)
-        .then(() => { copyLinkBtn.textContent = 'Link copied'; })
-        .catch(() => { copyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
-        .finally(() => {
-          setTimeout(() => { copyLinkBtn.textContent = COPY_LINK_LABEL; }, 1800);
-        });
-    });
-  } else {
-    copyLinkBtn.hidden = true;
+  // Falls back to a hidden textarea + execCommand for browsers/contexts where
+  // the async Clipboard API isn't available, same as CGT and Garage's own
+  // copy-link buttons, instead of just hiding the button.
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+    } finally {
+      document.body.removeChild(ta);
+    }
+    return Promise.resolve();
   }
+
+  const COPY_LINK_LABEL = copyLinkBtn.textContent;
+  copyLinkBtn.addEventListener('click', () => {
+    copyText(location.href)
+      .then(() => { copyLinkBtn.textContent = 'Link copied'; })
+      .catch(() => { copyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
+      .finally(() => {
+        setTimeout(() => { copyLinkBtn.textContent = COPY_LINK_LABEL; }, 1800);
+      });
+  });
 
   Promise.all([
     fetch('/csm/data/stages.json').then(r => r.json()),
