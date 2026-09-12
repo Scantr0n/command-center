@@ -1,0 +1,24 @@
+{
+  "events": [
+    {
+      "id": "depop-photo-audit",
+      "date": null,
+      "type": "photo-audit",
+      "platform": "depop",
+      "title": "Full photo audit of 48 Ready to Post Depop drafts",
+      "detail": "Automated sideways/landscape check plus a full visual review of every cover thumbnail. Found and fixed one real issue: a Haggar corduroy pants draft had a yellow tape measure across the pants as its cover photo. Swapped for the clean flat-lay shot already in that listing's photo set.",
+      "itemsReviewed": 48,
+      "issuesFound": 1
+    },
+    {
+      "id": "ebay-return-policy-fix",
+      "date": null,
+      "type": "bug-fix",
+      "platform": "ebay",
+      "title": "Fixed a return policy bug blocking eBay publish",
+      "detail": "Three eBay listings (both boots and the swing analyzer) had silently inherited a \"30-Day Seller-Paid Returns (Parts & Accessories)\" policy meant for auto parts, which was blocking publish. Fixed to a standard \"No Return Accepted\" policy.",
+      "itemsReviewed": 3,
+      "issuesFound": 1
+    }
+  ]
+}

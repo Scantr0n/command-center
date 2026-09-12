@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Garage / Command Center</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/garage/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">THE GARAGE</h1>
+      <p class="sub font-mono">Multi-platform reselling ops, eBay / Vinted / Poshmark / Depop, Jack Scanlon</p>
+    </div>
+    <div class="page-head-actions">
+      <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
+      <a href="/" class="back-link">&larr; Command Center</a>
+    </div>
+  </header>
+
+  <main>
+  <div class="callout">
+    <strong>No live platform connection yet.</strong> This page is the real UI and data model, seeded only with
+    real listings and real events actually confirmed to have happened. There is no live sync to eBay, Vinted,
+    Poshmark or Depop's APIs, every number here is hand-logged. A future session with real platform access can
+    wire live data in on top of this structure.
+  </div>
+
+  <details class="schema-help">
+    <summary>How to log a real update (until a backend is wired in)</summary>
+    <div class="schema-help-body">
+      <p>Edit the JSON files by hand under <code>public/garage/data/</code>, then run
+        <code>node public/garage/data/validate.js</code>. Leave any field you don't have a real answer for as
+        <code>null</code>, do not fill it in with a guess.</p>
+      <table class="schema-table">
+        <tbody>
+          <tr><th>listings.json</th><td>One object per listed item in the <code>listings</code> array.</td></tr>
+          <tr><th>id</th><td>Unique slug, e.g. <code>"black-boots"</code></td></tr>
+          <tr><th>title</th><td>Item name as it appears in the listing</td></tr>
+          <tr><th>price</th><td>USD asking price, a number or <code>null</code></td></tr>
+          <tr><th>platforms</th><td>Array of any of: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, <code>depop</code></td></tr>
+          <tr><th>status</th><td>One of: <code>draft</code>, <code>ready-to-post</code>, <code>live</code>, <code>sold</code></td></tr>
+          <tr><th>datePublished</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
+          <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
+          <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>.</td></tr>
+          <tr><th>activity.json</th><td>One object per logged event in the <code>events</code> array: real bug fixes, photo audits, and other quality checks. Requires <code>id</code>, <code>title</code>, and <code>type</code> (<code>bug-fix</code>, <code>photo-audit</code>, or <code>other</code>).</td></tr>
+        </tbody>
+      </table>
+      <pre class="schema-example font-mono">{
+  "id": "example-item-slug",
+  "title": null,
+  "price": null,
+  "platforms": [],
+  "status": "draft",
+  "datePublished": null,
+  "notes": null
+}</pre>
+    </div>
+  </details>
+
+  <section>
+    <h2 class="section-title">Summary</h2>
+    <div class="stat-row" id="statRow"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Pipeline</h2>
+    <div class="pipeline-row" id="pipelineRow"></div>
+  </section>
+
+  <section>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Live listings</h2>
+      <input
+        type="search"
+        id="searchInput"
+        class="search-input font-mono"
+        placeholder="Filter by item name..."
+        aria-label="Filter listings by name">
+    </div>
+    <div class="filter-row" id="platformFilter" role="group" aria-label="Filter by platform">
+      <span class="filter-row-label font-mono">PLATFORM</span>
+      <button type="button" class="chip" data-platform="all" aria-pressed="true">All</button>
+      <button type="button" class="chip" data-platform="ebay" aria-pressed="false">eBay</button>
+      <button type="button" class="chip" data-platform="vinted" aria-pressed="false">Vinted</button>
+      <button type="button" class="chip" data-platform="poshmark" aria-pressed="false">Poshmark</button>
+      <button type="button" class="chip" data-platform="depop" aria-pressed="false">Depop</button>
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="listingTable">
+        <thead>
+          <tr>
+            <th class="sortable" data-sort="title" tabindex="0" role="button" aria-sort="none">Item</th>
+            <th class="sortable" data-sort="price" tabindex="0" role="button" aria-sort="none">Price</th>
+            <th>Platforms</th>
+            <th class="sortable" data-sort="datePublished" tabindex="0" role="button" aria-sort="none">Published</th>
+          </tr>
+        </thead>
+        <tbody id="listingTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="tableEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Quality &amp; fixes log</h2>
+    <div class="activity-list" id="activityList"></div>
+  </section>
+  </main>
+
+  <footer class="page-foot font-mono">
+    Data source: <code>/garage/data/listings.json</code>, <code>pipeline.json</code>, and <code>activity.json</code>,
+    edited by hand until a real backend is wired in.
+  </footer>
+</div>
+
+<script src="/garage/app.js"></script>
+</body>
+</html>

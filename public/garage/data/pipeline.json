@@ -1,0 +1,24 @@
+{
+  "stages": [
+    {
+      "stage": "draft",
+      "count": 0,
+      "note": null
+    },
+    {
+      "stage": "ready-to-post",
+      "count": 48,
+      "note": "Depop drafts, full photo audit completed"
+    },
+    {
+      "stage": "live",
+      "count": 9,
+      "note": "Listing instances across platforms, 3 unique items"
+    },
+    {
+      "stage": "sold",
+      "count": 0,
+      "note": null
+    }
+  ]
+}

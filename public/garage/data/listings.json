@@ -1,0 +1,31 @@
+{
+  "listings": [
+    {
+      "id": "black-boots",
+      "title": "Black Boots",
+      "price": 85,
+      "platforms": ["ebay", "vinted", "poshmark", "depop"],
+      "status": "live",
+      "datePublished": null,
+      "notes": null
+    },
+    {
+      "id": "white-boots",
+      "title": "White Boots",
+      "price": 75,
+      "platforms": ["ebay", "vinted", "poshmark", "depop"],
+      "status": "live",
+      "datePublished": null,
+      "notes": null
+    },
+    {
+      "id": "softball-swing-analyzer",
+      "title": "Softball Swing Analyzer",
+      "price": 95,
+      "platforms": ["ebay"],
+      "status": "live",
+      "datePublished": null,
+      "notes": null
+    }
+  ]
+}
