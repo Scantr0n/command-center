@@ -188,11 +188,26 @@ function updateSortHeaders() {
   });
 }
 
+// Announces the live match count to screen-reader users, since the visual
+// feedback (the table simply shrinking) isn't perceivable non-visually,
+// same live region the main Command Center dashboard already uses for its
+// own search/category filter.
+function announceFilterStatus(matchCount) {
+  const anyFilterActive = !!searchTerm.trim() || activePlatform !== 'all';
+  const status = document.getElementById('filterStatus');
+  status.textContent = anyFilterActive
+    ? matchCount + ' listing' + (matchCount === 1 ? '' : 's') + ' match' + (matchCount === 1 ? 'es' : '')
+      + (activePlatform !== 'all' ? ' on ' + (PLATFORM_LABELS[activePlatform] || activePlatform) : '')
+      + (searchTerm.trim() ? ' for "' + searchTerm.trim() + '"' : '')
+    : '';
+}
+
 function applyFiltersAndRender() {
   const filtered = sortRows(listings.filter(matchesFilters));
   const tbody = document.getElementById('listingTableBody');
   const empty = document.getElementById('tableEmpty');
   updateSortHeaders();
+  announceFilterStatus(filtered.length);
 
   if (!filtered.length) {
     tbody.innerHTML = '';

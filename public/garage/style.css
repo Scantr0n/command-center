@@ -391,6 +391,21 @@ table.card-table {
   font-size: 0.85rem;
 }
 
+/* Visually hidden but still announced, for the live filter-match count next
+   to the platform chips, the same live-region pattern the main Command
+   Center dashboard uses for its own search/category filter. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Activity log */
 .activity-list {
   display: flex;
