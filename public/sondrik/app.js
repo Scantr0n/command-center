@@ -189,7 +189,7 @@
     renderAttentionPill(leadsData);
     csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
   }).catch(err => {
-    releaseSection.innerHTML = '<div class="empty-state">Failed to load release data: ' + escapeHtml(err.message) + '</div>';
+    releaseSection.innerHTML = '<div class="empty-state" role="alert">Failed to load release data: ' + escapeHtml(err.message) + '</div>';
     tractionSection.innerHTML = '<div class="empty-state">Failed to load.</div>';
     leadsSection.innerHTML = '<div class="empty-state">Failed to load.</div>';
     csvBtn.disabled = true;
