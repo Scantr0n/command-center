@@ -231,7 +231,15 @@ function renderEventLog(data) {
   log.innerHTML = sorted.map(eventItem).join('');
 }
 
+// loadStatus() fires from three places with no natural ordering (page load,
+// the 30s interval, and a manual refresh click), so a slower in-flight
+// request can resolve after a newer one and silently repaint the page with
+// stale data. A monotonic request id lets each call check it's still the
+// most recent before rendering, and drop its result otherwise.
+let latestStatusRequestId = 0;
+
 async function loadStatus() {
+  const requestId = ++latestStatusRequestId;
   try {
     // Cache-bust: this file is meant to change out from under the page
     // (a future session or export job rewrites it), a cached 304 would
@@ -239,6 +247,7 @@ async function loadStatus() {
     const res = await fetch('/alpha/data/status.json?t=' + Date.now());
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
+    if (requestId !== latestStatusRequestId) return;
     renderConnection(data);
     renderStats(data);
     renderPositionSizing(data);
@@ -246,6 +255,7 @@ async function loadStatus() {
     renderGenealogy(data);
     renderEventLog(data);
   } catch (e) {
+    if (requestId !== latestStatusRequestId) return;
     // Distinct from "down" (Alpha has no live feed yet, an expected,
     // unremarkable state): this is the page itself failing to read its own
     // status.json, a real problem worth standing out from the everyday
