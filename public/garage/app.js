@@ -201,7 +201,7 @@ function applyFiltersAndRender() {
   empty.hidden = true;
 
   tbody.innerHTML = filtered.map(l => `
-    <tr>
+    <tr class="row-clickable" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="View details for ${escapeHtml(l.title || 'Untitled item')}">
       <td>
         <div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div>
         ${l.notes ? `<div class="cell-card-meta">${escapeHtml(l.notes)}</div>` : ''}
@@ -211,6 +211,15 @@ function applyFiltersAndRender() {
       <td class="cell-muted">${l.datePublished ? escapeHtml(l.datePublished) : '<span class="cell-value empty">not logged</span>'}</td>
     </tr>
   `).join('');
+  tbody.querySelectorAll('[data-listing-id]').forEach(row => {
+    row.addEventListener('click', () => openModal(row.getAttribute('data-listing-id')));
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openModal(row.getAttribute('data-listing-id'));
+      }
+    });
+  });
   syncUrl();
 }
 
@@ -266,6 +275,7 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 
 // Same "/" jumps to search shortcut as the main Command Center dashboard.
 document.addEventListener('keydown', (e) => {
+  if (!document.getElementById('modalOverlay').hidden) return;
   if (e.key === '/' && document.activeElement.id !== 'searchInput') {
     e.preventDefault();
     document.getElementById('searchInput').focus();
@@ -309,6 +319,94 @@ document.querySelectorAll('th.sortable').forEach(th => {
 });
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+// Detail modal: click or Enter/Space a listing row to see the full record
+// (all platforms, sold-elsewhere status, per-platform net payout, notes)
+// in one place, same pattern and scroll-lock behavior as the CSM and CGT hubs.
+let lastFocusedEl = null;
+const modalOverlay = document.getElementById('modalOverlay');
+const modalClose = document.getElementById('modalClose');
+
+function lockBodyScroll() {
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+  if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + 'px';
+  document.body.style.overflow = 'hidden';
+}
+function unlockBodyScroll() {
+  document.body.style.overflow = '';
+  document.body.style.paddingRight = '';
+}
+
+function fieldRow(label, valueHtml, empty) {
+  return `
+    <div class="field-row">
+      <div class="field-label font-mono">${escapeHtml(label)}</div>
+      <div class="field-value${empty ? ' empty' : ''}">${valueHtml}</div>
+    </div>
+  `;
+}
+
+function openModal(id) {
+  const l = listings.find(item => item.id === id);
+  if (!l) return;
+  lastFocusedEl = document.activeElement;
+
+  document.getElementById('modalTitle').textContent = l.title || 'Untitled item';
+  document.getElementById('modalSub').textContent = STAGE_LABELS[l.status] || l.status || 'Status not logged';
+
+  const rows = [];
+  rows.push(fieldRow('Asking price', l.price != null ? formatUsd(l.price) : 'Not set', l.price == null));
+  rows.push(fieldRow('Platforms', (l.platforms || []).length ? platformBadges(l.platforms, l.soldOn) : 'None logged', !(l.platforms || []).length));
+  rows.push(fieldRow('Published', l.datePublished ? escapeHtml(l.datePublished) : 'Not logged yet', !l.datePublished));
+
+  const payoutHtml = (l.platforms || []).length
+    ? '<table class="modal-payout-table">' + (l.platforms || []).map(p => {
+        const net = estimateNetPayout(p, l.price);
+        return `<tr><td>${escapeHtml(PLATFORM_LABELS[p] || p)}</td><td class="cell-value${net == null ? ' empty' : ''}">${net != null ? formatUsd(net) : 'not set'}</td></tr>`;
+      }).join('') + '</table>'
+    : 'Not applicable, not listed anywhere yet.';
+  rows.push(fieldRow('Est. net payout by platform', payoutHtml, !(l.platforms || []).length));
+
+  rows.push(fieldRow('Notes', l.notes ? escapeHtml(l.notes) : 'None', !l.notes));
+
+  document.getElementById('modalBody').innerHTML = rows.join('');
+  modalOverlay.hidden = false;
+  lockBodyScroll();
+  modalClose.focus();
+}
+
+function closeModal() {
+  modalOverlay.hidden = true;
+  unlockBodyScroll();
+  if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') lastFocusedEl.focus();
+  lastFocusedEl = null;
+}
+
+function getModalFocusable() {
+  return Array.from(document.getElementById('modal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled'));
+}
+
+modalClose.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+document.addEventListener('keydown', (e) => {
+  if (modalOverlay.hidden) return;
+  if (e.key === 'Escape') { closeModal(); return; }
+  if (e.key === 'Tab') {
+    const focusable = getModalFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
 
 // The current filters/search/sort are already mirrored into the address bar
 // by syncUrl(), but most people won't notice that on their own, so this
