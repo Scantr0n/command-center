@@ -3,6 +3,7 @@
   const nudgeEl = document.getElementById('nudgeQueue');
   const statsEl = document.getElementById('statsBar');
   const searchInput = document.getElementById('searchInput');
+  const channelFilterEl = document.getElementById('channelFilter');
   const modalOverlay = document.getElementById('modalOverlay');
   const modalName = document.getElementById('modalName');
   const modalCompany = document.getElementById('modalCompany');
@@ -80,8 +81,7 @@
     }).join('');
   }
 
-  function renderBoard(stages, prospects, allProspects, query) {
-    const filtering = !!query;
+  function renderBoard(stages, prospects, allProspects, query, filtering) {
     boardEl.innerHTML = stages.map(stage => {
       const inStage = prospects.filter(p => p.stage === stage.id);
       const totalInStage = allProspects.filter(p => p.stage === stage.id).length;
@@ -89,7 +89,8 @@
       if (inStage.length) {
         cards = inStage.map(p => renderCard(p)).join('');
       } else if (filtering && totalInStage > 0) {
-        cards = '<div class="column-empty">No matches for "' + escapeHtml(query) + '" in this stage.</div>';
+        cards = '<div class="column-empty">No matches' +
+          (query ? ' for "' + escapeHtml(query) + '"' : '') + ' in this stage.</div>';
       } else {
         cards = '<div class="column-empty">No prospects in this stage yet.</div>';
       }
@@ -132,18 +133,35 @@
   let byId = {};
   let allStages = [];
   let allProspects = [];
+  let channelFilter = 'all';
+
+  function matchesChannel(p) {
+    if (channelFilter === 'all') return true;
+    const type = p.contactChannel && p.contactChannel.type;
+    if (channelFilter === 'unlogged') return !type;
+    return type === channelFilter;
+  }
 
   function applyFilter() {
     const query = searchInput.value.trim().toLowerCase();
-    const filtered = query
-      ? allProspects.filter(p =>
-          (p.name || '').toLowerCase().includes(query) ||
-          (p.company || '').toLowerCase().includes(query))
-      : allProspects;
-    renderBoard(allStages, filtered, allProspects, query);
+    const filtered = allProspects.filter(p =>
+      matchesChannel(p) &&
+      (!query ||
+        (p.name || '').toLowerCase().includes(query) ||
+        (p.company || '').toLowerCase().includes(query)));
+    renderBoard(allStages, filtered, allProspects, query, !!query || channelFilter !== 'all');
   }
 
   searchInput.addEventListener('input', applyFilter);
+
+  channelFilterEl.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      channelFilter = chip.getAttribute('data-channel');
+      channelFilterEl.querySelectorAll('.chip').forEach(c =>
+        c.setAttribute('aria-pressed', String(c === chip)));
+      applyFilter();
+    });
+  });
 
   let lastFocusedEl = null;
 
@@ -240,7 +258,7 @@
     byId = Object.fromEntries(allProspects.map(p => [p.id, p]));
     renderNudgeQueue(allProspects);
     renderStats(allStages, allProspects);
-    renderBoard(allStages, allProspects, allProspects, '');
+    applyFilter();
   }).catch(err => {
     boardEl.innerHTML = '<div class="column-empty">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
     nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';

@@ -82,6 +82,13 @@
         placeholder="Filter by name or company..."
         aria-label="Filter prospects by name or company">
     </div>
+    <div class="channel-filter" id="channelFilter" role="group" aria-label="Filter by contact channel type">
+      <span class="channel-filter-label font-mono">CHANNEL</span>
+      <button type="button" class="chip" data-channel="all" aria-pressed="true">All</button>
+      <button type="button" class="chip chip-dm" data-channel="named-decision-maker" aria-pressed="false">Named decision-maker</button>
+      <button type="button" class="chip chip-generic" data-channel="generic-inbox" aria-pressed="false">Generic inbox</button>
+      <button type="button" class="chip chip-unknown" data-channel="unlogged" aria-pressed="false">Not logged</button>
+    </div>
     <div class="board" id="board"></div>
   </section>
 

@@ -224,6 +224,38 @@ header.page-head .sub {
 }
 .search-input::placeholder { color: var(--dim); }
 
+.channel-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.channel-filter-label {
+  font-size: 0.65rem;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+}
+
+.chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: var(--panelLight);
+  color: var(--sub);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.chip:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.chip[aria-pressed="true"] { color: var(--ink); background: var(--panelLight); border-color: var(--hairlineHover); }
+.chip-dm[aria-pressed="true"] { background: rgba(61,220,132,0.12); color: #3DDC84; border-color: rgba(61,220,132,0.4); }
+.chip-generic[aria-pressed="true"] { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
+.chip-unknown[aria-pressed="true"] { background: rgba(255,255,255,0.06); color: var(--ink); border-color: var(--hairlineHover); }
+
 /* Board */
 .board {
   display: grid;
