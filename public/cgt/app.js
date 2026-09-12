@@ -266,6 +266,19 @@ function field(label, value, isEmpty) {
   `;
 }
 
+// Locks background scroll behind the modal overlay. Reserves the width the
+// scrollbar was taking up as body padding first, so hiding it doesn't shift
+// the layout sideways by a few pixels while the modal is open.
+function lockBodyScroll() {
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+  if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+  document.body.style.overflow = 'hidden';
+}
+function unlockBodyScroll() {
+  document.body.style.overflow = '';
+  document.body.style.paddingRight = '';
+}
+
 function openModal(id) {
   activeCard = cards.find(c => c.id === id);
   if (!activeCard) return;
@@ -294,11 +307,13 @@ function openModal(id) {
 
   document.getElementById('modalBody').innerHTML = body;
   document.getElementById('modalOverlay').hidden = false;
+  lockBodyScroll();
   document.getElementById('modalClose').focus();
 }
 
 function closeModal() {
   document.getElementById('modalOverlay').hidden = true;
+  unlockBodyScroll();
   if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') lastFocusedEl.focus();
   lastFocusedEl = null;
 }
