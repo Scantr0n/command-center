@@ -113,6 +113,14 @@
     });
   }
 
+  function renderChannelFilterCounts(prospects) {
+    channelFilterEl.querySelectorAll('.chip').forEach(chip => {
+      const key = chip.getAttribute('data-channel');
+      const count = prospects.filter(p => matchesChannel(p, key)).length;
+      chip.textContent = chip.getAttribute('data-label') + ' (' + count + ')';
+    });
+  }
+
   function renderStats(stages, prospects) {
     const total = prospects.length;
     const parts = ['<span><strong>' + total + '</strong> total</span>'];
@@ -138,17 +146,17 @@
   let allProspects = [];
   let channelFilter = 'all';
 
-  function matchesChannel(p) {
-    if (channelFilter === 'all') return true;
+  function matchesChannel(p, key) {
+    if (key === 'all') return true;
     const type = p.contactChannel && p.contactChannel.type;
-    if (channelFilter === 'unlogged') return !type;
-    return type === channelFilter;
+    if (key === 'unlogged') return !type;
+    return type === key;
   }
 
   function applyFilter() {
     const query = searchInput.value.trim().toLowerCase();
     const filtered = allProspects.filter(p =>
-      matchesChannel(p) &&
+      matchesChannel(p, channelFilter) &&
       (!query ||
         (p.name || '').toLowerCase().includes(query) ||
         (p.company || '').toLowerCase().includes(query)));
@@ -261,6 +269,7 @@
     byId = Object.fromEntries(allProspects.map(p => [p.id, p]));
     renderNudgeQueue(allProspects);
     renderStats(allStages, allProspects);
+    renderChannelFilterCounts(allProspects);
     applyFilter();
   }).catch(err => {
     boardEl.innerHTML = '<div class="column-empty">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
