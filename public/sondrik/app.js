@@ -76,7 +76,16 @@
         '</div>' +
         '<span class="compare-bar-date">' + fmtDate(c.date) + '</span>' +
         '</div>';
-    }).join('<span class="compare-gap-note">no daily tracking between checks</span>');
+    }).join('<span class="compare-gap-note" aria-hidden="true">no daily tracking between checks</span>');
+
+    // The bars are decorative only, aria-hidden, since a screen reader user
+    // gets the same numbers (and the exact dates, which the bars round off
+    // visually) from the chartSummary sentence and the linked data table.
+    const chartSummary = checks.map(c => fmtDate(c.date) + ': ' + c.count).join(', ');
+    const tableRowsHtml = checks.map(c =>
+      '<tr><th scope="row">' + fmtDate(c.date) + '</th><td>' + c.count +
+      (c.note ? ' - ' + escapeHtml(c.note) : '') + '</td></tr>'
+    ).join('');
 
     tractionSection.innerHTML =
       '<div class="stat-tile">' +
@@ -87,8 +96,16 @@
       freshnessHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +
       '</div>' +
-      '<div class="compare-bars">' + barsHtml + '</div>' +
+      '<div class="compare-bars" role="img" aria-label="' +
+        escapeHtml((metric.label || 'Download') + ' history by check date: ' + chartSummary) + '">' +
+        barsHtml +
       '</div>' +
+      '</div>' +
+      '<table class="sr-only-table">' +
+      '<caption>' + escapeHtml(metric.label || 'downloads') + ', full check history</caption>' +
+      '<thead><tr><th scope="col">Check date</th><th scope="col">Count</th></tr></thead>' +
+      '<tbody>' + tableRowsHtml + '</tbody>' +
+      '</table>' +
       (metric.scope ? '<div class="scope-note">' + escapeHtml(metric.scope) + '</div>' : '');
   }
 
