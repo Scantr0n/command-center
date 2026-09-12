@@ -76,6 +76,11 @@ function main() {
         'This is the single biggest driver of real reply rate, backfill it when known.');
     }
 
+    if (p.stage && p.stage !== 'researched' && !p.verifiedHook) {
+      warnings.push(where + ': stage is "' + p.stage + '" but verifiedHook is not logged yet. ' +
+        'Backfill why this person/brand is a real fit once known.');
+    }
+
     const stageDef = p.stage && stageById[p.stage];
     if (stageDef && stageDef.staleAfterDays != null && p.stageEnteredDate && DATE_RE.test(p.stageEnteredDate)) {
       const entered = new Date(p.stageEnteredDate + 'T00:00:00');

@@ -169,21 +169,29 @@
 
   function renderDataQuality(stages, prospects) {
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
-    const needsChannel = prospects.filter(p =>
-      p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type));
 
-    if (needsChannel.length === 0) {
+    const flagged = prospects
+      .filter(p => p.stage !== 'researched')
+      .map(p => {
+        const reasons = [];
+        if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
+        if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
+        return { p, reasons };
+      })
+      .filter(x => x.reasons.length > 0);
+
+    if (flagged.length === 0) {
       dataQualitySection.hidden = true;
       return;
     }
 
     dataQualitySection.hidden = false;
-    dataQualityList.innerHTML = needsChannel.map(p =>
+    dataQualityList.innerHTML = flagged.map(({ p, reasons }) =>
       '<div class="data-quality-row">' +
       '<strong>' + escapeHtml(p.name) + '</strong>' +
       '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
       '<span class="dq-why">' + escapeHtml(stageLabel[p.stage] || p.stage) +
-      ', NO CONTACT CHANNEL TYPE LOGGED YET</span>' +
+      ', ' + reasons.join(' &middot; ') + '</span>' +
       '</div>'
     ).join('');
   }
