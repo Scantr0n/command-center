@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Grading Tracker / Command Center</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/cgt/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">CARD GRADING TRACKER</h1>
+      <p class="sub font-mono">Graded hockey / baseball / football inventory and pricing, Jack Scanlon</p>
+    </div>
+    <div class="page-head-actions">
+      <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
+      <a href="/" class="back-link">&larr; Command Center</a>
+    </div>
+  </header>
+
+  <main>
+  <div class="callout">
+    <strong>No live inventory wired in yet.</strong> This page is the real UI and data model, seeded with a single
+    labeled example row so the layout can be checked, not real cards. Every card here gets individually researched,
+    never priced in bulk. When a grade tier has no real comparable sale, that price is a clearly labeled
+    <strong>comp-based estimate</strong>, never a silent guess and never left blank.
+  </div>
+
+  <details class="schema-help">
+    <summary>How to log a real card (until a backend is wired in)</summary>
+    <div class="schema-help-body">
+      <p>Edit <code>public/cgt/data/cards.json</code> by hand and add an object to the
+        <code>cards</code> array. Leave any field you do not have a real answer for as <code>null</code>,
+        do not fill it in with a guess.</p>
+      <p><strong>Run <code>node public/cgt/data/validate.js</code> after every edit.</strong> It catches
+        duplicate ids, a missing or unlabeled <code>valuationBasis</code> on a priced card, a
+        <code>comp-estimate</code> with no <code>compNote</code> explaining what it is based on, and bad dates.</p>
+      <table class="schema-table">
+        <tbody>
+          <tr><th>id</th><td>Unique slug, e.g. <code>"2021-topps-chrome-julio-rodriguez-psa10"</code></td></tr>
+          <tr><th>cardName</th><td>Full card description, e.g. <code>"2021 Topps Chrome Julio Rodriguez RC"</code></td></tr>
+          <tr><th>sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
+          <tr><th>gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
+          <tr><th>grade</th><td>The grade as shown on the slab label, e.g. <code>"10"</code> or <code>"9.5"</code></td></tr>
+          <tr><th>certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
+          <tr><th>estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
+          <tr><th>valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
+          <tr><th>compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
+          <tr><th>sourceNote</th><td>Where the price came from, e.g. <code>"eBay sold listings, 3 comps, Aug 2026"</code></td></tr>
+          <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
+          <tr><th>backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
+        </tbody>
+      </table>
+      <pre class="schema-example font-mono">{
+  "id": "example-company-card-slug",
+  "cardName": null,
+  "year": null,
+  "sport": "hockey",
+  "gradingCompany": null,
+  "grade": null,
+  "certNumber": null,
+  "estimatedValue": null,
+  "valuationBasis": null,
+  "compNote": null,
+  "sourceNote": null,
+  "datePriced": null,
+  "backlogBatch": null,
+  "notes": null
+}</pre>
+    </div>
+  </details>
+
+  <section>
+    <h2 class="section-title">Summary</h2>
+    <div class="stat-row" id="statRow"></div>
+  </section>
+
+  <section>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Inventory</h2>
+      <input
+        type="search"
+        id="searchInput"
+        class="search-input font-mono"
+        placeholder="Filter by card name..."
+        aria-label="Filter cards by name">
+    </div>
+    <div class="filter-row" id="sportFilter" role="group" aria-label="Filter by sport">
+      <span class="filter-row-label font-mono">SPORT</span>
+      <button type="button" class="chip" data-sport="all" aria-pressed="true">All</button>
+      <button type="button" class="chip" data-sport="hockey" aria-pressed="false">Hockey</button>
+      <button type="button" class="chip" data-sport="baseball" aria-pressed="false">Baseball</button>
+      <button type="button" class="chip" data-sport="football" aria-pressed="false">Football</button>
+    </div>
+    <div class="filter-row" id="basisFilter" role="group" aria-label="Filter by valuation basis">
+      <span class="filter-row-label font-mono">PRICING</span>
+      <button type="button" class="chip" data-basis="all" aria-pressed="true">All</button>
+      <button type="button" class="chip chip-sale" data-basis="recent-sale" aria-pressed="false">Recent sale</button>
+      <button type="button" class="chip chip-comp" data-basis="comp-estimate" aria-pressed="false">Comp estimate</button>
+      <button type="button" class="chip" data-basis="unpriced" aria-pressed="false">Not priced yet</button>
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="cardTable">
+        <thead>
+          <tr>
+            <th>Card</th>
+            <th>Sport</th>
+            <th>Grader</th>
+            <th>Grade</th>
+            <th>Est. value</th>
+            <th>Basis</th>
+            <th>Date priced</th>
+          </tr>
+        </thead>
+        <tbody id="cardTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="tableEmpty" hidden></div>
+    </div>
+  </section>
+  </main>
+
+  <footer class="page-foot font-mono">
+    Data source: <code>/cgt/data/cards.json</code>, edited by hand until a real backend is wired in. Real inventory
+    data (card names, grades, prices) lives in a separate local tracker file and still needs to be imported here.
+  </footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalName">
+    <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+    <h3 id="modalName" class="font-display"></h3>
+    <div class="modal-sub font-mono" id="modalSub"></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="/cgt/app.js"></script>
+</body>
+</html>

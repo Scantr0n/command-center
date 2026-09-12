@@ -1,0 +1,20 @@
+{
+  "cards": [
+    {
+      "id": "example-row-not-real",
+      "cardName": "(example row, not real data)",
+      "year": 2021,
+      "sport": "hockey",
+      "gradingCompany": "PSA",
+      "grade": "10",
+      "certNumber": null,
+      "estimatedValue": 25,
+      "valuationBasis": "comp-estimate",
+      "compNote": "Placeholder only, exists to verify the comp-estimate badge and detail modal render correctly. Not a real card, grade, or price.",
+      "sourceNote": null,
+      "datePriced": "2026-08-08",
+      "backlogBatch": "2026-08-08-full-backlog",
+      "notes": "Delete this row once real inventory data is wired in from the tracker file."
+    }
+  ]
+}
