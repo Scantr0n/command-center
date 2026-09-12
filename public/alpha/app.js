@@ -145,6 +145,9 @@ async function loadStatus() {
     renderArchitecture(data);
     renderGenealogy(data);
   } catch (e) {
+    // A failed refresh must not leave a stale "live" or "stale" dot showing,
+    // that would visually claim a fresher connection than we actually have.
+    document.getElementById('connDot').className = 'conn-dot down';
     document.getElementById('connLabel').textContent = "Couldn't load status.json";
     document.getElementById('connSub').textContent = e.message;
   }
