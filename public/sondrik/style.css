@@ -436,6 +436,14 @@ section { margin-bottom: 36px; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.lead-type {
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: var(--dim);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
 .lead-summary {
   font-size: 0.88rem;
   line-height: 1.5;
@@ -502,6 +510,7 @@ footer.page-foot {
   .release-date, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
   .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate { color: #555; }
   .stat-delta { color: #111; }
+  .lead-type { border-color: #999; color: #333; }
   .release-badge, .timeline-badge,
   .timeline-kind-release .timeline-badge, .timeline-kind-check .timeline-badge, .timeline-kind-lead .timeline-badge {
     border-color: #999; background: none; color: #111;

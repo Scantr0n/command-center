@@ -203,6 +203,7 @@
       return '<div class="lead-card">' +
         '<div class="lead-head">' +
         '<span class="lead-source">' + escapeHtml(l.sourceDetail || l.source || 'Unknown source') + '</span>' +
+        (l.type ? '<span class="lead-type font-mono">' + escapeHtml(l.type.replace(/-/g, ' ').toUpperCase()) + '</span>' : '') +
         '</div>' +
         '<div class="lead-summary">' + escapeHtml(l.summary || 'No summary logged.') + '</div>' +
         '<div class="lead-status-row">' +
