@@ -206,6 +206,50 @@ header.page-head .sub {
   margin-top: 4px;
 }
 
+/* Pricing activity feed, same shape as the Recent Activity feed in
+   CSM/Garage/Sondrik. */
+.activity-feed {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 32px;
+  background: var(--panel);
+}
+.activity-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.activity-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.82rem;
+}
+.activity-row:first-child { border-top: none; }
+.activity-date {
+  color: var(--dim);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  width: 82px;
+}
+.activity-who { flex-shrink: 0; color: var(--ink); }
+.activity-label { color: var(--sub); }
+.activity-list.is-collapsed .activity-row:nth-child(n+9) { display: none; }
+.activity-toggle {
+  display: block;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 10px 0 12px;
+}
+.activity-toggle:hover { color: var(--ink); }
+
 .board-toolbar {
   display: flex;
   align-items: center;
@@ -422,7 +466,7 @@ footer.page-foot {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .copy-link-status {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
@@ -432,6 +476,13 @@ footer.page-foot {
 
   .stat-tile { background: none; border: 1px solid #ccc; }
   .stat-tile-value, .stat-tile-label, .stat-tile-sub { color: #111 !important; }
+
+  .activity-feed { background: none; border-color: #bbb; }
+  .activity-row { border-color: #ddd; }
+  .activity-date, .activity-label { color: #444; }
+  .activity-who { color: #111; }
+  .activity-toggle { display: none !important; }
+  .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: flex !important; }
 
   .table-wrap { background: none; border: 1px solid #ccc; }
   .card-table thead th { color: #333; border-color: #ccc; }

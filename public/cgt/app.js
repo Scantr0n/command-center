@@ -131,6 +131,7 @@ async function loadCards() {
     const data = await res.json();
     cards = data.cards || [];
     renderStats();
+    renderPricingActivity();
     renderBatchFilter();
     applyFiltersAndRender();
   } catch (e) {
@@ -173,6 +174,50 @@ function renderStats() {
       ${t.sub ? `<div class="stat-tile-sub">${escapeHtml(t.sub)}</div>` : ''}
     </div>
   `).join('');
+}
+
+// Pulls "what got priced when" out of every card's own datePriced/backlogBatch
+// fields into one chronological feed, newest first, the same pattern already
+// used for Recent Activity in CSM/Garage/Sondrik. Reuses real per-card data,
+// does not add anything new; without this the only way to see pricing history
+// was scanning the whole table for datePriced values by eye.
+const PRICING_ACTIVITY_PREVIEW_COUNT = 8;
+
+function buildPricingEvents() {
+  return cards
+    .filter(c => !isExample(c) && c.datePriced)
+    .slice()
+    .sort((a, b) => b.datePriced.localeCompare(a.datePriced));
+}
+
+function renderPricingActivity() {
+  const el = document.getElementById('activityFeed');
+  const events = buildPricingEvents();
+  if (!events.length) {
+    el.innerHTML = '<p class="activity-empty" role="status">No pricing activity logged yet. Once a card ' +
+      'gets a real datePriced, it shows up here in one feed, newest first, instead of only being visible by ' +
+      'scanning the whole table.</p>';
+    return;
+  }
+  const needsToggle = events.length > PRICING_ACTIVITY_PREVIEW_COUNT;
+  const rowsHtml = events.map(c => `
+    <div class="activity-row">
+      <span class="activity-date font-mono">${escapeHtml(c.datePriced)}</span>
+      ${basisBadge(c)}
+      <span class="activity-who">${escapeHtml(c.cardName || 'Untitled card')}</span>
+      <span class="activity-label">${c.backlogBatch ? escapeHtml(c.backlogBatch) : 'no batch logged'}</span>
+    </div>
+  `).join('');
+  el.innerHTML = `<div class="activity-list${needsToggle ? ' is-collapsed' : ''}" id="pricingActivityList">${rowsHtml}</div>` +
+    (needsToggle ? `<button type="button" class="activity-toggle font-mono" id="pricingActivityToggle">Show all ${events.length}</button>` : '');
+  const toggleBtn = document.getElementById('pricingActivityToggle');
+  const listEl = document.getElementById('pricingActivityList');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const collapsed = listEl.classList.toggle('is-collapsed');
+      toggleBtn.textContent = collapsed ? `Show all ${events.length}` : 'Show fewer';
+    });
+  }
 }
 
 // Batches aren't a fixed vocabulary like sport/basis/grader, they're one per
