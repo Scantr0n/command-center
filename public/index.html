@@ -191,6 +191,16 @@
       <span class="graph-scroll-hint" aria-hidden="true">&larr; scroll &rarr;</span>
     </div>
 
+    <div id="gridToolbar" class="hidden items-center gap-2 mb-3">
+      <span class="text-[10px] font-mono tracking-wide" style="color: var(--faint)">SORT</span>
+      <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline">
+        <button type="button" class="view-toggle-btn active px-3 py-1.5" data-sort="priority">Priority</button>
+        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="name">Name</button>
+        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="updated">Updated</button>
+        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="status">Status</button>
+      </div>
+    </div>
+
     <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
     <div class="mt-10 pt-6 border-t hairline">
@@ -718,9 +728,45 @@ function relativeTime(dateStr) {
   return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
+let gridSortBy = 'priority';
+try { gridSortBy = localStorage.getItem('ccGridSort') || 'priority'; } catch {}
+document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
+  btn.classList.toggle('active', btn.dataset.sort === gridSortBy);
+});
+
+const STATUS_SEVERITY = { broken: 0, stalled: 1, active: 2, unknown: 3, done: 4 };
+
+// Grid's own sort, independent of the `clusters` array order the graph relies
+// on for its priority-orbit and category-sector angles, so re-sorting the
+// grid never nudges graph node positions.
+function sortForGrid(list) {
+  const sorted = list.slice();
+  if (gridSortBy === 'name') {
+    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (gridSortBy === 'updated') {
+    sorted.sort((a, b) => (b.lastUpdate || '').localeCompare(a.lastUpdate || ''));
+  } else if (gridSortBy === 'status') {
+    sorted.sort((a, b) => (STATUS_SEVERITY[a.status] ?? 3) - (STATUS_SEVERITY[b.status] ?? 3));
+  }
+  // 'priority' needs no re-sort, `clusters` is already priority-ordered.
+  return sorted;
+}
+
+function setGridSort(sortBy) {
+  gridSortBy = sortBy;
+  try { localStorage.setItem('ccGridSort', sortBy); } catch {}
+  document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sort === sortBy);
+  });
+  renderGrid();
+}
+document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
+  btn.addEventListener('click', () => setGridSort(btn.dataset.sort));
+});
+
 function renderGrid() {
   const grid = document.getElementById('clusterGrid');
-  grid.innerHTML = clusters.map(c => {
+  grid.innerHTML = sortForGrid(clusters).map(c => {
     const color = categoryColor(c.category);
     return `
     <div class="cluster-card cursor-pointer rounded-xl p-5 border hairline" style="background: var(--panel)" data-id="${escapeHtml(c.id)}">
@@ -751,6 +797,8 @@ function setView(view, persist = true) {
   currentView = view;
   document.getElementById('graphView').classList.toggle('hidden', view !== 'graph');
   document.getElementById('clusterGrid').classList.toggle('hidden', view !== 'grid');
+  document.getElementById('gridToolbar').classList.toggle('hidden', view !== 'grid');
+  document.getElementById('gridToolbar').classList.toggle('flex', view === 'grid');
   document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
   document.getElementById('viewGridBtn').classList.toggle('active', view === 'grid');
   updateAttentionVisibility();
