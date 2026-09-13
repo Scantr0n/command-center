@@ -69,7 +69,7 @@ function main() {
   const anyLiveValueSet =
     live.regime != null ||
     (live.killSwitch && live.killSwitch.engaged != null) ||
-    (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null)) ||
+    (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null || live.positionSizing.maxDrawdownPct != null)) ||
     (live.genealogy && (live.genealogy.generation != null || live.genealogy.activeLineages != null || live.genealogy.lastBreedingEventAt != null));
 
   if (anyLiveValueSet && !live.asOf) {
@@ -92,6 +92,17 @@ function main() {
     errors.push('live.positionSizing.currentDrawdownPct: must be null or a finite number from 0 to 100 ' +
       '(it drives a percentage meter on the page, an out-of-range value would render as a broken or misleading bar): ' +
       JSON.stringify(drawdownPct));
+  }
+
+  const maxDrawdownPct = live.positionSizing && live.positionSizing.maxDrawdownPct;
+  if (maxDrawdownPct != null && !(typeof maxDrawdownPct === 'number' && Number.isFinite(maxDrawdownPct) && maxDrawdownPct >= 0 && maxDrawdownPct <= 100)) {
+    errors.push('live.positionSizing.maxDrawdownPct: must be null or a finite number from 0 to 100 ' +
+      '(peak-to-trough drawdown observed, same 0-100 scale as currentDrawdownPct): ' +
+      JSON.stringify(maxDrawdownPct));
+  }
+  if (drawdownPct != null && maxDrawdownPct != null && drawdownPct > maxDrawdownPct) {
+    errors.push('live.positionSizing: currentDrawdownPct (' + drawdownPct + ') exceeds maxDrawdownPct (' + maxDrawdownPct +
+      '), max is defined as the deepest drawdown observed so it can never be smaller than the current reading');
   }
 
   if (data.connection && data.connection.connected === true && !data.connection.checkedAt) {

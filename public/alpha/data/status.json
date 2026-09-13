@@ -29,7 +29,8 @@
     },
     "positionSizing": {
       "activeMode": null,
-      "currentDrawdownPct": null
+      "currentDrawdownPct": null,
+      "maxDrawdownPct": null
     },
     "debatePanel": {
       "active": false,

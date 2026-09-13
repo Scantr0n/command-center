@@ -205,12 +205,42 @@ function renderStats(data) {
 // meter communicates and a bare number doesn't: how much of the range is
 // used up, at a glance. No color-coded thresholds here since this sandbox
 // doesn't know Alpha's real risk thresholds, only the percentage itself.
+// A single drawdown meter only ever shows the drop right now, which is the
+// wrong number to trust a risk reading by: it can read low simply because
+// equity just bounced off a much deeper trough. Real trading risk dashboards
+// pair "current" with "max" (peak-to-trough) precisely so a shallow-looking
+// current reading doesn't get mistaken for a shallow episode. Same 0-100
+// meter treatment as current drawdown, same honest empty state, and its own
+// schema field (positionSizing.maxDrawdownPct) rather than derived here,
+// since only a real feed from Alpha knows the true historical peak.
+function drawdownMeter(label, pct) {
+  const validPct = typeof pct === 'number' && Number.isFinite(pct) && pct >= 0 && pct <= 100;
+  if (!validPct) {
+    return `
+      <div class="ps-meter">
+        <div class="ps-field-label font-mono">${escapeHtml(label)}</div>
+        <div class="meter-track meter-track-empty" role="meter" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
+          aria-valuetext="awaiting connection" aria-label="${escapeHtml(label)}, percent of range used"></div>
+        <div class="meter-value awaiting font-mono">awaiting connection</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="ps-meter">
+      <div class="ps-field-label font-mono">${escapeHtml(label)}</div>
+      <div class="meter-track" role="meter" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
+        aria-label="${escapeHtml(label)}, percent of range used">
+        <div class="meter-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="meter-value font-mono">${escapeHtml(String(pct))}%</div>
+    </div>
+  `;
+}
+
 function renderPositionSizing(data) {
   const ps = data.live.positionSizing || {};
   const panel = document.getElementById('positionSizingPanel');
   const mode = ps.activeMode;
-  const pct = ps.currentDrawdownPct;
-  const validPct = typeof pct === 'number' && Number.isFinite(pct) && pct >= 0 && pct <= 100;
 
   const modeHtml = `
     <div class="ps-mode">
@@ -220,25 +250,9 @@ function renderPositionSizing(data) {
     </div>
   `;
 
-  const meterHtml = validPct ? `
-    <div class="ps-meter">
-      <div class="ps-field-label font-mono">CURRENT DRAWDOWN</div>
-      <div class="meter-track" role="meter" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
-        aria-label="Current drawdown, percent of range used">
-        <div class="meter-fill" style="width:${pct}%"></div>
-      </div>
-      <div class="meter-value font-mono">${escapeHtml(String(pct))}%</div>
-    </div>
-  ` : `
-    <div class="ps-meter">
-      <div class="ps-field-label font-mono">CURRENT DRAWDOWN</div>
-      <div class="meter-track meter-track-empty" role="meter" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
-        aria-valuetext="awaiting connection" aria-label="Current drawdown, percent of range used"></div>
-      <div class="meter-value awaiting font-mono">awaiting connection</div>
-    </div>
-  `;
-
-  panel.innerHTML = modeHtml + meterHtml;
+  panel.innerHTML = modeHtml +
+    drawdownMeter('CURRENT DRAWDOWN', ps.currentDrawdownPct) +
+    drawdownMeter('MAX DRAWDOWN (PEAK TO TROUGH)', ps.maxDrawdownPct);
 }
 
 function renderArchitecture(data) {
