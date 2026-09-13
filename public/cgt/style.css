@@ -475,6 +475,16 @@ table.card-table {
   font-size: 0.85rem;
 }
 
+.table-foot-row td.table-foot-cell {
+  padding: 10px 14px;
+  border-top: 1px solid var(--hairline);
+  background: rgba(255,255,255,0.02);
+  color: var(--sub);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+.table-foot-note { color: var(--dim); font-style: italic; }
+
 /* Visually hidden but still announced, for the live filter-match count,
    same live-region pattern the main Command Center dashboard uses for its
    own search/category filter. */
@@ -601,6 +611,8 @@ footer.page-foot {
   .card-table tbody tr + tr td { border-color: #ddd; }
   .cell-card-name, .cell-value { color: #111; }
   .cell-card-meta, .cell-muted, .cell-value.empty { color: #555; }
+  .table-foot-row td.table-foot-cell { background: none; border-color: #ccc; color: #333 !important; }
+  .table-foot-note { color: #555 !important; }
 
   .badge { border-color: #999; background: none !important; color: #111 !important; }
 

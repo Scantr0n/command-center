@@ -444,6 +444,36 @@ function announceFilterStatus(matchCount) {
     : '';
 }
 
+// The breakdown section above totals real priced cards by one dimension at a
+// time (sport, grader, grade), but never for whatever combination of filters
+// is currently active, e.g. "PSA hockey cards from the 2026-08-08 batch". This
+// reads that answer straight off the same `filtered` rows already computed
+// for the table, so narrowing down to a specific slice of the collection
+// always shows what it's worth without doing the math by hand.
+function renderTableFooter(filtered) {
+  const foot = document.getElementById('cardTableFoot');
+  if (!filtered.length) {
+    foot.innerHTML = '';
+    return;
+  }
+  const real = filtered.filter(c => !isExample(c));
+  const priced = real.filter(c => c.estimatedValue != null);
+  const total = priced.reduce((s, c) => s + c.estimatedValue, 0);
+  const includesExample = real.length !== filtered.length;
+  const summary = [
+    filtered.length + ' card' + (filtered.length === 1 ? '' : 's') + ' shown',
+    priced.length + ' priced',
+    formatUsd(total) + ' total'
+  ].join(' · ');
+  foot.innerHTML = `
+    <tr class="table-foot-row">
+      <td colspan="7" class="table-foot-cell font-mono">
+        ${summary}${includesExample ? ' <span class="table-foot-note">(includes example row, excluded from $ total)</span>' : ''}
+      </td>
+    </tr>
+  `;
+}
+
 function applyFiltersAndRender() {
   syncUrl();
   const filtered = sortRows(cards.filter(matchesFilters));
@@ -456,12 +486,14 @@ function applyFiltersAndRender() {
 
   if (!filtered.length) {
     tbody.innerHTML = '';
+    renderTableFooter(filtered);
     empty.hidden = false;
     empty.setAttribute('role', 'status');
     empty.textContent = cards.length ? 'No cards match the current filters.' : 'No cards logged yet.';
     return;
   }
   empty.hidden = true;
+  renderTableFooter(filtered);
 
   tbody.innerHTML = filtered.map(c => `
     <tr tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
