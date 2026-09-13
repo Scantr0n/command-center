@@ -243,6 +243,7 @@ header.page-head .sub {
   font-size: 0.8rem;
 }
 .nudge-action-missing { color: #E0A030; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+.nudge-touch-count { margin-left: 19px; color: var(--dim); font-size: 0.7rem; }
 
 .nudge-urgency-dot {
   width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0;
@@ -892,6 +893,7 @@ footer.page-foot {
   .nudge-when { color: #444; }
   .nudge-action { color: #444; }
   .nudge-action-missing { color: #111; }
+  .nudge-touch-count { color: #666; }
 
   .data-quality-list { background: none; border-color: #bbb; }
   .data-quality-row { border-color: #ddd; }

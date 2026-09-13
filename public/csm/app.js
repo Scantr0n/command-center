@@ -172,6 +172,11 @@
       const actionLine = p.nextAction
         ? '<div class="nudge-action">' + escapeHtml(p.nextAction) + '</div>'
         : '<div class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</div>';
+      const touchCount = (p.outreachLog || []).filter(e => e && e.date).length;
+      const touchLine = touchCount > 0
+        ? '<span class="nudge-touch-count font-mono">' + touchCount + ' touch' + (touchCount === 1 ? '' : 'es') +
+          ' logged so far</span>'
+        : '';
       return '<div class="nudge-row nudge-' + urgency + '">' +
         '<div class="nudge-top">' +
         '<span class="nudge-urgency-dot"></span>' +
@@ -181,6 +186,7 @@
         fmtDate(p.nextNudgeDate) + ' (' + when + ')' + notBefore +
         '</span></div>' +
         actionLine +
+        touchLine +
         '</div>';
     }).join('');
   }
