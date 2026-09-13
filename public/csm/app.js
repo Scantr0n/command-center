@@ -410,10 +410,10 @@
     });
   }
 
-  function renderChannelFilterCounts(prospects) {
+  function renderChannelFilterCounts(prospects, query) {
     channelFilterEl.querySelectorAll('.chip').forEach(chip => {
       const key = chip.getAttribute('data-channel');
-      const count = prospects.filter(p => matchesChannel(p, key)).length;
+      const count = channelFacetCount(prospects, query || '', key);
       chip.textContent = chip.getAttribute('data-label') + ' (' + count + ')';
     });
   }
@@ -491,6 +491,38 @@
     return (p.category || null) === key;
   }
 
+  function matchesSearchTerm(p, query) {
+    if (!query) return true;
+    return (p.name || '').toLowerCase().includes(query) ||
+      (p.company || '').toLowerCase().includes(query) ||
+      (p.category || '').toLowerCase().includes(query) ||
+      (p.verifiedHook || '').toLowerCase().includes(query) ||
+      (p.notes || '').toLowerCase().includes(query) ||
+      (p.contactChannel && (p.contactChannel.detail || '').toLowerCase().includes(query));
+  }
+
+  // Counts how many prospects would match if this one chip group (channel or
+  // category) were set to `key`, holding search and the *other* chip group as
+  // they currently are. Same faceted-search convention CGT's facetCount
+  // already uses, so switching category doesn't leave the channel counts
+  // silently describing a slice of prospects that isn't the one on screen.
+  function channelFacetCount(prospects, query, key) {
+    return prospects.filter(p =>
+      matchesCategory(p, categoryFilter) && matchesSearchTerm(p, query) && matchesChannel(p, key)
+    ).length;
+  }
+
+  function categoryFacetCount(prospects, query, key) {
+    return prospects.filter(p =>
+      matchesChannel(p, channelFilter) && matchesSearchTerm(p, query) && matchesCategory(p, key)
+    ).length;
+  }
+
+  // Builds the category chip row once, from every category logged across the
+  // full dataset, so a category doesn't disappear from the row just because
+  // the current search/channel filter happens to leave it at zero. Counts
+  // themselves are kept live by updateCategoryFilterCounts below, called on
+  // every applyFilter, not just here.
   function renderCategoryFilter(prospects) {
     const categories = Array.from(new Set(
       prospects.map(p => p.category).filter(Boolean)
@@ -509,9 +541,8 @@
     const keys = ['all', ...categories];
     const chipsHtml = keys.map(key => {
       const label = key === 'all' ? 'All' : key;
-      const count = prospects.filter(p => matchesCategory(p, key)).length;
       return '<button type="button" class="chip" data-category="' + escapeHtml(key) +
-        '" aria-pressed="' + (key === categoryFilter) + '">' + escapeHtml(label) + ' (' + count + ')</button>';
+        '" aria-pressed="' + (key === categoryFilter) + '">' + escapeHtml(label) + '</button>';
     }).join('');
     categoryFilterEl.innerHTML = '<span class="channel-filter-label font-mono">CATEGORY</span>' + chipsHtml;
 
@@ -522,6 +553,16 @@
           c.setAttribute('aria-pressed', String(c === chip)));
         applyFilter();
       });
+    });
+    updateCategoryFilterCounts(prospects, '');
+  }
+
+  function updateCategoryFilterCounts(prospects, query) {
+    categoryFilterEl.querySelectorAll('.chip').forEach(chip => {
+      const key = chip.getAttribute('data-category');
+      const label = key === 'all' ? 'All' : key;
+      const count = categoryFacetCount(prospects, query || '', key);
+      chip.textContent = label + ' (' + count + ')';
     });
   }
 
@@ -546,16 +587,12 @@
     const filtered = allProspects.filter(p =>
       matchesChannel(p, channelFilter) &&
       matchesCategory(p, categoryFilter) &&
-      (!query ||
-        (p.name || '').toLowerCase().includes(query) ||
-        (p.company || '').toLowerCase().includes(query) ||
-        (p.category || '').toLowerCase().includes(query) ||
-        (p.verifiedHook || '').toLowerCase().includes(query) ||
-        (p.notes || '').toLowerCase().includes(query) ||
-        (p.contactChannel && (p.contactChannel.detail || '').toLowerCase().includes(query))));
+      matchesSearchTerm(p, query));
     lastFiltered = filtered;
     const filterActive = anyFilterActive();
     renderBoard(allStages, filtered, allProspects, query, filterActive);
+    renderChannelFilterCounts(allProspects, query);
+    updateCategoryFilterCounts(allProspects, query);
     announceFilterStatus(filtered.length, query, filterActive);
     document.getElementById('clearFiltersBtn').hidden = !filterActive;
     syncUrl();
