@@ -7,6 +7,7 @@
   const copyStatusBtn = document.getElementById('copyStatusBtn');
   const copyStatusLive = document.getElementById('copyStatusLive');
   const attentionPill = document.getElementById('attentionPill');
+  const lastUpdatedSub = document.getElementById('lastUpdatedSub');
 
   function escapeHtml(s) {
     const div = document.createElement('div');
@@ -196,6 +197,33 @@
       (metric.scope ? '<div class="scope-note">' + escapeHtml(metric.scope) + '</div>' : '');
   }
 
+  // The download freshness badge only tracks how current the traction
+  // number is; a release logged last week or a lead never dated wouldn't
+  // show up in that. This scans every real date across all three files so
+  // a visitor can tell, at a glance, whether the whole hub (not just the
+  // download count) reflects anything recent or is running on old input.
+  function renderLastUpdated(releasesData, downloadsData, leadsData) {
+    const dates = [];
+    ((releasesData && releasesData.releases) || []).forEach(r => { if (r.date) dates.push(r.date); });
+    (((downloadsData && downloadsData.metric) || {}).checks || []).forEach(c => { if (c.date) dates.push(c.date); });
+    ((leadsData && leadsData.leads) || []).forEach(l => { if (l.loggedDate) dates.push(l.loggedDate); });
+
+    if (dates.length === 0) {
+      lastUpdatedSub.hidden = true;
+      return;
+    }
+    const latest = dates.sort().pop();
+    const rel = relativeDaysLabel(latest);
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const STALE_AFTER_DAYS = 7;
+    const isStale = daysBetween(latest, todayIso) > STALE_AFTER_DAYS;
+
+    lastUpdatedSub.hidden = false;
+    lastUpdatedSub.classList.toggle('last-updated-stale', isStale);
+    lastUpdatedSub.textContent = 'Last real update logged: ' + fmtDate(latest) + (rel ? ' (' + rel + ')' : '') +
+      (isStale ? ', over a week old' : '');
+  }
+
   // Surfaces the single most actionable fact on the page, real drafted
   // outreach sitting on a human approval, as a header pill rather than
   // making a visitor read the whole engagement queue to find it.
@@ -357,6 +385,7 @@
 
     if (releasesData || downloadsData || leadsData) {
       renderTimeline(releasesData || {}, downloadsData || {}, leadsData || {});
+      renderLastUpdated(releasesData || {}, downloadsData || {}, leadsData || {});
       if (failures.length) {
         timelineSection.insertAdjacentHTML('afterbegin',
           '<div class="empty-state file-error" role="alert">Showing partial data, failed to load: ' +

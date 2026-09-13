@@ -53,6 +53,14 @@ header.page-head .sub {
   margin-top: 6px;
 }
 
+.last-updated {
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+.last-updated-stale {
+  color: #E0A030;
+}
+
 .back-link {
   font-size: 0.75rem;
   color: var(--sub);
@@ -526,7 +534,7 @@ footer.page-foot {
   }
   .release-summary, .stat-label, .lead-summary, .timeline-title { color: #333; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
-  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate { color: #555; }
+  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .last-updated, .last-updated-stale { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
   .release-badge, .timeline-badge,
