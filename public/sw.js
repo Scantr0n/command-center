@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -47,16 +47,23 @@ function isDataRequest(url) {
   return url.pathname.startsWith('/api/') || /\/data\/.*\.json$/.test(url.pathname);
 }
 
+// Cached under the bare path, not the full request: Alpha's status.json
+// fetch appends a cache-busting "?t=<timestamp>" query so every 30s poll is
+// a distinct URL, and caching by full URL would grow the runtime cache by
+// one entry per poll forever instead of keeping one live snapshot per file.
 async function networkFirst(request) {
+  const url = new URL(request.url);
+  const cacheKey = url.origin + url.pathname;
   try {
     const fresh = await fetch(request);
     if (fresh.ok) {
       const cache = await caches.open(RUNTIME_CACHE);
-      cache.put(request, fresh.clone());
+      cache.put(cacheKey, fresh.clone());
     }
     return fresh;
   } catch (err) {
-    const cached = await caches.match(request);
+    const cache = await caches.open(RUNTIME_CACHE);
+    const cached = await cache.match(cacheKey);
     if (cached) return cached;
     throw err;
   }
