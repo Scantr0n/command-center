@@ -98,6 +98,12 @@
         warnings.push(where + ': has a "valuationBasis" but no "estimatedValue". Probably a leftover field.');
       }
 
+      if (c.costBasis !== null && c.costBasis !== undefined) {
+        if (typeof c.costBasis !== 'number' || Number.isNaN(c.costBasis) || c.costBasis < 0) {
+          errors.push(where + ': "costBasis" must be a non-negative number or null');
+        }
+      }
+
       if (!isDateOrNull(c.datePriced)) {
         errors.push(where + ': "datePriced" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.datePriced));
       }

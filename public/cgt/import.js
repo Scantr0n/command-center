@@ -25,6 +25,7 @@ const FIELD_DEFS = [
   { key: 'valuationBasis', label: 'Valuation basis', aliases: ['valuationbasis', 'basis'] },
   { key: 'compNote', label: 'Comp note', aliases: ['compnote'] },
   { key: 'sourceNote', label: 'Source', aliases: ['sourcenote', 'source'] },
+  { key: 'costBasis', label: 'Cost basis (what was paid)', aliases: ['costbasis', 'paid', 'pricepaid', 'cost'] },
   { key: 'datePriced', label: 'Date priced', aliases: ['datepriced', 'date'] },
   { key: 'backlogBatch', label: 'Backlog batch', aliases: ['backlogbatch', 'batch'] },
   { key: 'notes', label: 'Notes', aliases: ['notes', 'note'] }
@@ -110,9 +111,17 @@ async function loadExisting() {
   }
 }
 
+// Built by field key rather than a hand-typed positional list, so adding or
+// reordering a field in FIELD_DEFS can't silently leave the example row one
+// column short (or a value under the wrong header) the way a plain array of
+// values lined up by hand would.
+const TEMPLATE_EXAMPLE_ROW = {
+  cardName: '2021 Topps Chrome Julio Rodriguez RC', year: '2021', sport: 'baseball', gradingCompany: 'PSA', grade: '10'
+};
+
 document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
   const header = FIELD_DEFS.map(f => f.key).join(',');
-  const example = ['', '2021 Topps Chrome Julio Rodriguez RC', '2021', 'baseball', 'PSA', '10', '', '', '', '', '', '', ''].join(',');
+  const example = FIELD_DEFS.map(f => csvField(TEMPLATE_EXAMPLE_ROW[f.key] || '')).join(',');
   const csv = header + '\n' + example + '\n';
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -222,6 +231,7 @@ function buildCardFromRow(row, mapping, usedIds) {
 
   const year = raw.year != null ? Number(raw.year) : null;
   const estimatedValue = raw.estimatedValue != null ? Number(String(raw.estimatedValue).replace(/[$,]/g, '')) : null;
+  const costBasis = raw.costBasis != null ? Number(String(raw.costBasis).replace(/[$,]/g, '')) : null;
   const gradingCompany = raw.gradingCompany != null ? raw.gradingCompany.toUpperCase() : null;
   const sport = raw.sport != null ? raw.sport.toLowerCase() : null;
   const valuationBasis = normalizeBasis(raw.valuationBasis);
@@ -244,6 +254,7 @@ function buildCardFromRow(row, mapping, usedIds) {
     valuationBasis,
     compNote: raw.compNote || null,
     sourceNote: raw.sourceNote || null,
+    costBasis: (costBasis != null && !Number.isNaN(costBasis)) ? costBasis : null,
     datePriced: raw.datePriced || null,
     backlogBatch: raw.backlogBatch || null,
     notes: raw.notes || null

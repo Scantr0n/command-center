@@ -71,6 +71,7 @@
           <tr><th>valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
           <tr><th>compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
           <tr><th>sourceNote</th><td>Where the price came from, e.g. <code>"eBay sold listings, 3 comps, Aug 2026"</code></td></tr>
+          <tr><th>costBasis</th><td>USD number, what was actually paid for the card. Optional and independent of <code>estimatedValue</code>: log it when known, leave <code>null</code> when not. Powers the "Unrealized gain / loss" summary tile and the detail view, only computed for cards where both this and <code>estimatedValue</code> are on record.</td></tr>
           <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
           <tr><th>backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
         </tbody>
@@ -87,6 +88,7 @@
   "valuationBasis": null,
   "compNote": null,
   "sourceNote": null,
+  "costBasis": null,
   "datePriced": null,
   "backlogBatch": null,
   "notes": null

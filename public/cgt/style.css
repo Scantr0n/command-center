@@ -205,6 +205,11 @@ header.page-head .sub {
   color: var(--sub);
   margin-top: 4px;
 }
+/* Unrealized gain/loss tile: same green/red as the recent-sale/stale badges
+   elsewhere on the page, so a gain and a loss read at a glance without
+   needing to parse the sign on the number. */
+.stat-tile-value.positive { color: #3DDC84; }
+.stat-tile-value.negative { color: #E0503C; }
 
 /* Value breakdown: horizontal bar lists grouping real priced cards' value by
    sport / grading company. Single accent hue since these bars encode

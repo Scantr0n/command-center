@@ -10,8 +10,9 @@
       "certNumber": null,
       "estimatedValue": 25,
       "valuationBasis": "comp-estimate",
-      "compNote": "Placeholder only, exists to verify the comp-estimate badge and detail modal render correctly. Not a real card, grade, or price.",
+      "compNote": "Placeholder only, exists to verify the comp-estimate badge, gain/loss calculation, and detail modal render correctly. Not a real card, grade, price, or purchase cost.",
       "sourceNote": null,
+      "costBasis": 18,
       "datePriced": "2026-08-08",
       "backlogBatch": "2026-08-08-full-backlog",
       "notes": "Delete this row once real inventory data is wired in from the tracker file."

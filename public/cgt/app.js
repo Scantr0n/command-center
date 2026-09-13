@@ -72,6 +72,22 @@ function formatUsd(n) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function formatSignedUsd(n) {
+  return (n >= 0 ? '+' : '-') + formatUsd(Math.abs(n));
+}
+
+// Gain/loss only exists to compute where both a real purchase price
+// (costBasis) and a real researched value (estimatedValue) are on record.
+// Neither field requires the other: plenty of cards will have a price
+// logged with no memory of what was paid, or vice versa, so this returns
+// null rather than treating a missing side as zero.
+function computeGainLoss(c) {
+  if (c.costBasis == null || c.estimatedValue == null) return null;
+  const abs = c.estimatedValue - c.costBasis;
+  const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
+  return { abs, pct };
+}
+
 function isExample(c) {
   return c.id === 'example-row-not-real';
 }
@@ -163,6 +179,16 @@ function renderStats() {
   const bySport = { hockey: 0, baseball: 0, football: 0 };
   real.forEach(c => { if (bySport[c.sport] != null) bySport[c.sport]++; });
 
+  // Only counts cards where both a real purchase price and a real researched
+  // value are on record, same rule as computeGainLoss. A card with only one
+  // of the two contributes to neither side, rather than being treated as a
+  // break-even or a total-loss by assuming the missing field is zero.
+  const withCostBasis = real.filter(c => c.costBasis != null && c.estimatedValue != null);
+  const totalCostBasis = withCostBasis.reduce((s, c) => s + c.costBasis, 0);
+  const totalCurrentValue = withCostBasis.reduce((s, c) => s + c.estimatedValue, 0);
+  const netGainLoss = totalCurrentValue - totalCostBasis;
+  const netGainLossPct = totalCostBasis > 0 ? (netGainLoss / totalCostBasis) * 100 : null;
+
   const tiles = [
     { value: real.length, label: 'Cards logged', sub: cards.length !== real.length ? '+ 1 example row' : null },
     { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
@@ -171,13 +197,21 @@ function renderStats() {
     // at a glance, which is the whole point of never blending the two silently.
     { value: saleCards.length, label: 'Recent-sale priced', sub: saleCards.length ? formatUsd(saleValue) : null },
     { value: compCards.length, label: 'Comp-estimate priced', sub: compCards.length ? formatUsd(compValue) : null },
+    {
+      value: withCostBasis.length ? formatSignedUsd(netGainLoss) : 'n/a',
+      label: 'Unrealized gain / loss',
+      sub: withCostBasis.length
+        ? withCostBasis.length + ' card(s) with cost basis logged' + (netGainLossPct != null ? ' · ' + (netGainLossPct >= 0 ? '+' : '') + netGainLossPct.toFixed(1) + '%' : '')
+        : 'no purchase prices logged yet',
+      cls: withCostBasis.length ? (netGainLoss >= 0 ? 'positive' : 'negative') : null
+    },
     { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
     { value: bySport.hockey + ' / ' + bySport.baseball + ' / ' + bySport.football, label: 'Hockey / baseball / football', sub: null }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
     <div class="stat-tile">
-      <div class="stat-tile-value font-display">${escapeHtml(String(t.value))}</div>
+      <div class="stat-tile-value font-display${t.cls ? ' ' + t.cls : ''}">${escapeHtml(String(t.value))}</div>
       <div class="stat-tile-label">${escapeHtml(t.label)}</div>
       ${t.sub ? `<div class="stat-tile-sub">${escapeHtml(t.sub)}</div>` : ''}
     </div>
@@ -742,6 +776,11 @@ function openModal(id) {
   }
   body += field('Estimated value', activeCard.estimatedValue != null ? formatUsd(activeCard.estimatedValue) : null, activeCard.estimatedValue == null);
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
+  body += field('Cost basis (what was paid)', activeCard.costBasis != null ? formatUsd(activeCard.costBasis) : null, activeCard.costBasis == null);
+  const gl = computeGainLoss(activeCard);
+  if (gl) {
+    body += field('Gain / loss', formatSignedUsd(gl.abs) + (gl.pct != null ? ' (' + (gl.pct >= 0 ? '+' : '') + gl.pct.toFixed(1) + '%)' : ''), false);
+  }
   body += field('Comp note', activeCard.compNote, !activeCard.compNote);
   body += field('Source', activeCard.sourceNote, !activeCard.sourceNote);
   const datePricedDisplay = activeCard.datePriced && isStale(activeCard)
@@ -929,11 +968,16 @@ function csvField(v) {
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+// Each column is [accessor, label] rather than [key, label] so a derived
+// column (gain/loss isn't a real field on the card, it's computed from two
+// of them) fits the same list instead of needing special-cased handling
+// alongside the plain field lookups.
 const CSV_COLUMNS = [
-  ['cardName', 'Card'], ['year', 'Year'], ['sport', 'Sport'], ['gradingCompany', 'Grading company'],
-  ['grade', 'Grade'], ['certNumber', 'Cert number'], ['estimatedValue', 'Estimated value'],
-  ['valuationBasis', 'Valuation basis'], ['compNote', 'Comp note'], ['sourceNote', 'Source'],
-  ['datePriced', 'Date priced'], ['backlogBatch', 'Backlog batch'], ['notes', 'Notes']
+  [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'], [c => c.gradingCompany, 'Grading company'],
+  [c => c.grade, 'Grade'], [c => c.certNumber, 'Cert number'], [c => c.estimatedValue, 'Estimated value'],
+  [c => c.valuationBasis, 'Valuation basis'], [c => c.compNote, 'Comp note'], [c => c.sourceNote, 'Source'],
+  [c => c.costBasis, 'Cost basis'], [c => computeGainLoss(c)?.abs ?? null, 'Gain/loss'],
+  [c => c.datePriced, 'Date priced'], [c => c.backlogBatch, 'Backlog batch'], [c => c.notes, 'Notes']
 ];
 
 // Exports exactly what the table currently shows (same filters and sort
@@ -941,7 +985,7 @@ const CSV_COLUMNS = [
 document.getElementById('csvBtn').addEventListener('click', () => {
   const rows = sortRows(cards.filter(matchesFilters));
   const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
-  const lines = rows.map(c => CSV_COLUMNS.map(([key]) => csvField(c[key])).join(','));
+  const lines = rows.map(c => CSV_COLUMNS.map(([accessor]) => csvField(accessor(c))).join(','));
   const csv = [header, ...lines].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
