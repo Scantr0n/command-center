@@ -381,6 +381,20 @@ table.card-table {
 .cell-card-meta { color: var(--dim); font-size: 0.72rem; margin-top: 2px; }
 .cell-value { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
 .cell-value.empty { color: var(--dim); font-family: inherit; font-weight: 400; font-style: italic; }
+.cell-value-best { color: var(--accent); }
+.best-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--void);
+  background: var(--accent);
+  border-radius: 4px;
+  padding: 1px 4px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
 .cell-muted { color: var(--sub); }
 .cell-platforms { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -564,6 +578,7 @@ footer.page-foot {
   .cell-card-meta, .cell-muted, .cell-value.empty { color: #555; }
 
   .badge { border-color: #999; background: none !important; color: #111 !important; }
+  .best-tag { background: none !important; color: #111 !important; border: 1px solid #999; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }

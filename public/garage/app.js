@@ -110,6 +110,20 @@ function remainingPlatforms(l) {
   return (l.platforms || []).filter(p => !soldOn.includes(p));
 }
 
+// Best-case total: for each live item, the highest net payout among the
+// platforms it's actually listed on (falling back to price if fees can't be
+// estimated), summed across all items. Not a prediction of what will sell
+// where, just what picking the best-fee platform for each item nets in total.
+function bestCaseTotalPayout(live) {
+  return live.reduce((sum, l) => {
+    const nets = (l.platforms || [])
+      .map(p => estimateNetPayout(p, l.price))
+      .filter(n => n != null);
+    if (nets.length) return sum + Math.max(...nets);
+    return sum + (l.price || 0);
+  }, 0);
+}
+
 function renderStats(listings, stages) {
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
@@ -119,12 +133,14 @@ function renderStats(listings, stages) {
   const listingInstances = live.reduce((s, l) => s + remainingPlatforms(l).length, 0);
   const readyStage = stages.find(s => s.stage === 'ready-to-post');
   const atRiskCount = live.filter(l => (l.soldOn || []).length > 0 && remainingPlatforms(l).length > 0).length;
+  const bestCaseTotal = bestCaseTotalPayout(live);
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
     { value: live.length, label: 'Unique items live', sub: null },
     { value: activePlatforms, label: 'Platforms active', sub: Object.keys(platformCounts).map(p => PLATFORM_LABELS[p] || p).join(', ') || null },
     { value: formatUsd(totalValue), label: 'Total live asking value', sub: null },
+    { value: formatUsd(bestCaseTotal), label: 'Best-case net payout', sub: 'If each item sells on its best-fee platform' },
     { value: readyStage ? readyStage.count : 0, label: 'Drafts ready to post', sub: readyStage && readyStage.note ? readyStage.note : null },
     { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 }
   ];
@@ -275,6 +291,21 @@ function applyFiltersAndRender() {
   syncUrl();
 }
 
+// Finds which of an item's own listed platforms nets the most after fees, so
+// the payout table can point at the actual highest-payout choice rather than
+// making the seller compare four columns by eye. Ties (e.g. two platforms
+// both net exactly the same) intentionally mark none, since there's no real
+// "best" to point to.
+function bestPayoutPlatform(l) {
+  const candidates = (l.platforms || [])
+    .map(p => ({ p, net: estimateNetPayout(p, l.price) }))
+    .filter(c => c.net != null);
+  if (candidates.length < 2) return null;
+  candidates.sort((a, b) => b.net - a.net);
+  if (candidates[1].net === candidates[0].net) return null;
+  return candidates[0].p;
+}
+
 function renderPayoutTable(listings) {
   const tbody = document.getElementById('payoutTableBody');
   const empty = document.getElementById('payoutTableEmpty');
@@ -288,17 +319,21 @@ function renderPayoutTable(listings) {
   }
   empty.hidden = true;
 
-  tbody.innerHTML = rows.map(l => `
+  tbody.innerHTML = rows.map(l => {
+    const best = bestPayoutPlatform(l);
+    return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div></td>
       <td class="cell-value${l.price == null ? ' empty' : ''}">${l.price != null ? formatUsd(l.price) : 'not set'}</td>
       ${PAYOUT_PLATFORMS.map(p => {
         if (!(l.platforms || []).includes(p)) return '<td class="cell-value empty">not listed</td>';
         const net = estimateNetPayout(p, l.price);
-        return `<td class="cell-value">${net != null ? formatUsd(net) : 'not set'}</td>`;
+        const isBest = p === best;
+        return `<td class="cell-value${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>`;
       }).join('')}
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // Each .table-wrap has a fixed min-width so columns stay legible, which
@@ -441,10 +476,12 @@ function openModal(id) {
   rows.push(fieldRow('Platforms', (l.platforms || []).length ? platformBadges(l.platforms, l.soldOn) : 'None logged', !(l.platforms || []).length));
   rows.push(fieldRow('Published', l.datePublished ? escapeHtml(l.datePublished) : 'Not logged yet', !l.datePublished));
 
+  const modalBest = bestPayoutPlatform(l);
   const payoutHtml = (l.platforms || []).length
     ? '<table class="modal-payout-table">' + (l.platforms || []).map(p => {
         const net = estimateNetPayout(p, l.price);
-        return `<tr><td>${escapeHtml(PLATFORM_LABELS[p] || p)}</td><td class="cell-value${net == null ? ' empty' : ''}">${net != null ? formatUsd(net) : 'not set'}</td></tr>`;
+        const isBest = p === modalBest;
+        return `<tr><td>${escapeHtml(PLATFORM_LABELS[p] || p)}</td><td class="cell-value${net == null ? ' empty' : ''}${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td></tr>`;
       }).join('') + '</table>'
     : 'Not applicable, not listed anywhere yet.';
   rows.push(fieldRow('Est. net payout by platform', payoutHtml, !(l.platforms || []).length));
