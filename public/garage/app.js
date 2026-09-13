@@ -260,25 +260,39 @@ function daysSincePublished(dateStr) {
   return Math.max(0, Math.floor((Date.now() - published.getTime()) / 86400000));
 }
 
-function relistGuidanceHtml(l, days) {
-  if (days == null) {
-    return '<span class="cell-value empty">log a publish date for guidance</span>';
-  }
+// Plain-text guidance pieces shared by the on-page badges and the CSV export,
+// so both read the exact same underlying judgment instead of two versions
+// that could quietly drift apart.
+function relistGuidanceParts(l, days) {
+  if (days == null) return [{ tier: 'unknown', text: 'log a publish date for guidance' }];
   if (days < RELIST_FRESH_DAYS) {
-    return `<span class="badge badge-fresh">Fresh, ${RELIST_FRESH_DAYS - days}d until a refresh is worth considering</span>`;
+    return [{ tier: 'fresh', text: `Fresh, ${RELIST_FRESH_DAYS - days}d until a refresh is worth considering` }];
   }
   const platforms = remainingPlatforms(l);
-  const badges = [];
+  const parts = [];
   const nonPoshmark = platforms.filter(p => p !== 'poshmark');
   if (nonPoshmark.length) {
-    badges.push(`<span class="badge badge-due">Relist/renew on ${nonPoshmark.map(p => escapeHtml(PLATFORM_LABELS[p] || p)).join(', ')}</span>`);
+    parts.push({ tier: 'due', text: `Relist/renew on ${nonPoshmark.map(p => PLATFORM_LABELS[p] || p).join(', ')}` });
   }
   if (platforms.includes('poshmark')) {
-    badges.push(days < POSHMARK_HOLD_DAYS
-      ? `<span class="badge badge-hold">Hold off on Poshmark until day ${POSHMARK_HOLD_DAYS}</span>`
-      : '<span class="badge badge-due">Eligible to relist on Poshmark</span>');
+    parts.push(days < POSHMARK_HOLD_DAYS
+      ? { tier: 'hold', text: `Hold off on Poshmark until day ${POSHMARK_HOLD_DAYS}` }
+      : { tier: 'due', text: 'Eligible to relist on Poshmark' });
   }
-  return badges.join(' ') || '<span class="cell-value empty">nothing left to relist</span>';
+  return parts.length ? parts : [{ tier: 'unknown', text: 'nothing left to relist' }];
+}
+
+const RELIST_BADGE_CLASS = { fresh: 'badge-fresh', due: 'badge-due', hold: 'badge-hold' };
+
+function relistGuidanceHtml(l, days) {
+  return relistGuidanceParts(l, days).map(part => part.tier === 'unknown'
+    ? `<span class="cell-value empty">${escapeHtml(part.text)}</span>`
+    : `<span class="badge ${RELIST_BADGE_CLASS[part.tier]}">${escapeHtml(part.text)}</span>`
+  ).join(' ');
+}
+
+function relistGuidanceText(l, days) {
+  return relistGuidanceParts(l, days).map(part => part.text).join('; ');
 }
 
 function renderRelist(listings) {
@@ -774,18 +788,26 @@ function csvField(v) {
 
 const CSV_COLUMNS = [
   ['title', 'Item'], ['price', 'Price'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
-  ['status', 'Status'], ['datePublished', 'Published'], ['notes', 'Notes']
+  ['status', 'Status'], ['datePublished', 'Published'], ['daysListed', 'Days listed'],
+  ['relistGuidance', 'Relist guidance'], ['notes', 'Notes']
 ];
 
 // Exports exactly what the table currently shows (same search, platform
 // filter, and sort applied), not the full dataset, so the file matches
-// what's on screen.
+// what's on screen. Includes the same relist guidance as the on-page
+// section, computed fresh at export time rather than cached, since "days
+// listed" changes daily even with the underlying data untouched.
 document.getElementById('csvBtn').addEventListener('click', () => {
-  const rows = sortRows(listings.filter(matchesFilters)).map(l => ({
-    ...l,
-    platforms: (l.platforms || []).map(p => PLATFORM_LABELS[p] || p).join('; '),
-    soldOn: (l.soldOn || []).map(p => PLATFORM_LABELS[p] || p).join('; ')
-  }));
+  const rows = sortRows(listings.filter(matchesFilters)).map(l => {
+    const days = daysSincePublished(l.datePublished);
+    return {
+      ...l,
+      platforms: (l.platforms || []).map(p => PLATFORM_LABELS[p] || p).join('; '),
+      soldOn: (l.soldOn || []).map(p => PLATFORM_LABELS[p] || p).join('; '),
+      daysListed: days != null ? days : '',
+      relistGuidance: relistGuidanceText(l, days)
+    };
+  });
   const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(l => CSV_COLUMNS.map(([key]) => csvField(l[key])).join(','));
   const csv = [header, ...lines].join('\n');
