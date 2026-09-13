@@ -1185,27 +1185,54 @@
       .finally(() => { setTimeout(() => { npCopyBtn.textContent = original; }, 1800); });
   });
 
-  Promise.all([
-    fetch('/csm/data/stages.json').then(r => r.json()),
-    fetch('/csm/data/prospects.json').then(r => r.json())
-  ]).then(([stagesData, prospectsData]) => {
-    allStages = stagesData.stages;
-    allProspects = prospectsData.prospects;
+  // stages.json and prospects.json are both hand-edited (prospects.json most
+  // of all, every time a new one is logged via the guided JSON generator
+  // above), so a single Promise.all would fail the entire board over one typo
+  // in either file. Promise.allSettled degrades to the real half of the data
+  // instead, the same fix already applied to Sondrik's and Garage's loaders
+  // for the same reason.
+  Promise.allSettled([
+    fetch('/csm/data/stages.json').then(r => {
+      if (!r.ok) throw new Error('stages.json returned ' + r.status);
+      return r.json();
+    }),
+    fetch('/csm/data/prospects.json').then(r => {
+      if (!r.ok) throw new Error('prospects.json returned ' + r.status);
+      return r.json();
+    })
+  ]).then(([stagesResult, prospectsResult]) => {
+    const stagesData = stagesResult.status === 'fulfilled' ? stagesResult.value : null;
+    const prospectsData = prospectsResult.status === 'fulfilled' ? prospectsResult.value : null;
+    allStages = (stagesData && stagesData.stages) || [];
+    allProspects = (prospectsData && prospectsData.prospects) || [];
     byId = Object.fromEntries(allProspects.map(p => [p.id, p]));
-    renderNudgeQueue(allProspects);
-    renderStats(allStages, allProspects);
-    renderChannelFilterCounts(allProspects);
-    renderCategoryFilter(allProspects);
-    renderStalled(allStages, allProspects);
-    renderDataQuality(allStages, allProspects);
-    renderActivityFeed(allProspects, allStages);
-    renderStageVelocity(allStages, allProspects);
-    applyFilter();
-    document.getElementById('newProspectBtn').disabled = false;
-  }).catch(err => {
-    boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
-    nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
-    activityFeedEl.innerHTML = '<p class="activity-empty" role="alert">Failed to load.</p>';
-    velocityListEl.innerHTML = '<p class="velocity-empty" role="alert">Failed to load.</p>';
+
+    const failures = [];
+    if (stagesResult.status === 'rejected') failures.push('stages.json: ' + stagesResult.reason.message);
+    if (prospectsResult.status === 'rejected') failures.push('prospects.json: ' + prospectsResult.reason.message);
+
+    if (stagesData || prospectsData) {
+      renderNudgeQueue(allProspects);
+      renderStats(allStages, allProspects);
+      renderChannelFilterCounts(allProspects);
+      renderCategoryFilter(allProspects);
+      renderStalled(allStages, allProspects);
+      renderDataQuality(allStages, allProspects);
+      renderActivityFeed(allProspects, allStages);
+      renderStageVelocity(allStages, allProspects);
+      applyFilter();
+      if (failures.length) {
+        boardEl.insertAdjacentHTML('afterbegin',
+          '<div class="column-empty" role="alert">Showing partial data, failed to load: ' + failures.map(escapeHtml).join('; ') + '</div>');
+      }
+      // The generator's stage dropdown is built from allStages (npPopulateStageOptions),
+      // so it needs stages.json specifically, not just any data, to be usable.
+      document.getElementById('newProspectBtn').disabled = !stagesData;
+    } else {
+      boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + failures.map(escapeHtml).join('; ') + '</div>';
+      nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
+      activityFeedEl.innerHTML = '<p class="activity-empty" role="alert">Failed to load.</p>';
+      velocityListEl.innerHTML = '<p class="velocity-empty" role="alert">Failed to load.</p>';
+    }
   });
 })();

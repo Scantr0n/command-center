@@ -73,37 +73,64 @@ function formatUsd(n) {
   return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function fetchJson(url) {
+  return fetch(url).then(r => {
+    if (!r.ok) throw new Error(url.split('/').pop() + ' returned ' + r.status);
+    return r.json();
+  });
+}
+
+// Each of the three files is a hand-edited record that can be typo'd at any
+// time (see the sibling validate.js scripts). A single Promise.all would fail
+// every section over one bad file, e.g. a typo in activity.json alone would
+// also blank the listings table and payout section that have nothing to do
+// with it. Promise.allSettled lets each section degrade independently instead,
+// the same fix Sondrik's loadData already applies for the same reason.
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
-  try {
-    const [listingsRes, pipelineRes, activityRes] = await Promise.all([
-      fetch('/garage/data/listings.json'),
-      fetch('/garage/data/pipeline.json'),
-      fetch('/garage/data/activity.json')
-    ]);
-    if (!listingsRes.ok) throw new Error('listings.json returned ' + listingsRes.status);
-    if (!pipelineRes.ok) throw new Error('pipeline.json returned ' + pipelineRes.status);
-    if (!activityRes.ok) throw new Error('activity.json returned ' + activityRes.status);
+  const [listingsResult, pipelineResult, activityResult] = await Promise.allSettled([
+    fetchJson('/garage/data/listings.json'),
+    fetchJson('/garage/data/pipeline.json'),
+    fetchJson('/garage/data/activity.json')
+  ]);
+  const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value : null;
+  const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value : null;
+  const activityData = activityResult.status === 'fulfilled' ? activityResult.value : null;
+  const stages = (pipelineData && pipelineData.stages) || [];
 
-    const listingsData = await listingsRes.json();
-    const pipelineData = await pipelineRes.json();
-    const activityData = await activityRes.json();
-
+  if (listingsData) {
     listings = listingsData.listings || [];
-    renderStats(listings, pipelineData.stages || []);
-    renderPipeline(pipelineData.stages || []);
+    renderStats(listings, stages);
     applyFiltersAndRender();
     renderCoverage(listings);
     renderPayoutTable(listings);
-    renderActivity(activityData.events || []);
-    initTableScrollShadows();
-  } catch (e) {
+  } else {
     listings = [];
+    document.getElementById('statRow').innerHTML = '';
     document.getElementById('listingTableBody').innerHTML = '';
+    document.getElementById('coverageTableBody').innerHTML = '';
+    document.getElementById('payoutTableBody').innerHTML = '';
     errBox.hidden = false;
     errBox.setAttribute('role', 'alert');
-    errBox.textContent = "Couldn't load Garage data: " + e.message;
+    errBox.textContent = "Couldn't load Garage data: " + listingsResult.reason.message;
   }
+
+  if (pipelineData) {
+    renderPipeline(stages);
+  } else {
+    document.getElementById('pipelineRow').innerHTML =
+      '<div class="table-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(pipelineResult.reason.message) + '</div>';
+  }
+
+  if (activityData) {
+    renderActivity(activityData.events || []);
+  } else {
+    document.getElementById('activityList').innerHTML =
+      '<div class="activity-item" role="alert"><div class="activity-item-detail">Failed to load activity data: ' +
+      escapeHtml(activityResult.reason.message) + '</div></div>';
+  }
+
+  initTableScrollShadows();
 }
 
 function remainingPlatforms(l) {
