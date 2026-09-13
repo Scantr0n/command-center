@@ -46,6 +46,21 @@
     return { days, staleAfterDays: stageDef.staleAfterDays, isStale: days > stageDef.staleAfterDays };
   }
 
+  // Follower/engagement numbers are a one-time manual pull, never live, so
+  // the "as of" date is the only thing keeping them honest. 90 days (a
+  // typical social-audit refresh cadence) is the point past which those
+  // numbers are old enough that showing them without a loud flag would be
+  // misleading, not just informative.
+  const SOCIAL_SNAPSHOT_STALE_DAYS = 90;
+  function socialSnapshotStaleInfo(p) {
+    const snap = p.socialSnapshot || {};
+    if (snap.followers == null && snap.engagementRate == null) return null;
+    if (!snap.asOfDate) return null;
+    const days = daysSince(snap.asOfDate);
+    if (days <= SOCIAL_SNAPSHOT_STALE_DAYS) return null;
+    return { days };
+  }
+
   function channelBadge(channel) {
     if (!channel || !channel.type) {
       return '<span class="badge badge-unknown">CHANNEL NOT LOGGED</span>';
@@ -230,11 +245,14 @@
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
 
     const flagged = prospects
-      .filter(p => p.stage !== 'researched')
       .map(p => {
         const reasons = [];
-        if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
-        if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
+        if (p.stage !== 'researched') {
+          if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
+          if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
+        }
+        const snapStale = socialSnapshotStaleInfo(p);
+        if (snapStale) reasons.push(snapStale.days + 'D OLD SOCIAL SNAPSHOT, DUE FOR REFRESH');
         return { p, reasons };
       })
       .filter(x => x.reasons.length > 0);
@@ -738,12 +756,16 @@
     rows.push(fieldRow('Nudge schedule', nudgeText, !(ns.doNotNudgeBefore || ns.nudgePoint)));
 
     const snap = p.socialSnapshot || {};
+    const snapStale = socialSnapshotStaleInfo(p);
     let snapHtml;
     if (snap.platform || snap.followers != null) {
       snapHtml = escapeHtml(snap.platform || 'Platform not logged') +
         (snap.followers != null ? ', ' + Number(snap.followers).toLocaleString() + ' followers' : '') +
         (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '') +
-        '<span class="snapshot-tag">' + (snap.asOfDate ? 'AS OF ' + fmtDate(snap.asOfDate).toUpperCase() + ', ONE-TIME MANUAL SNAPSHOT, NOT LIVE' : 'NO SNAPSHOT DATE LOGGED') + '</span>';
+        '<span class="snapshot-tag' + (snapStale ? ' snapshot-tag-stale' : '') + '">' +
+        (snap.asOfDate ? 'AS OF ' + fmtDate(snap.asOfDate).toUpperCase() + ', ONE-TIME MANUAL SNAPSHOT, NOT LIVE' : 'NO SNAPSHOT DATE LOGGED') +
+        (snapStale ? ' &middot; ' + snapStale.days + 'D OLD, DUE FOR REFRESH' : '') +
+        '</span>';
     } else {
       snapHtml = 'Not logged yet';
     }

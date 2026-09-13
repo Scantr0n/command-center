@@ -15,6 +15,10 @@ const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CHANNEL_TYPES = ['named-decision-maker', 'generic-inbox'];
 const OUTREACH_TYPES = ['initial-send', 'nudge'];
+// Matches SOCIAL_SNAPSHOT_STALE_DAYS in app.js: 90 days is a typical
+// social-audit refresh cadence, past which a manual follower/engagement pull
+// is old enough to be misleading if shown without a flag.
+const SOCIAL_SNAPSHOT_STALE_DAYS = 90;
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
@@ -123,6 +127,14 @@ function main() {
     if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
       errors.push(where + ': socialSnapshot has follower/engagement numbers but no asOfDate. ' +
         'Every social number on this board must be labeled with when it was pulled, never shown as if live.');
+    }
+    if ((snap.followers != null || snap.engagementRate != null) && snap.asOfDate && DATE_RE.test(snap.asOfDate)) {
+      const asOf = new Date(snap.asOfDate + 'T00:00:00');
+      const daysOld = Math.round((today - asOf) / 86400000);
+      if (daysOld > SOCIAL_SNAPSHOT_STALE_DAYS) {
+        warnings.push(where + ': socialSnapshot is ' + daysOld + ' days old, past the ' +
+          SOCIAL_SNAPSHOT_STALE_DAYS + '-day refresh threshold. Worth a real re-pull before relying on it.');
+      }
     }
 
     if (!Array.isArray(p.contentIdeas || [])) {

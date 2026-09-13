@@ -830,6 +830,7 @@ textarea.np-input { resize: vertical; }
   margin-top: 4px;
   display: block;
 }
+.snapshot-tag-stale { color: #E5484D; }
 
 footer.page-foot {
   margin-top: 40px;
