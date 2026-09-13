@@ -240,13 +240,42 @@ section { margin-bottom: 36px; }
   font-weight: 500;
 }
 
+/* The chart grows one column per logged download check with no cap, so once
+   enough checks pile up it is wider than the page. Scrolls horizontally
+   instead of forcing the whole page to, same fade-edge treatment already
+   used for CGT/Garage's fixed-min-width tables. */
+.chart-scroll {
+  position: relative;
+  overflow-x: auto;
+  flex: 1;
+  min-width: 200px;
+}
+.chart-scroll::before, .chart-scroll::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.chart-scroll::before {
+  left: 0;
+  background: linear-gradient(to right, var(--panel), transparent);
+}
+.chart-scroll::after {
+  right: 0;
+  background: linear-gradient(to left, var(--panel), transparent);
+}
+.chart-scroll.can-scroll-left::before { opacity: 1; }
+.chart-scroll.can-scroll-right::after { opacity: 1; }
 .compare-bars {
   display: flex;
   align-items: flex-end;
   gap: 18px;
   height: 90px;
-  flex: 1;
-  min-width: 200px;
+  width: fit-content;
 }
 .compare-bar-col {
   display: flex;
@@ -254,6 +283,7 @@ section { margin-bottom: 36px; }
   align-items: center;
   gap: 6px;
   width: 64px;
+  flex-shrink: 0;
 }
 .compare-bar {
   width: 100%;
@@ -597,6 +627,7 @@ footer.page-foot {
   }
   .compare-bar { border-color: #ccc; }
   .compare-bar-fill { background: #888; }
+  .chart-scroll::before, .chart-scroll::after { display: none !important; }
   .compare-bar-count, .stat-number, .channel-value { color: #111; }
   .status-pill, .status-pill-sent, .channel-pill { border-color: #999; background: none; color: #111; }
   .timeline-item { border-color: #ddd; }

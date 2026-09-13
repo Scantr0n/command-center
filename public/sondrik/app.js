@@ -185,9 +185,11 @@
       freshnessHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +
       '</div>' +
+      '<div class="chart-scroll">' +
       '<div class="compare-bars" role="img" aria-label="' +
         escapeHtml((metric.label || 'Download') + ' history by check date: ' + chartSummary) + '">' +
         barsHtml +
+      '</div>' +
       '</div>' +
       '</div>' +
       '<table class="sr-only-table">' +
@@ -196,6 +198,25 @@
       '<tbody>' + tableRowsHtml + '</tbody>' +
       '</table>' +
       (metric.scope ? '<div class="scope-note">' + escapeHtml(metric.scope) + '</div>' : '');
+
+    initChartScrollShadow();
+  }
+
+  // Same fade-edge cue CGT/Garage use on their fixed-min-width tables,
+  // applied to the download chart, whose width grows with every logged
+  // check and has no other visual hint that it scrolls once it no longer
+  // fits.
+  function initChartScrollShadow() {
+    const wrap = tractionSection.querySelector('.chart-scroll');
+    if (!wrap) return;
+    const update = () => {
+      const maxScrollLeft = wrap.scrollWidth - wrap.clientWidth;
+      wrap.classList.toggle('can-scroll-left', wrap.scrollLeft > 1);
+      wrap.classList.toggle('can-scroll-right', wrap.scrollLeft < maxScrollLeft - 1);
+    };
+    wrap.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
   }
 
   // A glanceable, channel-level overview sitting above the single-metric
