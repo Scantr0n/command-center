@@ -53,9 +53,19 @@ async function readClusters() {
   }
 }
 
+// Same skip-and-fall-back guard as readLocalClusters above: toggles.json sits
+// right alongside the hand-edited cluster files, so a bad write (a killed
+// process mid-save, a stray hand-edit) should degrade to "no toggle state"
+// rather than throwing out of /api/clusters and 500ing the whole dashboard
+// over one project's on/off switch.
 function readToggles() {
   if (!fs.existsSync(TOGGLES_FILE)) return {};
-  return JSON.parse(fs.readFileSync(TOGGLES_FILE, 'utf8'));
+  try {
+    return JSON.parse(fs.readFileSync(TOGGLES_FILE, 'utf8'));
+  } catch (err) {
+    console.error(`Ignoring malformed toggles.json: ${err.message}`);
+    return {};
+  }
 }
 
 function writeToggles(toggles) {
