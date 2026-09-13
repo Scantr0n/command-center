@@ -139,10 +139,12 @@ const HISTORY_TICK_LIMIT = 60;
 
 function renderConnectionHistory(data) {
   const strip = document.getElementById('connHistoryStrip');
+  const summary = document.getElementById('connUptimeSummary');
   const history = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
 
   if (!history.length) {
     strip.innerHTML = `<span class="conn-history-empty">No connectivity checks recorded yet.</span>`;
+    summary.textContent = '';
     return;
   }
 
@@ -153,6 +155,17 @@ function renderConnectionHistory(data) {
     const title = label + ' at ' + formatAbsolute(entry.at);
     return `<span class="history-tick ${cls}" title="${escapeHtml(title)}"></span>`;
   }).join('');
+
+  // A per-check tick strip shows the shape of recent history but not its
+  // overall rate, exactly what a single "X% uptime" summary communicates at
+  // a glance, the same number every Statuspage/UptimeRobot-style page leads
+  // with next to its history strip. Computed only from the same real,
+  // already-recorded checks the ticks above are built from, over the same
+  // window, never a separate or estimated figure.
+  const upCount = recent.filter(e => e.connected).length;
+  const pct = (upCount / recent.length) * 100;
+  const pctText = Number.isInteger(pct) ? String(pct) : pct.toFixed(1);
+  summary.textContent = `· ${pctText}% up (last ${recent.length} check${recent.length === 1 ? '' : 's'})`;
 }
 
 function statTile(value, label, sub, awaiting) {

@@ -266,6 +266,11 @@ header.page-head .sub {
   color: var(--dim);
   margin-bottom: 6px;
 }
+.conn-uptime-summary {
+  color: var(--sub);
+  text-transform: none;
+  letter-spacing: normal;
+}
 .conn-history-strip {
   display: flex;
   align-items: flex-end;
