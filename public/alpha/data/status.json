@@ -17,7 +17,8 @@
   "connection": {
     "connected": false,
     "checkedAt": null,
-    "note": "This Command Center sandbox has no network path to Jack's Mac. Every field under \"live\" below is a structural placeholder, not a real reading, until a future session with real access to Alpha wires in an actual status feed."
+    "note": "This Command Center sandbox has no network path to Jack's Mac. Every field under \"live\" below is a structural placeholder, not a real reading, until a future session with real access to Alpha wires in an actual status feed.",
+    "history": []
   },
   "live": {
     "asOf": null,

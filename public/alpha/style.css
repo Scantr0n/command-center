@@ -249,6 +249,57 @@ header.page-head .sub {
 }
 .refresh-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
 
+/* Connectivity history strip: a compact left-to-right (oldest to newest) row
+   of per-check ticks, the same bar-strip pattern used by Statuspage,
+   UptimeRobot and similar uptime pages to show recent history at a glance
+   alongside the current state. Built only from real connection.history
+   entries, a real result of an actual check, never estimated or backfilled.
+   Up/down are told apart by shape and pattern as well as color (solid vs.
+   diagonally hatched), not by hue alone, since color-only status
+   indicators are unreadable for a meaningful share of readers. */
+.conn-history-wrap {
+  margin: -14px 0 28px;
+}
+.conn-history-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.conn-history-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.history-tick {
+  width: 7px;
+  height: 18px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  border: 1px solid var(--hairline);
+}
+.history-tick.up {
+  background: #3DDC84;
+  border-color: rgba(61,220,132,0.4);
+}
+.history-tick.down {
+  background: repeating-linear-gradient(
+    135deg, rgba(224,80,80,0.35), rgba(224,80,80,0.35) 2px, rgba(224,80,80,0.08) 2px, rgba(224,80,80,0.08) 4px
+  );
+  border-color: rgba(224,80,80,0.4);
+}
+.history-tick.placeholder {
+  background: transparent;
+  border: 1px dashed var(--hairline);
+  height: 10px;
+}
+.conn-history-empty {
+  font-size: 0.72rem;
+  color: var(--dim);
+  font-style: italic;
+}
+
 /* Stat tiles */
 .stat-row {
   display: grid;

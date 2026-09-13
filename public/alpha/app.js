@@ -128,6 +128,33 @@ function renderConnection(data) {
   updateGlanceIndicators(cls);
 }
 
+// Uptime-strip pattern (Statuspage, UptimeRobot, etc): a compact row of
+// per-check ticks, oldest to newest, so a real history of connectivity
+// checks is visible at a glance next to the current state, not just the
+// latest reading. Built only from real connection.history entries; shows
+// the honest "no checks recorded yet" placeholder otherwise, same as every
+// other empty state on this page. Capped to the most recent 60 so the strip
+// stays a glance, not a scroll.
+const HISTORY_TICK_LIMIT = 60;
+
+function renderConnectionHistory(data) {
+  const strip = document.getElementById('connHistoryStrip');
+  const history = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
+
+  if (!history.length) {
+    strip.innerHTML = `<span class="conn-history-empty">No connectivity checks recorded yet.</span>`;
+    return;
+  }
+
+  const recent = history.slice(-HISTORY_TICK_LIMIT);
+  strip.innerHTML = recent.map(entry => {
+    const cls = entry.connected ? 'up' : 'down';
+    const label = entry.connected ? 'Connected' : 'Not connected';
+    const title = label + ' at ' + formatAbsolute(entry.at);
+    return `<span class="history-tick ${cls}" title="${escapeHtml(title)}"></span>`;
+  }).join('');
+}
+
 function statTile(value, label, sub, awaiting) {
   return `
     <div class="stat-tile">
@@ -337,6 +364,7 @@ async function loadStatus() {
     noteHeadlineForToast(headline.level, headline.text);
     renderHeadline(headline.level, headline.text, headline.asOf);
     renderConnection(data);
+    renderConnectionHistory(data);
     renderStats(data);
     renderPositionSizing(data);
     renderArchitecture(data);

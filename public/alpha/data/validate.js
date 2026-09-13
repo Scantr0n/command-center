@@ -98,6 +98,27 @@ function main() {
     warnings.push('connection.connected is true but connection.checkedAt is empty. Backfill when known.');
   }
 
+  if (data.connection && 'history' in data.connection) {
+    const history = data.connection.history;
+    if (!Array.isArray(history)) {
+      errors.push('connection.history: must be an array (empty is fine, it starts that way honestly)');
+    } else {
+      history.forEach((entry, i) => {
+        const where = `connection.history[${i}]`;
+        if (!entry || typeof entry !== 'object') {
+          errors.push(where + ': must be an object');
+          return;
+        }
+        if (!isIsoDatetimeOrNull(entry.at) || entry.at == null) {
+          errors.push(where + '.at: required, must be a valid ISO datetime (every check needs a real timestamp)');
+        }
+        if (typeof entry.connected !== 'boolean') {
+          errors.push(where + '.connected: required, must be true or false (a real connectivity result, never null/unknown)');
+        }
+      });
+    }
+  }
+
   if (!Array.isArray(data.system && data.system.features)) {
     errors.push('system.features: missing or not an array');
   }

@@ -59,6 +59,7 @@
           <tr><th>system.*</th><td>Static architectural facts (agent count, feature list). Real, does not change with market conditions, safe to hand-edit only when the architecture itself changes.</td></tr>
           <tr><th>connection.connected</th><td><code>true</code> once a real feed exists and is currently reachable, otherwise <code>false</code>.</td></tr>
           <tr><th>connection.checkedAt</th><td>ISO datetime of the last time connectivity was actually checked, or <code>null</code>.</td></tr>
+          <tr><th>connection.history[]</th><td>Append-only log of past connectivity checks, oldest first, each a real result of an actual check, never backfilled or estimated. Each entry needs <code>at</code> (ISO datetime) and <code>connected</code> (<code>true</code>/<code>false</code>, never <code>null</code>, since a check that never resolved is not a result). Drives the strip of ticks under the connection status. Starts empty, honestly.</td></tr>
           <tr><th>live.asOf</th><td><strong>Required whenever any field below it is set.</strong> ISO datetime the live reading was actually taken at.</td></tr>
           <tr><th>live.regime</th><td>Current detected market regime label, or <code>null</code>.</td></tr>
           <tr><th>live.killSwitch.engaged</th><td><code>true</code> / <code>false</code> / <code>null</code> if unknown.</td></tr>
@@ -78,6 +79,10 @@
       <span class="conn-label font-mono" id="connLabel">Loading...</span>
       <span class="conn-sub" id="connSub"></span>
       <button type="button" id="refreshBtn" class="refresh-btn font-mono">Refresh</button>
+    </div>
+    <div class="conn-history-wrap">
+      <div class="conn-history-label font-mono">RECENT CONNECTIVITY CHECKS</div>
+      <div class="conn-history-strip" id="connHistoryStrip"></div>
     </div>
   </section>
 
