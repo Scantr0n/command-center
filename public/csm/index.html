@@ -20,6 +20,7 @@
       <p class="sub font-mono">China social media / business-development outreach, Jack Scanlon</p>
     </div>
     <div class="page-head-actions">
+      <button type="button" id="newProspectBtn" class="print-btn font-mono" disabled>+ Log new prospect</button>
       <button type="button" id="copyLinkBtn" class="print-btn font-mono" aria-live="polite">Copy link to this view</button>
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
@@ -37,7 +38,11 @@
   <details class="schema-help">
     <summary>How to log a real prospect (until a backend is wired in)</summary>
     <div class="schema-help-body">
-      <p>Edit <code>public/csm/data/prospects.json</code> by hand and add an object to the
+      <p>Fastest path: click <strong>+ Log new prospect</strong> above, fill in whatever fields you actually have
+        real answers for, and it generates a paste-ready JSON object with the id, dates, and nested objects
+        already shaped correctly, plus the same backfill warnings <code>validate.js</code> would raise. Paste the
+        result into the <code>prospects</code> array below.</p>
+      <p>Or edit <code>public/csm/data/prospects.json</code> by hand and add an object to the
         <code>prospects</code> array. Leave any field you do not have a real answer for as <code>null</code> or
         <code>[]</code>, do not fill it in with a guess.</p>
       <p><strong>Run <code>node public/csm/data/validate.js</code> after every edit.</strong> A typo in
@@ -146,6 +151,120 @@
     <h3 id="modalName" class="font-display"></h3>
     <div class="modal-company font-mono" id="modalCompany"></div>
     <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="npOverlay" hidden>
+  <div class="modal modal-wide" id="npModal" role="dialog" aria-modal="true" aria-labelledby="npTitle">
+    <button class="modal-close" id="npClose" aria-label="Close">&times;</button>
+    <h3 id="npTitle" class="font-display">Log new prospect</h3>
+    <p class="np-disclaimer">This generates JSON text only, right here in your browser. It does not save,
+      submit, or contact anyone. Copy the result into <code>public/csm/data/prospects.json</code> by hand.</p>
+
+    <div class="np-form">
+      <div class="form-row">
+        <label for="npName">Name *</label>
+        <input type="text" id="npName" class="np-input">
+      </div>
+      <div class="form-row">
+        <label for="npCompany">Company</label>
+        <input type="text" id="npCompany" class="np-input">
+      </div>
+      <div class="form-row">
+        <label for="npCategory">Category</label>
+        <input type="text" id="npCategory" class="np-input" list="npCategoryList">
+        <datalist id="npCategoryList"></datalist>
+      </div>
+      <div class="form-row form-row-split">
+        <div>
+          <label for="npStage">Stage</label>
+          <select id="npStage" class="np-input"></select>
+        </div>
+        <div>
+          <label for="npStageEnteredDate">Stage entered date</label>
+          <input type="date" id="npStageEnteredDate" class="np-input">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="npVerifiedHook">Verified hook (why this person/brand fits, for real)</label>
+        <textarea id="npVerifiedHook" class="np-input" rows="2"></textarea>
+      </div>
+      <div class="form-row form-row-split">
+        <div>
+          <label for="npChannelType">Contact channel type</label>
+          <select id="npChannelType" class="np-input">
+            <option value="">Not logged yet</option>
+            <option value="named-decision-maker">Named decision-maker</option>
+            <option value="generic-inbox">Generic inbox</option>
+          </select>
+        </div>
+        <div>
+          <label for="npChannelDetail">Contact channel detail</label>
+          <input type="text" id="npChannelDetail" class="np-input" placeholder="e.g. name@company.com">
+        </div>
+      </div>
+      <div class="form-row form-row-split">
+        <div>
+          <label for="npSendDate">Send date</label>
+          <input type="date" id="npSendDate" class="np-input">
+        </div>
+        <div>
+          <label for="npNextNudgeDate">Next nudge date</label>
+          <input type="date" id="npNextNudgeDate" class="np-input">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="npNextAction">Next action (concrete, not just a date)</label>
+        <input type="text" id="npNextAction" class="np-input">
+      </div>
+      <div class="form-row form-row-split">
+        <div>
+          <label for="npDoNotNudgeBefore">Do not nudge before</label>
+          <input type="date" id="npDoNotNudgeBefore" class="np-input">
+        </div>
+        <div>
+          <label for="npNudgePoint">Nudge point</label>
+          <input type="date" id="npNudgePoint" class="np-input">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="npReplyStatus">Reply status</label>
+        <textarea id="npReplyStatus" class="np-input" rows="2"></textarea>
+      </div>
+      <div class="form-row form-row-split3">
+        <div>
+          <label for="npSocialPlatform">Social platform</label>
+          <input type="text" id="npSocialPlatform" class="np-input">
+        </div>
+        <div>
+          <label for="npSocialFollowers">Followers</label>
+          <input type="number" min="0" id="npSocialFollowers" class="np-input">
+        </div>
+        <div>
+          <label for="npSocialEngagementRate">Engagement %</label>
+          <input type="number" min="0" step="0.1" id="npSocialEngagementRate" class="np-input">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="npSocialAsOfDate">Social snapshot as-of date (when you actually pulled these numbers)</label>
+        <input type="date" id="npSocialAsOfDate" class="np-input">
+      </div>
+      <div class="form-row">
+        <label for="npNotes">Notes</label>
+        <textarea id="npNotes" class="np-input" rows="2"></textarea>
+      </div>
+    </div>
+
+    <button type="button" id="npGenerateBtn" class="print-btn font-mono np-generate-btn">Generate JSON</button>
+
+    <div id="npResult" class="np-result" hidden>
+      <ul id="npWarnings" class="np-warnings"></ul>
+      <div class="np-output-head">
+        <span class="field-label" style="margin:0">Paste this into the <code>prospects</code> array</span>
+        <button type="button" id="npCopyBtn" class="print-btn font-mono">Copy JSON</button>
+      </div>
+      <pre class="np-output font-mono" id="npOutput"></pre>
+    </div>
   </div>
 </div>
 

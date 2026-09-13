@@ -701,6 +701,206 @@
       });
   });
 
+  // "Log new prospect": a guided form that generates paste-ready JSON matching
+  // the schema documented in the "How to log a real prospect" section, with
+  // the same backfill/consistency warnings validate.js would raise. There is
+  // no backend to write to, so this only ever produces text for hand-pasting
+  // into prospects.json, never anything that saves or sends on its own.
+  const npOverlay = document.getElementById('npOverlay');
+  const npClose = document.getElementById('npClose');
+  const npGenerateBtn = document.getElementById('npGenerateBtn');
+  const npResult = document.getElementById('npResult');
+  const npWarningsEl = document.getElementById('npWarnings');
+  const npOutputEl = document.getElementById('npOutput');
+  const npCopyBtn = document.getElementById('npCopyBtn');
+  const npStageSelect = document.getElementById('npStage');
+  const npCategoryList = document.getElementById('npCategoryList');
+  const NP_FIELD_IDS = [
+    'npName', 'npCompany', 'npCategory', 'npStageEnteredDate', 'npVerifiedHook',
+    'npChannelType', 'npChannelDetail', 'npSendDate', 'npNextNudgeDate', 'npNextAction',
+    'npDoNotNudgeBefore', 'npNudgePoint', 'npReplyStatus', 'npSocialPlatform',
+    'npSocialFollowers', 'npSocialEngagementRate', 'npSocialAsOfDate', 'npNotes'
+  ];
+  let npLastFocusedEl = null;
+
+  function npSlugify(name, company) {
+    const base = [company, name].filter(Boolean).join('-');
+    return base.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'new-prospect';
+  }
+
+  function npUniqueId(baseId) {
+    if (!byId[baseId]) return baseId;
+    let n = 2;
+    while (byId[baseId + '-' + n]) n++;
+    return baseId + '-' + n;
+  }
+
+  function npVal(id) {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : v;
+  }
+
+  // Mirrors the key rules in data/validate.js so a prospect generated here
+  // is warned about the same things the validator would catch, before it
+  // ever gets hand-pasted into prospects.json.
+  function npBuildWarnings(p, isDuplicateId) {
+    const warnings = [];
+    if (isDuplicateId) {
+      warnings.push('An id starting with "' + p.id.replace(/-\d+$/, '') + '" already exists, this one was ' +
+        'suffixed to "' + p.id + '" to avoid a duplicate. Rename it to something more readable if you want.');
+    }
+    if (p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type)) {
+      warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
+        'biggest driver of real reply rate, fill it in as soon as it is known.');
+    }
+    if (p.stage !== 'researched' && !p.verifiedHook) {
+      warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
+        'is a real fit once known.');
+    }
+    const ns = p.nudgeSchedule || {};
+    if (ns.doNotNudgeBefore && ns.nudgePoint && ns.doNotNudgeBefore > ns.nudgePoint) {
+      warnings.push('"Do not nudge before" is after "nudge point", swap them.');
+    }
+    if (ns.doNotNudgeBefore && p.nextNudgeDate && p.nextNudgeDate < ns.doNotNudgeBefore) {
+      warnings.push('"Next nudge date" is before "do not nudge before", the nudge queue would surface this ' +
+        'prospect too early.');
+    }
+    if (p.nextNudgeDate && !p.nextAction) {
+      warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
+        'common way real deals quietly stall.');
+    }
+    const snap = p.socialSnapshot || {};
+    if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
+      warnings.push('Social numbers are logged without an as-of date. Every social number on this board must be ' +
+        'labeled with when it was actually pulled, never shown as if live.');
+    }
+    if (p.category) {
+      const norm = p.category.trim().toLowerCase();
+      const existing = allProspects.map(x => x.category).filter(Boolean);
+      const clash = existing.find(c => c.trim().toLowerCase() === norm && c !== p.category);
+      if (clash) {
+        warnings.push('Category "' + p.category + '" differs in casing/spacing from existing category "' + clash +
+          '", they would render as separate filter chips. Pick one spelling.');
+      }
+    }
+    return warnings;
+  }
+
+  function npBuildProspect() {
+    const name = npVal('npName');
+    const company = npVal('npCompany');
+    const stage = npStageSelect.value;
+    const stageEnteredDate = npVal('npStageEnteredDate');
+    const baseId = npSlugify(name || 'new-prospect', company);
+    const id = npUniqueId(baseId);
+    const isDuplicateId = id !== baseId;
+
+    const p = {
+      id,
+      name: name || 'UNNAMED, fill this in',
+      company,
+      category: npVal('npCategory'),
+      stage,
+      stageEnteredDate,
+      verifiedHook: npVal('npVerifiedHook'),
+      contactChannel: { type: npVal('npChannelType'), detail: npVal('npChannelDetail') },
+      sendDate: npVal('npSendDate'),
+      nextNudgeDate: npVal('npNextNudgeDate'),
+      nextAction: npVal('npNextAction'),
+      nudgeSchedule: { doNotNudgeBefore: npVal('npDoNotNudgeBefore'), nudgePoint: npVal('npNudgePoint') },
+      replyStatus: npVal('npReplyStatus'),
+      socialSnapshot: {
+        platform: npVal('npSocialPlatform'),
+        followers: npVal('npSocialFollowers') != null ? Number(npVal('npSocialFollowers')) : null,
+        engagementRate: npVal('npSocialEngagementRate') != null ? Number(npVal('npSocialEngagementRate')) : null,
+        asOfDate: npVal('npSocialAsOfDate')
+      },
+      contentIdeas: [],
+      stageHistory: stageEnteredDate ? [{ date: stageEnteredDate, stage }] : [],
+      notes: npVal('npNotes')
+    };
+    return { p, isDuplicateId };
+  }
+
+  function npPopulateStageOptions() {
+    npStageSelect.innerHTML = allStages.map(s => '<option value="' + escapeHtml(s.id) + '">' +
+      escapeHtml(s.label) + '</option>').join('');
+  }
+
+  function npPopulateCategoryList() {
+    const categories = Array.from(new Set(allProspects.map(p => p.category).filter(Boolean))).sort();
+    npCategoryList.innerHTML = categories.map(c => '<option value="' + escapeHtml(c) + '"></option>').join('');
+  }
+
+  function npResetForm() {
+    NP_FIELD_IDS.forEach(id => { document.getElementById(id).value = ''; });
+    npStageSelect.value = 'researched';
+    npResult.hidden = true;
+    npOutputEl.textContent = '';
+    npWarningsEl.innerHTML = '';
+  }
+
+  function npOpen() {
+    npLastFocusedEl = document.activeElement;
+    npPopulateStageOptions();
+    npPopulateCategoryList();
+    npResetForm();
+    npOverlay.hidden = false;
+    lockBodyScroll();
+    document.getElementById('npName').focus();
+  }
+
+  function npCloseModal() {
+    npOverlay.hidden = true;
+    unlockBodyScroll();
+    if (npLastFocusedEl && typeof npLastFocusedEl.focus === 'function') npLastFocusedEl.focus();
+    npLastFocusedEl = null;
+  }
+
+  document.getElementById('newProspectBtn').addEventListener('click', npOpen);
+  npClose.addEventListener('click', npCloseModal);
+  npOverlay.addEventListener('click', e => { if (e.target === npOverlay) npCloseModal(); });
+
+  document.addEventListener('keydown', e => {
+    if (npOverlay.hidden) return;
+    if (e.key === 'Escape') { npCloseModal(); return; }
+    if (e.key === 'Tab') {
+      const focusable = Array.from(npModalEl().querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )).filter(el => !el.hasAttribute('disabled'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+  function npModalEl() { return document.getElementById('npModal'); }
+
+  npGenerateBtn.addEventListener('click', () => {
+    const { p, isDuplicateId } = npBuildProspect();
+    const warnings = npBuildWarnings(p, isDuplicateId);
+    npWarningsEl.innerHTML = warnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+    npOutputEl.textContent = JSON.stringify(p, null, 2) + ',';
+    npResult.hidden = false;
+    npResult.scrollIntoView({ block: 'nearest' });
+  });
+
+  npCopyBtn.addEventListener('click', () => {
+    const original = npCopyBtn.textContent;
+    copyText(npOutputEl.textContent)
+      .then(() => { npCopyBtn.textContent = 'Copied'; })
+      .catch(() => { npCopyBtn.textContent = "Couldn't copy"; })
+      .finally(() => { setTimeout(() => { npCopyBtn.textContent = original; }, 1800); });
+  });
+
   Promise.all([
     fetch('/csm/data/stages.json').then(r => r.json()),
     fetch('/csm/data/prospects.json').then(r => r.json())
@@ -716,6 +916,7 @@
     renderDataQuality(allStages, allProspects);
     renderActivityFeed(allProspects, allStages);
     applyFilter();
+    document.getElementById('newProspectBtn').disabled = false;
   }).catch(err => {
     boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
     nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
