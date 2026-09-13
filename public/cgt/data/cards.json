@@ -8,6 +8,7 @@
       "gradingCompany": "PSA",
       "grade": "10",
       "certNumber": null,
+      "storageLocation": "Home safe (example only)",
       "estimatedValue": 25,
       "valuationBasis": "comp-estimate",
       "compNote": "Placeholder only, exists to verify the comp-estimate badge, gain/loss calculation, and detail modal render correctly. Not a real card, grade, price, or purchase cost.",

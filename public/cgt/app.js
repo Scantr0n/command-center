@@ -480,6 +480,7 @@ function renderInsuranceSummary() {
       <td>${escapeHtml(c.gradingCompany || '')}</td>
       <td>${c.grade != null ? escapeHtml(String(c.grade)) : ''}</td>
       <td>${escapeHtml(c.certNumber || '')}</td>
+      <td>${escapeHtml(c.storageLocation || '')}</td>
       <td class="num">${formatUsd(c.estimatedValue)}</td>
       <td>${c.valuationBasis === 'recent-sale' ? 'Recent sale' : c.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : 'Unlabeled'}</td>
       <td>${escapeHtml(c.datePriced || '')}</td>
@@ -492,18 +493,18 @@ function renderInsuranceSummary() {
     <p class="insurance-summary-note">${unpricedCount
       ? unpricedCount + ' additional card' + (unpricedCount === 1 ? '' : 's') + ' logged with no researched value yet, excluded from this list and from the total below.'
       : 'Every logged card has a researched value on record; none excluded.'
-    } A value marked "Comp-based estimate" has no directly comparable sale on record and is inferred from related sales, not a confirmed sale of this exact card and grade.</p>
+    } A value marked "Comp-based estimate" has no directly comparable sale on record and is inferred from related sales, not a confirmed sale of this exact card and grade. A blank "Location" means no storage location has been logged for that card yet.</p>
     <table class="insurance-summary-table">
       <thead>
         <tr>
-          <th>Card</th><th>Sport</th><th>Grader</th><th>Grade</th><th>Cert #</th>
+          <th>Card</th><th>Sport</th><th>Grader</th><th>Grade</th><th>Cert #</th><th>Location</th>
           <th class="num">Est. value</th><th>Basis</th><th>Date priced</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
       <tfoot>
         <tr class="insurance-summary-total">
-          <td colspan="5">Total (${priced.length} card${priced.length === 1 ? '' : 's'})</td>
+          <td colspan="6">Total (${priced.length} card${priced.length === 1 ? '' : 's'})</td>
           <td class="num">${formatUsd(total)}</td>
           <td colspan="2"></td>
         </tr>
@@ -528,6 +529,7 @@ function matchesSearchTerm(c, term) {
   return !term
     || (c.cardName || '').toLowerCase().includes(term)
     || (c.certNumber || '').toLowerCase().includes(term)
+    || (c.storageLocation || '').toLowerCase().includes(term)
     || String(c.year ?? '').includes(term);
 }
 function matchesSportValue(c, sport) { return sport === 'all' || c.sport === sport; }
@@ -774,6 +776,7 @@ function openModal(id) {
   if (lookup) {
     body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
   }
+  body += field('Storage location', activeCard.storageLocation, !activeCard.storageLocation);
   body += field('Estimated value', activeCard.estimatedValue != null ? formatUsd(activeCard.estimatedValue) : null, activeCard.estimatedValue == null);
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
   body += field('Cost basis (what was paid)', activeCard.costBasis != null ? formatUsd(activeCard.costBasis) : null, activeCard.costBasis == null);
@@ -974,7 +977,8 @@ function csvField(v) {
 // alongside the plain field lookups.
 const CSV_COLUMNS = [
   [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'], [c => c.gradingCompany, 'Grading company'],
-  [c => c.grade, 'Grade'], [c => c.certNumber, 'Cert number'], [c => c.estimatedValue, 'Estimated value'],
+  [c => c.grade, 'Grade'], [c => c.certNumber, 'Cert number'], [c => c.storageLocation, 'Storage location'],
+  [c => c.estimatedValue, 'Estimated value'],
   [c => c.valuationBasis, 'Valuation basis'], [c => c.compNote, 'Comp note'], [c => c.sourceNote, 'Source'],
   [c => c.costBasis, 'Cost basis'], [c => computeGainLoss(c)?.abs ?? null, 'Gain/loss'],
   [c => c.datePriced, 'Date priced'], [c => c.backlogBatch, 'Backlog batch'], [c => c.notes, 'Notes']

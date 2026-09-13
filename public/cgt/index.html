@@ -67,6 +67,7 @@
           <tr><th>gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
           <tr><th>grade</th><td>The grade as shown on the slab label, e.g. <code>"10"</code> or <code>"9.5"</code></td></tr>
           <tr><th>certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
+          <tr><th>storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
           <tr><th>estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
           <tr><th>valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
           <tr><th>compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
@@ -84,6 +85,7 @@
   "gradingCompany": null,
   "grade": null,
   "certNumber": null,
+  "storageLocation": null,
   "estimatedValue": null,
   "valuationBasis": null,
   "compNote": null,
@@ -129,8 +131,8 @@
         type="search"
         id="searchInput"
         class="search-input font-mono"
-        placeholder="Filter by card name, cert #, or year..."
-        aria-label="Filter cards by name, cert number, or year">
+        placeholder="Filter by card name, cert #, storage location, or year..."
+        aria-label="Filter cards by name, cert number, storage location, or year">
     </div>
     <div class="filter-row" id="sportFilter" role="group" aria-label="Filter by sport">
       <span class="filter-row-label font-mono">SPORT</span>
