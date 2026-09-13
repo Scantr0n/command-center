@@ -17,6 +17,22 @@ function timeAgo(iso) {
   return days + 'd ago';
 }
 
+// Relative time ("3m ago") is fine for a glance but hides the one thing a
+// reader needs the moment they actually stop to check it: whether this is
+// 3 minutes from now or 3 minutes from an hour they already know is stale.
+// Status-page UX guidance is consistent on this: a stale reading should
+// carry an exact stamp, not only a relative one. Used as a hover title on
+// the relative-time text rather than printed inline, so the page stays
+// scannable while the exact moment is one hover away. Local time, since
+// it's Jack looking at his own screen.
+function formatAbsolute(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit'
+  });
+}
+
 // Data-freshness convention: green under a minute, amber under 15 minutes,
 // past that a live reading is old enough to call out rather than trust.
 function freshnessClass(iso) {
@@ -59,21 +75,22 @@ function computeHeadline(data) {
   const killEngaged = live.killSwitch && live.killSwitch.engaged;
 
   if (killEngaged === true) {
-    return { level: 'critical', text: 'KILL SWITCH ENGAGED' };
+    return { level: 'critical', text: 'KILL SWITCH ENGAGED', asOf };
   }
   if (!data.connection.connected || !asOf) {
-    return { level: 'awaiting', text: 'Awaiting live connection' };
+    return { level: 'awaiting', text: 'Awaiting live connection', asOf };
   }
   const cls = freshnessClass(asOf);
-  if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale' };
-  if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging' };
-  return { level: 'good', text: 'Connected' };
+  if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale', asOf };
+  if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging', asOf };
+  return { level: 'good', text: 'Connected', asOf };
 }
 
-function renderHeadline(level, text) {
+function renderHeadline(level, text, asOf) {
   const el = document.getElementById('headlineStatus');
   el.className = 'headline-status ' + level;
   document.getElementById('headlineText').textContent = text;
+  el.title = asOf ? 'Reading taken at ' + formatAbsolute(asOf) : '';
 }
 
 function renderConnection(data) {
@@ -81,11 +98,20 @@ function renderConnection(data) {
   const label = document.getElementById('connLabel');
   const sub = document.getElementById('connSub');
   const asOf = data.live && data.live.asOf;
+  // connection.checkedAt is a distinct real field from live.asOf: it is when
+  // connectivity itself was last probed, which can exist even with no live
+  // reading yet. The schema-help table below documents it but nothing on the
+  // page actually surfaced it, so "not connected" gave no sense of whether a
+  // check had ever run versus one never being attempted.
+  const checkedAt = data.connection && data.connection.checkedAt;
 
   if (!data.connection.connected || !asOf) {
     dot.className = 'conn-dot down';
     label.textContent = 'Not connected';
     sub.textContent = data.connection.note || 'No live feed configured yet.';
+    sub.title = checkedAt
+      ? 'Connectivity last checked ' + (timeAgo(checkedAt) || '') + ' (' + formatAbsolute(checkedAt) + ')'
+      : 'Connectivity has never been checked yet.';
     updateGlanceIndicators('down');
     return;
   }
@@ -97,6 +123,8 @@ function renderConnection(data) {
     ? 'Connected, but last reading is old'
     : 'Connected';
   sub.textContent = 'Last reading: ' + (age || asOf);
+  sub.title = 'Reading taken at ' + formatAbsolute(asOf) +
+    (checkedAt ? ' • Connectivity last checked ' + formatAbsolute(checkedAt) : '');
   updateGlanceIndicators(cls);
 }
 
@@ -231,7 +259,7 @@ function eventItem(evt) {
         <div class="event-label">${escapeHtml(evt.label)}</div>
         ${evt.detail ? `<div class="event-detail">${escapeHtml(evt.detail)}</div>` : ''}
       </div>
-      <time class="event-time font-mono" datetime="${escapeHtml(evt.at)}">${escapeHtml(age || evt.at)}</time>
+      <time class="event-time font-mono" datetime="${escapeHtml(evt.at)}" title="${escapeHtml(formatAbsolute(evt.at))}">${escapeHtml(age || evt.at)}</time>
     </li>
   `;
 }
@@ -307,7 +335,7 @@ async function loadStatus() {
     if (requestId !== latestStatusRequestId) return;
     const headline = computeHeadline(data);
     noteHeadlineForToast(headline.level, headline.text);
-    renderHeadline(headline.level, headline.text);
+    renderHeadline(headline.level, headline.text, headline.asOf);
     renderConnection(data);
     renderStats(data);
     renderPositionSizing(data);
