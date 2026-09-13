@@ -605,7 +605,7 @@
     rows.push(fieldRow('Social snapshot', snapHtml, !(snap.platform || snap.followers != null)));
 
     const historyHtml = renderStageHistory(p, allStages);
-    rows.push(fieldRow('Stage history', historyHtml.html, historyHtml.empty));
+    rows.push(fieldRow('Stage history', historyHtml.html + stageMoveGeneratorHtml(), historyHtml.empty));
 
     const ideas = (p.contentIdeas || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const ideasHtml = ideas.length
@@ -613,14 +613,130 @@
           '<li><span class="idea-date font-mono">' + (entry.date ? escapeHtml(fmtDate(entry.date)) : 'NO DATE') +
           '</span>' + escapeHtml(entry.idea) + '</li>').join('') + '</ul>'
       : 'No content ideas logged yet.';
-    rows.push(fieldRow('Content ideas log', ideasHtml, ideas.length === 0));
+    rows.push(fieldRow('Content ideas log', ideasHtml + ideaGeneratorHtml(), ideas.length === 0));
 
     rows.push(fieldRow('Notes', p.notes ? escapeHtml(p.notes) : 'None', !p.notes));
 
     modalBody.innerHTML = rows.join('');
     modalOverlay.hidden = false;
+    wireStageMoveGenerator(p);
+    wireIdeaGenerator(p);
     lockBodyScroll();
     modalClose.focus();
+  }
+
+  // Small snippet generators embedded in the detail modal for the two
+  // per-prospect logs that otherwise require hand-appending an object into
+  // a nested array in prospects.json (stageHistory / contentIdeas), the same
+  // class of friction the "Log new prospect" generator addresses for new
+  // rows. Output is copy-paste JSON only, nothing is written automatically.
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function stageMoveGeneratorHtml() {
+    return '<div class="inline-gen">' +
+      '<div class="inline-gen-row">' +
+      '<select id="modalMoveStage" class="np-input inline-gen-select"></select>' +
+      '<input type="date" id="modalMoveDate" class="np-input inline-gen-date">' +
+      '<button type="button" id="modalMoveGenerate" class="print-btn font-mono">+ Log stage move</button>' +
+      '</div>' +
+      '<div id="modalMoveResult" class="inline-gen-result" hidden>' +
+      '<div class="inline-gen-warn" id="modalMoveWarn" hidden></div>' +
+      '<div class="np-output-head">' +
+      '<span class="field-label" style="margin:0">Paste into <code>stageHistory</code></span>' +
+      '<button type="button" id="modalMoveCopy" class="print-btn font-mono">Copy</button>' +
+      '</div>' +
+      '<pre class="np-output font-mono" id="modalMoveOutput"></pre>' +
+      '</div></div>';
+  }
+
+  function ideaGeneratorHtml() {
+    return '<div class="inline-gen">' +
+      '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<input type="date" id="modalIdeaDate" class="np-input inline-gen-date">' +
+      '<input type="text" id="modalIdeaText" class="np-input" placeholder="Content idea, logged today">' +
+      '<button type="button" id="modalIdeaGenerate" class="print-btn font-mono">+ Log idea</button>' +
+      '</div>' +
+      '<div id="modalIdeaResult" class="inline-gen-result" hidden>' +
+      '<div class="inline-gen-warn" id="modalIdeaWarn" hidden></div>' +
+      '<div class="np-output-head">' +
+      '<span class="field-label" style="margin:0">Paste into <code>contentIdeas</code></span>' +
+      '<button type="button" id="modalIdeaCopy" class="print-btn font-mono">Copy</button>' +
+      '</div>' +
+      '<pre class="np-output font-mono" id="modalIdeaOutput"></pre>' +
+      '</div></div>';
+  }
+
+  function wireCopyButton(btn, sourceEl) {
+    const original = btn.textContent;
+    btn.addEventListener('click', () => {
+      copyText(sourceEl.textContent)
+        .then(() => { btn.textContent = 'Copied'; })
+        .catch(() => { btn.textContent = "Couldn't copy"; })
+        .finally(() => { setTimeout(() => { btn.textContent = original; }, 1800); });
+    });
+  }
+
+  function wireStageMoveGenerator(p) {
+    const select = document.getElementById('modalMoveStage');
+    select.innerHTML = allStages.map(s => '<option value="' + escapeHtml(s.id) + '"' +
+      (s.id === p.stage ? ' selected' : '') + '>' + escapeHtml(s.label) + '</option>').join('');
+    const dateInput = document.getElementById('modalMoveDate');
+    dateInput.value = todayIso();
+    const resultEl = document.getElementById('modalMoveResult');
+    const warnEl = document.getElementById('modalMoveWarn');
+    const outputEl = document.getElementById('modalMoveOutput');
+    document.getElementById('modalMoveGenerate').addEventListener('click', () => {
+      const stage = select.value;
+      const date = dateInput.value;
+      if (!date) {
+        warnEl.hidden = false;
+        warnEl.textContent = 'Pick the real date this move happened first.';
+        outputEl.textContent = '';
+        resultEl.hidden = false;
+        return;
+      }
+      const history = p.stageHistory || [];
+      const last = history[history.length - 1];
+      let warn = '';
+      if (last && last.date && date < last.date) {
+        warn = 'This date is before the last logged move (' + last.date + '). stageHistory must stay sorted oldest first.';
+      } else if (stage !== p.stage) {
+        warn = 'This prospect’s own "stage" field is still "' + p.stage + '". If this move already really ' +
+          'happened, also update this prospect’s "stage" and "stageEnteredDate" fields, not just stageHistory.';
+      }
+      warnEl.hidden = !warn;
+      warnEl.textContent = warn;
+      outputEl.textContent = JSON.stringify({ date, stage }, null, 2) + ',';
+      resultEl.hidden = false;
+    });
+    wireCopyButton(document.getElementById('modalMoveCopy'), outputEl);
+  }
+
+  function wireIdeaGenerator(p) {
+    const dateInput = document.getElementById('modalIdeaDate');
+    dateInput.value = todayIso();
+    const textInput = document.getElementById('modalIdeaText');
+    const resultEl = document.getElementById('modalIdeaResult');
+    const warnEl = document.getElementById('modalIdeaWarn');
+    const outputEl = document.getElementById('modalIdeaOutput');
+    document.getElementById('modalIdeaGenerate').addEventListener('click', () => {
+      const date = dateInput.value;
+      const idea = textInput.value.trim();
+      if (!idea || !date) {
+        warnEl.hidden = false;
+        warnEl.textContent = !idea ? 'Enter the actual idea first.' : 'Pick the date this idea was actually logged.';
+        outputEl.textContent = '';
+        resultEl.hidden = false;
+        return;
+      }
+      warnEl.hidden = true;
+      outputEl.textContent = JSON.stringify({ date, idea }, null, 2) + ',';
+      resultEl.hidden = false;
+    });
+    wireCopyButton(document.getElementById('modalIdeaCopy'), outputEl);
   }
 
   function closeModal() {

@@ -751,6 +751,36 @@ textarea.np-input { resize: vertical; }
   max-height: 300px;
 }
 
+.inline-gen {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--hairline);
+}
+.inline-gen-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.inline-gen-row-idea .np-input[type="text"] {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+.inline-gen-date { flex: 0 0 auto; width: auto; min-width: 130px; }
+.inline-gen-select { flex: 0 0 auto; width: auto; min-width: 130px; }
+.inline-gen-result { margin-top: 10px; }
+.inline-gen-warn {
+  font-size: 0.74rem;
+  color: #E0A030;
+  background: rgba(224,160,48,0.06);
+  border: 1px solid rgba(224,160,48,0.25);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.inline-gen-result .np-output { max-height: 160px; }
+
 .snapshot-tag {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.65rem;
