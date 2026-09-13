@@ -47,6 +47,7 @@
           <tr><th>id</th><td>Unique slug, e.g. <code>"black-boots"</code></td></tr>
           <tr><th>title</th><td>Item name as it appears in the listing</td></tr>
           <tr><th>price</th><td>USD asking price, a number or <code>null</code></td></tr>
+          <tr><th>costBasis</th><td>USD cost of actually acquiring this item (what it was paid for), a non-negative number or <code>null</code>. Drives real profit figures separate from the fee-only payout estimates below, leave <code>null</code> until you have the real number, never guess it.</td></tr>
           <tr><th>platforms</th><td>Array of any of: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, <code>depop</code></td></tr>
           <tr><th>soldOn</th><td>Array, subset of <code>platforms</code>, marking which of them the item has actually sold on so it can be manually delisted from the rest. Leave <code>[]</code> until a real sale happens on one platform while the item is still live on others.</td></tr>
           <tr><th>status</th><td>One of: <code>draft</code>, <code>ready-to-post</code>, <code>live</code>, <code>sold</code></td></tr>
@@ -61,6 +62,7 @@
           <tr><th>platform</th><td>Which platform it actually sold on: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, or <code>depop</code></td></tr>
           <tr><th>salePrice</th><td>USD price it actually sold for, a non-negative number (can differ from the asking price on an accepted offer)</td></tr>
           <tr><th>askingPrice</th><td>USD asking price at time of sale, or <code>null</code> if not tracked</td></tr>
+          <tr><th>costBasis</th><td>USD cost of acquiring the sold item, a non-negative number or <code>null</code>. Usually copied over from the matching listing's own <code>costBasis</code> at the time it sold; drives the real profit column in the sales log, stays <code>null</code> until known.</td></tr>
           <tr><th>saleDate</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
         </tbody>
       </table>
@@ -68,6 +70,7 @@
   "id": "example-item-slug",
   "title": null,
   "price": null,
+  "costBasis": null,
   "platforms": [],
   "soldOn": [],
   "status": "draft",
@@ -217,7 +220,9 @@
     <div class="callout">
       Quick what-if calculator, not tied to any logged listing. Type an asking price to see the estimated net
       payout on each platform before a draft even exists. Uses the same fee formulas as the payout table above,
-      toggle a platform off if this item wouldn't go there.
+      toggle a platform off if this item wouldn't go there. Add what the item actually cost to get it (thrifted
+      price, wholesale cost, etc.) to see real estimated profit alongside the fee-only payout, that field is
+      optional and purely a scratch calculation, it doesn't get saved anywhere.
     </div>
     <div class="calc-row">
       <div class="calc-price-input-wrap">
@@ -231,6 +236,18 @@
           inputmode="decimal"
           placeholder="0.00"
           aria-label="Asking price to calculate">
+      </div>
+      <div class="calc-price-input-wrap">
+        <label for="calcCostInput" class="calc-price-prefix font-mono">cost $</label>
+        <input
+          type="number"
+          id="calcCostInput"
+          class="calc-price-input font-mono"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="optional"
+          aria-label="What this item cost to acquire, optional">
       </div>
       <div class="filter-row" id="calcPlatformToggle" role="group" aria-label="Platforms to include in calculator" style="margin-bottom:0">
         <button type="button" class="chip" data-platform="ebay" aria-pressed="true">eBay</button>
@@ -246,6 +263,7 @@
             <th>Platform</th>
             <th>Fees</th>
             <th>Est. net payout</th>
+            <th id="calcProfitHead" hidden>Est. profit</th>
           </tr>
         </thead>
         <tbody id="calcTableBody"></tbody>
@@ -260,7 +278,9 @@
       Every real completed sale, one row per platform a sale happened on. Nothing here is estimated, this only
       shows what's actually been hand-logged in <code>sales.json</code> after a real sale. Logging a sale here
       is separate from marking that platform in the item's <code>soldOn</code> array above, a real sale needs
-      both done, one to log the sale itself and one to flag that item for delisting elsewhere.
+      both done, one to log the sale itself and one to flag that item for delisting elsewhere. Profit is only
+      shown once a real <code>costBasis</code> is logged for that sale, it stays honestly blank otherwise
+      rather than assuming a cost of $0.
     </div>
     <div class="table-wrap">
       <table class="card-table" id="salesTable">
@@ -270,6 +290,8 @@
             <th>Platform</th>
             <th>Sale price</th>
             <th>Est. net payout</th>
+            <th>Cost basis</th>
+            <th>Profit</th>
             <th>Date</th>
           </tr>
         </thead>

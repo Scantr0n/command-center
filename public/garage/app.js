@@ -189,6 +189,11 @@ function renderStats(listings, stages, sales) {
     return days != null && days >= RELIST_FRESH_DAYS;
   }).length;
   const realizedRevenue = sales.reduce((s, sale) => s + (sale.salePrice || 0), 0);
+  const salesWithCost = sales.filter(sale => sale.costBasis != null);
+  const realizedProfit = salesWithCost.reduce((s, sale) => {
+    const net = estimateNetPayout(sale.platform, sale.salePrice);
+    return s + ((net != null ? net : (sale.salePrice || 0)) - sale.costBasis);
+  }, 0);
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -201,7 +206,8 @@ function renderStats(listings, stages, sales) {
     { value: coverageGapCount, label: 'Items with cross-post gaps', sub: coverageGapCount ? 'Not yet on all 4 platforms' : 'Fully cross-listed' },
     { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 },
     { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
-    { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' }
+    { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },
+    { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis, ${salesWithCost.length}/${sales.length} sale(s) have a cost logged` : 'No sale has a cost basis logged yet' }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -542,13 +548,28 @@ const CALC_FEE_DESCRIPTIONS = {
 };
 let calcPlatforms = new Set(PAYOUT_PLATFORMS);
 
+// Reads a positive-or-zero numeric input, treating blank as "not provided"
+// (null) rather than 0, since a real $0 cost and "haven't entered one yet"
+// are different states, same distinction the rest of this file draws
+// between null and 0 everywhere else.
+function readOptionalNonNegativeInput(el) {
+  const raw = el.value.trim();
+  if (raw === '') return null;
+  const n = Number(raw);
+  return Number.isNaN(n) || n < 0 ? undefined : n;
+}
+
 function renderCalc() {
   const input = document.getElementById('calcPriceInput');
+  const costInput = document.getElementById('calcCostInput');
   const tbody = document.getElementById('calcTableBody');
   const empty = document.getElementById('calcTableEmpty');
   const table = document.getElementById('calcTable');
+  const profitHead = document.getElementById('calcProfitHead');
   const raw = input.value.trim();
   const price = raw === '' ? null : Number(raw);
+  const cost = readOptionalNonNegativeInput(costInput);
+  const hasCost = cost != null && cost !== undefined;
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;
@@ -560,6 +581,7 @@ function renderCalc() {
   }
   table.hidden = false;
   empty.hidden = true;
+  profitHead.hidden = !hasCost;
 
   const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => ({
     p, net: estimateNetPayout(p, price)
@@ -569,11 +591,13 @@ function renderCalc() {
 
   tbody.innerHTML = rows.map(r => {
     const isBest = bestNet != null && !tiedForBest && r.net === bestNet;
+    const profit = hasCost ? r.net - cost : null;
     return `
     <tr>
       <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
       <td class="cell-muted">${escapeHtml(CALC_FEE_DESCRIPTIONS[r.p])}</td>
       <td class="cell-value${isBest ? ' cell-value-best' : ''}">${formatUsd(r.net)}${isBest ? ' <span class="best-tag" title="Highest net payout at this price">best</span>' : ''}</td>
+      ${hasCost ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)}</td>` : ''}
     </tr>
   `;
   }).join('');
@@ -581,6 +605,7 @@ function renderCalc() {
 
 function wireCalc() {
   document.getElementById('calcPriceInput').addEventListener('input', renderCalc);
+  document.getElementById('calcCostInput').addEventListener('input', renderCalc);
   const container = document.getElementById('calcPlatformToggle');
   container.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -638,12 +663,15 @@ function renderSales(sales) {
 
   tbody.innerHTML = sorted.map(s => {
     const net = estimateNetPayout(s.platform, s.salePrice);
+    const profit = net != null && s.costBasis != null ? net - s.costBasis : null;
     return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(s.title || 'Untitled item')}</div></td>
       <td class="cell-platforms">${s.platform ? `<span class="badge badge-${escapeHtml(s.platform)}">${escapeHtml(PLATFORM_LABELS[s.platform] || s.platform)}</span>` : ''}</td>
       <td class="cell-value${s.salePrice == null ? ' empty' : ''}">${s.salePrice != null ? formatUsd(s.salePrice) : 'not set'}</td>
       <td class="cell-value${net == null ? ' empty' : ''}">${net != null ? formatUsd(net) : 'unknown'}</td>
+      <td class="cell-value${s.costBasis == null ? ' empty' : ''}">${s.costBasis != null ? formatUsd(s.costBasis) : 'not logged'}</td>
+      <td class="cell-value${profit == null ? ' empty' : (profit < 0 ? ' cell-value-loss' : '')}">${profit != null ? formatUsd(profit) : 'not logged'}</td>
       <td class="cell-muted">${s.saleDate ? escapeHtml(s.saleDate) : '<span class="cell-value empty">not logged</span>'}</td>
     </tr>
   `;
@@ -749,6 +777,7 @@ function openModal(id) {
 
   const rows = [];
   rows.push(fieldRow('Asking price', l.price != null ? formatUsd(l.price) : 'Not set', l.price == null));
+  rows.push(fieldRow('Cost basis', l.costBasis != null ? formatUsd(l.costBasis) : 'Not logged', l.costBasis == null));
   rows.push(fieldRow('Platforms', (l.platforms || []).length ? platformBadges(l.platforms, l.soldOn) : 'None logged', !(l.platforms || []).length));
   rows.push(fieldRow('Published', l.datePublished ? escapeHtml(l.datePublished) : 'Not logged yet', !l.datePublished));
 
@@ -756,11 +785,13 @@ function openModal(id) {
   rows.push(fieldRow('Relist guidance', relistGuidanceHtml(l, modalDays), modalDays == null));
 
   const modalBest = bestPayoutPlatform(l);
+  const hasCostBasis = l.costBasis != null;
   const payoutHtml = (l.platforms || []).length
     ? '<table class="modal-payout-table">' + (l.platforms || []).map(p => {
         const net = estimateNetPayout(p, l.price);
         const isBest = p === modalBest;
-        return `<tr><td>${escapeHtml(PLATFORM_LABELS[p] || p)}</td><td class="cell-value${net == null ? ' empty' : ''}${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td></tr>`;
+        const profit = net != null && hasCostBasis ? net - l.costBasis : null;
+        return `<tr><td>${escapeHtml(PLATFORM_LABELS[p] || p)}</td><td class="cell-value${net == null ? ' empty' : ''}${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>${hasCostBasis ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)} profit</td>` : ''}</tr>`;
       }).join('') + '</table>'
     : 'Not applicable, not listed anywhere yet.';
   rows.push(fieldRow('Est. net payout by platform', payoutHtml, !(l.platforms || []).length));
@@ -845,7 +876,7 @@ function csvField(v) {
 }
 
 const CSV_COLUMNS = [
-  ['title', 'Item'], ['price', 'Price'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
+  ['title', 'Item'], ['price', 'Price'], ['costBasis', 'Cost basis'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
   ['status', 'Status'], ['datePublished', 'Published'], ['daysListed', 'Days listed'],
   ['relistGuidance', 'Relist guidance'], ['notes', 'Notes']
 ];

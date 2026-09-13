@@ -73,6 +73,12 @@ function main() {
       }
     }
 
+    if (l.costBasis !== null && l.costBasis !== undefined) {
+      if (typeof l.costBasis !== 'number' || l.costBasis < 0) {
+        errors.push(where + ': "costBasis" must be a non-negative number or null');
+      }
+    }
+
     if (!Array.isArray(l.platforms) || l.platforms.length === 0) {
       errors.push(where + ': "platforms" must be a non-empty array');
     } else {
@@ -178,6 +184,12 @@ function main() {
     if (s.askingPrice !== null && s.askingPrice !== undefined) {
       if (typeof s.askingPrice !== 'number' || s.askingPrice < 0) {
         errors.push(where + ': "askingPrice" must be a non-negative number or null');
+      }
+    }
+
+    if (s.costBasis !== null && s.costBasis !== undefined) {
+      if (typeof s.costBasis !== 'number' || s.costBasis < 0) {
+        errors.push(where + ': "costBasis" must be a non-negative number or null');
       }
     }
 

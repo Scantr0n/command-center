@@ -413,6 +413,7 @@ table.card-table {
 .cell-value { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
 .cell-value.empty { color: var(--dim); font-family: inherit; font-weight: 400; font-style: italic; }
 .cell-value-best { color: var(--accent); }
+.cell-value-loss { color: #E56464; }
 .best-tag {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.6rem;
