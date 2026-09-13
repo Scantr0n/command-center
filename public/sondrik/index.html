@@ -20,17 +20,21 @@
     </div>
     <div class="page-head-actions">
       <a id="attentionPill" href="#leadsSection" class="attention-pill font-mono" hidden></a>
+      <button type="button" id="copyStatusBtn" class="print-btn font-mono">Copy status update</button>
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
 
+  <div id="copyStatusLive" class="sr-only-live" role="status" aria-live="polite"></div>
+
   <main>
   <div class="callout">
     <strong>Display tool, not a send tool.</strong> Nothing on this page contacts anyone. There is no live backend
     connected yet, so every number here is either a real logged fact with a cited source and date, or an honest
-    empty state, never a filled-in guess.
+    empty state, never a filled-in guess. "Copy status update" only copies text to your own clipboard, it does not
+    send anything to anyone.
   </div>
 
   <details class="schema-help">

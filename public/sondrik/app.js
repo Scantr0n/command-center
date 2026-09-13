@@ -4,6 +4,8 @@
   const tractionSection = document.getElementById('tractionSection');
   const leadsSection = document.getElementById('leadsSection');
   const csvBtn = document.getElementById('csvBtn');
+  const copyStatusBtn = document.getElementById('copyStatusBtn');
+  const copyStatusLive = document.getElementById('copyStatusLive');
   const attentionPill = document.getElementById('attentionPill');
 
   function escapeHtml(s) {
@@ -224,6 +226,68 @@
     }).join('');
   }
 
+  // Builds a plain-text snapshot from the same three real data files already
+  // on the page, for Jack to paste into a build log or status update himself.
+  // Purely a clipboard copy, nothing here ever transmits anywhere on its own.
+  function buildStatusUpdate(releasesData, downloadsData, leadsData) {
+    const lines = ['Sondrik status snapshot, generated ' + fmtDate(new Date().toISOString().slice(0, 10))];
+
+    const releases = ((releasesData && releasesData.releases) || []).slice()
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (releases.length > 0) {
+      const r = releases[0];
+      lines.push('');
+      lines.push('Latest release: v' + r.version + (r.date ? ' (' + fmtDate(r.date) + ')' : '') +
+        (r.summary ? ', ' + r.summary : ''));
+    }
+
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length > 0) {
+      const latest = checks[checks.length - 1];
+      let line = latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date);
+      if (checks.length > 1) {
+        const first = checks[0];
+        const delta = latest.count - first.count;
+        line += ' (' + (delta >= 0 ? '+' : '') + delta + ' vs ' + fmtDate(first.date) + ' check)';
+      }
+      if (metric.source) line += '. Source: ' + metric.source;
+      lines.push('');
+      lines.push(line);
+    }
+
+    const leads = (leadsData && leadsData.leads) || [];
+    if (leads.length > 0) {
+      lines.push('');
+      leads.forEach(l => {
+        const o = l.outreach || {};
+        const status = o.sent ? 'sent'
+          : (o.approvalStatus === 'awaiting-approval' ? 'drafted, awaiting approval' : (o.draftStatus || 'no draft yet'));
+        lines.push('Lead: ' + (l.sourceDetail || l.source || 'Unknown source') +
+          (l.summary ? ', ' + l.summary : '') + ' [' + status + ']');
+      });
+    }
+
+    return lines.join('\n');
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-10000px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('execCommand copy failed'));
+    });
+  }
+
   function csvField(v) {
     const s = v == null ? '' : String(v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -309,6 +373,22 @@
     } else {
       leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
         escapeHtml(leadsResult.reason.message) + '</div>';
+    }
+
+    if (releasesData || downloadsData || leadsData) {
+      copyStatusBtn.addEventListener('click', () => {
+        const text = buildStatusUpdate(releasesData || {}, downloadsData || {}, leadsData || {});
+        copyText(text).then(() => {
+          const original = copyStatusBtn.textContent;
+          copyStatusBtn.textContent = 'Copied!';
+          copyStatusLive.textContent = 'Status update copied to clipboard.';
+          setTimeout(() => { copyStatusBtn.textContent = original; }, 1800);
+        }).catch(() => {
+          copyStatusLive.textContent = 'Could not copy to clipboard.';
+        });
+      });
+    } else {
+      copyStatusBtn.disabled = true;
     }
   });
 })();
