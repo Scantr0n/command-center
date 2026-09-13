@@ -1,0 +1,90 @@
+// Bump this on any change to the cache lists or strategy below, it is the
+// only thing that makes the browser fetch a new sw.js and run activate to
+// drop the previous cache. The dashboard is otherwise "installable" (see the
+// manifest) but was never actually usable offline: this is what closes that
+// gap, without touching how any page talks to /api or its own /data files.
+const CACHE_VERSION = 'v1';
+const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
+const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
+
+// The app shell: every hub's own page plus the assets it needs to render
+// fully offline on a repeat visit. Hand-listed rather than crawled, since
+// there is no build step here to generate a manifest from.
+const SHELL_URLS = [
+  '/', '/index.html', '/style.css', '/manifest.webmanifest',
+  '/favicon.svg', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png',
+  '/vendor/d3-force-selection.min.js',
+  '/alpha/', '/alpha/index.html', '/alpha/app.js', '/alpha/style.css',
+  '/cgt/', '/cgt/index.html', '/cgt/app.js', '/cgt/style.css',
+  '/csm/', '/csm/index.html', '/csm/app.js', '/csm/style.css',
+  '/garage/', '/garage/index.html', '/garage/app.js', '/garage/style.css',
+  '/sondrik/', '/sondrik/index.html', '/sondrik/app.js', '/sondrik/style.css'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(SHELL_CACHE)
+      .then(cache => cache.addAll(SHELL_URLS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== SHELL_CACHE && k !== RUNTIME_CACHE).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+// Real project data (the /api/clusters feed and every hub's hand-edited
+// /data/*.json) must show the live file whenever the network is up, an old
+// cached snapshot silently served over a working connection would be worse
+// than no offline support at all. Cache is only the offline fallback.
+function isDataRequest(url) {
+  return url.pathname.startsWith('/api/') || /\/data\/.*\.json$/.test(url.pathname);
+}
+
+async function networkFirst(request) {
+  try {
+    const fresh = await fetch(request);
+    if (fresh.ok) {
+      const cache = await caches.open(RUNTIME_CACHE);
+      cache.put(request, fresh.clone());
+    }
+    return fresh;
+  } catch (err) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    throw err;
+  }
+}
+
+// Static assets (the app shell, plus vendor/icons/fonts fetched at runtime)
+// rarely change and are only ever replaced by a new CACHE_VERSION, so serve
+// the cached copy instantly and refresh it in the background rather than
+// waiting on the network every time.
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  const cached = await cache.match(request);
+  const networkFetch = fetch(request).then(fresh => {
+    if (fresh.ok) cache.put(request, fresh.clone());
+    return fresh;
+  }).catch(() => null);
+  return cached || (await networkFetch) || Response.error();
+}
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return; // toggles/chat POSTs always go straight to network
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (isDataRequest(url)) {
+    event.respondWith(networkFirst(request));
+  } else {
+    event.respondWith(staleWhileRevalidate(request));
+  }
+});
