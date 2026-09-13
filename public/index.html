@@ -304,6 +304,7 @@ function pillStyle(status) {
 }
 
 let lastClustersRaw = null;
+let lastFullRenderAt = 0;
 let deepLinkChecked = false;
 
 // True whenever the currently open modal added its own history entry (a
@@ -344,10 +345,18 @@ async function loadClusters() {
     // Skip the re-render on unchanged data (the 30s poll refetches even
     // when nothing moved), since rebuilding the graph/grid DOM every time
     // would drop keyboard focus mid-tab and restart the pulse animations
-    // on every active-status node.
+    // on every active-status node. But every relative-time label on the
+    // page (activity feed, LAST SYNC, graph node tooltips) is computed at
+    // render time and frozen otherwise, so a dashboard left open with truly
+    // unchanged data would keep saying "today" days later. Force a real
+    // re-render at least every 5 minutes regardless, to bound how stale
+    // those labels can get without giving up the skip's actual benefit.
     const raw = JSON.stringify(data.clusters);
-    if (raw === lastClustersRaw) return;
+    const dataUnchanged = raw === lastClustersRaw;
+    const staleRenderTooLong = Date.now() - lastFullRenderAt > 5 * 60 * 1000;
+    if (dataUnchanged && !staleRenderTooLong) return;
     lastClustersRaw = raw;
+    lastFullRenderAt = Date.now();
 
     clusters = data.clusters.sort((a, b) => {
       const order = { top: 0, normal: 1, low: 2 };
