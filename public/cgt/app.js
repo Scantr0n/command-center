@@ -133,6 +133,7 @@ async function loadCards() {
     renderStats();
     renderValueBreakdown();
     renderPricingActivity();
+    renderDataQuality();
     renderBatchFilter();
     applyFiltersAndRender();
     initTableScrollShadows();
@@ -313,6 +314,48 @@ function renderBatchFilter() {
     batches.map(b => `<button type="button" class="chip" data-batch="${escapeHtml(b)}" aria-pressed="${activeBatch === b}">${escapeHtml(b)}<span class="chip-count"></span></button>`).join('');
 
   wireChipGroup('batchFilter', 'data-batch', (v) => { activeBatch = v; });
+}
+
+// Flags real (non-example) cards missing a field that validate.js does not
+// already enforce as an error but that matters for the "individually
+// researched, never a silent guess" methodology: a priced card with no
+// record of where the price came from or when it was checked, or a graded
+// card with no cert number logged (so it can't be looked back up later).
+// Same "Needs backfill" pattern as the CSM hub's own data-quality panel,
+// hidden entirely when nothing is flagged rather than showing an empty box.
+function buildDataQualityFlags() {
+  return cards
+    .filter(c => !isExample(c))
+    .map(c => {
+      const reasons = [];
+      if (c.estimatedValue != null && !c.sourceNote) reasons.push('PRICED BUT NO SOURCE LOGGED');
+      if (c.estimatedValue != null && !c.datePriced) reasons.push('PRICED BUT NO DATE LOGGED');
+      if (c.gradingCompany && !c.certNumber) reasons.push('NO CERT NUMBER LOGGED');
+      return { c, reasons };
+    })
+    .filter(x => x.reasons.length > 0);
+}
+
+function renderDataQuality() {
+  const section = document.getElementById('dataQualitySection');
+  const list = document.getElementById('dataQualityList');
+  const flagged = buildDataQualityFlags();
+
+  if (!flagged.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flagged.map(({ c, reasons }) => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}</span>
+      <span class="dq-meta">${escapeHtml([c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '))}</span>
+      <span class="dq-why">${escapeHtml(reasons.join(' · '))}</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
 }
 
 function basisBadge(c) {

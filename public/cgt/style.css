@@ -468,6 +468,47 @@ table.card-table {
 .badge-sport { background: rgba(255,255,255,0.03); color: var(--sub); }
 .badge-stale { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
 
+/* "Needs backfill" data-quality list, same amber-flag pattern and markup as
+   the CSM hub's own data-quality panel, restyled with CGT's own tokens. */
+.data-quality-list {
+  border: 1px solid rgba(224,160,48,0.3);
+  background: rgba(224,160,48,0.04);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 8px;
+}
+.data-quality-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 0;
+  border-top: 1px solid rgba(224,160,48,0.15);
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.data-quality-row:first-of-type { border-top: none; }
+.data-quality-row:hover, .data-quality-row:focus-visible {
+  background: rgba(224,160,48,0.08);
+}
+.data-quality-row:focus-visible { outline: 1px solid rgba(224,160,48,0.5); outline-offset: -2px; }
+.data-quality-row .dq-why {
+  margin-left: auto;
+  color: #E0A030;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+}
+.data-quality-row .dq-name { font-weight: 600; color: var(--ink); }
+.data-quality-row .dq-meta { color: var(--sub); }
+
 .table-empty {
   padding: 40px 20px;
   text-align: center;
@@ -603,6 +644,11 @@ footer.page-foot {
   .activity-who { color: #111; }
   .activity-toggle { display: none !important; }
   .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: flex !important; }
+
+  .data-quality-list { background: none; border-color: #bbb; }
+  .data-quality-row { border-color: #ddd; }
+  .data-quality-row .dq-name { color: #111; }
+  .data-quality-row .dq-meta, .data-quality-row .dq-why { color: #555; }
 
   .table-wrap { background: none; border: 1px solid #ccc; }
   .table-wrap::before, .table-wrap::after { display: none !important; }
