@@ -558,10 +558,15 @@ function renderGraph() {
     const dx = nx + (r + 3) * 0.7;
     const dy = ny - (r + 3) * 0.7;
     const stale = c.lastUpdate && (Date.now() - new Date(c.lastUpdate + 'T00:00:00')) / 86400000 > 30;
+    // A JS-added role="button" on a grouped SVG element can't reliably rely
+    // on a nested <title> for its accessible name across every browser and
+    // screen reader pairing, so this is stated explicitly rather than only
+    // implied by <title>, which stays for the native mouse-hover tooltip.
+    const nodeLabel = `${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}${stale ? ' (stale, over a month untouched)' : ''}`;
 
     nodesHtml += `
-      <g class="graph-node" data-id="${escapeHtml(c.id)}">
-        <title>${escapeHtml(c.name)}, ${escapeHtml(c.status)}, updated ${relativeTime(c.lastUpdate)}${stale ? ' (stale, over a month untouched)' : ''}</title>
+      <g class="graph-node" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(nodeLabel)}">
+        <title>${escapeHtml(nodeLabel)}</title>
         <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${color}" opacity="0.16" />
         <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}20" stroke="${color}" stroke-width="1.5" ${stale ? 'stroke-dasharray="4,3"' : ''} />
         <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" opacity="${stale ? 0.45 : 1}" />
