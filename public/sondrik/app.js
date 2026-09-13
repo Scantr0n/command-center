@@ -28,13 +28,23 @@
     return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
   }
 
+  // Local calendar date as YYYY-MM-DD. daysBetween (like CSM's daysUntil)
+  // parses logged dates as local midnight, so "today" has to match that or
+  // every comparison drifts. new Date().toISOString().slice(0, 10) instead
+  // reads the UTC calendar date, which rolls over to tomorrow while it is
+  // still today in any timezone behind UTC, so a check logged "today" would
+  // read as "1 day ago" for the rest of the evening, local time.
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   // Same "N days ago" phrasing the download freshness badge already uses,
   // applied to any other real logged date so recency reads consistently
   // across the page instead of leaving a reader to do the date math.
   function relativeDaysLabel(iso) {
     if (!iso) return null;
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const age = daysBetween(iso, todayIso);
+    const age = daysBetween(iso, todayIso());
     if (age < 0) return null;
     if (age === 0) return 'today';
     if (age === 1) return '1 day ago';
@@ -139,8 +149,7 @@
       }
     }
 
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const ageDays = daysBetween(latest.date, todayIso);
+    const ageDays = daysBetween(latest.date, todayIso());
     const STALE_AFTER_DAYS = 7;
     const isStale = ageDays > STALE_AFTER_DAYS;
     const ageLabel = ageDays <= 0 ? 'checked today' : ageDays === 1 ? 'checked 1 day ago' : 'checked ' + ageDays + ' days ago';
@@ -249,7 +258,6 @@
         '<code>public/sondrik/data/goals.json</code> once there is a real target to track against.</div>';
       return;
     }
-    const todayIso = new Date().toISOString().slice(0, 10);
     goalsSection.innerHTML = goals.map(g => {
       const current = currentMetricValue(g.metric, downloadsData);
       const currentCount = current ? current.count : 0;
@@ -257,7 +265,7 @@
 
       let paceHtml = '';
       if (g.targetDate) {
-        const daysLeft = daysBetween(todayIso, g.targetDate);
+        const daysLeft = daysBetween(todayIso(), g.targetDate);
         if (daysLeft < 0) {
           paceHtml = '<div class="goal-pace goal-pace-overdue font-mono">TARGET DATE PASSED, ' + fmtDate(g.targetDate).toUpperCase() + '</div>';
         } else {
@@ -359,9 +367,8 @@
     }
     const latest = dates.sort().pop();
     const rel = relativeDaysLabel(latest);
-    const todayIso = new Date().toISOString().slice(0, 10);
     const STALE_AFTER_DAYS = 7;
-    const isStale = daysBetween(latest, todayIso) > STALE_AFTER_DAYS;
+    const isStale = daysBetween(latest, todayIso()) > STALE_AFTER_DAYS;
 
     lastUpdatedSub.hidden = false;
     lastUpdatedSub.classList.toggle('last-updated-stale', isStale);
@@ -418,7 +425,7 @@
   // the page, for Jack to paste into a build log or status update himself.
   // Purely a clipboard copy, nothing here ever transmits anywhere on its own.
   function buildStatusUpdate(releasesData, downloadsData, leadsData, goalsData) {
-    const lines = ['Sondrik status snapshot, generated ' + fmtDate(new Date().toISOString().slice(0, 10))];
+    const lines = ['Sondrik status snapshot, generated ' + fmtDate(todayIso())];
 
     const releases = ((releasesData && releasesData.releases) || []).slice()
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
