@@ -691,6 +691,21 @@ code.inline-code {
 }
 .mapping-select:focus { outline: none; border-color: var(--hairlineHover); }
 
+/* Below ~560px the row's minimum column widths (140px source + 20px arrow +
+   180px select, plus gaps) no longer fit inside .wrap's own side padding,
+   which pushed the whole page into horizontal scroll on a phone. Stacking
+   the row instead of forcing it onto one line fixes that without needing
+   the columns to shrink below a legible width. */
+@media (max-width: 560px) {
+  .mapping-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .mapping-arrow { display: none; }
+}
+
 .import-validation-ok { color: #3DDC84; font-size: 0.85rem; }
 .import-validation-box {
   border-radius: 10px;
