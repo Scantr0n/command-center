@@ -224,6 +224,43 @@
     <h2 class="section-title">Quality &amp; fixes log</h2>
     <div class="activity-list" id="activityList"></div>
   </section>
+
+  <section>
+    <h2 class="section-title">Pre-publish checklist</h2>
+    <div class="callout">
+      Built directly from the two real issues caught in the log above, so they don't repeat. Checks are saved
+      in this browser only, per new listing, use <strong>Reset checklist</strong> once it's live.
+    </div>
+    <ul class="checklist" id="publishChecklist">
+      <li>
+        <label>
+          <input type="checkbox" data-check-id="return-policy">
+          Return policy matches this item's actual category, not inherited from an unrelated template
+          (the eBay auto-parts return policy bug)
+        </label>
+      </li>
+      <li>
+        <label>
+          <input type="checkbox" data-check-id="cover-photo">
+          Cover photo is the clean product shot, not a measurement or reference photo
+          (the Haggar corduroy tape-measure bug)
+        </label>
+      </li>
+      <li>
+        <label>
+          <input type="checkbox" data-check-id="platforms-match">
+          The <code>platforms</code> logged for this item actually matches everywhere it's really live
+        </label>
+      </li>
+      <li>
+        <label>
+          <input type="checkbox" data-check-id="price-set">
+          Asking price is set and matches what's live on each platform
+        </label>
+      </li>
+    </ul>
+    <button type="button" id="resetChecklistBtn" class="print-btn font-mono">Reset checklist</button>
+  </section>
   </main>
 
   <footer class="page-foot font-mono">

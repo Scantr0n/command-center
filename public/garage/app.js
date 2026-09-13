@@ -696,5 +696,43 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// Pre-publish checklist: state is per-browser only (not shared data, and
+// not worth a JSON file for a personal reminder), so it's fine to sit in
+// localStorage. Falls back to an in-memory Set and just doesn't persist
+// across reloads if storage is unavailable (private window, blocked, etc).
+const CHECKLIST_STORAGE_KEY = 'garage-publish-checklist';
+function loadChecklistState() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(CHECKLIST_STORAGE_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+function saveChecklistState(checked) {
+  try {
+    localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify([...checked]));
+  } catch {
+    // Storage unavailable, checklist just won't persist this session.
+  }
+}
+function wireChecklist() {
+  const checked = loadChecklistState();
+  const boxes = document.querySelectorAll('#publishChecklist input[type="checkbox"]');
+  boxes.forEach(box => {
+    box.checked = checked.has(box.getAttribute('data-check-id'));
+    box.addEventListener('change', () => {
+      const id = box.getAttribute('data-check-id');
+      if (box.checked) checked.add(id); else checked.delete(id);
+      saveChecklistState(checked);
+    });
+  });
+  document.getElementById('resetChecklistBtn').addEventListener('click', () => {
+    checked.clear();
+    boxes.forEach(box => { box.checked = false; });
+    saveChecklistState(checked);
+  });
+}
+
 wireCalc();
+wireChecklist();
 loadData();
