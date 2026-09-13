@@ -48,6 +48,14 @@ function main() {
   // Keyed by grading company since cert numbers are only guaranteed unique
   // within one company's own numbering, not across PSA/BGS/SGC/etc.
   const seenCerts = new Map();
+  // Keyed by cardName + year + gradingCompany + grade, to catch the same
+  // physical card accidentally logged twice under two different ids (e.g. a
+  // copy-pasted entry that only got the id changed). Distinct cert numbers
+  // don't rule this out on their own, since a typo'd cert reads as "distinct"
+  // too, so this is reported as a warning to confirm by hand, not an error:
+  // genuinely owning two real copies of the same card at the same grade is
+  // a real thing collectors have, not a mistake.
+  const seenNameGradeCombos = new Map();
 
   cards.forEach((c, idx) => {
     const where = 'cards[' + idx + ']' + (c && c.id ? ' (' + c.id + ')' : '');
@@ -67,6 +75,12 @@ function main() {
     }
 
     if (!c.cardName) errors.push(where + ': missing "cardName"');
+
+    if (c.cardName && c.gradingCompany && c.grade != null) {
+      const comboKey = c.cardName.trim().toLowerCase() + '|' + (c.year ?? '') + '|' + c.gradingCompany + '|' + c.grade;
+      if (!seenNameGradeCombos.has(comboKey)) seenNameGradeCombos.set(comboKey, []);
+      seenNameGradeCombos.get(comboKey).push(c.id || where);
+    }
 
     if (!c.sport) {
       errors.push(where + ': missing "sport"');
@@ -112,6 +126,14 @@ function main() {
     if (c.backlogBatch && !DATE_RE.test(c.backlogBatch.slice(0, 10))) {
       warnings.push(where + ': "backlogBatch" ("' + c.backlogBatch + '") does not start with a YYYY-MM-DD date. ' +
         'The batch filter sorts by this label as a plain string, so it needs an ISO-date prefix to sort newest-first.');
+    }
+  });
+
+  seenNameGradeCombos.forEach((ids) => {
+    if (ids.length > 1) {
+      warnings.push('possible duplicate entry: the same card name + year + grading company + grade appears on ' +
+        ids.length + ' rows (' + ids.join(', ') + '). Confirm these are really separate physical copies, not the ' +
+        'same card logged twice under two different ids.');
     }
   });
 

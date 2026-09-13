@@ -44,7 +44,10 @@
         do not fill it in with a guess.</p>
       <p><strong>Run <code>node public/cgt/data/validate.js</code> after every edit.</strong> It catches
         duplicate ids, a missing or unlabeled <code>valuationBasis</code> on a priced card, a
-        <code>comp-estimate</code> with no <code>compNote</code> explaining what it is based on, and bad dates.</p>
+        <code>comp-estimate</code> with no <code>compNote</code> explaining what it is based on, and bad dates.
+        It also warns (not an error, since owning two real copies of the same card and grade is a real thing)
+        when the same card name, year, grading company, and grade shows up on more than one row, in case a row
+        got copy-pasted and only the id was changed.</p>
       <p>A priced card gets a <code>stale</code> badge once its <code>datePriced</code> is more than 180 days old.
         That is not an error, card market prices just drift over months, and it is a nudge to re-check the price
         next time you are in this hub, not something to fix immediately.</p>
