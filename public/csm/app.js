@@ -18,6 +18,7 @@
   const dataQualityList = document.getElementById('dataQualityList');
   const activityFeedEl = document.getElementById('activityFeed');
   const velocityListEl = document.getElementById('velocityList');
+  const funnelListEl = document.getElementById('funnelList');
   const ACTIVITY_PREVIEW_COUNT = 8;
 
   printBtn.addEventListener('click', () => window.print());
@@ -346,6 +347,53 @@
         toggleBtn.textContent = collapsed ? 'Show all ' + events.length : 'Show fewer';
       });
     }
+  }
+
+  // How many prospects have ever reached each stage, inferred from current
+  // stage alone: since the pipeline is a straight line (researched ->
+  // outreach-sent -> silent-replied -> in-exploration -> client), a prospect
+  // sitting at stage index i has necessarily already passed every stage
+  // before it, whether or not that move was ever logged in stageHistory.
+  // Unlike computeStageVelocity, this works from data every prospect already
+  // has (the required "stage" field), not only from optional history logs.
+  function computeFunnel(stages, prospects) {
+    const indexOfStage = Object.fromEntries(stages.map((s, i) => [s.id, i]));
+    const reached = stages.map(() => 0);
+    prospects.forEach(p => {
+      const idx = indexOfStage[p.stage];
+      if (idx == null) return;
+      for (let i = 0; i <= idx; i++) reached[i]++;
+    });
+    return stages.map((stage, i) => ({
+      stage,
+      reached: reached[i],
+      conversionFromPrev: i > 0 && reached[i - 1] > 0 ? Math.round((reached[i] / reached[i - 1]) * 100) : null
+    }));
+  }
+
+  function renderFunnel(stages, prospects) {
+    const results = computeFunnel(stages, prospects);
+    const total = results.length ? results[0].reached : 0;
+    if (total === 0) {
+      funnelListEl.innerHTML = '<p class="funnel-empty">No prospects logged yet.</p>';
+      return;
+    }
+    funnelListEl.innerHTML = results.map(r => {
+      const widthPct = total > 0 ? Math.max(2, Math.round((r.reached / total) * 100)) : 0;
+      const conversionHtml = r.conversionFromPrev == null ? '' :
+        '<span class="funnel-conversion font-mono">' + r.conversionFromPrev + '% reached this stage from the ' +
+        'previous one</span>';
+      return '<div class="funnel-row">' +
+        '<div class="funnel-row-head">' +
+        '<span class="stage-dot" style="background:' + r.stage.color + '"></span>' +
+        '<span class="funnel-label">' + escapeHtml(r.stage.label) + '</span>' +
+        '<span class="funnel-count font-mono">' + r.reached + ' of ' + total + '</span>' +
+        '</div>' +
+        '<div class="funnel-track"><div class="funnel-fill" style="width:' + widthPct + '%;background:' +
+        r.stage.color + '"></div></div>' +
+        conversionHtml +
+        '</div>';
+    }).join('');
   }
 
   // Average time actually spent in each stage, computed only from completed
@@ -1359,6 +1407,7 @@
       renderStalled(allStages, allProspects);
       renderDataQuality(allStages, allProspects);
       renderActivityFeed(allProspects, allStages);
+      renderFunnel(allStages, allProspects);
       renderStageVelocity(allStages, allProspects);
       applyFilter();
       if (failures.length) {
@@ -1372,6 +1421,7 @@
       boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + failures.map(escapeHtml).join('; ') + '</div>';
       nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
       activityFeedEl.innerHTML = '<p class="activity-empty" role="alert">Failed to load.</p>';
+      funnelListEl.innerHTML = '<p class="funnel-empty" role="alert">Failed to load.</p>';
       velocityListEl.innerHTML = '<p class="velocity-empty" role="alert">Failed to load.</p>';
     }
   });

@@ -180,6 +180,52 @@ header.page-head .sub {
   max-width: 72ch;
 }
 
+/* Pipeline funnel: how many prospects have ever reached each stage,
+   inferred from current stage position, not from optional history logs. */
+.funnel-list {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 36px;
+  background: var(--panel);
+}
+.funnel-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.funnel-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--hairline);
+}
+.funnel-row:first-child { border-top: none; }
+.funnel-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+.funnel-label { flex: 1; font-weight: 500; }
+.funnel-count { color: var(--sub); font-size: 0.78rem; }
+.funnel-track {
+  height: 6px;
+  border-radius: 4px;
+  background: var(--panelLight);
+  overflow: hidden;
+}
+.funnel-fill {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 2px;
+}
+.funnel-conversion {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+
 /* Stage velocity: average days spent per stage, from completed
    stageHistory moves only (not prospects still sitting in a stage now). */
 .velocity-list {
@@ -912,6 +958,12 @@ footer.page-foot {
   .velocity-value { color: #444; }
   .velocity-value-empty { color: #666; }
   .section-note { color: #555; }
+
+  .funnel-list { background: none; border-color: #bbb; }
+  .funnel-row { border-color: #ddd; }
+  .funnel-count { color: #444; }
+  .funnel-conversion { color: #666; }
+  .funnel-track { background: #eee; border: 1px solid #ccc; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }
