@@ -479,6 +479,7 @@ header.page-head .sub {
 .badge-generic { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
 .badge-unknown { background: rgba(255,255,255,0.03); color: var(--sub); }
 .badge-age { background: rgba(255,255,255,0.03); color: var(--dim); }
+.badge-category { background: rgba(255,255,255,0.04); color: var(--sub); border-color: var(--hairline); }
 .badge-stale { background: rgba(229,72,77,0.1); color: #E5484D; border-color: rgba(229,72,77,0.35); }
 
 .card-stale { border-color: rgba(229,72,77,0.35); }

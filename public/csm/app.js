@@ -336,10 +336,13 @@
       ? '<span class="badge ' + (info.isStale ? 'badge-stale' : 'badge-age') + '">' +
         info.days + 'D IN STAGE' + (info.isStale ? ' &middot; STALLED' : '') + '</span>'
       : '';
+    const categoryBadge = p.category
+      ? '<span class="badge badge-category">' + escapeHtml(p.category).toUpperCase() + '</span>'
+      : '';
     return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
-      '<div class="card-meta">' + channelBadge(p.contactChannel) + stallBadge + '</div>' +
+      '<div class="card-meta">' + categoryBadge + channelBadge(p.contactChannel) + stallBadge + '</div>' +
       '</button>';
   }
 
