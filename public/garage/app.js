@@ -48,10 +48,14 @@ const PAYOUT_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
 
 // Standard published 2026 seller fee schedules, not a live account connection.
 // See the "Fee formulas used" details on the page for the rate each case applies.
+// eBay moved to managed payments years ago: the final value fee is one combined
+// rate with no separate card-processing surcharge on top, so the old "13.25% +
+// 2.9% + $0.30" formula here was double-charging a processing fee that no
+// longer exists, and undercounting every eBay net payout on the page by it.
 function estimateNetPayout(platform, price) {
   if (price == null) return null;
   switch (platform) {
-    case 'ebay': return price - (price * 0.1325 + price * 0.029 + 0.30);
+    case 'ebay': return price - (price * 0.136 + (price > 10 ? 0.40 : 0.30));
     case 'vinted': return price;
     case 'poshmark': return price < 15 ? price - 2.95 : price * 0.80;
     case 'depop': return price - (price * 0.033 + 0.45);
@@ -514,7 +518,7 @@ function initTableScrollShadows() {
 // a draft even exists. Same fee formulas and best-tag convention as the
 // payout table above, just driven by a typed price instead of listings.json.
 const CALC_FEE_DESCRIPTIONS = {
-  ebay: '13.25% final value fee + 2.9% + $0.30 payment processing',
+  ebay: '13.6% final value fee + $0.30 ($0.40 over $10) per-order fee',
   vinted: 'No seller fees',
   poshmark: 'Flat $2.95 under $15, otherwise 20% commission',
   depop: '3.3% + $0.45 payment processing, no commission'
