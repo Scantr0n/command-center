@@ -394,6 +394,70 @@ function initTableScrollShadows() {
   });
 }
 
+// "Price a new item" what-if calculator: purely client-side, not tied to
+// any logged listing, so someone can check payout across platforms before
+// a draft even exists. Same fee formulas and best-tag convention as the
+// payout table above, just driven by a typed price instead of listings.json.
+const CALC_FEE_DESCRIPTIONS = {
+  ebay: '13.25% final value fee + 2.9% + $0.30 payment processing',
+  vinted: 'No seller fees',
+  poshmark: 'Flat $2.95 under $15, otherwise 20% commission',
+  depop: '3.3% + $0.45 payment processing, no commission'
+};
+let calcPlatforms = new Set(PAYOUT_PLATFORMS);
+
+function renderCalc() {
+  const input = document.getElementById('calcPriceInput');
+  const tbody = document.getElementById('calcTableBody');
+  const empty = document.getElementById('calcTableEmpty');
+  const table = document.getElementById('calcTable');
+  const raw = input.value.trim();
+  const price = raw === '' ? null : Number(raw);
+
+  if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
+    table.hidden = true;
+    empty.hidden = false;
+    empty.textContent = calcPlatforms.size === 0
+      ? 'No platforms selected above.'
+      : 'Enter a price above to see estimated payouts.';
+    return;
+  }
+  table.hidden = false;
+  empty.hidden = true;
+
+  const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => ({
+    p, net: estimateNetPayout(p, price)
+  }));
+  const bestNet = rows.length > 1 ? Math.max(...rows.map(r => r.net)) : null;
+  const tiedForBest = bestNet != null && rows.filter(r => r.net === bestNet).length > 1;
+
+  tbody.innerHTML = rows.map(r => {
+    const isBest = bestNet != null && !tiedForBest && r.net === bestNet;
+    return `
+    <tr>
+      <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
+      <td class="cell-muted">${escapeHtml(CALC_FEE_DESCRIPTIONS[r.p])}</td>
+      <td class="cell-value${isBest ? ' cell-value-best' : ''}">${formatUsd(r.net)}${isBest ? ' <span class="best-tag" title="Highest net payout at this price">best</span>' : ''}</td>
+    </tr>
+  `;
+  }).join('');
+}
+
+function wireCalc() {
+  document.getElementById('calcPriceInput').addEventListener('input', renderCalc);
+  const container = document.getElementById('calcPlatformToggle');
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const platform = chip.getAttribute('data-platform');
+      const nowOn = chip.getAttribute('aria-pressed') !== 'true';
+      chip.setAttribute('aria-pressed', String(nowOn));
+      if (nowOn) calcPlatforms.add(platform); else calcPlatforms.delete(platform);
+      renderCalc();
+    });
+  });
+  renderCalc();
+}
+
 function renderActivity(events) {
   const list = document.getElementById('activityList');
   if (!events.length) {
@@ -632,4 +696,5 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+wireCalc();
 loadData();

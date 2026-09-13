@@ -306,6 +306,37 @@ section { margin-bottom: 36px; }
 .chip[aria-pressed="true"] .chip-count { color: var(--sub); }
 .chip-zero { opacity: 0.45; }
 
+.calc-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.calc-price-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 0 4px 0 12px;
+  transition: border-color 0.15s ease;
+}
+.calc-price-input-wrap:focus-within { border-color: var(--hairlineHover); }
+.calc-price-prefix { color: var(--dim); font-size: 0.78rem; }
+.calc-price-input {
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-size: 0.85rem;
+  padding: 7px 8px;
+  width: 110px;
+}
+.calc-price-input:focus { outline: none; }
+.calc-price-input::-webkit-outer-spin-button,
+.calc-price-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 /* Table */
 .table-wrap {
   position: relative;
@@ -562,7 +593,7 @@ footer.page-foot {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, #calcSection {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }

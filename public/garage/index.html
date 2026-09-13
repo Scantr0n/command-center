@@ -178,6 +178,48 @@
     </div>
   </section>
 
+  <section id="calcSection">
+    <h2 class="section-title">Price a new item</h2>
+    <div class="callout">
+      Quick what-if calculator, not tied to any logged listing. Type an asking price to see the estimated net
+      payout on each platform before a draft even exists. Uses the same fee formulas as the payout table above,
+      toggle a platform off if this item wouldn't go there.
+    </div>
+    <div class="calc-row">
+      <div class="calc-price-input-wrap">
+        <label for="calcPriceInput" class="calc-price-prefix font-mono">$</label>
+        <input
+          type="number"
+          id="calcPriceInput"
+          class="calc-price-input font-mono"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0.00"
+          aria-label="Asking price to calculate">
+      </div>
+      <div class="filter-row" id="calcPlatformToggle" role="group" aria-label="Platforms to include in calculator" style="margin-bottom:0">
+        <button type="button" class="chip" data-platform="ebay" aria-pressed="true">eBay</button>
+        <button type="button" class="chip" data-platform="vinted" aria-pressed="true">Vinted</button>
+        <button type="button" class="chip" data-platform="poshmark" aria-pressed="true">Poshmark</button>
+        <button type="button" class="chip" data-platform="depop" aria-pressed="true">Depop</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="calcTable">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Fees</th>
+            <th>Est. net payout</th>
+          </tr>
+        </thead>
+        <tbody id="calcTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="calcTableEmpty">Enter a price above to see estimated payouts.</div>
+    </div>
+  </section>
+
   <section>
     <h2 class="section-title">Quality &amp; fixes log</h2>
     <div class="activity-list" id="activityList"></div>
