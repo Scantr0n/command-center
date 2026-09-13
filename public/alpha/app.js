@@ -259,6 +259,35 @@ function renderEventLog(data) {
   log.innerHTML = sorted.map(eventItem).join('');
 }
 
+// A passive color change on the headline pill is easy to miss if this tab
+// sits open in the background while the 30s auto-refresh keeps polling.
+// Real trading-bot monitoring UIs surface a transient alert on state
+// transitions (disconnects, threshold breaches) rather than relying only on
+// a static indicator. This mirrors that with an in-page toast, purely
+// informational, on the same real fields the headline pill already uses.
+// Suppressed on the very first load so opening the page doesn't itself look
+// like a state change.
+let previousHeadlineLevel = null;
+
+function showToast(level, text) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-' + level;
+  toast.setAttribute('role', level === 'critical' ? 'alert' : 'status');
+  toast.innerHTML = `<span class="toast-text">${escapeHtml(text)}</span>` +
+    `<button type="button" class="toast-close" aria-label="Dismiss">&times;</button>`;
+  toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 8000);
+}
+
+function noteHeadlineForToast(level, text) {
+  if (previousHeadlineLevel !== null && level !== previousHeadlineLevel) {
+    showToast(level, 'Status changed: ' + text);
+  }
+  previousHeadlineLevel = level;
+}
+
 // loadStatus() fires from three places with no natural ordering (page load,
 // the 30s interval, and a manual refresh click), so a slower in-flight
 // request can resolve after a newer one and silently repaint the page with
@@ -277,6 +306,7 @@ async function loadStatus() {
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
     const headline = computeHeadline(data);
+    noteHeadlineForToast(headline.level, headline.text);
     renderHeadline(headline.level, headline.text);
     renderConnection(data);
     renderStats(data);
@@ -290,6 +320,7 @@ async function loadStatus() {
     // unremarkable state): this is the page itself failing to read its own
     // status.json, a real problem worth standing out from the everyday
     // "awaiting connection" gray, not blending into it.
+    noteHeadlineForToast('critical', "Page error, couldn't load status.json");
     renderHeadline('critical', "Page error, couldn't load status.json");
     document.getElementById('connDot').className = 'conn-dot error';
     document.getElementById('connLabel').textContent = "Couldn't load status.json";

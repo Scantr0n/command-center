@@ -452,6 +452,55 @@ header.page-head .sub {
   margin-top: 2px;
 }
 
+/* Toasts: transient, informational only, never require action. */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 40px));
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--hairline);
+  background: var(--panelLight);
+  border-radius: 10px;
+  padding: 12px 12px 12px 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  border-left: 3px solid var(--dim);
+  animation: toast-in 0.2s ease;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.toast-text {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.toast-close {
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.toast-close:hover { color: var(--ink); }
+.toast-critical { border-left-color: #E05050; }
+.toast-caution { border-left-color: #E0A030; }
+.toast-good { border-left-color: #3DDC84; }
+.toast-awaiting { border-left-color: #7B8188; }
+
 footer.page-foot {
   margin-top: 40px;
   font-size: 0.72rem;
