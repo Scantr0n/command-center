@@ -223,7 +223,11 @@
         return latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date);
       }
       if (c.linkedMetric === 'leads') {
-        const leads = (leadsData && leadsData.leads) || [];
+        // Leads carry a free-form source, not a channel, so a lead from any
+        // channel could otherwise get counted under whichever card happens
+        // to have linkedMetric "leads". Filtering on channelId keeps this
+        // card honest about leads actually attributed to it.
+        const leads = ((leadsData && leadsData.leads) || []).filter(l => l.channelId === c.id);
         if (leads.length === 0) return null;
         return leads.length + (leads.length === 1 ? ' lead logged' : ' leads logged');
       }

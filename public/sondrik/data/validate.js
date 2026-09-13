@@ -87,27 +87,8 @@ function main() {
     }
   });
 
-  // leads.json
-  const seenLeadIds = new Set();
-  (leadsData.leads || []).forEach((l, idx) => {
-    const where = 'leads[' + idx + ']' + (l && l.id ? ' (' + l.id + ')' : '');
-    if (!l.id) errors.push(where + ': missing "id"');
-    else if (seenLeadIds.has(l.id)) errors.push(where + ': duplicate id "' + l.id + '"');
-    else seenLeadIds.add(l.id);
-    if (!l.summary) errors.push(where + ': missing "summary"');
-    if (!isDateOrNull(l.loggedDate)) errors.push(where + ': "loggedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(l.loggedDate));
-
-    const o = l.outreach || {};
-    if (o.sent === true && o.approvalStatus !== 'approved') {
-      errors.push(where + ': outreach.sent is true but approvalStatus is not "approved". A send must never be ' +
-        'recorded without an explicit approval on record.');
-    }
-    if (o.sent === undefined) {
-      errors.push(where + ': outreach.sent must be explicitly true or false, never left unset.');
-    }
-  });
-
-  // channels.json
+  // channels.json (validated before leads.json so a lead's channelId can be
+  // checked against the real set of channel ids)
   const VALID_STATUSES = new Set(['tracked', 'manual-log', 'not-tracked']);
   const VALID_LINKS = new Set([null, undefined, 'downloads', 'leads']);
   const seenChannelIds = new Set();
@@ -128,6 +109,33 @@ function main() {
     }
     if (c.status === 'not-tracked' && !c.note) {
       warnings.push(where + ': status is "not-tracked" with no note explaining why, reads as an unexplained gap');
+    }
+  });
+
+  // leads.json
+  const seenLeadIds = new Set();
+  (leadsData.leads || []).forEach((l, idx) => {
+    const where = 'leads[' + idx + ']' + (l && l.id ? ' (' + l.id + ')' : '');
+    if (!l.id) errors.push(where + ': missing "id"');
+    else if (seenLeadIds.has(l.id)) errors.push(where + ': duplicate id "' + l.id + '"');
+    else seenLeadIds.add(l.id);
+    if (!l.summary) errors.push(where + ': missing "summary"');
+    if (!isDateOrNull(l.loggedDate)) errors.push(where + ': "loggedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(l.loggedDate));
+    // channelId attributes this lead to a channel card's count (see
+    // renderChannels in app.js); a channelId that doesn't match any real
+    // channel would silently attribute the lead to nothing, so it's an
+    // error, not a warning, same weight as a bad relatedTo id elsewhere.
+    if (l.channelId !== undefined && l.channelId !== null && !seenChannelIds.has(l.channelId)) {
+      errors.push(where + ': "channelId" references unknown channel id "' + l.channelId + '"');
+    }
+
+    const o = l.outreach || {};
+    if (o.sent === true && o.approvalStatus !== 'approved') {
+      errors.push(where + ': outreach.sent is true but approvalStatus is not "approved". A send must never be ' +
+        'recorded without an explicit approval on record.');
+    }
+    if (o.sent === undefined) {
+      errors.push(where + ': outreach.sent must be explicitly true or false, never left unset.');
     }
   });
 

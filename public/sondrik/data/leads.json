@@ -2,6 +2,7 @@
   "leads": [
     {
       "id": "reddit-imadethis-tester-offer",
+      "channelId": "reddit",
       "source": "Reddit",
       "sourceDetail": "Commenter on r/IMadeThis",
       "type": "beta-tester-offer",
