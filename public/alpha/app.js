@@ -340,4 +340,13 @@ setInterval(() => {
   if (document.visibilityState === 'visible') loadStatus();
 }, REFRESH_INTERVAL_MS);
 
+// The interval above only fires while the tab is visible, so a tab left
+// hidden for a while (Jack tabs away, comes back) can show a reading up to
+// a full interval stale at the moment he actually looks. Refetching the
+// instant the tab regains visibility is what makes a glance-at-status page
+// trustworthy the moment it is glanced at, rather than up to 30s behind.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') loadStatus();
+});
+
 loadStatus();
