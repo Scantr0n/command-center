@@ -302,12 +302,21 @@ function pillStyle(status) {
 
 let lastClustersRaw = null;
 
+// loadClusters() fires from three unsynchronized places (initial load, the
+// 30s interval, and the visibility-change refetch below), so a slower
+// in-flight request can resolve after a newer one and repaint the page with
+// stale data. Same monotonic-request-id guard as alpha/app.js's loadStatus(),
+// for the same race.
+let latestClustersRequestId = 0;
+
 async function loadClusters() {
+  const requestId = ++latestClustersRequestId;
   const errBox = document.getElementById('errorBanner');
   try {
     const res = await fetch('/api/clusters');
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
+    if (requestId !== latestClustersRequestId) return;
     document.getElementById('graphSkeleton').classList.add('hidden');
 
     // A cluster file that fails to parse (a hand-edit typo) is skipped
@@ -340,6 +349,7 @@ async function loadClusters() {
     renderGrid();
     renderActivityFeed();
   } catch (e) {
+    if (requestId !== latestClustersRequestId) return;
     errBox.textContent = `Couldn't load project data: ${e.message}. Retrying in 30s.`;
     errBox.classList.remove('hidden');
   }
