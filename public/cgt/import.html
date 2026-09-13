@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#08090A">
+<title>Import CSV / Card Grading Tracker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/cgt/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">IMPORT CSV</h1>
+      <p class="sub font-mono">Turn a CSV export from the real tracker file into a cards.json you can save over public/cgt/data/cards.json</p>
+    </div>
+    <div class="page-head-actions">
+      <a href="/cgt/" class="back-link">&larr; Card Grading Tracker</a>
+    </div>
+  </header>
+
+  <main>
+  <div class="callout">
+    <strong>This page does not save anything by itself.</strong> Command Center's dashboards are static files with
+    no database, so there is nothing here for this tool to write to directly. It parses a CSV, lets you map its
+    columns to the real schema, runs the exact same checks as
+    <code class="inline-code">node public/cgt/data/validate.js</code>, and then gives you a
+    <code class="inline-code">cards.json</code> file to download and use to replace
+    <code class="inline-code">public/cgt/data/cards.json</code> by hand. Nothing is invented: a blank
+    cell stays <code class="inline-code">null</code>, never a guess.
+  </div>
+
+  <section class="import-step" id="stepLoadStatus">
+    <h2 class="section-title">Existing data</h2>
+    <p class="import-status-line font-mono" id="existingStatus">Checking public/cgt/data/cards.json&hellip;</p>
+  </section>
+
+  <section class="import-step">
+    <h2 class="section-title">1. Paste or choose a CSV file</h2>
+    <p class="import-help">The first row must be a header row. Column names don't need to match the schema exactly,
+      the next step lets you map each one, and any column you don't map is ignored.</p>
+    <div class="import-input-row">
+      <input type="file" id="csvFile" accept=".csv,text/csv" class="import-file-input font-mono">
+      <button type="button" id="downloadTemplateBtn" class="print-btn font-mono">Download blank template CSV</button>
+    </div>
+    <textarea id="csvPaste" class="import-textarea font-mono" rows="6" placeholder="Or paste CSV text here, e.g.&#10;Card,Year,Sport,Grader,Grade,Cert #,Value,Basis,Comp note,Source,Date priced,Batch,Notes&#10;2021 Topps Chrome Julio Rodriguez RC,2021,baseball,PSA,10,12345678,450,recent-sale,,eBay sold Aug 2026 3 comps,2026-08-08,2026-08-08-full-backlog,"></textarea>
+    <button type="button" id="parseBtn" class="print-btn font-mono import-primary-btn">Parse CSV</button>
+    <p class="import-error" id="parseError" hidden role="alert"></p>
+  </section>
+
+  <section class="import-step" id="mappingStep" hidden>
+    <h2 class="section-title">2. Map columns</h2>
+    <p class="import-help">Guessed automatically from the header names where possible. Check each one, especially
+      any left as "Ignore this column".</p>
+    <div class="mapping-grid" id="mappingGrid"></div>
+  </section>
+
+  <section class="import-step" id="previewStep" hidden>
+    <h2 class="section-title">3. Preview</h2>
+    <p class="import-help" id="previewSummary"></p>
+    <div class="table-wrap">
+      <table class="card-table" id="previewTable">
+        <thead><tr id="previewHead"></tr></thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="import-step" id="validateStep" hidden>
+    <h2 class="section-title">4. Validate</h2>
+    <p class="import-help">Runs the same rules as <code class="inline-code">validate.js</code> against your
+      import combined with the existing real cards already on record (the example placeholder row is dropped
+      automatically). Errors block the download below, warnings don't.</p>
+    <div id="validationResults"></div>
+  </section>
+
+  <section class="import-step" id="downloadStep" hidden>
+    <h2 class="section-title">5. Download</h2>
+    <p class="import-help" id="downloadSummary"></p>
+    <button type="button" id="downloadJsonBtn" class="print-btn font-mono import-primary-btn">Download cards.json</button>
+    <p class="import-help">Save the downloaded file over <code class="inline-code">public/cgt/data/cards.json</code>,
+      then run <code class="inline-code">node public/cgt/data/validate.js</code> one more time from a real
+      checkout as a final check before committing it.</p>
+  </section>
+  </main>
+
+  <footer class="page-foot font-mono">
+    Runs entirely in your browser. Nothing you paste or upload here is sent anywhere.
+  </footer>
+</div>
+
+<script src="/cgt/data/validate-core.js"></script>
+<script src="/cgt/import.js"></script>
+</body>
+</html>

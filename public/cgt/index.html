@@ -24,6 +24,7 @@
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
       <button type="button" id="insurancePrintBtn" class="print-btn font-mono">Print insurance summary</button>
+      <a href="/cgt/import.html" class="print-btn font-mono">Import CSV</a>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
@@ -41,7 +42,9 @@
     <div class="schema-help-body">
       <p>Edit <code>public/cgt/data/cards.json</code> by hand and add an object to the
         <code>cards</code> array. Leave any field you do not have a real answer for as <code>null</code>,
-        do not fill it in with a guess.</p>
+        do not fill it in with a guess. If the real data already exists as a CSV export from the tracker file,
+        the <a href="/cgt/import.html">Import CSV</a> page will map its columns to this schema, validate it, and
+        hand back a ready-to-save cards.json instead of retyping everything by hand.</p>
       <p><strong>Run <code>node public/cgt/data/validate.js</code> after every edit.</strong> It catches
         duplicate ids, a missing or unlabeled <code>valuationBasis</code> on a priced card, a
         <code>comp-estimate</code> with no <code>compNote</code> explaining what it is based on, and bad dates.

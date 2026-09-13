@@ -616,6 +616,91 @@ footer.page-foot {
   padding-top: 16px;
 }
 
+/* Standalone <code> snippet outside .schema-help-body (e.g. in import.html's
+   intro callout), same look as .schema-help-body code without needing the
+   descendant selector's parent. */
+code.inline-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  background: rgba(255,255,255,0.05);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--ink);
+}
+
+/* CSV import page (import.html / import.js): a linear wizard, each step a
+   plain section rather than the dashboard's card/grid layout, since the
+   input to one step is the output of the step before it. */
+.import-step { margin-bottom: 32px; }
+.import-status-line { color: var(--sub); font-size: 0.82rem; }
+.import-help { color: var(--sub); font-size: 0.8rem; line-height: 1.6; margin: 0 0 12px; }
+.import-input-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.import-file-input { color: var(--sub); font-size: 0.78rem; max-width: 100%; }
+.import-textarea {
+  width: 100%;
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  resize: vertical;
+  margin-bottom: 12px;
+}
+.import-textarea:focus { outline: none; border-color: var(--hairlineHover); }
+.import-textarea::placeholder { color: var(--dim); }
+.import-primary-btn { color: var(--ink); border-color: var(--hairlineHover); background: rgba(255,255,255,0.05); }
+.import-error { color: #E0503C; font-size: 0.8rem; margin-top: 10px; }
+
+.mapping-grid {
+  display: grid;
+  gap: 8px;
+}
+.mapping-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 20px minmax(180px, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.mapping-source { color: var(--sub); font-size: 0.78rem; overflow-wrap: anywhere; }
+.mapping-arrow { color: var(--dim); text-align: center; }
+.mapping-select {
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  width: 100%;
+}
+.mapping-select:focus { outline: none; border-color: var(--hairlineHover); }
+
+.import-validation-ok { color: #3DDC84; font-size: 0.85rem; }
+.import-validation-box {
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+}
+.import-validation-box ul { margin: 6px 0 0; padding-left: 20px; }
+.import-validation-box li { margin: 3px 0; line-height: 1.5; }
+.import-validation-errors { border: 1px solid rgba(224,80,60,0.35); background: rgba(224,80,60,0.06); }
+.import-validation-errors .import-validation-title { color: #E0503C; font-weight: 600; }
+.import-validation-warnings { border: 1px solid rgba(224,160,48,0.3); background: rgba(224,160,48,0.05); }
+.import-validation-warnings .import-validation-title { color: #E0A030; font-weight: 600; }
+.import-primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* Insurance/appraisal summary: built once from real data (see
    renderInsuranceSummary in app.js), always hidden on screen, and shown only
    inside @media print while body.insurance-print-mode is set (see the
