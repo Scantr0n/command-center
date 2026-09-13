@@ -5,6 +5,7 @@
   const goalsSection = document.getElementById('goalsSection');
   const channelsSection = document.getElementById('channelsSection');
   const leadsSection = document.getElementById('leadsSection');
+  const nextStepsList = document.getElementById('nextStepsList');
   const csvBtn = document.getElementById('csvBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
   const copyStatusLive = document.getElementById('copyStatusLive');
@@ -421,6 +422,72 @@
     }).join('');
   }
 
+  // Consolidates the "needs a real human action" signals that otherwise sit
+  // scattered across three separate sections (the header approval pill, the
+  // traction staleness badge, the empty goal state) into one scannable
+  // checklist. Every line here is a fact already computed elsewhere on the
+  // page, this only decides which of those facts amount to an actual next
+  // action and lists them together, it does not add any new data of its own.
+  function renderNextSteps(downloadsData, leadsData, goalsData) {
+    const STALE_AFTER_DAYS = 7;
+    const steps = [];
+
+    const leads = (leadsData && leadsData.leads) || [];
+    leads.forEach(l => {
+      const o = l.outreach || {};
+      if (!o.sent && o.approvalStatus === 'awaiting-approval') {
+        steps.push({
+          urgent: true,
+          text: 'Approve or send the drafted message to ' + (l.sourceDetail || l.source || 'this lead') + '.',
+          href: '#leadsSection'
+        });
+      }
+    });
+
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length === 0) {
+      steps.push({
+        urgent: false,
+        text: 'Log a first download check in downloads.json once you have a real count to record.',
+        href: '#tractionSection'
+      });
+    } else {
+      const latest = checks[checks.length - 1];
+      const ageDays = daysBetween(latest.date, todayIso());
+      if (ageDays > STALE_AFTER_DAYS) {
+        steps.push({
+          urgent: true,
+          text: 'Pull a fresh ' + (metric.label || 'download') + ' count, the last one logged is ' + ageDays + ' days old.',
+          href: '#tractionSection'
+        });
+      }
+    }
+
+    const goals = (goalsData && goalsData.goals) || [];
+    if (goals.length === 0) {
+      steps.push({
+        urgent: false,
+        text: 'Set a real target in goals.json once there is one worth tracking against.',
+        href: '#goalsSection'
+      });
+    }
+
+    if (steps.length === 0) {
+      nextStepsList.innerHTML = '<div class="empty-state">Nothing needs your attention right now.</div>';
+      return;
+    }
+
+    steps.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
+    nextStepsList.innerHTML = '<ul class="next-steps-list">' + steps.map(s =>
+      '<li class="next-step-item ' + (s.urgent ? 'next-step-urgent' : 'next-step-info') + '">' +
+      '<a href="' + s.href + '">' +
+      '<span class="next-step-pill font-mono">' + (s.urgent ? 'ACTION' : 'WHEN READY') + '</span>' +
+      '<span class="next-step-text">' + escapeHtml(s.text) + '</span>' +
+      '</a></li>'
+    ).join('') + '</ul>';
+  }
+
   // Builds a plain-text snapshot from the same real data files already on
   // the page, for Jack to paste into a build log or status update himself.
   // Purely a clipboard copy, nothing here ever transmits anywhere on its own.
@@ -601,6 +668,12 @@
     } else {
       leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
         escapeHtml(leadsResult.reason.message) + '</div>';
+    }
+
+    if (downloadsData || leadsData || goalsData) {
+      renderNextSteps(downloadsData, leadsData, goalsData);
+    } else {
+      nextStepsList.innerHTML = '<div class="empty-state" role="alert">Could not compute next steps, data failed to load.</div>';
     }
 
     if (releasesData || downloadsData || leadsData) {
