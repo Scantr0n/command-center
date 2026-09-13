@@ -67,6 +67,7 @@
   }
   .search-input { transition: border-color 0.15s ease, background 0.15s ease; }
   .search-input:focus { border-color: var(--hairlineHover) !important; }
+  #chatInput:disabled, #sendChat:disabled { opacity: 0.5; cursor: not-allowed; }
   .graph-node.dimmed, .cluster-card.dimmed { opacity: 0.16; }
   .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
   .cat-label { cursor: pointer; }
@@ -873,13 +874,39 @@ function appendMessage(role, text) {
   document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
 }
 
+// A real round trip to the Anthropic API takes long enough that, with no
+// feedback at all, hitting Send looks like it did nothing. Reuses the same
+// pulse animation as the graph's own loading skeleton.
+function showTypingIndicator() {
+  const div = document.createElement('div');
+  div.className = 'text-left';
+  div.id = 'typingIndicator';
+  const span = document.createElement('span');
+  span.className = 'inline-block px-3 py-2 rounded-lg skeleton-pulse';
+  span.style.cssText = 'background: var(--panelLight); color: var(--sub);';
+  span.textContent = '...';
+  div.appendChild(span);
+  document.getElementById('chatMessages').appendChild(div);
+  document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+}
+
+function removeTypingIndicator() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendChat');
   const text = input.value.trim();
   if (!text || !activeCluster) return;
   input.value = '';
   appendMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
+
+  input.disabled = true;
+  sendBtn.disabled = true;
+  showTypingIndicator();
 
   try {
     const res = await fetch(`/api/clusters/${activeCluster.id}/chat`, {
@@ -888,6 +915,7 @@ async function sendChat() {
       body: JSON.stringify({ messages: chatHistory })
     });
     const data = await res.json();
+    removeTypingIndicator();
     if (data.text) {
       appendMessage('assistant', data.text);
       chatHistory.push({ role: 'assistant', content: data.text });
@@ -895,7 +923,12 @@ async function sendChat() {
       appendMessage('assistant', 'Error reaching the assistant.');
     }
   } catch (e) {
+    removeTypingIndicator();
     appendMessage('assistant', 'Error reaching the assistant.');
+  } finally {
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
   }
 }
 
