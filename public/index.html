@@ -218,7 +218,10 @@
           <div id="modalDot" class="w-3 h-3 rounded-full status-dot"></div>
           <h2 id="modalTitle" class="font-display font-700 text-lg"></h2>
         </div>
-        <button id="closeModal" class="text-xl leading-none" style="color: var(--sub)">&times;</button>
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <button id="copyLinkBtn" type="button" class="text-[10px] font-mono px-2.5 py-1 rounded border hairline" style="color: var(--sub)" aria-live="polite">Copy link</button>
+          <button id="closeModal" class="text-xl leading-none" style="color: var(--sub)">&times;</button>
+        </div>
       </div>
       <div class="px-6 py-4 border-b hairline">
         <div class="flex items-center gap-2 mb-3 flex-wrap">
@@ -301,6 +304,14 @@ function pillStyle(status) {
 }
 
 let lastClustersRaw = null;
+let deepLinkChecked = false;
+
+// True whenever the currently open modal added its own history entry (a
+// normal card click), so closing it can hand control back to history.back()
+// and let the URL/back-button stay in sync. False for a modal opened by
+// restoring ?project= from the URL on load or via popstate, where the entry
+// is already the current one and there is nothing of ours left to pop.
+let modalHistoryPushed = false;
 
 // loadClusters() fires from three unsynchronized places (initial load, the
 // 30s interval, and the visibility-change refetch below), so a slower
@@ -348,6 +359,18 @@ async function loadClusters() {
     renderGraph();
     renderGrid();
     renderActivityFeed();
+
+    // A project link (e.g. shared from the activity feed or a needs-attention
+    // pill) only resolves once real cluster data is in, so this runs once
+    // here rather than at page-load time, and only once, since loadClusters
+    // itself re-fires every 30s on the polling interval.
+    if (!deepLinkChecked) {
+      deepLinkChecked = true;
+      const pid = new URLSearchParams(location.search).get('project');
+      if (pid && clusters.some(c => c.id === pid)) {
+        openModal(pid, { isDeepLink: true });
+      }
+    }
   } catch (e) {
     if (requestId !== latestClustersRequestId) return;
     errBox.textContent = `Couldn't load project data: ${e.message}. Retrying in 30s.`;
@@ -844,7 +867,14 @@ function unlockBodyScroll() {
   document.body.style.paddingRight = '';
 }
 
-function openModal(id) {
+// Mirrors the currently open project into ?project=<id>, same convention as
+// the CSM/Garage/CGT hubs mirroring their own filters into the URL, so a
+// specific project's modal can be bookmarked or shared as a direct link.
+// A real click pushes a new history entry (so the back button closes the
+// modal, standard modal-deep-link behavior); restoring from a URL that
+// already names the project (initial load, or popstate) does not.
+function openModal(id, opts = {}) {
+  const { isDeepLink = false } = opts;
   activeCluster = clusters.find(c => c.id === id);
   lastFocusedEl = document.activeElement;
   chatHistory = [];
@@ -888,6 +918,14 @@ function openModal(id) {
   document.getElementById('modalOverlay').classList.add('flex');
   lockBodyScroll();
   document.getElementById('closeModal').focus();
+
+  if (isDeepLink) {
+    modalHistoryPushed = false;
+  } else {
+    const url = `${location.pathname}?project=${encodeURIComponent(id)}`;
+    history.pushState({ ccProject: id }, '', url);
+    modalHistoryPushed = true;
+  }
 }
 
 function getModalFocusable() {
@@ -896,7 +934,8 @@ function getModalFocusable() {
   )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
 }
 
-function closeModalAndReturnFocus() {
+function closeModalAndReturnFocus(opts = {}) {
+  const { fromPopState = false } = opts;
   document.getElementById('modalOverlay').classList.add('hidden');
   document.getElementById('modalOverlay').classList.remove('flex');
   unlockBodyScroll();
@@ -904,7 +943,65 @@ function closeModalAndReturnFocus() {
     lastFocusedEl.focus();
   }
   lastFocusedEl = null;
+
+  // Closing already came from the back button (fromPopState), so the URL is
+  // already correct, don't touch history again. Otherwise, an X/Escape/
+  // overlay-click close should behave like pressing back if opening this
+  // modal is what pushed the history entry now on top, and just strip the
+  // query string in place if it didn't (a modal restored from a shared link).
+  if (!fromPopState) {
+    if (modalHistoryPushed) {
+      history.back();
+    } else if (new URLSearchParams(location.search).has('project')) {
+      history.replaceState(null, '', location.pathname);
+    }
+  }
+  modalHistoryPushed = false;
 }
+
+window.addEventListener('popstate', () => {
+  const pid = new URLSearchParams(location.search).get('project');
+  const modalOpen = !document.getElementById('modalOverlay').classList.contains('hidden');
+  if (pid) {
+    if (!modalOpen || !activeCluster || activeCluster.id !== pid) {
+      if (clusters.some(c => c.id === pid)) openModal(pid, { isDeepLink: true });
+    }
+  } else if (modalOpen) {
+    closeModalAndReturnFocus({ fromPopState: true });
+  }
+});
+
+// Same "copy the shareable URL" affordance as the CSM/Garage/CGT hubs, here
+// copying a direct link to the open project's modal rather than a filtered
+// view.
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(ta);
+  }
+  return Promise.resolve();
+}
+
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const COPY_LINK_LABEL = copyLinkBtn.textContent;
+copyLinkBtn.addEventListener('click', () => {
+  copyText(location.href)
+    .then(() => { copyLinkBtn.textContent = 'Link copied'; })
+    .catch(() => { copyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
+    .finally(() => {
+      setTimeout(() => { copyLinkBtn.textContent = COPY_LINK_LABEL; }, 1800);
+    });
+});
 
 function updateToggleBtn() {
   const btn = document.getElementById('toggleBtn');

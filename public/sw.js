@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -73,11 +73,20 @@ async function networkFirst(request) {
 // rarely change and are only ever replaced by a new CACHE_VERSION, so serve
 // the cached copy instantly and refresh it in the background rather than
 // waiting on the network every time.
+//
+// Cached under the bare path, same reasoning as networkFirst's cacheKey
+// above: the dashboard now supports "?project=<id>" deep links into a
+// project's modal (shareable via the modal's own Copy link button), so a
+// plain path match against the request would miss the cached "/" shell for
+// every such link and, worse, store each distinct link as its own cache
+// entry forever instead of recognizing it as the same page.
 async function staleWhileRevalidate(request) {
+  const url = new URL(request.url);
+  const cacheKey = url.origin + url.pathname;
   const cache = await caches.open(SHELL_CACHE);
-  const cached = await cache.match(request);
+  const cached = await cache.match(cacheKey);
   const networkFetch = fetch(request).then(fresh => {
-    if (fresh.ok) cache.put(request, fresh.clone());
+    if (fresh.ok) cache.put(cacheKey, fresh.clone());
     return fresh;
   }).catch(() => null);
   return cached || (await networkFetch) || Response.error();
