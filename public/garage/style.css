@@ -308,11 +308,36 @@ section { margin-bottom: 36px; }
 
 /* Table */
 .table-wrap {
+  position: relative;
   border: 1px solid var(--hairline);
   border-radius: 12px;
   background: var(--panel);
   overflow-x: auto;
 }
+/* The table has a fixed min-width to keep columns legible, so on a narrow
+   screen it scrolls horizontally with no other visual cue. A fade at
+   whichever edge still has content past the frame signals that, and clears
+   once you scroll that edge into view. */
+.table-wrap::before, .table-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.table-wrap::before {
+  left: 0;
+  background: linear-gradient(to right, var(--panel), transparent);
+}
+.table-wrap::after {
+  right: 0;
+  background: linear-gradient(to left, var(--panel), transparent);
+}
+.table-wrap.can-scroll-left::before { opacity: 1; }
+.table-wrap.can-scroll-right::after { opacity: 1; }
 table.card-table {
   width: 100%;
   border-collapse: collapse;
@@ -532,6 +557,7 @@ footer.page-foot {
   .activity-item-title, .activity-item-detail, .activity-item-meta { color: #111 !important; }
 
   .table-wrap { background: none; border: 1px solid #ccc; }
+  .table-wrap::before, .table-wrap::after { display: none !important; }
   .card-table thead th { color: #333; border-color: #ccc; }
   .card-table tbody tr + tr td { border-color: #ddd; }
   .cell-card-name, .cell-value { color: #111; }

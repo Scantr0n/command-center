@@ -95,6 +95,7 @@ async function loadData() {
     applyFiltersAndRender();
     renderPayoutTable(listings);
     renderActivity(activityData.events || []);
+    initTableScrollShadows();
   } catch (e) {
     listings = [];
     document.getElementById('listingTableBody').innerHTML = '';
@@ -298,6 +299,25 @@ function renderPayoutTable(listings) {
       }).join('')}
     </tr>
   `).join('');
+}
+
+// Each .table-wrap has a fixed min-width so columns stay legible, which
+// means on a narrow screen it scrolls horizontally with no other visual
+// cue. Toggles a fade at whichever edge still has content past the frame.
+function initTableScrollShadows() {
+  document.querySelectorAll('.table-wrap').forEach(wrap => {
+    const update = () => {
+      const maxScrollLeft = wrap.scrollWidth - wrap.clientWidth;
+      wrap.classList.toggle('can-scroll-left', wrap.scrollLeft > 1);
+      wrap.classList.toggle('can-scroll-right', wrap.scrollLeft < maxScrollLeft - 1);
+    };
+    if (!wrap.dataset.scrollShadowBound) {
+      wrap.dataset.scrollShadowBound = '1';
+      wrap.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+    }
+    update();
+  });
 }
 
 function renderActivity(events) {

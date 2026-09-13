@@ -135,6 +135,7 @@ async function loadCards() {
     renderPricingActivity();
     renderBatchFilter();
     applyFiltersAndRender();
+    initTableScrollShadows();
   } catch (e) {
     cards = [];
     document.getElementById('cardTableBody').innerHTML = '';
@@ -464,6 +465,25 @@ function applyFiltersAndRender() {
         openModal(row.dataset.id);
       }
     });
+  });
+}
+
+// The .table-wrap has a fixed min-width so columns stay legible, which
+// means on a narrow screen it scrolls horizontally with no other visual
+// cue. Toggles a fade at whichever edge still has content past the frame.
+function initTableScrollShadows() {
+  document.querySelectorAll('.table-wrap').forEach(wrap => {
+    const update = () => {
+      const maxScrollLeft = wrap.scrollWidth - wrap.clientWidth;
+      wrap.classList.toggle('can-scroll-left', wrap.scrollLeft > 1);
+      wrap.classList.toggle('can-scroll-right', wrap.scrollLeft < maxScrollLeft - 1);
+    };
+    if (!wrap.dataset.scrollShadowBound) {
+      wrap.dataset.scrollShadowBound = '1';
+      wrap.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+    }
+    update();
   });
 }
 
