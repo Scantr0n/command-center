@@ -93,7 +93,12 @@
   </details>
 
   <section>
-    <h2 class="section-title">Nudge queue</h2>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Nudge queue</h2>
+      <button type="button" id="icsBtn" class="print-btn font-mono" disabled>Export to calendar (.ics)</button>
+    </div>
+    <p class="section-note">Downloads real nudge dates as calendar events to import into Google Calendar, Apple
+      Calendar, or Outlook. This only creates a file on your device, it does not send or sync anything.</p>
     <div class="nudge-queue" id="nudgeQueue">
       <p class="nudge-empty">Loading...</p>
     </div>

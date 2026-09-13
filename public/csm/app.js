@@ -12,6 +12,7 @@
   const modalClose = document.getElementById('modalClose');
   const printBtn = document.getElementById('printBtn');
   const csvBtn = document.getElementById('csvBtn');
+  const icsBtn = document.getElementById('icsBtn');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   const dataQualitySection = document.getElementById('dataQualitySection');
   const dataQualityList = document.getElementById('dataQualityList');
@@ -168,6 +169,8 @@
       .filter(p => p.nextNudgeDate)
       .map(p => ({ p, days: daysUntil(p.nextNudgeDate) }))
       .sort((a, b) => a.days - b.days);
+
+    icsBtn.disabled = withDates.length === 0;
 
     if (withDates.length === 0) {
       nudgeEl.innerHTML = '<p class="nudge-empty">No nudge dates logged yet. Once a real send date and nudge ' +
@@ -616,6 +619,21 @@
     syncUrl();
   }
 
+  // Shared by CSV and ICS export: builds a Blob, triggers a download, and
+  // cleans up the object URL. Neither export contacts anyone or writes back
+  // to prospects.json, both only ever produce a local file.
+  function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function csvField(v) {
     const s = v == null ? '' : String(v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -668,15 +686,78 @@
     const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
     const lines = rows.map(r => CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
     const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'csm-pipeline-' + new Date().toISOString().slice(0, 10) + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile(csv, 'csm-pipeline-' + todayIso() + '.csv', 'text/csv;charset=utf-8;');
+  });
+
+  // RFC 5545 (iCalendar) text escaping: backslash, comma, semicolon, and
+  // newline all need a backslash escape inside a property value.
+  function icsEscapeText(s) {
+    return String(s == null ? '' : s)
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\n/g, '\\n');
+  }
+
+  // Folds a single logical property line at 75 octets with a CRLF + single
+  // space continuation, per RFC 5545 section 3.1. Long SUMMARY/DESCRIPTION
+  // lines are common here (name + company, or a full next-action sentence),
+  // and unfolded lines are technically invalid even though most calendar
+  // apps tolerate them.
+  function icsFoldLine(line) {
+    if (line.length <= 75) return line;
+    let out = line.slice(0, 75);
+    let rest = line.slice(75);
+    while (rest.length > 0) {
+      out += '\r\n ' + rest.slice(0, 74);
+      rest = rest.slice(74);
+    }
+    return out;
+  }
+
+  // One all-day VEVENT per prospect with a real nextNudgeDate, meant to be
+  // imported into a real calendar app so the "don't nudge before X, nudge by
+  // Y" schedule becomes an actual reminder instead of only living on this
+  // page. Exports only real, already-logged dates, never a guessed one, and
+  // never anything that contacts the prospect itself.
+  function buildNudgeIcs(prospects) {
+    const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const events = prospects.map(p => {
+      const descLines = [];
+      descLines.push(p.nextAction ? 'Next action: ' + p.nextAction : 'No next action logged yet.');
+      const ns = p.nudgeSchedule || {};
+      if (ns.doNotNudgeBefore) descLines.push('Do not nudge before ' + fmtDate(ns.doNotNudgeBefore) + '.');
+      const touchCount = (p.outreachLog || []).filter(e => e && e.date).length;
+      if (touchCount > 0) descLines.push(touchCount + ' outreach touch' + (touchCount === 1 ? '' : 'es') + ' logged so far.');
+      descLines.push('CSM pipeline: ' + location.origin + '/csm/');
+      const lines = [
+        'BEGIN:VEVENT',
+        'UID:' + p.id + '-' + p.nextNudgeDate + '@csm.command-center',
+        'DTSTAMP:' + dtstamp,
+        'DTSTART;VALUE=DATE:' + p.nextNudgeDate.replace(/-/g, ''),
+        'SUMMARY:' + icsEscapeText('Nudge: ' + p.name + (p.company ? ' (' + p.company + ')' : '')),
+        'DESCRIPTION:' + icsEscapeText(descLines.join('\n')),
+        'END:VEVENT'
+      ];
+      return lines.map(icsFoldLine).join('\r\n');
+    });
+    return [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Command Center//CSM Pipeline//EN',
+      'CALSCALE:GREGORIAN',
+      events.join('\r\n'),
+      'END:VCALENDAR'
+    ].join('\r\n') + '\r\n';
+  }
+
+  // Exports every real nudge date currently logged, not just the visible
+  // board's filtered slice, since a calendar reminder is still real and
+  // still needed even for a prospect the current search/filter hides.
+  icsBtn.addEventListener('click', () => {
+    const withDates = allProspects.filter(p => p.nextNudgeDate);
+    if (withDates.length === 0) return;
+    downloadFile(buildNudgeIcs(withDates), 'csm-nudges-' + todayIso() + '.ics', 'text/calendar;charset=utf-8;');
   });
 
   searchInput.addEventListener('input', applyFilter);
