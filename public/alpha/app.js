@@ -93,6 +93,18 @@ function renderHeadline(level, text, asOf) {
   el.title = asOf ? 'Reading taken at ' + formatAbsolute(asOf) : '';
 }
 
+// Scans connection.history for the most recent entry that was actually
+// connected, newest first. Real status pages surface "last seen" for a
+// monitor that is currently down precisely because "not connected" alone
+// doesn't say whether it just dropped or has never once come up; built only
+// from real recorded checks, never estimated.
+function mostRecentConnectedAt(history) {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i] && history[i].connected) return history[i].at;
+  }
+  return null;
+}
+
 function renderConnection(data) {
   const dot = document.getElementById('connDot');
   const label = document.getElementById('connLabel');
@@ -104,14 +116,20 @@ function renderConnection(data) {
   // page actually surfaced it, so "not connected" gave no sense of whether a
   // check had ever run versus one never being attempted.
   const checkedAt = data.connection && data.connection.checkedAt;
+  const history = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
 
   if (!data.connection.connected || !asOf) {
     dot.className = 'conn-dot down';
     label.textContent = 'Not connected';
+    const lastConnectedAt = mostRecentConnectedAt(history);
     sub.textContent = data.connection.note || 'No live feed configured yet.';
-    sub.title = checkedAt
+    if (lastConnectedAt) {
+      sub.textContent += ' · Last connected ' + (timeAgo(lastConnectedAt) || formatAbsolute(lastConnectedAt));
+    }
+    sub.title = (checkedAt
       ? 'Connectivity last checked ' + (timeAgo(checkedAt) || '') + ' (' + formatAbsolute(checkedAt) + ')'
-      : 'Connectivity has never been checked yet.';
+      : 'Connectivity has never been checked yet.') +
+      (lastConnectedAt ? ' • Last seen connected at ' + formatAbsolute(lastConnectedAt) : '');
     updateGlanceIndicators('down');
     return;
   }
