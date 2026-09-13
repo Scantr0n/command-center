@@ -504,7 +504,9 @@
         (p.name || '').toLowerCase().includes(query) ||
         (p.company || '').toLowerCase().includes(query) ||
         (p.category || '').toLowerCase().includes(query) ||
-        (p.verifiedHook || '').toLowerCase().includes(query)));
+        (p.verifiedHook || '').toLowerCase().includes(query) ||
+        (p.notes || '').toLowerCase().includes(query) ||
+        (p.contactChannel && (p.contactChannel.detail || '').toLowerCase().includes(query))));
     lastFiltered = filtered;
     const filterActive = anyFilterActive();
     renderBoard(allStages, filtered, allProspects, query, filterActive);
