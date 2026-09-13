@@ -93,6 +93,7 @@ async function loadData() {
     renderStats(listings, pipelineData.stages || []);
     renderPipeline(pipelineData.stages || []);
     applyFiltersAndRender();
+    renderCoverage(listings);
     renderPayoutTable(listings);
     renderActivity(activityData.events || []);
     initTableScrollShadows();
@@ -134,6 +135,7 @@ function renderStats(listings, stages) {
   const readyStage = stages.find(s => s.stage === 'ready-to-post');
   const atRiskCount = live.filter(l => (l.soldOn || []).length > 0 && remainingPlatforms(l).length > 0).length;
   const bestCaseTotal = bestCaseTotalPayout(live);
+  const coverageGapCount = live.filter(l => missingPlatforms(l).length > 0).length;
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -142,7 +144,8 @@ function renderStats(listings, stages) {
     { value: formatUsd(totalValue), label: 'Total live asking value', sub: null },
     { value: formatUsd(bestCaseTotal), label: 'Best-case net payout', sub: 'If each item sells on its best-fee platform' },
     { value: readyStage ? readyStage.count : 0, label: 'Drafts ready to post', sub: readyStage && readyStage.note ? readyStage.note : null },
-    { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 }
+    { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 },
+    { value: coverageGapCount, label: 'Items with cross-post gaps', sub: coverageGapCount ? 'Not yet on all 4 platforms' : 'Fully cross-listed' }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -165,6 +168,42 @@ function renderPipeline(stages) {
       <div class="pipeline-stage-note${s.note ? '' : ' empty'}">${s.note ? escapeHtml(s.note) : 'Nothing logged'}</div>
     </div>
   `).join('');
+}
+
+// Which of the four known platforms an item isn't listed on yet, used for
+// the "Cross-post coverage" section. Only reads the real platforms array,
+// doesn't guess whether a given item actually fits an unlisted platform.
+function missingPlatforms(l) {
+  const listedOn = l.platforms || [];
+  return VALID_PLATFORMS.filter(p => !listedOn.includes(p));
+}
+
+function renderCoverage(listings) {
+  const tbody = document.getElementById('coverageTableBody');
+  const empty = document.getElementById('coverageTableEmpty');
+  const rows = listings.filter(l => l.status === 'live');
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No live listings to check coverage for yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  tbody.innerHTML = rows.map(l => {
+    const missing = missingPlatforms(l);
+    const missingHtml = missing.length
+      ? missing.map(p => `<span class="badge badge-missing">${escapeHtml(PLATFORM_LABELS[p] || p)}</span>`).join('')
+      : '<span class="cell-value empty">none, fully cross-listed</span>';
+    return `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div></td>
+      <td class="cell-platforms">${platformBadges(l.platforms, l.soldOn)}</td>
+      <td class="cell-platforms">${missingHtml}</td>
+    </tr>
+  `;
+  }).join('');
 }
 
 function platformBadges(platforms, soldOn) {

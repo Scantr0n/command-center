@@ -425,6 +425,12 @@ table.card-table {
   text-decoration: line-through;
   text-decoration-color: rgba(229,100,100,0.6);
 }
+.badge-missing {
+  background: transparent;
+  color: var(--dim);
+  border-color: var(--hairline);
+  border-style: dashed;
+}
 
 .table-empty {
   padding: 40px 20px;

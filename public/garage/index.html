@@ -116,6 +116,28 @@
   </section>
 
   <section>
+    <h2 class="section-title">Cross-post coverage</h2>
+    <div class="callout">
+      Shows which of the four platforms each live item is <em>not</em> on yet, since broader platform coverage
+      is one of the main levers for selling faster. This only reads the real <code>platforms</code> field
+      already logged per item, it doesn't judge whether a given item actually fits a platform's audience.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="coverageTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Listed on</th>
+            <th>Not yet listed on</th>
+          </tr>
+        </thead>
+        <tbody id="coverageTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="coverageTableEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section>
     <h2 class="section-title">Est. net payout by platform</h2>
     <div class="callout">
       <strong>Estimates only, not a live account connection.</strong> Computed from each platform's standard
