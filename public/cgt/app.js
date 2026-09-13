@@ -134,6 +134,7 @@ async function loadCards() {
     renderValueBreakdown();
     renderPricingActivity();
     renderDataQuality();
+    renderStalePricing();
     renderBatchFilter();
     applyFiltersAndRender();
     initTableScrollShadows();
@@ -367,6 +368,39 @@ function renderDataQuality() {
       <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}</span>
       <span class="dq-meta">${escapeHtml([c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '))}</span>
       <span class="dq-why">${escapeHtml(reasons.join(' · '))}</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
+// A separate, distinct concern from buildDataQualityFlags above: those cards
+// have a real price on record but it hasn't been re-checked in a while, not a
+// missing field. Same click-to-jump list pattern as "Needs backfill" and
+// CSM's own "Stalled in stage" panel, oldest price first since that is the
+// most out of date and the most worth re-checking first.
+function buildStalePricingFlags() {
+  return cards
+    .filter(c => !isExample(c) && isStale(c))
+    .sort((a, b) => daysSince(b.datePriced) - daysSince(a.datePriced));
+}
+
+function renderStalePricing() {
+  const section = document.getElementById('stalePricingSection');
+  const list = document.getElementById('stalePricingList');
+  const flagged = buildStalePricingFlags();
+
+  if (!flagged.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flagged.map(c => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}</span>
+      <span class="dq-meta">${escapeHtml([c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '))}</span>
+      <span class="dq-why">PRICED ${daysSince(c.datePriced)} DAYS AGO</span>
     </button>
   `).join('');
   list.querySelectorAll('.data-quality-row').forEach(row => {
