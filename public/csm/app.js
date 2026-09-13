@@ -414,12 +414,16 @@
   // feedback (cards disappearing from columns) isn't perceivable
   // non-visually, same live region the main Command Center dashboard already
   // uses for its own search/category filter.
-  function announceFilterStatus(matchCount, query, anyFilterActive) {
+  function announceFilterStatus(matchCount, query, filterActive) {
     const status = document.getElementById('filterStatus');
-    status.textContent = anyFilterActive
+    status.textContent = filterActive
       ? matchCount + ' prospect' + (matchCount === 1 ? '' : 's') + ' match' + (matchCount === 1 ? 'es' : '') +
         (query ? ' for "' + query + '"' : '')
       : '';
+  }
+
+  function anyFilterActive() {
+    return !!searchInput.value.trim() || channelFilter !== 'all' || categoryFilter !== 'all';
   }
 
   function applyFilter() {
@@ -433,9 +437,10 @@
         (p.category || '').toLowerCase().includes(query) ||
         (p.verifiedHook || '').toLowerCase().includes(query)));
     lastFiltered = filtered;
-    const anyFilterActive = !!query || channelFilter !== 'all' || categoryFilter !== 'all';
-    renderBoard(allStages, filtered, allProspects, query, anyFilterActive);
-    announceFilterStatus(filtered.length, query, anyFilterActive);
+    const filterActive = anyFilterActive();
+    renderBoard(allStages, filtered, allProspects, query, filterActive);
+    announceFilterStatus(filtered.length, query, filterActive);
+    document.getElementById('clearFiltersBtn').hidden = !filterActive;
     syncUrl();
   }
 
@@ -507,6 +512,21 @@
         c.setAttribute('aria-pressed', String(c === chip)));
       applyFilter();
     });
+  });
+
+  // Resets search plus both chip groups (channel and category) and the
+  // address bar back to the bare /csm/ URL in one action, same "Clear
+  // filters" pattern already established on CGT and the main dashboard.
+  document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+    searchInput.value = '';
+    channelFilter = 'all';
+    categoryFilter = 'all';
+    channelFilterEl.querySelectorAll('.chip').forEach(c =>
+      c.setAttribute('aria-pressed', String(c.getAttribute('data-channel') === 'all')));
+    categoryFilterEl.querySelectorAll('.chip').forEach(c =>
+      c.setAttribute('aria-pressed', String(c.getAttribute('data-category') === 'all')));
+    applyFilter();
+    searchInput.focus();
   });
 
   let lastFocusedEl = null;
