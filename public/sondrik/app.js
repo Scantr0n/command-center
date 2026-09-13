@@ -428,9 +428,26 @@
   // checklist. Every line here is a fact already computed elsewhere on the
   // page, this only decides which of those facts amount to an actual next
   // action and lists them together, it does not add any new data of its own.
-  function renderNextSteps(downloadsData, leadsData, goalsData) {
+  //
+  // Also folds in the same data-quality gaps public/sondrik/data/validate.js
+  // flags as warnings (an undated release, an uncited metric, an unexplained
+  // "not-tracked" channel), so those show up here on page load instead of
+  // only when someone remembers to run the validator from the command line.
+  function renderNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData) {
     const STALE_AFTER_DAYS = 7;
     const steps = [];
+
+    const releases = (releasesData && releasesData.releases) || [];
+    const undatedReleases = releases.filter(r => !r.date);
+    if (undatedReleases.length > 0) {
+      steps.push({
+        urgent: false,
+        text: 'Log the ship date for ' +
+          (undatedReleases.length === 1 ? 'v' + undatedReleases[0].version : undatedReleases.length + ' releases') +
+          ', no date is on record.',
+        href: '#releaseSection'
+      });
+    }
 
     const leads = (leadsData && leadsData.leads) || [];
     leads.forEach(l => {
@@ -462,6 +479,25 @@
           href: '#tractionSection'
         });
       }
+      if (!metric.source) {
+        steps.push({
+          urgent: false,
+          text: 'Cite a source for the ' + (metric.label || 'download') + ' count, an uncited number reads as an estimate.',
+          href: '#tractionSection'
+        });
+      }
+    }
+
+    const channels = (channelsData && channelsData.channels) || [];
+    const unexplainedGaps = channels.filter(c => c.status === 'not-tracked' && !c.note);
+    if (unexplainedGaps.length > 0) {
+      steps.push({
+        urgent: false,
+        text: 'Add a note explaining why ' +
+          (unexplainedGaps.length === 1 ? (unexplainedGaps[0].name || 'this channel') + ' is' : unexplainedGaps.length + ' channels are') +
+          ' not tracked yet, an unexplained gap reads as an oversight.',
+        href: '#channelsSection'
+      });
     }
 
     const goals = (goalsData && goalsData.goals) || [];
@@ -670,8 +706,8 @@
         escapeHtml(leadsResult.reason.message) + '</div>';
     }
 
-    if (downloadsData || leadsData || goalsData) {
-      renderNextSteps(downloadsData, leadsData, goalsData);
+    if (releasesData || downloadsData || leadsData || goalsData || channelsData) {
+      renderNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData);
     } else {
       nextStepsList.innerHTML = '<div class="empty-state" role="alert">Could not compute next steps, data failed to load.</div>';
     }
