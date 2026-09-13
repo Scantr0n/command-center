@@ -102,6 +102,16 @@
     </div>
   </section>
 
+  <section>
+    <h2 class="section-title">Stage velocity</h2>
+    <p class="section-note">Average days spent in each stage, computed only from completed moves logged in
+      <code>stageHistory</code> (entering a stage, then later leaving it). This is a different signal from the
+      "stalled" flags below, which only look at prospects still sitting in a stage right now.</p>
+    <div class="velocity-list" id="velocityList">
+      <p class="velocity-empty">Loading...</p>
+    </div>
+  </section>
+
   <section id="stalledSection" hidden>
     <h2 class="section-title">Stalled in stage</h2>
     <div class="data-quality-list data-quality-list-stale" id="stalledList"></div>

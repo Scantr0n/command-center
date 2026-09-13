@@ -16,6 +16,7 @@
   const dataQualitySection = document.getElementById('dataQualitySection');
   const dataQualityList = document.getElementById('dataQualityList');
   const activityFeedEl = document.getElementById('activityFeed');
+  const velocityListEl = document.getElementById('velocityList');
   const ACTIVITY_PREVIEW_COUNT = 8;
 
   printBtn.addEventListener('click', () => window.print());
@@ -278,6 +279,59 @@
         toggleBtn.textContent = collapsed ? 'Show all ' + events.length : 'Show fewer';
       });
     }
+  }
+
+  // Average time actually spent in each stage, computed only from completed
+  // moves in a prospect's own stageHistory (entering a stage, then later
+  // logging a move out of it). Deliberately separate from stallInfo(), which
+  // only looks at prospects still sitting in a stage right now, this is a
+  // pipeline-wide velocity signal from moves that already finished.
+  function computeStageVelocity(stages, prospects) {
+    const sums = {};
+    const counts = {};
+    stages.forEach(s => { sums[s.id] = 0; counts[s.id] = 0; });
+    prospects.forEach(p => {
+      const history = (p.stageHistory || [])
+        .filter(e => e && e.date && e.stage)
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date));
+      for (let i = 0; i < history.length - 1; i++) {
+        const cur = history[i];
+        const next = history[i + 1];
+        if (!(cur.stage in sums)) continue;
+        const dwellDays = daysUntil(next.date) - daysUntil(cur.date);
+        if (dwellDays < 0) continue;
+        sums[cur.stage] += dwellDays;
+        counts[cur.stage] += 1;
+      }
+    });
+    return stages.map(s => ({
+      stage: s,
+      n: counts[s.id],
+      avgDays: counts[s.id] > 0 ? Math.round(sums[s.id] / counts[s.id]) : null
+    }));
+  }
+
+  function renderStageVelocity(stages, prospects) {
+    const results = computeStageVelocity(stages, prospects);
+    const totalMoves = results.reduce((sum, r) => sum + r.n, 0);
+    if (totalMoves === 0) {
+      velocityListEl.innerHTML = '<p class="velocity-empty">No completed stage moves logged yet across the ' +
+        'pipeline. This fills in once a prospect&rsquo;s stageHistory shows a move out of a stage, not just ' +
+        'into one.</p>';
+      return;
+    }
+    velocityListEl.innerHTML = results.map(r => {
+      const valueHtml = r.n > 0
+        ? '<span class="velocity-value font-mono">' + r.avgDays + 'd avg &middot; ' + r.n +
+          ' completed move' + (r.n === 1 ? '' : 's') + '</span>'
+        : '<span class="velocity-value velocity-value-empty font-mono">No completed moves logged yet</span>';
+      return '<div class="velocity-row">' +
+        '<span class="velocity-dot" style="background:' + r.stage.color + '"></span>' +
+        '<span class="velocity-label">' + escapeHtml(r.stage.label) + '</span>' +
+        valueHtml +
+        '</div>';
+    }).join('');
   }
 
   function renderBoard(stages, prospects, allProspects, query, filtering) {
@@ -1031,11 +1085,13 @@
     renderStalled(allStages, allProspects);
     renderDataQuality(allStages, allProspects);
     renderActivityFeed(allProspects, allStages);
+    renderStageVelocity(allStages, allProspects);
     applyFilter();
     document.getElementById('newProspectBtn').disabled = false;
   }).catch(err => {
     boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(err.message) + '</div>';
     nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
     activityFeedEl.innerHTML = '<p class="activity-empty" role="alert">Failed to load.</p>';
+    velocityListEl.innerHTML = '<p class="velocity-empty" role="alert">Failed to load.</p>';
   });
 })();
