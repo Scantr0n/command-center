@@ -48,6 +48,34 @@ function updateGlanceIndicators(cls) {
   document.title = `Alpha (${GLANCE_TEXT[cls] || cls}) / Command Center`;
 }
 
+// The one glance-first signal at the very top of the page, above every
+// detailed section. Derived entirely from fields the page already has
+// (connection state, reading freshness, kill-switch state), never from
+// anything invented. Kill switch engaged always wins: it is the one state
+// Jack would want to see even from across the room.
+function computeHeadline(data) {
+  const live = data.live || {};
+  const asOf = live.asOf;
+  const killEngaged = live.killSwitch && live.killSwitch.engaged;
+
+  if (killEngaged === true) {
+    return { level: 'critical', text: 'KILL SWITCH ENGAGED' };
+  }
+  if (!data.connection.connected || !asOf) {
+    return { level: 'awaiting', text: 'Awaiting live connection' };
+  }
+  const cls = freshnessClass(asOf);
+  if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale' };
+  if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging' };
+  return { level: 'good', text: 'Connected' };
+}
+
+function renderHeadline(level, text) {
+  const el = document.getElementById('headlineStatus');
+  el.className = 'headline-status ' + level;
+  document.getElementById('headlineText').textContent = text;
+}
+
 function renderConnection(data) {
   const dot = document.getElementById('connDot');
   const label = document.getElementById('connLabel');
@@ -248,6 +276,8 @@ async function loadStatus() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
+    const headline = computeHeadline(data);
+    renderHeadline(headline.level, headline.text);
     renderConnection(data);
     renderStats(data);
     renderPositionSizing(data);
@@ -260,6 +290,7 @@ async function loadStatus() {
     // unremarkable state): this is the page itself failing to read its own
     // status.json, a real problem worth standing out from the everyday
     // "awaiting connection" gray, not blending into it.
+    renderHeadline('critical', "Page error, couldn't load status.json");
     document.getElementById('connDot').className = 'conn-dot error';
     document.getElementById('connLabel').textContent = "Couldn't load status.json";
     document.getElementById('connSub').textContent = e.message;

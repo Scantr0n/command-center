@@ -52,6 +52,13 @@ header.page-head .sub {
   margin-top: 6px;
 }
 
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .back-link {
   font-size: 0.75rem;
   color: var(--sub);
@@ -66,6 +73,43 @@ header.page-head .sub {
   height: fit-content;
 }
 .back-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
+
+/* Headline status: the single glance-first indicator, above and separate
+   from the detailed connection strip further down the page. Research on
+   status-page UX consistently puts one overall indicator at the very top,
+   ahead of any component-level detail, since that is what a reader checking
+   in without reading the whole page actually looks for first. */
+.headline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 7px 14px 7px 12px;
+  height: fit-content;
+}
+.headline-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.headline-text {
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.headline-status.good .headline-dot { background: #3DDC84; box-shadow: 0 0 0 3px rgba(61,220,132,0.18); }
+.headline-status.good .headline-text { color: #3DDC84; }
+.headline-status.caution .headline-dot { background: #E0A030; box-shadow: 0 0 0 3px rgba(224,160,48,0.18); }
+.headline-status.caution .headline-text { color: #E0A030; }
+.headline-status.awaiting .headline-dot { background: #7B8188; box-shadow: 0 0 0 3px rgba(123,129,136,0.18); }
+.headline-status.awaiting .headline-text { color: var(--sub); }
+.headline-status.critical { border-color: rgba(224,80,80,0.4); }
+.headline-status.critical .headline-dot { background: #E05050; box-shadow: 0 0 0 3px rgba(224,80,80,0.22); }
+.headline-status.critical .headline-text { color: #F2B8B8; }
 
 .callout {
   border: 1px solid var(--hairline);
