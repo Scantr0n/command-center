@@ -193,6 +193,26 @@ function buildValueGroups(field) {
     .sort((a, b) => b.value - a.value);
 }
 
+// Same shape as buildValueGroups, but grouped by "<grader> <grade>" (e.g.
+// "PSA 10") rather than a single field. This is the personal-portfolio
+// equivalent of the population/pop reports PSA, SGC, and CGC publish
+// (how many of my own cards sit at each grade, and how much of my money is
+// riding on the top grade vs. the rest), which is exactly the breakdown
+// GradedFolio and Card Ladder lead with once a grader's own pop report is
+// merged with a real collection. Grade alone is skipped here since "10" from
+// PSA and "10" from SGC track very different markets.
+function buildValueGroupsByGrade() {
+  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c.gradingCompany && c.grade != null);
+  const totals = new Map();
+  priced.forEach(c => {
+    const label = c.gradingCompany + ' ' + c.grade;
+    totals.set(label, (totals.get(label) || 0) + c.estimatedValue);
+  });
+  return [...totals.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
 function renderBreakdownList(title, groups) {
   if (!groups.length) {
     return `
@@ -224,7 +244,8 @@ function renderValueBreakdown() {
   const el = document.getElementById('breakdownGrid');
   el.innerHTML =
     renderBreakdownList('By sport', buildValueGroups('sport')) +
-    renderBreakdownList('By grading company', buildValueGroups('gradingCompany'));
+    renderBreakdownList('By grading company', buildValueGroups('gradingCompany')) +
+    renderBreakdownList('By grade', buildValueGroupsByGrade());
 }
 
 // Pulls "what got priced when" out of every card's own datePriced/backlogBatch
