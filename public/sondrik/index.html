@@ -69,6 +69,12 @@
             so the channel row always shows the real current number from that file instead of a second, possibly
             stale copy of it; for a <code>leads</code> link, only leads whose <code>channelId</code> matches this
             channel's <code>id</code> count toward it.</td></tr>
+          <tr><th>goals.json</th><td>Only add an entry once Jack has actually set a real target, an empty
+            <code>goals</code> array is the honest default. <code>metric</code> must be <code>"downloads"</code>,
+            the only metric with real numbers behind it so far. <code>target</code> is the real number Jack is
+            aiming for, <code>targetDate</code> the real date he's aiming for it by (or <code>null</code> if
+            open-ended). Set <code>setDate</code> to the actual date the goal was set, not today's date by
+            default, so the progress bar isn't silently backdated.</td></tr>
         </tbody>
       </table>
     </div>
@@ -90,6 +96,11 @@
   </section>
 
   <section>
+    <h2 class="section-title">Goal</h2>
+    <div id="goalsSection"></div>
+  </section>
+
+  <section>
     <h2 class="section-title">Channels</h2>
     <div id="channelsSection"></div>
   </section>
@@ -102,8 +113,9 @@
 
   <footer class="page-foot font-mono">
     Data source: <code>/sondrik/data/releases.json</code>, <code>/sondrik/data/downloads.json</code>,
-    <code>/sondrik/data/leads.json</code>, and <code>/sondrik/data/channels.json</code>, edited by hand until a
-    real backend is wired in. Run <code>node public/sondrik/data/validate.js</code> after any edit.
+    <code>/sondrik/data/leads.json</code>, <code>/sondrik/data/channels.json</code>, and
+    <code>/sondrik/data/goals.json</code>, edited by hand until a real backend is wired in. Run
+    <code>node public/sondrik/data/validate.js</code> after any edit.
   </footer>
 </div>
 

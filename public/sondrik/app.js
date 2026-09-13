@@ -2,6 +2,7 @@
   const timelineSection = document.getElementById('timelineSection');
   const releaseSection = document.getElementById('releaseSection');
   const tractionSection = document.getElementById('tractionSection');
+  const goalsSection = document.getElementById('goalsSection');
   const channelsSection = document.getElementById('channelsSection');
   const leadsSection = document.getElementById('leadsSection');
   const csvBtn = document.getElementById('csvBtn');
@@ -45,8 +46,8 @@
   // than making a reader cross-reference separate per-topic sections to
   // reconstruct "what happened when"; this reuses the same real records,
   // it does not add any new fact.
-  function renderTimeline(releasesData, downloadsData, leadsData) {
-    const KIND_LABEL = { release: 'RELEASE', check: 'DOWNLOAD CHECK', lead: 'LEAD' };
+  function renderTimeline(releasesData, downloadsData, leadsData, goalsData) {
+    const KIND_LABEL = { release: 'RELEASE', check: 'DOWNLOAD CHECK', lead: 'LEAD', goal: 'GOAL SET' };
     const events = [];
     (releasesData.releases || []).forEach(r => {
       events.push({ date: r.date, kind: 'release', title: 'v' + r.version + ' shipped', detail: r.summary || null });
@@ -57,6 +58,9 @@
     });
     (leadsData.leads || []).forEach(l => {
       events.push({ date: l.loggedDate, kind: 'lead', title: l.sourceDetail || l.source || 'Lead logged', detail: l.summary || null });
+    });
+    ((goalsData && goalsData.goals) || []).forEach(g => {
+      events.push({ date: g.setDate, kind: 'goal', title: g.label + ' target set (' + g.target + ')', detail: g.note || null });
     });
 
     const dated = events.filter(e => e.date).sort((a, b) => b.date.localeCompare(a.date));
@@ -219,6 +223,73 @@
     update();
   }
 
+  // Looks up the real current value behind a goal's target. Only "downloads"
+  // has real numbers behind it so far (see VALID_GOAL_METRICS in validate.js);
+  // any other metric name would have nothing real to compare the target
+  // against, so this returns null rather than guessing at zero.
+  function currentMetricValue(metricName, downloadsData) {
+    if (metricName !== 'downloads') return null;
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length === 0) return null;
+    const latest = checks[checks.length - 1];
+    return { count: latest.count, asOf: latest.date };
+  }
+
+  // Renders the real target-vs-actual goal Jack has logged, if any. This is
+  // the standard "target vs actual" pattern from traction dashboards: a
+  // benchmark, how the current real number compares to it, and a trend cue
+  // (days left) for whether it's on track, at risk, or overdue. An empty
+  // goals.json (the honest default until Jack sets a real target) renders
+  // as a plain empty state rather than a fabricated placeholder goal.
+  function renderGoals(goalsData, downloadsData) {
+    const goals = (goalsData && goalsData.goals) || [];
+    if (goals.length === 0) {
+      goalsSection.innerHTML = '<div class="empty-state">No goal set yet. Add one to ' +
+        '<code>public/sondrik/data/goals.json</code> once there is a real target to track against.</div>';
+      return;
+    }
+    const todayIso = new Date().toISOString().slice(0, 10);
+    goalsSection.innerHTML = goals.map(g => {
+      const current = currentMetricValue(g.metric, downloadsData);
+      const currentCount = current ? current.count : 0;
+      const pct = Math.max(0, Math.min(100, Math.round((currentCount / g.target) * 100)));
+
+      let paceHtml = '';
+      if (g.targetDate) {
+        const daysLeft = daysBetween(todayIso, g.targetDate);
+        if (daysLeft < 0) {
+          paceHtml = '<div class="goal-pace goal-pace-overdue font-mono">TARGET DATE PASSED, ' + fmtDate(g.targetDate).toUpperCase() + '</div>';
+        } else {
+          const daysLeftLabel = daysLeft === 0 ? 'DUE TODAY' : daysLeft === 1 ? '1 DAY LEFT' : daysLeft + ' DAYS LEFT';
+          paceHtml = '<div class="goal-pace font-mono">' + daysLeftLabel + ', BY ' + fmtDate(g.targetDate).toUpperCase() + '</div>';
+        }
+      }
+
+      const setLabel = g.setDate ? 'Goal set ' + fmtDate(g.setDate) : 'No set date logged';
+      const currentNote = current
+        ? 'Current: ' + currentCount + ' as of ' + fmtDate(current.asOf)
+        : 'No real data logged for this metric yet';
+
+      return '<div class="goal-card">' +
+        '<div class="goal-head">' +
+        '<span class="goal-label">' + escapeHtml(g.label) + '</span>' +
+        '<span class="goal-set-date font-mono">' + escapeHtml(setLabel) + '</span>' +
+        '</div>' +
+        '<div class="goal-progress-row">' +
+        '<div class="goal-progress-track" role="img" aria-label="' +
+        escapeHtml(currentCount + ' of ' + g.target + ' target, ' + pct + ' percent') + '">' +
+        '<div class="goal-progress-fill" style="width:' + pct + '%"></div>' +
+        '</div>' +
+        '<span class="goal-progress-pct font-mono">' + pct + '%</span>' +
+        '</div>' +
+        '<div class="goal-current font-mono">' + escapeHtml(currentNote) + ', target ' + g.target + '</div>' +
+        paceHtml +
+        (g.note ? '<div class="goal-note">' + escapeHtml(g.note) + '</div>' : '') +
+        '</div>';
+    }).join('');
+  }
+
   // A glanceable, channel-level overview sitting above the single-metric
   // Traction deep-dive and the per-lead Engagement queue: which distribution
   // channels have a real live-tracked number, which are only hand-logged,
@@ -275,11 +346,12 @@
   // show up in that. This scans every real date across all three files so
   // a visitor can tell, at a glance, whether the whole hub (not just the
   // download count) reflects anything recent or is running on old input.
-  function renderLastUpdated(releasesData, downloadsData, leadsData) {
+  function renderLastUpdated(releasesData, downloadsData, leadsData, goalsData) {
     const dates = [];
     ((releasesData && releasesData.releases) || []).forEach(r => { if (r.date) dates.push(r.date); });
     (((downloadsData && downloadsData.metric) || {}).checks || []).forEach(c => { if (c.date) dates.push(c.date); });
     ((leadsData && leadsData.leads) || []).forEach(l => { if (l.loggedDate) dates.push(l.loggedDate); });
+    ((goalsData && goalsData.goals) || []).forEach(g => { if (g.setDate) dates.push(g.setDate); });
 
     if (dates.length === 0) {
       lastUpdatedSub.hidden = true;
@@ -342,10 +414,10 @@
     }).join('');
   }
 
-  // Builds a plain-text snapshot from the same three real data files already
-  // on the page, for Jack to paste into a build log or status update himself.
+  // Builds a plain-text snapshot from the same real data files already on
+  // the page, for Jack to paste into a build log or status update himself.
   // Purely a clipboard copy, nothing here ever transmits anywhere on its own.
-  function buildStatusUpdate(releasesData, downloadsData, leadsData) {
+  function buildStatusUpdate(releasesData, downloadsData, leadsData, goalsData) {
     const lines = ['Sondrik status snapshot, generated ' + fmtDate(new Date().toISOString().slice(0, 10))];
 
     const releases = ((releasesData && releasesData.releases) || []).slice()
@@ -382,6 +454,17 @@
           : (o.approvalStatus === 'awaiting-approval' ? 'drafted, awaiting approval' : (o.draftStatus || 'no draft yet'));
         lines.push('Lead: ' + (l.sourceDetail || l.source || 'Unknown source') +
           (l.summary ? ', ' + l.summary : '') + ' [' + status + ']');
+      });
+    }
+
+    const goals = (goalsData && goalsData.goals) || [];
+    if (goals.length > 0) {
+      lines.push('');
+      goals.forEach(g => {
+        const current = currentMetricValue(g.metric, downloadsData);
+        const currentCount = current ? current.count : 0;
+        lines.push('Goal: ' + g.label + ', ' + currentCount + ' / ' + g.target +
+          (g.targetDate ? ' by ' + fmtDate(g.targetDate) : ''));
       });
     }
 
@@ -446,22 +529,25 @@
     loadDataFile('releases'),
     loadDataFile('downloads'),
     loadDataFile('leads'),
-    loadDataFile('channels')
-  ]).then(([releasesResult, downloadsResult, leadsResult, channelsResult]) => {
+    loadDataFile('channels'),
+    loadDataFile('goals')
+  ]).then(([releasesResult, downloadsResult, leadsResult, channelsResult, goalsResult]) => {
     const releasesData = releasesResult.status === 'fulfilled' ? releasesResult.value : null;
     const downloadsData = downloadsResult.status === 'fulfilled' ? downloadsResult.value : null;
     const leadsData = leadsResult.status === 'fulfilled' ? leadsResult.value : null;
     const channelsData = channelsResult.status === 'fulfilled' ? channelsResult.value : null;
+    const goalsData = goalsResult.status === 'fulfilled' ? goalsResult.value : null;
 
     const failures = [];
     if (releasesResult.status === 'rejected') failures.push('releases.json: ' + releasesResult.reason.message);
     if (downloadsResult.status === 'rejected') failures.push('downloads.json: ' + downloadsResult.reason.message);
     if (leadsResult.status === 'rejected') failures.push('leads.json: ' + leadsResult.reason.message);
     if (channelsResult.status === 'rejected') failures.push('channels.json: ' + channelsResult.reason.message);
+    if (goalsResult.status === 'rejected') failures.push('goals.json: ' + goalsResult.reason.message);
 
     if (releasesData || downloadsData || leadsData) {
-      renderTimeline(releasesData || {}, downloadsData || {}, leadsData || {});
-      renderLastUpdated(releasesData || {}, downloadsData || {}, leadsData || {});
+      renderTimeline(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {});
+      renderLastUpdated(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {});
       if (failures.length) {
         timelineSection.insertAdjacentHTML('afterbegin',
           '<div class="empty-state file-error" role="alert">Showing partial data, failed to load: ' +
@@ -488,6 +574,13 @@
       csvBtn.disabled = true;
     }
 
+    if (goalsData) {
+      renderGoals(goalsData, downloadsData);
+    } else {
+      goalsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load goal data: ' +
+        escapeHtml(goalsResult.reason.message) + '</div>';
+    }
+
     if (channelsData) {
       renderChannels(channelsData, downloadsData, leadsData);
     } else {
@@ -505,7 +598,7 @@
 
     if (releasesData || downloadsData || leadsData) {
       copyStatusBtn.addEventListener('click', () => {
-        const text = buildStatusUpdate(releasesData || {}, downloadsData || {}, leadsData || {});
+        const text = buildStatusUpdate(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {});
         copyText(text).then(() => {
           const original = copyStatusBtn.textContent;
           copyStatusBtn.textContent = 'Copied!';

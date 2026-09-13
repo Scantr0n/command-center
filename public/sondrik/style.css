@@ -391,6 +391,7 @@ section { margin-bottom: 36px; }
 .timeline-kind-release .timeline-badge { border-color: rgba(224,160,48,0.35); background: rgba(224,160,48,0.1); color: #E0A030; }
 .timeline-kind-check .timeline-badge { border-color: rgba(91,140,255,0.35); background: rgba(91,140,255,0.1); color: var(--accent); }
 .timeline-kind-lead .timeline-badge { border-color: rgba(61,220,132,0.35); background: rgba(61,220,132,0.1); color: #3DDC84; }
+.timeline-kind-goal .timeline-badge { border-color: rgba(155,110,255,0.35); background: rgba(155,110,255,0.1); color: #9B6EFF; }
 .timeline-date {
   font-size: 0.7rem;
   color: var(--dim);
@@ -524,6 +525,74 @@ section { margin-bottom: 36px; }
   margin-top: 6px;
 }
 
+/* Goal (target vs actual) */
+.goal-card {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: var(--panel);
+}
+.goal-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.goal-label {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.goal-set-date {
+  font-size: 0.68rem;
+  color: var(--dim);
+}
+.goal-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.goal-progress-track {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+.goal-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.goal-progress-pct {
+  font-size: 0.78rem;
+  color: var(--ink);
+  min-width: 3.2em;
+  text-align: right;
+}
+.goal-current {
+  font-size: 0.7rem;
+  color: var(--dim);
+  margin-top: 10px;
+}
+.goal-pace {
+  font-size: 0.68rem;
+  color: var(--dim);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.goal-pace-overdue { color: #E0A030; }
+.goal-note {
+  font-size: 0.75rem;
+  color: var(--sub);
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
 /* Lead / engagement queue */
 .lead-card {
   border: 1px solid var(--hairline);
@@ -610,19 +679,20 @@ footer.page-foot {
   }
   .callout strong { color: #111; }
 
-  .release-card, .stat-tile, .lead-card, .timeline, .channel-card {
+  .release-card, .stat-tile, .lead-card, .timeline, .channel-card, .goal-card {
     background: none;
     border: 1px solid #ccc;
     break-inside: avoid;
   }
-  .release-summary, .stat-label, .lead-summary, .timeline-title, .channel-name { color: #333; }
+  .release-summary, .stat-label, .lead-summary, .timeline-title, .channel-name, .goal-label { color: #333; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
   .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .last-updated, .last-updated-stale, .channel-note,
-  .channel-value-empty { color: #555; }
+  .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-note { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
   .release-badge, .timeline-badge,
-  .timeline-kind-release .timeline-badge, .timeline-kind-check .timeline-badge, .timeline-kind-lead .timeline-badge {
+  .timeline-kind-release .timeline-badge, .timeline-kind-check .timeline-badge, .timeline-kind-lead .timeline-badge,
+  .timeline-kind-goal .timeline-badge {
     border-color: #999; background: none; color: #111;
   }
   .compare-bar { border-color: #ccc; }
@@ -631,6 +701,9 @@ footer.page-foot {
   .compare-bar-count, .stat-number, .channel-value { color: #111; }
   .status-pill, .status-pill-sent, .channel-pill { border-color: #999; background: none; color: #111; }
   .timeline-item { border-color: #ddd; }
+  .goal-progress-track { border-color: #999; background: none; }
+  .goal-progress-fill { background: #888; }
+  .goal-progress-pct { color: #111; }
 
   .empty-state { border-color: #ccc; color: #555; }
   footer.page-foot { border-color: #ccc; color: #555; }

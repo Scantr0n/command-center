@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /*
- * Validates releases.json, downloads.json, and leads.json against the field
- * rules used by public/sondrik/app.js. Run after hand-editing any of them.
+ * Validates releases.json, downloads.json, leads.json, channels.json, and
+ * goals.json against the field rules used by public/sondrik/app.js. Run
+ * after hand-editing any of them.
  *
  * Usage: node public/sondrik/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -49,6 +50,13 @@ function main() {
     channelsData = loadJson('channels.json');
   } catch (e) {
     console.error('Failed to read/parse channels.json: ' + e.message);
+    process.exit(1);
+  }
+  let goalsData;
+  try {
+    goalsData = loadJson('goals.json');
+  } catch (e) {
+    console.error('Failed to read/parse goals.json: ' + e.message);
     process.exit(1);
   }
 
@@ -139,6 +147,29 @@ function main() {
     }
   });
 
+  // goals.json (validated after downloads.json, since the only supported
+  // metric right now is "downloads"; a goal against an unsupported metric
+  // has nothing real to show progress against, so that's an error, not a
+  // warning)
+  const VALID_GOAL_METRICS = new Set(['downloads']);
+  const seenGoalIds = new Set();
+  (goalsData.goals || []).forEach((g, idx) => {
+    const where = 'goals[' + idx + ']' + (g && g.id ? ' (' + g.id + ')' : '');
+    if (!g.id) errors.push(where + ': missing "id"');
+    else if (seenGoalIds.has(g.id)) errors.push(where + ': duplicate id "' + g.id + '"');
+    else seenGoalIds.add(g.id);
+    if (!g.label) errors.push(where + ': missing "label"');
+    if (!VALID_GOAL_METRICS.has(g.metric)) {
+      errors.push(where + ': "metric" must be one of ' + [...VALID_GOAL_METRICS].join(', ') + ', got ' + JSON.stringify(g.metric));
+    }
+    if (typeof g.target !== 'number' || g.target <= 0) {
+      errors.push(where + ': "target" must be a positive number, got ' + JSON.stringify(g.target));
+    }
+    if (!isDateOrNull(g.targetDate)) errors.push(where + ': "targetDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(g.targetDate));
+    if (!isDateOrNull(g.setDate)) errors.push(where + ': "setDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(g.setDate));
+    if (!g.setDate) warnings.push(where + ': no setDate logged, cannot tell when this target was actually set');
+  });
+
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
     warnings.forEach(w => console.warn('  - ' + w));
@@ -152,7 +183,7 @@ function main() {
 
   console.log('sondrik data files are valid (' + (releasesData.releases || []).length + ' release(s), ' +
     checks.length + ' download check(s), ' + (leadsData.leads || []).length + ' lead(s), ' +
-    (channelsData.channels || []).length + ' channel(s)).');
+    (channelsData.channels || []).length + ' channel(s), ' + (goalsData.goals || []).length + ' goal(s)).');
   process.exit(0);
 }
 
