@@ -54,6 +54,14 @@
           <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
           <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>.</td></tr>
           <tr><th>activity.json</th><td>One object per logged event in the <code>events</code> array: real bug fixes, photo audits, and other quality checks. Requires <code>id</code>, <code>title</code>, and <code>type</code> (<code>bug-fix</code>, <code>photo-audit</code>, or <code>other</code>).</td></tr>
+          <tr><th>sales.json</th><td>One object per real completed sale in the <code>sales</code> array. Log a sale here <em>and</em> add that platform to the item's <code>soldOn</code> array in listings.json, both matter: this is the sale history, soldOn is what still needs delisting elsewhere.</td></tr>
+          <tr><th>id</th><td>Unique slug for the sale, e.g. <code>"black-boots-ebay-2026-09"</code></td></tr>
+          <tr><th>listingId</th><td>The <code>id</code> of the matching entry in listings.json, or <code>null</code> if that listing was fully sold through and removed</td></tr>
+          <tr><th>title</th><td>Item name, kept here too so sale history survives the listing being removed later</td></tr>
+          <tr><th>platform</th><td>Which platform it actually sold on: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, or <code>depop</code></td></tr>
+          <tr><th>salePrice</th><td>USD price it actually sold for, a non-negative number (can differ from the asking price on an accepted offer)</td></tr>
+          <tr><th>askingPrice</th><td>USD asking price at time of sale, or <code>null</code> if not tracked</td></tr>
+          <tr><th>saleDate</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
         </tbody>
       </table>
       <pre class="schema-example font-mono">{
@@ -247,6 +255,31 @@
   </section>
 
   <section>
+    <h2 class="section-title">Sales log</h2>
+    <div class="callout">
+      Every real completed sale, one row per platform a sale happened on. Nothing here is estimated, this only
+      shows what's actually been hand-logged in <code>sales.json</code> after a real sale. Logging a sale here
+      is separate from marking that platform in the item's <code>soldOn</code> array above, a real sale needs
+      both done, one to log the sale itself and one to flag that item for delisting elsewhere.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="salesTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Platform</th>
+            <th>Sale price</th>
+            <th>Est. net payout</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="salesTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="salesTableEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section>
     <h2 class="section-title">Quality &amp; fixes log</h2>
     <div class="activity-list" id="activityList"></div>
   </section>
@@ -290,8 +323,8 @@
   </main>
 
   <footer class="page-foot font-mono">
-    Data source: <code>/garage/data/listings.json</code>, <code>pipeline.json</code>, and <code>activity.json</code>,
-    edited by hand until a real backend is wired in.
+    Data source: <code>/garage/data/listings.json</code>, <code>pipeline.json</code>, <code>activity.json</code>,
+    and <code>sales.json</code>, edited by hand until a real backend is wired in.
   </footer>
 </div>
 

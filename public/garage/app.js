@@ -92,19 +92,22 @@ function fetchJson(url) {
 // the same fix Sondrik's loadData already applies for the same reason.
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
-  const [listingsResult, pipelineResult, activityResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
-    fetchJson('/garage/data/activity.json')
+    fetchJson('/garage/data/activity.json'),
+    fetchJson('/garage/data/sales.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value : null;
   const activityData = activityResult.status === 'fulfilled' ? activityResult.value : null;
+  const salesData = salesResult.status === 'fulfilled' ? salesResult.value : null;
   const stages = (pipelineData && pipelineData.stages) || [];
+  const sales = (salesData && salesData.sales) || [];
 
   if (listingsData) {
     listings = listingsData.listings || [];
-    renderStats(listings, stages);
+    renderStats(listings, stages, sales);
     applyFiltersAndRender();
     renderCoverage(listings);
     renderRelist(listings);
@@ -136,6 +139,16 @@ async function loadData() {
       escapeHtml(activityResult.reason.message) + '</div></div>';
   }
 
+  if (salesData) {
+    renderSales(sales);
+  } else {
+    document.getElementById('salesTableBody').innerHTML = '';
+    const empty = document.getElementById('salesTableEmpty');
+    empty.hidden = false;
+    empty.setAttribute('role', 'alert');
+    empty.textContent = "Couldn't load sales data: " + salesResult.reason.message;
+  }
+
   initTableScrollShadows();
 }
 
@@ -158,7 +171,8 @@ function bestCaseTotalPayout(live) {
   }, 0);
 }
 
-function renderStats(listings, stages) {
+function renderStats(listings, stages, sales) {
+  sales = sales || [];
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
   const platformCounts = {};
@@ -174,6 +188,7 @@ function renderStats(listings, stages) {
     const days = daysSincePublished(l.datePublished);
     return days != null && days >= RELIST_FRESH_DAYS;
   }).length;
+  const realizedRevenue = sales.reduce((s, sale) => s + (sale.salePrice || 0), 0);
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -184,7 +199,9 @@ function renderStats(listings, stages) {
     { value: readyStage ? readyStage.count : 0, label: 'Drafts ready to post', sub: readyStage && readyStage.note ? readyStage.note : null },
     { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 },
     { value: coverageGapCount, label: 'Items with cross-post gaps', sub: coverageGapCount ? 'Not yet on all 4 platforms' : 'Fully cross-listed' },
-    { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 }
+    { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 },
+    { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
+    { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -594,6 +611,43 @@ function renderActivity(events) {
       <div class="activity-item-meta">${e.itemsReviewed != null ? e.itemsReviewed + ' item(s) reviewed' : ''}${e.itemsReviewed != null && e.issuesFound != null ? ' &middot; ' : ''}${e.issuesFound != null ? e.issuesFound + ' issue(s) found' : ''}${e.date ? ' &middot; ' + escapeHtml(e.date) : ''}</div>
     </div>
   `).join('');
+}
+
+// Sale rows are sorted most-recent-first when a date is logged; undated
+// sales (date not tracked yet) sort to the bottom rather than being treated
+// as oldest, since an unknown date isn't the same real information as an
+// old one.
+function renderSales(sales) {
+  const tbody = document.getElementById('salesTableBody');
+  const empty = document.getElementById('salesTableEmpty');
+
+  if (!sales.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No sales logged yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...sales].sort((a, b) => {
+    if (!a.saleDate && !b.saleDate) return 0;
+    if (!a.saleDate) return 1;
+    if (!b.saleDate) return -1;
+    return b.saleDate.localeCompare(a.saleDate);
+  });
+
+  tbody.innerHTML = sorted.map(s => {
+    const net = estimateNetPayout(s.platform, s.salePrice);
+    return `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(s.title || 'Untitled item')}</div></td>
+      <td class="cell-platforms">${s.platform ? `<span class="badge badge-${escapeHtml(s.platform)}">${escapeHtml(PLATFORM_LABELS[s.platform] || s.platform)}</span>` : ''}</td>
+      <td class="cell-value${s.salePrice == null ? ' empty' : ''}">${s.salePrice != null ? formatUsd(s.salePrice) : 'not set'}</td>
+      <td class="cell-value${net == null ? ' empty' : ''}">${net != null ? formatUsd(net) : 'unknown'}</td>
+      <td class="cell-muted">${s.saleDate ? escapeHtml(s.saleDate) : '<span class="cell-value empty">not logged</span>'}</td>
+    </tr>
+  `;
+  }).join('');
 }
 
 document.getElementById('searchInput').addEventListener('input', (e) => {

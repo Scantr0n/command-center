@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
- * Validates listings.json, pipeline.json and activity.json against the
- * field rules documented in public/garage/index.html.
+ * Validates listings.json, pipeline.json, activity.json and sales.json
+ * against the field rules documented in public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -12,7 +12,10 @@
  * what listings.json actually contains, since the two files are hand-edited
  * separately and can drift out of sync (the "ready-to-post" stage is left
  * alone: those items, e.g. the 48 Depop drafts, aren't itemized individually
- * in listings.json yet).
+ * in listings.json yet). It also cross-checks sales.json against every
+ * listing's "soldOn" array in both directions, since a real sale should show
+ * up in exactly one place: logged once as a sale, and marked once as sold on
+ * that platform.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -41,11 +44,12 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData;
+  let listingsData, pipelineData, activityData, salesData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
     activityData = loadJson('activity.json');
+    salesData = loadJson('sales.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -143,6 +147,65 @@ function main() {
     }
   });
 
+  const sales = salesData.sales || [];
+  const seenSaleIds = new Set();
+  const listingById = {};
+  listings.forEach(l => { if (l.id) listingById[l.id] = l; });
+
+  sales.forEach((s, idx) => {
+    const where = 'sales[' + idx + ']' + (s && s.id ? ' (' + s.id + ')' : '');
+
+    if (!s.id) errors.push(where + ': missing "id"');
+    else if (seenSaleIds.has(s.id)) errors.push(where + ': duplicate id "' + s.id + '"');
+    else seenSaleIds.add(s.id);
+
+    if (!s.title) errors.push(where + ': missing "title"');
+
+    if (s.listingId !== null && s.listingId !== undefined && !listingById[s.listingId]) {
+      warnings.push(where + ': listingId "' + s.listingId + '" does not match any listing in listings.json (fine if that listing has since fully sold through and was removed)');
+    }
+
+    if (!s.platform) {
+      errors.push(where + ': missing "platform"');
+    } else if (!PLATFORMS.includes(s.platform)) {
+      errors.push(where + ': platform "' + s.platform + '" is not one of ' + PLATFORMS.join(', '));
+    }
+
+    if (typeof s.salePrice !== 'number' || s.salePrice < 0) {
+      errors.push(where + ': "salePrice" must be a non-negative number');
+    }
+
+    if (s.askingPrice !== null && s.askingPrice !== undefined) {
+      if (typeof s.askingPrice !== 'number' || s.askingPrice < 0) {
+        errors.push(where + ': "askingPrice" must be a non-negative number or null');
+      }
+    }
+
+    if (!isDateOrNull(s.saleDate)) {
+      errors.push(where + ': "saleDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.saleDate));
+    }
+
+    if (s.listingId && listingById[s.listingId] && s.platform) {
+      const soldOn = listingById[s.listingId].soldOn || [];
+      if (!soldOn.includes(s.platform)) {
+        warnings.push(where + ': sale logged on ' + s.platform + ' but listing "' + s.listingId +
+          '" does not have "' + s.platform + '" in its "soldOn" array yet');
+      }
+    }
+  });
+
+  // Every soldOn entry should have a matching sale logged, since a platform
+  // only belongs in soldOn once something has actually sold there.
+  listings.forEach(l => {
+    const soldOn = l.soldOn || [];
+    soldOn.forEach(p => {
+      const hasSale = sales.some(s => s.listingId === l.id && s.platform === p);
+      if (!hasSale) {
+        warnings.push('listing "' + l.id + '" has "' + p + '" in "soldOn" but no matching sale logged in sales.json');
+      }
+    });
+  });
+
   // Cross-check pipeline.json's stage counts against listings.json for the
   // stages that are fully itemized there (draft, live, sold). "Live" is
   // counted as listing instances (one per platform still active, same as
@@ -186,7 +249,8 @@ function main() {
     process.exit(1);
   }
 
-  console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' + events.length + ' activity event(s)).');
+  console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
+    events.length + ' activity event(s), ' + sales.length + ' sale(s)).');
   process.exit(0);
 }
 
