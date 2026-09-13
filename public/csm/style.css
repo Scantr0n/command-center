@@ -227,8 +227,21 @@ header.page-head .sub {
   padding: 10px 0;
   border-top: 1px solid rgba(224,160,48,0.15);
   font-size: 0.85rem;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .data-quality-row:first-of-type { border-top: none; }
+.data-quality-row:hover, .data-quality-row:focus-visible {
+  background: rgba(224,160,48,0.08);
+}
+.data-quality-row:focus-visible { outline: 1px solid rgba(224,160,48,0.5); outline-offset: -1px; }
 .data-quality-row .dq-why {
   margin-left: auto;
   color: #E0A030;

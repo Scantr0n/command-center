@@ -64,6 +64,16 @@
     return div.innerHTML;
   }
 
+  // Lets the "Stalled in stage" and "Needs backfill" rows jump straight to the
+  // flagged prospect's own detail modal, same click-to-view behavior as a
+  // board card, instead of only flagging the problem and leaving the user to
+  // go find that card themselves.
+  function wireRowsToModal(container) {
+    container.querySelectorAll('[data-prospect-id]').forEach(el => {
+      el.addEventListener('click', () => openModal(el.getAttribute('data-prospect-id')));
+    });
+  }
+
   function renderStageHistory(p, stages) {
     const history = p.stageHistory || [];
     if (history.length === 0) {
@@ -166,13 +176,14 @@
     stalledSection.hidden = false;
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
     stalledEl.innerHTML = stalled.map(({ p, info }) =>
-      '<div class="data-quality-row">' +
+      '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<strong>' + escapeHtml(p.name) + '</strong>' +
       '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
       '<span class="dq-why">' + escapeHtml(stageLabel[p.stage] || p.stage).toUpperCase() + ' &middot; ' +
       info.days + 'D (OVER ' + info.staleAfterDays + 'D)</span>' +
-      '</div>'
+      '</button>'
     ).join('');
+    wireRowsToModal(stalledEl);
   }
 
   function renderDataQuality(stages, prospects) {
@@ -195,13 +206,14 @@
 
     dataQualitySection.hidden = false;
     dataQualityList.innerHTML = flagged.map(({ p, reasons }) =>
-      '<div class="data-quality-row">' +
+      '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<strong>' + escapeHtml(p.name) + '</strong>' +
       '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
       '<span class="dq-why">' + escapeHtml(stageLabel[p.stage] || p.stage) +
       ', ' + reasons.join(' &middot; ') + '</span>' +
-      '</div>'
+      '</button>'
     ).join('');
+    wireRowsToModal(dataQualityList);
   }
 
   // Pulls stage moves and content-ideas entries out of every prospect's own
