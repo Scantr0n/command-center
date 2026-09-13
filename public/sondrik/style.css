@@ -441,6 +441,59 @@ section { margin-bottom: 36px; }
   color: #E0A030;
 }
 
+/* Channels */
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+.channel-card {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: var(--panel);
+}
+.channel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.channel-name {
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.channel-pill {
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  color: var(--dim);
+  white-space: nowrap;
+}
+.channel-pill-tracked { border-color: rgba(61,220,132,0.35); background: rgba(61,220,132,0.1); color: #3DDC84; }
+.channel-pill-manual { border-color: rgba(91,140,255,0.35); background: rgba(91,140,255,0.1); color: var(--accent); }
+.channel-pill-gap { border-color: var(--hairline); background: rgba(255,255,255,0.02); color: var(--dim); }
+.channel-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.channel-value-empty {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--dim);
+  font-style: italic;
+}
+.channel-note {
+  font-size: 0.75rem;
+  color: var(--dim);
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
 /* Lead / engagement queue */
 .lead-card {
   border: 1px solid var(--hairline);
@@ -527,14 +580,15 @@ footer.page-foot {
   }
   .callout strong { color: #111; }
 
-  .release-card, .stat-tile, .lead-card, .timeline {
+  .release-card, .stat-tile, .lead-card, .timeline, .channel-card {
     background: none;
     border: 1px solid #ccc;
     break-inside: avoid;
   }
-  .release-summary, .stat-label, .lead-summary, .timeline-title { color: #333; }
+  .release-summary, .stat-label, .lead-summary, .timeline-title, .channel-name { color: #333; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
-  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .last-updated, .last-updated-stale { color: #555; }
+  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .last-updated, .last-updated-stale, .channel-note,
+  .channel-value-empty { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
   .release-badge, .timeline-badge,
@@ -543,8 +597,8 @@ footer.page-foot {
   }
   .compare-bar { border-color: #ccc; }
   .compare-bar-fill { background: #888; }
-  .compare-bar-count, .stat-number { color: #111; }
-  .status-pill, .status-pill-sent { border-color: #999; background: none; color: #111; }
+  .compare-bar-count, .stat-number, .channel-value { color: #111; }
+  .status-pill, .status-pill-sent, .channel-pill { border-color: #999; background: none; color: #111; }
   .timeline-item { border-color: #ddd; }
 
   .empty-state { border-color: #ccc; color: #555; }

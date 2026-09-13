@@ -2,6 +2,7 @@
   const timelineSection = document.getElementById('timelineSection');
   const releaseSection = document.getElementById('releaseSection');
   const tractionSection = document.getElementById('tractionSection');
+  const channelsSection = document.getElementById('channelsSection');
   const leadsSection = document.getElementById('leadsSection');
   const csvBtn = document.getElementById('csvBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
@@ -197,6 +198,53 @@
       (metric.scope ? '<div class="scope-note">' + escapeHtml(metric.scope) + '</div>' : '');
   }
 
+  // A glanceable, channel-level overview sitting above the single-metric
+  // Traction deep-dive and the per-lead Engagement queue: which distribution
+  // channels have a real live-tracked number, which are only hand-logged,
+  // and which are an honest "not tracked yet" gap. Reads its numbers from
+  // downloads.json/leads.json rather than duplicating them in channels.json,
+  // so a channel row can never drift out of sync with the section it links to.
+  function renderChannels(channelsData, downloadsData, leadsData) {
+    const channels = channelsData.channels || [];
+    if (channels.length === 0) {
+      channelsSection.innerHTML = '<div class="empty-state">No channels logged yet.</div>';
+      return;
+    }
+
+    const STATUS_LABEL = { tracked: 'TRACKED', 'manual-log': 'MANUAL LOG', 'not-tracked': 'NOT TRACKED' };
+    const STATUS_CLASS = { tracked: 'channel-pill-tracked', 'manual-log': 'channel-pill-manual', 'not-tracked': 'channel-pill-gap' };
+
+    function linkedValue(c) {
+      if (c.linkedMetric === 'downloads') {
+        const metric = (downloadsData && downloadsData.metric) || {};
+        const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        if (checks.length === 0) return null;
+        const latest = checks[checks.length - 1];
+        return latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date);
+      }
+      if (c.linkedMetric === 'leads') {
+        const leads = (leadsData && leadsData.leads) || [];
+        if (leads.length === 0) return null;
+        return leads.length + (leads.length === 1 ? ' lead logged' : ' leads logged');
+      }
+      return null;
+    }
+
+    channelsSection.innerHTML = '<div class="channel-grid">' + channels.map(c => {
+      const value = linkedValue(c);
+      return '<div class="channel-card">' +
+        '<div class="channel-head">' +
+        '<span class="channel-name">' + escapeHtml(c.name || 'Unnamed channel') + '</span>' +
+        '<span class="channel-pill ' + (STATUS_CLASS[c.status] || '') + ' font-mono">' +
+        (STATUS_LABEL[c.status] || escapeHtml(c.status || 'UNKNOWN')) + '</span>' +
+        '</div>' +
+        (value ? '<div class="channel-value font-display">' + escapeHtml(value) + '</div>'
+               : '<div class="channel-value channel-value-empty">No number logged yet.</div>') +
+        (c.note ? '<div class="channel-note">' + escapeHtml(c.note) + '</div>' : '') +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
   // The download freshness badge only tracks how current the traction
   // number is; a release logged last week or a lead never dated wouldn't
   // show up in that. This scans every real date across all three files so
@@ -372,16 +420,19 @@
   Promise.allSettled([
     loadDataFile('releases'),
     loadDataFile('downloads'),
-    loadDataFile('leads')
-  ]).then(([releasesResult, downloadsResult, leadsResult]) => {
+    loadDataFile('leads'),
+    loadDataFile('channels')
+  ]).then(([releasesResult, downloadsResult, leadsResult, channelsResult]) => {
     const releasesData = releasesResult.status === 'fulfilled' ? releasesResult.value : null;
     const downloadsData = downloadsResult.status === 'fulfilled' ? downloadsResult.value : null;
     const leadsData = leadsResult.status === 'fulfilled' ? leadsResult.value : null;
+    const channelsData = channelsResult.status === 'fulfilled' ? channelsResult.value : null;
 
     const failures = [];
     if (releasesResult.status === 'rejected') failures.push('releases.json: ' + releasesResult.reason.message);
     if (downloadsResult.status === 'rejected') failures.push('downloads.json: ' + downloadsResult.reason.message);
     if (leadsResult.status === 'rejected') failures.push('leads.json: ' + leadsResult.reason.message);
+    if (channelsResult.status === 'rejected') failures.push('channels.json: ' + channelsResult.reason.message);
 
     if (releasesData || downloadsData || leadsData) {
       renderTimeline(releasesData || {}, downloadsData || {}, leadsData || {});
@@ -410,6 +461,13 @@
       tractionSection.innerHTML = '<div class="empty-state" role="alert">Failed to load traction data: ' +
         escapeHtml(downloadsResult.reason.message) + '</div>';
       csvBtn.disabled = true;
+    }
+
+    if (channelsData) {
+      renderChannels(channelsData, downloadsData, leadsData);
+    } else {
+      channelsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load channels data: ' +
+        escapeHtml(channelsResult.reason.message) + '</div>';
     }
 
     if (leadsData) {

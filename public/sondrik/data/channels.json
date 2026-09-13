@@ -1,0 +1,25 @@
+{
+  "channels": [
+    {
+      "id": "github-releases",
+      "name": "GitHub Releases",
+      "linkedMetric": "downloads",
+      "status": "tracked",
+      "note": null
+    },
+    {
+      "id": "reddit",
+      "name": "Reddit (r/IMadeThis)",
+      "linkedMetric": "leads",
+      "status": "manual-log",
+      "note": "No live follower or upvote count tracked, real leads are logged by hand as they happen."
+    },
+    {
+      "id": "product-hunt",
+      "name": "Product Hunt",
+      "linkedMetric": null,
+      "status": "not-tracked",
+      "note": "Not wired into tracking yet."
+    }
+  ]
+}

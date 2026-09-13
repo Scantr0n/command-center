@@ -26,7 +26,7 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let releasesData, downloadsData, leadsData;
+  let releasesData, downloadsData, leadsData, channelsData;
   try {
     releasesData = loadJson('releases.json');
   } catch (e) {
@@ -43,6 +43,12 @@ function main() {
     leadsData = loadJson('leads.json');
   } catch (e) {
     console.error('Failed to read/parse leads.json: ' + e.message);
+    process.exit(1);
+  }
+  try {
+    channelsData = loadJson('channels.json');
+  } catch (e) {
+    console.error('Failed to read/parse channels.json: ' + e.message);
     process.exit(1);
   }
 
@@ -101,6 +107,30 @@ function main() {
     }
   });
 
+  // channels.json
+  const VALID_STATUSES = new Set(['tracked', 'manual-log', 'not-tracked']);
+  const VALID_LINKS = new Set([null, undefined, 'downloads', 'leads']);
+  const seenChannelIds = new Set();
+  (channelsData.channels || []).forEach((c, idx) => {
+    const where = 'channels[' + idx + ']' + (c && c.id ? ' (' + c.id + ')' : '');
+    if (!c.id) errors.push(where + ': missing "id"');
+    else if (seenChannelIds.has(c.id)) errors.push(where + ': duplicate id "' + c.id + '"');
+    else seenChannelIds.add(c.id);
+    if (!c.name) errors.push(where + ': missing "name"');
+    if (!VALID_STATUSES.has(c.status)) {
+      errors.push(where + ': "status" must be one of tracked, manual-log, not-tracked, got ' + JSON.stringify(c.status));
+    }
+    if (!VALID_LINKS.has(c.linkedMetric)) {
+      errors.push(where + ': "linkedMetric" must be null, "downloads", or "leads", got ' + JSON.stringify(c.linkedMetric));
+    }
+    if (c.status === 'tracked' && !c.linkedMetric) {
+      warnings.push(where + ': status is "tracked" but no linkedMetric is set, nothing real to display for it');
+    }
+    if (c.status === 'not-tracked' && !c.note) {
+      warnings.push(where + ': status is "not-tracked" with no note explaining why, reads as an unexplained gap');
+    }
+  });
+
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
     warnings.forEach(w => console.warn('  - ' + w));
@@ -113,7 +143,8 @@ function main() {
   }
 
   console.log('sondrik data files are valid (' + (releasesData.releases || []).length + ' release(s), ' +
-    checks.length + ' download check(s), ' + (leadsData.leads || []).length + ' lead(s)).');
+    checks.length + ' download check(s), ' + (leadsData.leads || []).length + ' lead(s), ' +
+    (channelsData.channels || []).length + ' channel(s)).');
   process.exit(0);
 }
 
