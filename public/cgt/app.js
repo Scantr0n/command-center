@@ -214,6 +214,21 @@ function buildValueGroupsByGrade() {
     .sort((a, b) => b.value - a.value);
 }
 
+// Groups real priced cards' estimatedValue by card year. "By year" is one of
+// the standard facets industry trackers (Sports Card Investor's Market
+// Movers among them) break a collection's value down by alongside sport and
+// grade, so it belongs next to the other breakdown cards here. Sorted newest
+// year first rather than by value like the other breakdown cards, since a
+// year list reads as a timeline and a value-sorted year list would not.
+function buildValueGroupsByYear() {
+  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c.year != null);
+  const totals = new Map();
+  priced.forEach(c => totals.set(c.year, (totals.get(c.year) || 0) + c.estimatedValue));
+  return [...totals.entries()]
+    .map(([year, value]) => ({ label: String(year), value }))
+    .sort((a, b) => Number(b.label) - Number(a.label));
+}
+
 function renderBreakdownList(title, groups) {
   if (!groups.length) {
     return `
@@ -246,7 +261,8 @@ function renderValueBreakdown() {
   el.innerHTML =
     renderBreakdownList('By sport', buildValueGroups('sport')) +
     renderBreakdownList('By grading company', buildValueGroups('gradingCompany')) +
-    renderBreakdownList('By grade', buildValueGroupsByGrade());
+    renderBreakdownList('By grade', buildValueGroupsByGrade()) +
+    renderBreakdownList('By year', buildValueGroupsByYear());
 }
 
 // Pulls "what got priced when" out of every card's own datePriced/backlogBatch
