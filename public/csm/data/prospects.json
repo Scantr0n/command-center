@@ -30,6 +30,7 @@
       },
       "contentIdeas": [],
       "stageHistory": [],
+      "outreachLog": [],
       "notes": "Only verified contact currently past outreach. Historical send date, channel type, and hook were not carried into this structured log yet, backfill from real records instead of guessing."
     }
   ]

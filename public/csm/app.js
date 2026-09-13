@@ -108,6 +108,39 @@
     return { html: '<ul class="timeline-list">' + rowsHtml + '</ul>', empty: false };
   }
 
+  const OUTREACH_TYPE_LABEL = { 'initial-send': 'Initial send', 'nudge': 'Nudge' };
+
+  // A prospect can be nudged more than once before it moves stage, so a
+  // single sendDate/nextNudgeDate pair has no memory of what already went
+  // out. outreachLog is the actual touch-by-touch record: real replies come
+  // from follow-ups, not the first message, so knowing how many real touches
+  // have already happened (and when) is its own signal, separate from
+  // stageHistory (pipeline stage) and contentIdeas (what to say).
+  function renderOutreachLog(p) {
+    const log = (p.outreachLog || []).filter(e => e && e.date);
+    if (log.length === 0) {
+      return { html: 'No outreach touches logged yet.', empty: true, count: 0 };
+    }
+    const sorted = log.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const rowsHtml = sorted.map((entry, i) => {
+      const label = OUTREACH_TYPE_LABEL[entry.type] || entry.type || 'Touch';
+      const prev = sorted[i - 1];
+      const gapText = prev && prev.date && entry.date
+        ? (daysUntil(entry.date) - daysUntil(prev.date)) + 'd since last touch'
+        : '';
+      return '<li class="timeline-row">' +
+        '<span class="timeline-dot" style="background:#5EC8D8"></span>' +
+        '<span class="timeline-body">' +
+        '<span class="timeline-stage">' + escapeHtml(label) + (entry.note ? ': ' + escapeHtml(entry.note) : '') + '</span>' +
+        '<span class="timeline-date font-mono">' + escapeHtml(fmtDate(entry.date)) +
+        (gapText ? ' &middot; ' + gapText : '') + '</span>' +
+        '</span></li>';
+    }).join('');
+    const summary = '<div class="section-note" style="margin:0 0 8px">' + sorted.length + ' touch' +
+      (sorted.length === 1 ? '' : 'es') + ' logged &middot; last ' + escapeHtml(fmtDate(sorted[sorted.length - 1].date)) + '</div>';
+    return { html: summary + '<ul class="timeline-list">' + rowsHtml + '</ul>', empty: false, count: sorted.length };
+  }
+
   function fieldRow(label, valueHtml, isEmpty) {
     return '<div class="field-row">' +
       '<div class="field-label">' + escapeHtml(label) + '</div>' +
@@ -240,6 +273,11 @@
         if (!entry.date || !entry.idea) return;
         events.push({ date: entry.date, type: 'idea', prospect: p, label: entry.idea });
       });
+      (p.outreachLog || []).forEach(entry => {
+        if (!entry.date) return;
+        const label = (OUTREACH_TYPE_LABEL[entry.type] || entry.type || 'Touch') + (entry.note ? ': ' + entry.note : '');
+        events.push({ date: entry.date, type: 'touch', prospect: p, label });
+      });
     });
     events.sort((a, b) => b.date.localeCompare(a.date));
     return events;
@@ -257,6 +295,8 @@
     const rowsHtml = events.map(ev => {
       const tag = ev.type === 'stage'
         ? '<span class="activity-tag activity-tag-stage" style="color:' + ev.color + ';border-color:' + ev.color + '66">MOVED</span>'
+        : ev.type === 'touch'
+        ? '<span class="activity-tag activity-tag-touch">TOUCH</span>'
         : '<span class="activity-tag activity-tag-idea">IDEA</span>';
       return '<div class="activity-row">' +
         '<span class="activity-date font-mono">' + escapeHtml(fmtDate(ev.date)) + '</span>' +
@@ -530,7 +570,7 @@
     ['replyStatus', 'Reply Status'],
     ['socialPlatform', 'Social Platform'], ['socialFollowers', 'Social Followers'],
     ['socialEngagementRate', 'Social Engagement Rate'], ['socialAsOfDate', 'Social Snapshot As Of'],
-    ['contentIdeas', 'Content Ideas'], ['notes', 'Notes']
+    ['outreachLog', 'Outreach Touches'], ['contentIdeas', 'Content Ideas'], ['notes', 'Notes']
   ];
 
   // Exports exactly what the board currently shows (search + channel + category
@@ -555,6 +595,10 @@
       socialFollowers: p.socialSnapshot && p.socialSnapshot.followers,
       socialEngagementRate: p.socialSnapshot && p.socialSnapshot.engagementRate,
       socialAsOfDate: p.socialSnapshot && p.socialSnapshot.asOfDate,
+      outreachLog: (p.outreachLog || [])
+        .map(entry => (entry.date ? entry.date + ': ' : '') + (OUTREACH_TYPE_LABEL[entry.type] || entry.type) +
+          (entry.note ? ' (' + entry.note + ')' : ''))
+        .join('; '),
       contentIdeas: (p.contentIdeas || [])
         .map(entry => (entry.date ? entry.date + ': ' : '') + entry.idea)
         .join('; '),
@@ -629,6 +673,8 @@
       (p.contactChannel && p.contactChannel.detail ? '<div style="margin-top:6px">' + escapeHtml(p.contactChannel.detail) + '</div>' : ''), false));
     rows.push(fieldRow('Reply status', p.replyStatus ? escapeHtml(p.replyStatus) : 'Not logged yet', !p.replyStatus));
     rows.push(fieldRow('Send date', p.sendDate ? fmtDate(p.sendDate) : 'Not logged yet', !p.sendDate));
+    const outreachLogHtml = renderOutreachLog(p);
+    rows.push(fieldRow('Outreach touch log', outreachLogHtml.html + outreachLogGeneratorHtml(), outreachLogHtml.empty));
     rows.push(fieldRow('Next nudge date', p.nextNudgeDate ? fmtDate(p.nextNudgeDate) : 'Not scheduled yet', !p.nextNudgeDate));
     rows.push(fieldRow('Next action', p.nextAction ? escapeHtml(p.nextAction) : 'Not logged yet', !p.nextAction));
 
@@ -677,6 +723,7 @@
     modalOverlay.hidden = false;
     wireStageMoveGenerator(p);
     wireIdeaGenerator(p);
+    wireOutreachLogGenerator(p);
     lockBodyScroll();
     modalClose.focus();
   }
@@ -722,6 +769,29 @@
       '<button type="button" id="modalIdeaCopy" class="print-btn font-mono">Copy</button>' +
       '</div>' +
       '<pre class="np-output font-mono" id="modalIdeaOutput"></pre>' +
+      '</div></div>';
+  }
+
+  function outreachLogGeneratorHtml() {
+    return '<div class="inline-gen">' +
+      '<div class="inline-gen-row">' +
+      '<select id="modalTouchType" class="np-input inline-gen-select">' +
+      '<option value="initial-send">Initial send</option>' +
+      '<option value="nudge">Nudge</option>' +
+      '</select>' +
+      '<input type="date" id="modalTouchDate" class="np-input inline-gen-date">' +
+      '<button type="button" id="modalTouchGenerate" class="print-btn font-mono">+ Log touch</button>' +
+      '</div>' +
+      '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<input type="text" id="modalTouchNote" class="np-input" placeholder="Note, optional (e.g. which channel, what was said)">' +
+      '</div>' +
+      '<div id="modalTouchResult" class="inline-gen-result" hidden>' +
+      '<div class="inline-gen-warn" id="modalTouchWarn" hidden></div>' +
+      '<div class="np-output-head">' +
+      '<span class="field-label" style="margin:0">Paste into <code>outreachLog</code></span>' +
+      '<button type="button" id="modalTouchCopy" class="print-btn font-mono">Copy</button>' +
+      '</div>' +
+      '<pre class="np-output font-mono" id="modalTouchOutput"></pre>' +
       '</div></div>';
   }
 
@@ -793,6 +863,41 @@
       resultEl.hidden = false;
     });
     wireCopyButton(document.getElementById('modalIdeaCopy'), outputEl);
+  }
+
+  function wireOutreachLogGenerator(p) {
+    const typeSelect = document.getElementById('modalTouchType');
+    const dateInput = document.getElementById('modalTouchDate');
+    dateInput.value = todayIso();
+    const noteInput = document.getElementById('modalTouchNote');
+    const resultEl = document.getElementById('modalTouchResult');
+    const warnEl = document.getElementById('modalTouchWarn');
+    const outputEl = document.getElementById('modalTouchOutput');
+    document.getElementById('modalTouchGenerate').addEventListener('click', () => {
+      const type = typeSelect.value;
+      const date = dateInput.value;
+      const note = noteInput.value.trim();
+      if (!date) {
+        warnEl.hidden = false;
+        warnEl.textContent = 'Pick the real date this touch actually happened first.';
+        outputEl.textContent = '';
+        resultEl.hidden = false;
+        return;
+      }
+      const log = p.outreachLog || [];
+      const alreadySent = log.some(e => e.type === 'initial-send');
+      let warn = '';
+      if (type === 'initial-send' && alreadySent) {
+        warn = 'An "initial-send" touch is already logged for this prospect. If this is a follow-up, use "Nudge" instead.';
+      }
+      warnEl.hidden = !warn;
+      warnEl.textContent = warn;
+      const entry = { date, type };
+      if (note) entry.note = note;
+      outputEl.textContent = JSON.stringify(entry, null, 2) + ',';
+      resultEl.hidden = false;
+    });
+    wireCopyButton(document.getElementById('modalTouchCopy'), outputEl);
   }
 
   function closeModal() {
@@ -991,6 +1096,7 @@
       },
       contentIdeas: [],
       stageHistory: stageEnteredDate ? [{ date: stageEnteredDate, stage }] : [],
+      outreachLog: npVal('npSendDate') ? [{ date: npVal('npSendDate'), type: 'initial-send' }] : [],
       notes: npVal('npNotes')
     };
     return { p, isDuplicateId };

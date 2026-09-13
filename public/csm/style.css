@@ -332,6 +332,7 @@ header.page-head .sub {
   color: var(--sub);
 }
 .activity-tag-idea { color: #4A9EDB; border-color: rgba(74,158,219,0.4); background: rgba(74,158,219,0.08); }
+.activity-tag-touch { color: #5EC8D8; border-color: rgba(94,200,216,0.4); background: rgba(94,200,216,0.08); }
 .activity-who { flex-shrink: 0; }
 .activity-label { color: var(--sub); }
 .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: none; }

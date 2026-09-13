@@ -14,6 +14,7 @@ const path = require('path');
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CHANNEL_TYPES = ['named-decision-maker', 'generic-inbox'];
+const OUTREACH_TYPES = ['initial-send', 'nudge'];
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
@@ -142,6 +143,34 @@ function main() {
             JSON.stringify(entry.date));
         }
       });
+    }
+
+    if (!Array.isArray(p.outreachLog || [])) {
+      errors.push(where + ': "outreachLog" must be an array.');
+    } else {
+      (p.outreachLog || []).forEach((entry, logIdx) => {
+        const logWhere = where + '.outreachLog[' + logIdx + ']';
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+          errors.push(logWhere + ': must be an object like { "date": "YYYY-MM-DD", "type": "initial-send" }, not ' +
+            JSON.stringify(entry));
+          return;
+        }
+        if (!isDateOrNull(entry.date) || entry.date == null) {
+          errors.push(logWhere + ': "date" must be a YYYY-MM-DD date (when this touch actually happened): ' +
+            JSON.stringify(entry.date));
+        }
+        if (!entry.type || !OUTREACH_TYPES.includes(entry.type)) {
+          errors.push(logWhere + ': "type" ("' + entry.type + '") must be one of ' + OUTREACH_TYPES.join(', '));
+        }
+        if (entry.note != null && typeof entry.note !== 'string') {
+          errors.push(logWhere + ': "note" must be a string or omitted, not ' + JSON.stringify(entry.note));
+        }
+      });
+      const sendCount = (p.outreachLog || []).filter(e => e && e.type === 'initial-send').length;
+      if (sendCount > 1) {
+        warnings.push(where + ': outreachLog has ' + sendCount + ' "initial-send" entries, there should only ' +
+          'ever be one, later touches should be logged as "nudge".');
+      }
     }
 
     if (!Array.isArray(p.stageHistory || [])) {
