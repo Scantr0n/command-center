@@ -1108,7 +1108,12 @@ async function sendChat() {
 
 document.getElementById('sendChat').addEventListener('click', sendChat);
 document.getElementById('chatInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendChat();
+  // e.isComposing (plus the keyCode 229 fallback some browsers still use
+  // instead of setting isComposing) is true while an IME is still resolving
+  // a candidate, e.g. typing Chinese/Japanese/Korean: the Enter that
+  // confirms the candidate would otherwise also fire this and send the
+  // message mid-composition.
+  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) sendChat();
 });
 
 document.addEventListener('keydown', (e) => {
