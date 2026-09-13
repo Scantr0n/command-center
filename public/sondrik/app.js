@@ -25,6 +25,19 @@
     return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
   }
 
+  // Same "N days ago" phrasing the download freshness badge already uses,
+  // applied to any other real logged date so recency reads consistently
+  // across the page instead of leaving a reader to do the date math.
+  function relativeDaysLabel(iso) {
+    if (!iso) return null;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const age = daysBetween(iso, todayIso);
+    if (age < 0) return null;
+    if (age === 0) return 'today';
+    if (age === 1) return '1 day ago';
+    return age + ' days ago';
+  }
+
   // Merges the three data files into one chronological narrative. Indie/solo
   // founder dashboards commonly surface a unified activity timeline rather
   // than making a reader cross-reference separate per-topic sections to
@@ -81,14 +94,16 @@
       releaseSection.innerHTML = '<div class="empty-state">No releases logged yet.</div>';
       return;
     }
-    releaseSection.innerHTML = releases.map(r =>
-      '<div class="release-card">' +
+    releaseSection.innerHTML = releases.map((r, idx) => {
+      const rel = idx === 0 ? relativeDaysLabel(r.date) : null;
+      return '<div class="release-card">' +
       '<span class="release-version font-display">v' + escapeHtml(r.version) + '</span>' +
-      (r.date ? '<span class="release-date">' + fmtDate(r.date) + '</span>' : '') +
+      (r.date ? '<span class="release-date">' + fmtDate(r.date) +
+        (rel ? ' <span class="release-relative font-mono">(' + rel + ')</span>' : '') + '</span>' : '') +
       (r.type ? '<span class="release-badge">' + escapeHtml(r.type).toUpperCase() + '</span>' : '') +
       '<div class="release-summary">' + escapeHtml(r.summary || 'No summary logged yet.') + '</div>' +
-      '</div>'
-    ).join('');
+      '</div>';
+    }).join('');
   }
 
   function renderTraction(data) {
@@ -236,8 +251,9 @@
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     if (releases.length > 0) {
       const r = releases[0];
+      const rel = relativeDaysLabel(r.date);
       lines.push('');
-      lines.push('Latest release: v' + r.version + (r.date ? ' (' + fmtDate(r.date) + ')' : '') +
+      lines.push('Latest release: v' + r.version + (r.date ? ' (' + fmtDate(r.date) + (rel ? ', ' + rel : '') + ')' : '') +
         (r.summary ? ', ' + r.summary : ''));
     }
 
