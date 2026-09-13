@@ -50,7 +50,7 @@
           <tr><th>platforms</th><td>Array of any of: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, <code>depop</code></td></tr>
           <tr><th>soldOn</th><td>Array, subset of <code>platforms</code>, marking which of them the item has actually sold on so it can be manually delisted from the rest. Leave <code>[]</code> until a real sale happens on one platform while the item is still live on others.</td></tr>
           <tr><th>status</th><td>One of: <code>draft</code>, <code>ready-to-post</code>, <code>live</code>, <code>sold</code></td></tr>
-          <tr><th>datePublished</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
+          <tr><th>datePublished</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet. Also drives the "Relist reminders" section below, log the real date an item first went live to get relist guidance for it.</td></tr>
           <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
           <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>.</td></tr>
           <tr><th>activity.json</th><td>One object per logged event in the <code>events</code> array: real bug fixes, photo audits, and other quality checks. Requires <code>id</code>, <code>title</code>, and <code>type</code> (<code>bug-fix</code>, <code>photo-audit</code>, or <code>other</code>).</td></tr>
@@ -134,6 +134,32 @@
         <tbody id="coverageTableBody"></tbody>
       </table>
       <div class="table-empty" id="coverageTableEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Relist reminders</h2>
+    <div class="callout">
+      Platform-aware guidance on when to refresh a live listing that hasn't sold. eBay, Vinted, and Depop's
+      search all favor listing recency, common reseller practice is to relist or renew after about 30 days
+      without a sale. Poshmark is the exception: its Excessive Listing Removal Policy blocks relisting the
+      <em>same</em> item again before day 60, doing it earlier risks the listing getting pulled instead of
+      refreshed. This needs a real <code>datePublished</code> logged per item to compute anything, it stays
+      honestly blank until then, no guessed dates.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="relistTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Published</th>
+            <th>Days listed</th>
+            <th>Guidance</th>
+          </tr>
+        </thead>
+        <tbody id="relistTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="relistTableEmpty" hidden></div>
     </div>
   </section>
 

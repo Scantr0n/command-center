@@ -103,12 +103,14 @@ async function loadData() {
     renderStats(listings, stages);
     applyFiltersAndRender();
     renderCoverage(listings);
+    renderRelist(listings);
     renderPayoutTable(listings);
   } else {
     listings = [];
     document.getElementById('statRow').innerHTML = '';
     document.getElementById('listingTableBody').innerHTML = '';
     document.getElementById('coverageTableBody').innerHTML = '';
+    document.getElementById('relistTableBody').innerHTML = '';
     document.getElementById('payoutTableBody').innerHTML = '';
     errBox.hidden = false;
     errBox.setAttribute('role', 'alert');
@@ -163,6 +165,11 @@ function renderStats(listings, stages) {
   const atRiskCount = live.filter(l => (l.soldOn || []).length > 0 && remainingPlatforms(l).length > 0).length;
   const bestCaseTotal = bestCaseTotalPayout(live);
   const coverageGapCount = live.filter(l => missingPlatforms(l).length > 0).length;
+  const knownAgeCount = live.filter(l => l.datePublished).length;
+  const dueForRelistCount = live.filter(l => {
+    const days = daysSincePublished(l.datePublished);
+    return days != null && days >= RELIST_FRESH_DAYS;
+  }).length;
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -172,7 +179,8 @@ function renderStats(listings, stages) {
     { value: formatUsd(bestCaseTotal), label: 'Best-case net payout', sub: 'If each item sells on its best-fee platform' },
     { value: readyStage ? readyStage.count : 0, label: 'Drafts ready to post', sub: readyStage && readyStage.note ? readyStage.note : null },
     { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 },
-    { value: coverageGapCount, label: 'Items with cross-post gaps', sub: coverageGapCount ? 'Not yet on all 4 platforms' : 'Fully cross-listed' }
+    { value: coverageGapCount, label: 'Items with cross-post gaps', sub: coverageGapCount ? 'Not yet on all 4 platforms' : 'Fully cross-listed' },
+    { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -228,6 +236,72 @@ function renderCoverage(listings) {
       <td><div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div></td>
       <td class="cell-platforms">${platformBadges(l.platforms, l.soldOn)}</td>
       <td class="cell-platforms">${missingHtml}</td>
+    </tr>
+  `;
+  }).join('');
+}
+
+// Real reseller-tooling convention (Vendoo, Crosslist, etc.): eBay, Vinted,
+// and Depop's search all favor listing recency, so ~30 days without a sale
+// is the common point to relist or renew. Poshmark is the opposite case,
+// its Excessive Listing Removal Policy blocks relisting the same item again
+// before day 60, so it needs its own later threshold instead of the general
+// 30-day one.
+const RELIST_FRESH_DAYS = 30;
+const POSHMARK_HOLD_DAYS = 60;
+
+// Returns null (not days-ago-unknown-as-zero) when there's no real logged
+// date to compute from, so the UI can show an honest "not logged" state
+// instead of a misleading "0 days".
+function daysSincePublished(dateStr) {
+  if (!dateStr) return null;
+  const published = new Date(dateStr + 'T00:00:00');
+  if (Number.isNaN(published.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - published.getTime()) / 86400000));
+}
+
+function relistGuidanceHtml(l, days) {
+  if (days == null) {
+    return '<span class="cell-value empty">log a publish date for guidance</span>';
+  }
+  if (days < RELIST_FRESH_DAYS) {
+    return `<span class="badge badge-fresh">Fresh, ${RELIST_FRESH_DAYS - days}d until a refresh is worth considering</span>`;
+  }
+  const platforms = remainingPlatforms(l);
+  const badges = [];
+  const nonPoshmark = platforms.filter(p => p !== 'poshmark');
+  if (nonPoshmark.length) {
+    badges.push(`<span class="badge badge-due">Relist/renew on ${nonPoshmark.map(p => escapeHtml(PLATFORM_LABELS[p] || p)).join(', ')}</span>`);
+  }
+  if (platforms.includes('poshmark')) {
+    badges.push(days < POSHMARK_HOLD_DAYS
+      ? `<span class="badge badge-hold">Hold off on Poshmark until day ${POSHMARK_HOLD_DAYS}</span>`
+      : '<span class="badge badge-due">Eligible to relist on Poshmark</span>');
+  }
+  return badges.join(' ') || '<span class="cell-value empty">nothing left to relist</span>';
+}
+
+function renderRelist(listings) {
+  const tbody = document.getElementById('relistTableBody');
+  const empty = document.getElementById('relistTableEmpty');
+  const rows = listings.filter(l => l.status === 'live');
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No live listings to track relist timing for yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  tbody.innerHTML = rows.map(l => {
+    const days = daysSincePublished(l.datePublished);
+    return `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div></td>
+      <td class="cell-muted">${l.datePublished ? escapeHtml(l.datePublished) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-value${days == null ? ' empty' : ''}">${days != null ? days : 'unknown'}</td>
+      <td>${relistGuidanceHtml(l, days)}</td>
     </tr>
   `;
   }).join('');
@@ -605,6 +679,9 @@ function openModal(id) {
   rows.push(fieldRow('Asking price', l.price != null ? formatUsd(l.price) : 'Not set', l.price == null));
   rows.push(fieldRow('Platforms', (l.platforms || []).length ? platformBadges(l.platforms, l.soldOn) : 'None logged', !(l.platforms || []).length));
   rows.push(fieldRow('Published', l.datePublished ? escapeHtml(l.datePublished) : 'Not logged yet', !l.datePublished));
+
+  const modalDays = daysSincePublished(l.datePublished);
+  rows.push(fieldRow('Relist guidance', relistGuidanceHtml(l, modalDays), modalDays == null));
 
   const modalBest = bestPayoutPlatform(l);
   const payoutHtml = (l.platforms || []).length
