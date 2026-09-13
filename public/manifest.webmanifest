@@ -10,5 +10,31 @@
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Sondrik",
+      "short_name": "Sondrik",
+      "description": "Product / traction hub",
+      "url": "/sondrik/"
+    },
+    {
+      "name": "The Garage",
+      "short_name": "Garage",
+      "description": "Multi-platform reselling ops",
+      "url": "/garage/"
+    },
+    {
+      "name": "CSM Pipeline",
+      "short_name": "CSM",
+      "description": "China social media outreach pipeline",
+      "url": "/csm/"
+    },
+    {
+      "name": "Card Grading Tracker",
+      "short_name": "CGT",
+      "description": "Graded card inventory and pricing",
+      "url": "/cgt/"
+    }
   ]
 }
