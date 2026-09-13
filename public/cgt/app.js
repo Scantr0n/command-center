@@ -136,6 +136,7 @@ async function loadCards() {
     renderDataQuality();
     renderStalePricing();
     renderBatchFilter();
+    renderInsuranceSummary();
     applyFiltersAndRender();
     initTableScrollShadows();
   } catch (e) {
@@ -406,6 +407,72 @@ function renderStalePricing() {
   list.querySelectorAll('.data-quality-row').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.id));
   });
+}
+
+// Builds the itemized appraisal/insurance list once from the real dataset,
+// independent of whatever the on-screen table is currently filtered/sorted
+// to, since an insurance document needs "everything with a real value on
+// record," not "whatever slice happened to be on screen when someone hit
+// print." Unpriced cards and the example row are excluded from both the
+// list and the total, and the exclusion count is stated plainly so the
+// total on the page never gets mistaken for a complete collection value.
+function renderInsuranceSummary() {
+  const el = document.getElementById('insuranceSummary');
+  const real = cards.filter(c => !isExample(c));
+  const priced = real
+    .filter(c => c.estimatedValue != null)
+    .slice()
+    .sort((a, b) => b.estimatedValue - a.estimatedValue);
+  const unpricedCount = real.length - priced.length;
+  const generatedOn = new Date().toISOString().slice(0, 10);
+
+  if (!priced.length) {
+    el.innerHTML = `
+      <h1 class="insurance-summary-title">Card Grading Tracker, Insurance / Appraisal Summary</h1>
+      <p class="insurance-summary-meta">Generated ${escapeHtml(generatedOn)}</p>
+      <p class="insurance-summary-empty">No cards with a researched value on record yet. Nothing to summarize.</p>
+    `;
+    return;
+  }
+
+  const total = priced.reduce((s, c) => s + c.estimatedValue, 0);
+  const rows = priced.map(c => `
+    <tr>
+      <td>${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</td>
+      <td>${escapeHtml(c.sport || '')}</td>
+      <td>${escapeHtml(c.gradingCompany || '')}</td>
+      <td>${c.grade != null ? escapeHtml(String(c.grade)) : ''}</td>
+      <td>${escapeHtml(c.certNumber || '')}</td>
+      <td class="num">${formatUsd(c.estimatedValue)}</td>
+      <td>${c.valuationBasis === 'recent-sale' ? 'Recent sale' : c.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : 'Unlabeled'}</td>
+      <td>${escapeHtml(c.datePriced || '')}</td>
+    </tr>
+  `).join('');
+
+  el.innerHTML = `
+    <h1 class="insurance-summary-title">Card Grading Tracker, Insurance / Appraisal Summary</h1>
+    <p class="insurance-summary-meta">Generated ${escapeHtml(generatedOn)} &middot; ${priced.length} priced card${priced.length === 1 ? '' : 's'}</p>
+    <p class="insurance-summary-note">${unpricedCount
+      ? unpricedCount + ' additional card' + (unpricedCount === 1 ? '' : 's') + ' logged with no researched value yet, excluded from this list and from the total below.'
+      : 'Every logged card has a researched value on record; none excluded.'
+    } A value marked "Comp-based estimate" has no directly comparable sale on record and is inferred from related sales, not a confirmed sale of this exact card and grade.</p>
+    <table class="insurance-summary-table">
+      <thead>
+        <tr>
+          <th>Card</th><th>Sport</th><th>Grader</th><th>Grade</th><th>Cert #</th>
+          <th class="num">Est. value</th><th>Basis</th><th>Date priced</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr class="insurance-summary-total">
+          <td colspan="5">Total (${priced.length} card${priced.length === 1 ? '' : 's'})</td>
+          <td class="num">${formatUsd(total)}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
 }
 
 function basisBadge(c) {
@@ -806,6 +873,20 @@ document.querySelectorAll('th.sortable').forEach(th => {
 });
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+// Separate from the plain print button above: this prints only the
+// itemized insurance/appraisal summary (see renderInsuranceSummary), not
+// whatever the dashboard happens to be filtered/sorted to right now. The
+// insurance-print-mode class is what style.css's @media print block keys
+// off of to hide everything else; 'afterprint' cleans it back up whether
+// the user actually printed or cancelled out of the print dialog.
+document.getElementById('insurancePrintBtn').addEventListener('click', () => {
+  document.body.classList.add('insurance-print-mode');
+  window.print();
+});
+window.addEventListener('afterprint', () => {
+  document.body.classList.remove('insurance-print-mode');
+});
 
 // The current filters/search/sort are already mirrored into the address bar
 // by syncUrl(), but most people won't notice that on their own, so this

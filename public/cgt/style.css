@@ -616,6 +616,22 @@ footer.page-foot {
   padding-top: 16px;
 }
 
+/* Insurance/appraisal summary: built once from real data (see
+   renderInsuranceSummary in app.js), always hidden on screen, and shown only
+   inside @media print while body.insurance-print-mode is set (see the
+   insurancePrintBtn handler). Plain black-on-white, no badges/chips/nav, the
+   way an actual appraisal document reads. */
+.insurance-print-only { display: none; }
+.insurance-summary-title { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 1.3rem; margin: 0 0 4px; }
+.insurance-summary-meta { font-size: 0.8rem; color: var(--sub); margin: 0 0 4px; }
+.insurance-summary-note { font-size: 0.78rem; color: var(--dim); margin: 0 0 18px; font-style: italic; }
+.insurance-summary-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.insurance-summary-table th, .insurance-summary-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--hairline); }
+.insurance-summary-table th { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dim); }
+.insurance-summary-table td.num, .insurance-summary-table th.num { text-align: right; }
+.insurance-summary-total td { font-weight: 700; border-bottom: none; border-top: 2px solid var(--hairlineHover); }
+.insurance-summary-empty { font-size: 0.85rem; color: var(--dim); }
+
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
   body { background: #fff; color: #111; }
@@ -625,6 +641,26 @@ footer.page-foot {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
+
+  /* Insurance print mode: hide every normal dashboard section (all direct
+     `main > section` children, plus the callout above them) and show only
+     the itemized summary, regardless of whatever's filtered/sorted on
+     screen right now. Targeting the section wrappers themselves, not their
+     inner content, so this doesn't need updating every time a section is
+     added to the dashboard. */
+  body.insurance-print-mode header.page-head,
+  body.insurance-print-mode main > section,
+  body.insurance-print-mode .callout,
+  body.insurance-print-mode footer.page-foot {
+    display: none !important;
+  }
+  body.insurance-print-mode .insurance-print-only {
+    display: block !important;
+  }
+  .insurance-summary-meta, .insurance-summary-note { color: #333 !important; }
+  .insurance-summary-table th { color: #333 !important; border-color: #ccc !important; }
+  .insurance-summary-table td, .insurance-summary-table th { border-color: #ddd !important; }
+  .insurance-summary-total td { color: #111 !important; border-top-color: #111 !important; }
 
   .callout { border-color: #bbb; background: none; color: #333; }
   .callout strong { color: #111; }

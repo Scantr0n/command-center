@@ -23,6 +23,7 @@
       <button type="button" id="copyLinkBtn" class="print-btn font-mono" aria-live="polite">Copy link to this view</button>
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
+      <button type="button" id="insurancePrintBtn" class="print-btn font-mono">Print insurance summary</button>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
@@ -168,6 +169,19 @@
       <div class="table-empty" id="tableEmpty" hidden></div>
     </div>
   </section>
+
+  <!--
+    Built for print only (see #insuranceSummary in style.css and the
+    insurancePrintBtn handler in app.js). The regular "Print / export PDF"
+    button prints whatever the dashboard currently shows: stats, breakdowns,
+    activity feed, and the table under whatever filters happen to be active.
+    An insurance/appraisal document needs something narrower and unfiltered:
+    a plain dated list of every real card with a researched value on record,
+    sorted highest value first, plus a total, regardless of what's currently
+    filtered on screen. Hidden on screen at all times; shown only inside
+    @media print, and only while body.insurance-print-mode is set.
+  -->
+  <div class="insurance-print-only" id="insuranceSummary" hidden></div>
   </main>
 
   <footer class="page-foot font-mono">
