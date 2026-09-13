@@ -98,7 +98,10 @@ function daysSince(isoDate) {
 // public cert lookup as of this writing, so it is left out entirely rather
 // than link to something that doesn't exist.
 const CERT_LOOKUP = {
-  PSA: { deepLink: cert => 'https://www.psacard.com/cert/' + encodeURIComponent(cert) },
+  // The trailing "/psa" scopes the lookup to PSA-graded cards specifically:
+  // cert numbers are shared with PSA/DNA's autograph-only database, so a
+  // bare /cert/<number> can land on the wrong item type for a colliding id.
+  PSA: { deepLink: cert => 'https://www.psacard.com/cert/' + encodeURIComponent(cert) + '/psa' },
   BGS: { deepLink: cert => 'https://www.beckett.com/grading/card-lookup?item_id=' + encodeURIComponent(cert) + '&item_type=BGS' },
   SGC: { landing: 'https://www.gosgc.com/auth-code' },
   CGC: { landing: 'https://www.cgccards.com/verify' },
