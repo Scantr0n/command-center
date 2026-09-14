@@ -158,12 +158,13 @@ function remainingPlatforms(l) {
 }
 
 // Best-case total: for each live item, the highest net payout among the
-// platforms it's actually listed on (falling back to price if fees can't be
-// estimated), summed across all items. Not a prediction of what will sell
-// where, just what picking the best-fee platform for each item nets in total.
+// platforms it's still actually listed on (excluding ones already sold via
+// soldOn, same as every other stat here), falling back to price if fees
+// can't be estimated, summed across all items. Not a prediction of what will
+// sell where, just what picking the best-fee platform for each item nets.
 function bestCaseTotalPayout(live) {
   return live.reduce((sum, l) => {
-    const nets = (l.platforms || [])
+    const nets = remainingPlatforms(l)
       .map(p => estimateNetPayout(p, l.price))
       .filter(n => n != null);
     if (nets.length) return sum + Math.max(...nets);
