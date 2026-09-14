@@ -105,6 +105,38 @@ function mostRecentConnectedAt(history) {
   return null;
 }
 
+// Statuspage/UptimeRobot-style incident duration: not just "last check was
+// up/down" but how long the current state has held, e.g. "Down for 3h 12m".
+// Derived by walking connection.history backward from the newest entry
+// while its connected value keeps matching the current one, and taking the
+// oldest such entry's timestamp as when the current streak began. Built
+// only from real recorded checks; returns null (nothing shown) when there
+// isn't enough history to derive it from, same honest-empty-state rule as
+// everything else on this page.
+function currentStateStartedAt(history, currentConnected) {
+  if (!Array.isArray(history) || !history.length) return null;
+  let startedAt = null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (!entry || entry.connected !== currentConnected) break;
+    startedAt = entry.at;
+  }
+  return startedAt;
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'under 1m';
+  if (mins < 60) return mins + 'm';
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return hours + 'h' + (remMins ? ' ' + remMins + 'm' : '');
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return days + 'd' + (remHours ? ' ' + remHours + 'h' : '');
+}
+
 function renderConnection(data) {
   const dot = document.getElementById('connDot');
   const label = document.getElementById('connLabel');
@@ -122,13 +154,19 @@ function renderConnection(data) {
     dot.className = 'conn-dot down';
     label.textContent = 'Not connected';
     const lastConnectedAt = mostRecentConnectedAt(history);
+    const downSince = currentStateStartedAt(history, false);
+    const downDuration = downSince ? formatDuration(Date.now() - new Date(downSince).getTime()) : null;
     sub.textContent = data.connection.note || 'No live feed configured yet.';
+    if (downDuration) {
+      sub.textContent += ' · Down for ' + downDuration;
+    }
     if (lastConnectedAt) {
       sub.textContent += ' · Last connected ' + (timeAgo(lastConnectedAt) || formatAbsolute(lastConnectedAt));
     }
     sub.title = (checkedAt
       ? 'Connectivity last checked ' + (timeAgo(checkedAt) || '') + ' (' + formatAbsolute(checkedAt) + ')'
       : 'Connectivity has never been checked yet.') +
+      (downSince ? ' • Continuously not connected since ' + formatAbsolute(downSince) : '') +
       (lastConnectedAt ? ' • Last seen connected at ' + formatAbsolute(lastConnectedAt) : '');
     updateGlanceIndicators('down');
     return;
@@ -140,9 +178,12 @@ function renderConnection(data) {
   label.textContent = cls === 'down'
     ? 'Connected, but last reading is old'
     : 'Connected';
-  sub.textContent = 'Last reading: ' + (age || asOf);
+  const upSince = currentStateStartedAt(history, true);
+  const upDuration = upSince ? formatDuration(Date.now() - new Date(upSince).getTime()) : null;
+  sub.textContent = 'Last reading: ' + (age || asOf) + (upDuration ? ' · Connected for ' + upDuration : '');
   sub.title = 'Reading taken at ' + formatAbsolute(asOf) +
-    (checkedAt ? ' • Connectivity last checked ' + formatAbsolute(checkedAt) : '');
+    (checkedAt ? ' • Connectivity last checked ' + formatAbsolute(checkedAt) : '') +
+    (upSince ? ' • Continuously connected since ' + formatAbsolute(upSince) : '');
   updateGlanceIndicators(cls);
 }
 
