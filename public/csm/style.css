@@ -350,6 +350,8 @@ header.page-head .sub {
 .nudge-today .nudge-urgency-dot { background: #E0A030; }
 .nudge-today .nudge-when { color: #E0A030; font-weight: 500; }
 .nudge-soon .nudge-urgency-dot { background: #E0A030; opacity: 0.6; }
+.nudge-row-unqueued { border-left: 2px dashed #E5484D; padding-left: 10px; margin-left: -11px; }
+.nudge-row-unqueued .nudge-urgency-dot { border: 1px solid #E5484D; background: transparent; }
 
 .data-quality-list {
   border: 1px solid rgba(224,160,48,0.3);

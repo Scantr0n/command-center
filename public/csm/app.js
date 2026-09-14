@@ -192,42 +192,63 @@
   function renderNudgeQueue(prospects) {
     const withDates = prospects
       .filter(p => p.nextNudgeDate)
-      .map(p => ({ p, days: daysUntil(p.nextNudgeDate) }))
-      .sort((a, b) => a.days - b.days);
+      .map(p => ({ p, days: daysUntil(p.nextNudgeDate), unqueued: false }));
+
+    // Real gap this closes: nudgeSchedule.nudgePoint is the actual planned "nudge by
+    // this date" record (edited via the same guided forms as everything else on this
+    // board), but the queue above only ever keys off the separate nextNudgeDate field.
+    // A real nudgePoint can be logged, pass, and never appear anywhere on the board if
+    // nextNudgeDate was never also set to match it, silently falling off the radar
+    // with nothing here saying so. Surface those the same way an overdue nudge is.
+    const unqueued = prospects
+      .filter(p => {
+        const point = p.nudgeSchedule && p.nudgeSchedule.nudgePoint;
+        return point && !p.nextNudgeDate && daysUntil(point) <= 0;
+      })
+      .map(p => ({ p, days: daysUntil(p.nudgeSchedule.nudgePoint), unqueued: true }));
+
+    const rows = withDates.concat(unqueued).sort((a, b) => a.days - b.days);
 
     icsBtn.disabled = withDates.length === 0;
 
-    if (withDates.length === 0) {
+    if (rows.length === 0) {
       nudgeEl.innerHTML = '<p class="nudge-empty">No nudge dates logged yet. Once a real send date and nudge ' +
         'schedule are recorded for a prospect, the next one due shows up here.</p>';
       return;
     }
 
-    nudgeEl.innerHTML = withDates.map(({ p, days }) => {
+    nudgeEl.innerHTML = rows.map(({ p, days, unqueued }) => {
       let when, urgency;
-      if (days < 0) { when = Math.abs(days) + 'd overdue'; urgency = 'overdue'; }
+      if (unqueued) { when = Math.abs(days) + 'd past planned nudge point'; urgency = 'overdue'; }
+      else if (days < 0) { when = Math.abs(days) + 'd overdue'; urgency = 'overdue'; }
       else if (days === 0) { when = 'today'; urgency = 'today'; }
       else if (days <= 2) { when = 'in ' + days + 'd'; urgency = 'soon'; }
       else { when = 'in ' + days + 'd'; urgency = 'later'; }
       const notBefore = p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore
         ? ' &middot; do not nudge before ' + fmtDate(p.nudgeSchedule.doNotNudgeBefore)
         : '';
+      const dateShown = unqueued ? fmtDate(p.nudgeSchedule.nudgePoint) : fmtDate(p.nextNudgeDate);
+      const unqueuedNote = unqueued
+        ? '<div class="nudge-action nudge-action-missing">NOT ON THE QUEUE &middot; nudgeSchedule.nudgePoint ' +
+          'passed but nextNudgeDate was never set, log a real nextNudgeDate or this keeps going unseen</div>'
+        : '';
       const actionLine = p.nextAction
         ? '<div class="nudge-action">' + escapeHtml(p.nextAction) + '</div>'
-        : '<div class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</div>';
+        : (unqueued ? '' : '<div class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</div>');
       const touchCount = (p.outreachLog || []).filter(e => e && e.date).length;
       const touchLine = touchCount > 0
         ? '<span class="nudge-touch-count font-mono">' + touchCount + ' touch' + (touchCount === 1 ? '' : 'es') +
           ' logged so far</span>'
         : '';
-      return '<div class="nudge-row nudge-' + urgency + '">' +
+      return '<div class="nudge-row nudge-' + urgency + (unqueued ? ' nudge-row-unqueued' : '') + '">' +
         '<div class="nudge-top">' +
         '<span class="nudge-urgency-dot"></span>' +
         '<strong>' + escapeHtml(p.name) + '</strong>' +
         '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
         '<span class="font-mono nudge-when">' +
-        fmtDate(p.nextNudgeDate) + ' (' + when + ')' + notBefore +
+        dateShown + ' (' + when + ')' + notBefore +
         '</span></div>' +
+        unqueuedNote +
         actionLine +
         touchLine +
         '</div>';

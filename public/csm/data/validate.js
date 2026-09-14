@@ -119,6 +119,14 @@ function main() {
       warnings.push(where + ': nextNudgeDate is set but nextAction is not logged. A due date with no concrete ' +
         'next step is a common way real deals quietly stall, backfill what actually needs to happen.');
     }
+    if (ns.nudgePoint && DATE_RE.test(ns.nudgePoint) && !p.nextNudgeDate) {
+      const nudgePointDate = new Date(ns.nudgePoint + 'T00:00:00');
+      if (nudgePointDate <= today) {
+        warnings.push(where + ': nudgeSchedule.nudgePoint (' + ns.nudgePoint + ') has passed but nextNudgeDate ' +
+          'is not set. The Nudge queue only reads nextNudgeDate, so this planned nudge is not showing up ' +
+          'anywhere on the board, log a real nextNudgeDate.');
+      }
+    }
 
     const snap = p.socialSnapshot || {};
     if (!isDateOrNull(snap.asOfDate)) {
