@@ -29,6 +29,10 @@
   </header>
 
   <main>
+  <div class="offline-banner" id="offlineBanner" role="status" aria-atomic="true" hidden>
+    <strong>This device is offline.</strong> <span id="offlineBannerDetail">Showing the last snapshot it saw; that may not reflect Alpha's current state.</span>
+  </div>
+
   <div class="scope-banner">
     <strong>Read-only, on purpose.</strong> Alpha is a real, live, money-trading daemon running on a separate
     machine. This page can only ever display its status, never start, stop, configure, or otherwise influence it.

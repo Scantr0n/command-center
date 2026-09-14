@@ -123,6 +123,25 @@ header.page-head .sub {
 }
 .callout strong { color: var(--ink); }
 
+/* Offline banner: distinct from the connection strip below, which reports
+   whether Alpha itself is reachable. This reports whether Jack's own device
+   has a network path at all, using the browser's real navigator.onLine /
+   online / offline signals, never inferred from a failed fetch (the service
+   worker can serve a cached response successfully while genuinely offline).
+   Sits above the scope banner since "this data may be stale because you're
+   offline" is the more urgent caveat when both are true at once. */
+.offline-banner {
+  border: 1px solid rgba(224,160,48,0.35);
+  background: rgba(224,160,48,0.06);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 0.8rem;
+  color: #E8C088;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.offline-banner strong { color: #F2D9B0; }
+
 /* Read-only-scope banner: deliberately the loudest thing on the page. */
 .scope-banner {
   border: 1px solid rgba(224,80,80,0.35);

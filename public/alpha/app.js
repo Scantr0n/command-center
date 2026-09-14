@@ -388,6 +388,37 @@ function noteHeadlineForToast(level, text) {
   previousHeadlineLevel = level;
 }
 
+// Offline banner: navigator.onLine plus the real 'online'/'offline' window
+// events are the browser's own signal for whether this device has a network
+// path at all, a different question from whether Alpha is connected. This
+// matters specifically because the service worker can resolve the
+// status.json fetch below successfully from its cache while genuinely
+// offline, so "the fetch succeeded" is not proof the page is current.
+// lastLoadedAt tracks the last time loadStatus() actually completed (from
+// cache or network alike) purely to give the banner an honest "as of" time,
+// never a guess.
+let lastLoadedAt = null;
+
+function updateOfflineBanner() {
+  const banner = document.getElementById('offlineBanner');
+  if (!banner) return;
+  const offline = !navigator.onLine;
+  banner.hidden = !offline;
+  if (offline) {
+    const detail = document.getElementById('offlineBannerDetail');
+    detail.textContent = lastLoadedAt
+      ? `Showing the snapshot last loaded ${timeAgo(lastLoadedAt) || 'earlier'}; that may not reflect Alpha's current state.`
+      : "Showing the last snapshot this device saw; that may not reflect Alpha's current state.";
+  }
+}
+
+window.addEventListener('offline', updateOfflineBanner);
+window.addEventListener('online', () => {
+  updateOfflineBanner();
+  showToast('good', 'Back online, refreshing status');
+  loadStatus();
+});
+
 // loadStatus() fires from three places with no natural ordering (page load,
 // the 30s interval, and a manual refresh click), so a slower in-flight
 // request can resolve after a newer one and silently repaint the page with
@@ -405,6 +436,8 @@ async function loadStatus() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
+    lastLoadedAt = new Date().toISOString();
+    updateOfflineBanner();
     const headline = computeHeadline(data);
     noteHeadlineForToast(headline.level, headline.text);
     renderHeadline(headline.level, headline.text, headline.asOf);
@@ -467,4 +500,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') loadStatus();
 });
 
+// Covers the case where the page itself loads while already offline (the
+// service worker can still serve the cached app shell), so the banner
+// doesn't wait for a later 'offline' event that will never fire.
+updateOfflineBanner();
 loadStatus();
