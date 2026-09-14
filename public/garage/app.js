@@ -1,5 +1,6 @@
 let listings = [];
 let salesLog = [];
+let expensesLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 let sortKey = null;
@@ -47,6 +48,39 @@ const PLATFORM_LABELS = { ebay: 'eBay', vinted: 'Vinted', poshmark: 'Poshmark', 
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 const PAYOUT_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+const EXPENSE_CATEGORY_LABELS = {
+  mileage: 'Mileage', supplies: 'Supplies', 'platform-fees': 'Platform fees',
+  subscriptions: 'Subscriptions', other: 'Other'
+};
+
+// Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
+// Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
+// announced 2026-07-13 due to fuel prices (irs.gov/newsroom). Kept in sync
+// with the same table in data/validate.js. Only 2026 is a real published
+// rate right now, an expense dated outside it gets an honest "no rate known"
+// rather than reusing the wrong year's number.
+const MILEAGE_RATES_2026 = [
+  { from: '2026-01-01', to: '2026-06-30', rate: 0.725 },
+  { from: '2026-07-01', to: '2026-12-31', rate: 0.76 }
+];
+function irsMileageRateForDate(dateStr) {
+  if (!dateStr) return null;
+  const hit = MILEAGE_RATES_2026.find(r => dateStr >= r.from && dateStr <= r.to);
+  return hit ? hit.rate : null;
+}
+
+// A logged "amount" always wins (it's a real number someone entered), a
+// mileage entry with no amount falls back to computing one from real miles
+// at the real rate for its real date, everything else with no amount stays
+// honestly un-computable (null) rather than assumed $0.
+function computeExpenseAmount(e) {
+  if (e.amount != null) return e.amount;
+  if (e.category === 'mileage' && e.miles != null && e.date) {
+    const rate = irsMileageRateForDate(e.date);
+    return rate != null ? e.miles * rate : null;
+  }
+  return null;
+}
 
 // Standard published 2026 seller fee schedules, not a live account connection.
 // See the "Fee formulas used" details on the page for the rate each case applies.
@@ -117,26 +151,29 @@ function renderDataFreshness(lastModifiedDates) {
 // the same fix Sondrik's loadData already applies for the same reason.
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
-  const [listingsResult, pipelineResult, activityResult, salesResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
     fetchJson('/garage/data/activity.json'),
-    fetchJson('/garage/data/sales.json')
+    fetchJson('/garage/data/sales.json'),
+    fetchJson('/garage/data/expenses.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
   const activityData = activityResult.status === 'fulfilled' ? activityResult.value.data : null;
   const salesData = salesResult.status === 'fulfilled' ? salesResult.value.data : null;
+  const expensesData = expensesResult.status === 'fulfilled' ? expensesResult.value.data : null;
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
+  const expenses = (expensesData && expensesData.expenses) || [];
 
-  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult]
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult]
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value.lastModified));
 
   if (listingsData) {
     listings = listingsData.listings || [];
-    renderStats(listings, stages, sales);
+    renderStats(listings, stages, sales, expenses);
     renderDelistList(listings);
     renderDataQuality(listings);
     applyFiltersAndRender();
@@ -194,6 +231,19 @@ async function loadData() {
       '<tr><td colspan="6" class="table-empty" role="alert">Failed to load sales data: ' + escapeHtml(salesResult.reason.message) + '</td></tr>';
   }
 
+  if (expensesData) {
+    expensesLog = expenses;
+    renderExpenses(expenses);
+  } else {
+    expensesLog = [];
+    document.getElementById('expensesTableBody').innerHTML = '';
+    const expensesEmpty = document.getElementById('expensesTableEmpty');
+    expensesEmpty.hidden = false;
+    expensesEmpty.setAttribute('role', 'alert');
+    expensesEmpty.textContent = "Couldn't load expenses data: " + expensesResult.reason.message;
+    document.getElementById('expensesTotals').innerHTML = '';
+  }
+
   initTableScrollShadows();
 }
 
@@ -217,8 +267,9 @@ function bestCaseTotalPayout(live) {
   }, 0);
 }
 
-function renderStats(listings, stages, sales) {
+function renderStats(listings, stages, sales, expenses) {
   sales = sales || [];
+  expenses = expenses || [];
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
   const platformCounts = {};
@@ -240,6 +291,9 @@ function renderStats(listings, stages, sales) {
     const net = estimateNetPayout(sale.platform, sale.salePrice);
     return s + ((net != null ? net : (sale.salePrice || 0)) - (sale.costBasis || 0) - (sale.shippingCost || 0));
   }, 0);
+  const computedExpenses = expenses.map(e => computeExpenseAmount(e)).filter(a => a != null);
+  const totalExpenses = computedExpenses.reduce((s, a) => s + a, 0);
+  const uncomputedExpenseCount = expenses.length - computedExpenses.length;
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -253,7 +307,9 @@ function renderStats(listings, stages, sales) {
     { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 },
     { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
     { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },
-    { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have at least one logged` : 'No sale has a cost basis or shipping cost logged yet' }
+    { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have at least one logged` : 'No sale has a cost basis or shipping cost logged yet' },
+    { value: expenses.length, label: 'Business expenses logged', sub: expenses.length ? null : 'None yet' },
+    { value: formatUsd(totalExpenses), label: 'Real business expenses', sub: uncomputedExpenseCount ? `${uncomputedExpenseCount} of ${expenses.length} not counted yet, missing amount or a usable mileage rate` : (expenses.length ? 'For Schedule C, not tax advice' : 'No expenses logged yet') }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -1036,6 +1092,64 @@ function renderTaxTracker(sales) {
   note.textContent = noteParts.join(' ');
 }
 
+// Expenses are sorted most-recent-first when a date is logged, undated
+// entries sort to the bottom, same convention renderSales already uses.
+function renderExpenses(expenses) {
+  const tbody = document.getElementById('expensesTableBody');
+  const empty = document.getElementById('expensesTableEmpty');
+  const totalsEl = document.getElementById('expensesTotals');
+
+  if (!expenses.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No business expenses logged yet.';
+    totalsEl.innerHTML = '';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...expenses].sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  });
+
+  tbody.innerHTML = sorted.map(e => {
+    const amount = computeExpenseAmount(e);
+    const isComputedMileage = e.amount == null && e.category === 'mileage' && amount != null;
+    const rate = isComputedMileage ? irsMileageRateForDate(e.date) : null;
+    return `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(e.description || 'Untitled expense')}</div></td>
+      <td>${e.category ? `<span class="badge">${escapeHtml(EXPENSE_CATEGORY_LABELS[e.category] || e.category)}</span>` : ''}</td>
+      <td class="cell-value${e.miles == null ? ' empty' : ''}">${e.miles != null ? e.miles : ''}</td>
+      <td class="cell-value${amount == null ? ' empty' : ''}" title="${isComputedMileage ? `Computed at the real IRS rate of ${(rate * 100).toFixed(1)}&cent;/mile for this date` : ''}">${amount != null ? formatUsd(amount) + (isComputedMileage ? ' <span class="cell-muted">(mileage)</span>' : '') : 'not logged'}</td>
+      <td class="cell-muted">${e.date ? escapeHtml(e.date) : '<span class="cell-value empty">not logged</span>'}</td>
+    </tr>
+  `;
+  }).join('');
+
+  const computed = expenses.map(e => ({ e, amount: computeExpenseAmount(e) }));
+  const uncounted = computed.filter(c => c.amount == null).length;
+  const byCategory = {};
+  computed.forEach(({ e, amount }) => {
+    if (amount == null) return;
+    const cat = e.category || 'other';
+    byCategory[cat] = (byCategory[cat] || 0) + amount;
+  });
+  const total = Object.values(byCategory).reduce((s, v) => s + v, 0);
+  const categoryParts = Object.keys(byCategory)
+    .map(cat => `${EXPENSE_CATEGORY_LABELS[cat] || cat}: ${formatUsd(byCategory[cat])}`)
+    .join(', ');
+
+  totalsEl.innerHTML = `
+    <p class="pace-result-note">
+      <span class="pace-result-figure">${formatUsd(total)}</span> total real expenses logged${categoryParts ? ' (' + escapeHtml(categoryParts) + ')' : ''}.
+      ${uncounted ? `${uncounted} expense(s) not counted yet, missing a real amount or a usable mileage rate.` : ''}
+    </p>`;
+}
+
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchTerm = e.target.value;
   applyFiltersAndRender();
@@ -1309,6 +1423,36 @@ document.getElementById('salesCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'garage-sales-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const EXPENSES_CSV_COLUMNS = [
+  ['description', 'Description'], ['category', 'Category'], ['miles', 'Miles'],
+  ['amount', 'Amount'], ['date', 'Date']
+];
+
+// Exports every real logged expense, with the same computed mileage-at-the-
+// real-IRS-rate amount as the on-page table, for a real Schedule C record.
+document.getElementById('expensesCsvBtn').addEventListener('click', () => {
+  const rows = expensesLog.map(e => {
+    const amount = computeExpenseAmount(e);
+    return {
+      ...e,
+      category: EXPENSE_CATEGORY_LABELS[e.category] || e.category || '',
+      amount: amount != null ? amount.toFixed(2) : ''
+    };
+  });
+  const header = EXPENSES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(e => EXPENSES_CSV_COLUMNS.map(([key]) => csvField(e[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-expenses-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

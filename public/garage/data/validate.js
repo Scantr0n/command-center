@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
- * Validates listings.json, pipeline.json, activity.json and sales.json
- * against the field rules documented in public/garage/index.html.
+ * Validates listings.json, pipeline.json, activity.json, sales.json and
+ * expenses.json against the field rules documented in public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -17,7 +17,11 @@
  * in listings.json yet). It also cross-checks sales.json against every
  * listing's "soldOn" array in both directions, since a real sale should show
  * up in exactly one place: logged once as a sale, and marked once as sold on
- * that platform.
+ * that platform. Every expenses.json entry needs a real, computable dollar
+ * amount: either a logged "amount", or (mileage entries only) real "miles"
+ * on a real date the IRS has a published 2026 standard mileage rate for,
+ * since a mileage deduction with no rate to apply it against isn't a real
+ * number yet.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -36,6 +40,21 @@ const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
 // has no published hard cap, only a soft mobile-truncation point, so it's
 // deliberately left out here rather than treated as a validation error.
 const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
+const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
+// Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
+// Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
+// announced 2026-07-13 (irs.gov/newsroom: "IRS sets 2026 business standard
+// mileage rate at 72.5 cents per mile" and "IRS Increases Standard Mileage
+// Rate for Second Half of 2026"). Kept in sync with the same table in app.js.
+const MILEAGE_RATES_2026 = [
+  { from: '2026-01-01', to: '2026-06-30', rate: 0.725 },
+  { from: '2026-07-01', to: '2026-12-31', rate: 0.76 }
+];
+function irsMileageRateForDate(dateStr) {
+  if (!dateStr) return null;
+  const hit = MILEAGE_RATES_2026.find(r => dateStr >= r.from && dateStr <= r.to);
+  return hit ? hit.rate : null;
+}
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
@@ -51,12 +70,13 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData, salesData;
+  let listingsData, pipelineData, activityData, salesData, expensesData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
     activityData = loadJson('activity.json');
     salesData = loadJson('sales.json');
+    expensesData = loadJson('expenses.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -249,6 +269,59 @@ function main() {
     }
   });
 
+  const expenses = expensesData.expenses || [];
+  const seenExpenseIds = new Set();
+
+  expenses.forEach((e, idx) => {
+    const where = 'expenses[' + idx + ']' + (e && e.id ? ' (' + e.id + ')' : '');
+
+    if (!e.id) errors.push(where + ': missing "id"');
+    else if (seenExpenseIds.has(e.id)) errors.push(where + ': duplicate id "' + e.id + '"');
+    else seenExpenseIds.add(e.id);
+
+    if (!e.description) errors.push(where + ': missing "description"');
+
+    if (!e.category) {
+      errors.push(where + ': missing "category"');
+    } else if (!EXPENSE_CATEGORIES.includes(e.category)) {
+      errors.push(where + ': category "' + e.category + '" is not one of ' + EXPENSE_CATEGORIES.join(', '));
+    }
+
+    if (!isDateOrNull(e.date)) {
+      errors.push(where + ': "date" is not a YYYY-MM-DD date or null: ' + JSON.stringify(e.date));
+    }
+
+    if (e.miles !== null && e.miles !== undefined) {
+      if (typeof e.miles !== 'number' || e.miles < 0) {
+        errors.push(where + ': "miles" must be a non-negative number or null');
+      } else if (e.category !== 'mileage') {
+        warnings.push(where + ': "miles" is set but category is "' + e.category + '", not "mileage", it will be ignored');
+      }
+    }
+
+    if (e.amount !== null && e.amount !== undefined) {
+      if (typeof e.amount !== 'number' || e.amount < 0) {
+        errors.push(where + ': "amount" must be a non-negative number or null');
+      }
+    }
+
+    // A mileage entry with no logged amount needs real miles on a real date
+    // the IRS has a published 2026 rate for, otherwise there's no honest
+    // dollar figure to compute, same "leave null rather than guess" rule as
+    // every other optional field here.
+    if (e.amount == null && e.category === 'mileage') {
+      if (e.miles == null) {
+        warnings.push(where + ': mileage expense has no "amount" and no "miles" to compute one from');
+      } else if (!e.date) {
+        warnings.push(where + ': mileage expense has "miles" but no "date", can\'t look up which IRS rate applies');
+      } else if (irsMileageRateForDate(e.date) == null) {
+        warnings.push(where + ': mileage expense dated ' + e.date + ' has no known IRS rate (only 2026 rates are in this tool), log a manual "amount" instead');
+      }
+    } else if (e.amount == null && e.category && e.category !== 'mileage') {
+      warnings.push(where + ': expense has no "amount" logged yet');
+    }
+  });
+
   // Every soldOn entry should have a matching sale logged, since a platform
   // only belongs in soldOn once something has actually sold there.
   listings.forEach(l => {
@@ -305,7 +378,7 @@ function main() {
   }
 
   console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
-    events.length + ' activity event(s), ' + sales.length + ' sale(s)).');
+    events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s)).');
   process.exit(0);
 }
 

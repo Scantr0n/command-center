@@ -66,6 +66,13 @@
           <tr><th>costBasis</th><td>USD cost of acquiring the sold item, a non-negative number or <code>null</code>. Usually copied over from the matching listing's own <code>costBasis</code> at the time it sold; drives the real profit column in the sales log, stays <code>null</code> until known.</td></tr>
           <tr><th>shippingCost</th><td>USD actually spent shipping this sale out (postage, box, mailer), a non-negative number or <code>null</code>. Only real on a platform where the seller pays for shipping rather than the buyer covering it separately (see the shipping note on the price calculator above); leave <code>null</code> until the real receipt is known, it also feeds the profit column in the sales log.</td></tr>
           <tr><th>saleDate</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
+          <tr><th>expenses.json</th><td>One object per real business expense in the <code>expenses</code> array, for Schedule C record-keeping.</td></tr>
+          <tr><th>id</th><td>Unique slug for the expense, e.g. <code>"2026-03-thrift-run-mileage"</code></td></tr>
+          <tr><th>date</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
+          <tr><th>category</th><td>One of: <code>mileage</code>, <code>supplies</code>, <code>platform-fees</code>, <code>subscriptions</code>, <code>other</code></td></tr>
+          <tr><th>description</th><td>Free text describing the real expense, e.g. <code>"Drive to Goodwill and post office"</code></td></tr>
+          <tr><th>miles</th><td>Non-negative number of real miles driven, only meaningful on a <code>mileage</code> expense, otherwise <code>null</code></td></tr>
+          <tr><th>amount</th><td>USD amount, a non-negative number or <code>null</code>. For a <code>mileage</code> expense, leave <code>null</code> to auto-compute from real <code>miles</code> at the real published IRS 2026 standard mileage rate for that <code>date</code> (72.5&cent;/mi through June 30, 76&cent;/mi from July 1 on, see the mid-year fuel-price increase the IRS announced 2026-07-13), or set a real number directly if a different documented amount applies. Every other category needs a real logged <code>amount</code>, nothing here is estimated.</td></tr>
         </tbody>
       </table>
       <pre class="schema-example font-mono">{
@@ -436,6 +443,37 @@
   </section>
 
   <section>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Business expenses log</h2>
+      <button type="button" id="expensesCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
+    <div class="callout">
+      Real Schedule C record-keeping, not tax advice. Every dollar here is a real logged expense, or a real
+      <code>mileage</code> entry computed from real miles driven at the actual IRS 2026 standard mileage rate for
+      that date: 72.5&cent;/mile January 1 through June 30, then 76&cent;/mile July 1 through December 31 after
+      the IRS's mid-year increase (announced 2026-07-13, driven by fuel prices). An expense with no real amount
+      or miles logged yet shows as such rather than being left out of the count silently, run
+      <code>node public/garage/data/validate.js</code> to find any.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="expensesTable">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Miles</th>
+            <th>Amount</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="expensesTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="expensesTableEmpty" hidden></div>
+    </div>
+    <div id="expensesTotals" class="pace-result"></div>
+  </section>
+
+  <section>
     <h2 class="section-title">Quality &amp; fixes log</h2>
     <div class="activity-list" id="activityList"></div>
   </section>
@@ -496,7 +534,7 @@
 
   <footer class="page-foot font-mono">
     Data source: <code>/garage/data/listings.json</code>, <code>pipeline.json</code>, <code>activity.json</code>,
-    and <code>sales.json</code>, edited by hand until a real backend is wired in.
+    <code>sales.json</code>, and <code>expenses.json</code>, edited by hand until a real backend is wired in.
     <span id="dataFreshness"></span>
   </footer>
 </div>
