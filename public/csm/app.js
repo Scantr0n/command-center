@@ -521,7 +521,12 @@
       return;
     }
     categoryEffListEl.innerHTML = results.map(r => {
-      const widthPct = r.advanced > 0 ? Math.max(2, Math.round((r.advanced / r.contacted) * 100)) : 0;
+      // Below the minimum sample size, the bar has to stay as empty as the
+      // text next to it, same reasoning as the CHANNEL_EFF_MIN_N_FOR_RATE
+      // comment above: a filled-looking bar next to "sample too small for a
+      // rate" would still visually claim the rate it says it can't show.
+      const widthPct = r.contacted < CHANNEL_EFF_MIN_N_FOR_RATE ? 0
+        : r.advanced > 0 ? Math.max(2, Math.round((r.advanced / r.contacted) * 100)) : 0;
       const rateHtml = r.contacted >= CHANNEL_EFF_MIN_N_FOR_RATE
         ? '<span class="channel-eff-rate font-mono">' + widthPct + '% reached active exploration</span>'
         : '<span class="channel-eff-rate font-mono">Sample too small for a rate (n=' + r.contacted + ')</span>';
@@ -552,7 +557,9 @@
           '<span class="channel-eff-count-empty">No contacted prospects on this channel yet</span>' +
           '</div></div>';
       }
-      const widthPct = Math.max(2, Math.round((r.advanced / r.contacted) * 100));
+      // Same empty-bar-below-threshold rule as computeCategoryEffectiveness's
+      // render function above.
+      const widthPct = r.contacted < CHANNEL_EFF_MIN_N_FOR_RATE ? 0 : Math.max(2, Math.round((r.advanced / r.contacted) * 100));
       const rateHtml = r.contacted >= CHANNEL_EFF_MIN_N_FOR_RATE
         ? '<span class="channel-eff-rate font-mono">' + widthPct + '% reached active exploration</span>'
         : '<span class="channel-eff-rate font-mono">Sample too small for a rate (n=' + r.contacted + ')</span>';
