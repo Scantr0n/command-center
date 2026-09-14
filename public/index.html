@@ -140,7 +140,7 @@
       </div>
       <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
         <div class="relative">
-          <input id="searchInput" type="text" placeholder="Search projects..."
+          <input id="searchInput" type="text" placeholder="Search projects..." aria-label="Search projects"
             class="search-input text-xs font-mono rounded-lg pl-3 pr-6 py-1.5 border hairline focus:outline-none w-[175px] sm:w-[190px]"
             style="background: var(--panelLight); color: var(--ink)">
           <button id="searchClearBtn" type="button" aria-label="Clear search" tabindex="-1"
@@ -148,9 +148,9 @@
             style="color: var(--faint)">&times;</button>
         </div>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
-        <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline">
-          <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5">Graph</button>
-          <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5">Grid</button>
+        <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
+          <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5" aria-pressed="true">Graph</button>
+          <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5" aria-pressed="false">Grid</button>
         </div>
       </div>
     </header>
@@ -193,11 +193,11 @@
 
     <div id="gridToolbar" class="hidden items-center gap-2 mb-3">
       <span class="text-[10px] font-mono tracking-wide" style="color: var(--faint)">SORT</span>
-      <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline">
-        <button type="button" class="view-toggle-btn active px-3 py-1.5" data-sort="priority">Priority</button>
-        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="name">Name</button>
-        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="updated">Updated</button>
-        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="status">Status</button>
+      <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="Sort by">
+        <button type="button" class="view-toggle-btn active px-3 py-1.5" data-sort="priority" aria-pressed="true">Priority</button>
+        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="name" aria-pressed="false">Name</button>
+        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="updated" aria-pressed="false">Updated</button>
+        <button type="button" class="view-toggle-btn px-3 py-1.5" data-sort="status" aria-pressed="false">Status</button>
       </div>
     </div>
 
@@ -785,6 +785,7 @@ let gridSortBy = 'priority';
 try { gridSortBy = localStorage.getItem('ccGridSort') || 'priority'; } catch {}
 document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
   btn.classList.toggle('active', btn.dataset.sort === gridSortBy);
+  btn.setAttribute('aria-pressed', String(btn.dataset.sort === gridSortBy));
 });
 
 const STATUS_SEVERITY = { broken: 0, stalled: 1, active: 2, unknown: 3, done: 4 };
@@ -810,6 +811,7 @@ function setGridSort(sortBy) {
   try { localStorage.setItem('ccGridSort', sortBy); } catch {}
   document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.sort === sortBy);
+    btn.setAttribute('aria-pressed', String(btn.dataset.sort === sortBy));
   });
   renderGrid();
 }
@@ -854,6 +856,8 @@ function setView(view, persist = true) {
   document.getElementById('gridToolbar').classList.toggle('flex', view === 'grid');
   document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
   document.getElementById('viewGridBtn').classList.toggle('active', view === 'grid');
+  document.getElementById('viewGraphBtn').setAttribute('aria-pressed', String(view === 'graph'));
+  document.getElementById('viewGridBtn').setAttribute('aria-pressed', String(view === 'grid'));
   updateAttentionVisibility();
   if (persist) {
     try { localStorage.setItem('ccView', view); } catch {}
