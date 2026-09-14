@@ -253,6 +253,12 @@
 let clusters = [];
 let activeCluster = null;
 let chatHistory = [];
+// Bumped every time a modal opens, so an in-flight chat response for a
+// project the user has since navigated away from (closed the modal, or
+// opened a different project before the reply arrived) can tell it no
+// longer applies and drop itself instead of appending into whatever
+// project's chat window happens to be open when it resolves.
+let chatSessionId = 0;
 let currentView = 'graph';
 let lastFocusedEl = null;
 
@@ -887,6 +893,14 @@ function openModal(id, opts = {}) {
   activeCluster = clusters.find(c => c.id === id);
   lastFocusedEl = document.activeElement;
   chatHistory = [];
+  chatSessionId++;
+  // A pending chat request from whatever project was open before could
+  // still be in flight and would otherwise re-disable these once it settles;
+  // this fresh modal's own input should never start out stuck disabled
+  // because of a conversation that isn't even showing anymore.
+  document.getElementById('chatInput').disabled = false;
+  document.getElementById('sendChat').disabled = false;
+  removeTypingIndicator();
   const color = categoryColor(activeCluster.category);
   document.getElementById('modalDot').style.background = statusColor(activeCluster.status);
   document.getElementById('modalDot').style.color = statusColor(activeCluster.status);
@@ -1019,15 +1033,21 @@ function updateToggleBtn() {
 }
 
 document.getElementById('toggleBtn').addEventListener('click', async () => {
-  const newState = !activeCluster.enabled;
-  const res = await fetch(`/api/toggles/${activeCluster.toggleId}`, {
+  // Captured by reference, not just id, so this keeps pointing at the
+  // project that was actually toggled even if the user closes this modal
+  // and opens a different one before the request resolves. Without this,
+  // the response would land on whatever `activeCluster` refers to *then*,
+  // silently flipping the wrong project's automation state.
+  const cluster = activeCluster;
+  const newState = !cluster.enabled;
+  const res = await fetch(`/api/toggles/${cluster.toggleId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled: newState })
   });
   const data = await res.json();
-  activeCluster.enabled = data.enabled;
-  updateToggleBtn();
+  cluster.enabled = data.enabled;
+  if (activeCluster === cluster) updateToggleBtn();
   loadClusters();
 });
 
@@ -1074,6 +1094,8 @@ async function sendChat() {
   const sendBtn = document.getElementById('sendChat');
   const text = input.value.trim();
   if (!text || !activeCluster) return;
+  const clusterId = activeCluster.id;
+  const sessionId = chatSessionId;
   input.value = '';
   appendMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
@@ -1083,12 +1105,17 @@ async function sendChat() {
   showTypingIndicator();
 
   try {
-    const res = await fetch(`/api/clusters/${activeCluster.id}/chat`, {
+    const res = await fetch(`/api/clusters/${clusterId}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: chatHistory })
     });
     const data = await res.json();
+    // The modal may have moved on to a different project (or closed and
+    // reopened the same one, which also resets chatHistory) while this was
+    // in flight. Applying it now would append a reply into the wrong
+    // conversation and corrupt whatever chatHistory currently holds.
+    if (sessionId !== chatSessionId) return;
     removeTypingIndicator();
     if (data.text) {
       appendMessage('assistant', data.text);
@@ -1097,12 +1124,15 @@ async function sendChat() {
       appendMessage('assistant', 'Error reaching the assistant.');
     }
   } catch (e) {
+    if (sessionId !== chatSessionId) return;
     removeTypingIndicator();
     appendMessage('assistant', 'Error reaching the assistant.');
   } finally {
-    input.disabled = false;
-    sendBtn.disabled = false;
-    input.focus();
+    if (sessionId === chatSessionId) {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
   }
 }
 
