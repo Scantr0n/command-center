@@ -117,7 +117,7 @@
         dwellText = '';
       }
       return '<li class="timeline-row">' +
-        '<span class="timeline-dot" style="background:' + color + '"></span>' +
+        '<span class="timeline-dot" style="background:' + escapeHtml(color) + '"></span>' +
         '<span class="timeline-body">' +
         '<span class="timeline-stage">' + escapeHtml(label) + '</span>' +
         '<span class="timeline-date font-mono">' + (entry.date ? escapeHtml(fmtDate(entry.date)) : 'NO DATE') +
@@ -324,7 +324,7 @@
     const needsToggle = events.length > ACTIVITY_PREVIEW_COUNT;
     const rowsHtml = events.map(ev => {
       const tag = ev.type === 'stage'
-        ? '<span class="activity-tag activity-tag-stage" style="color:' + ev.color + ';border-color:' + ev.color + '66">MOVED</span>'
+        ? '<span class="activity-tag activity-tag-stage" style="color:' + escapeHtml(ev.color) + ';border-color:' + escapeHtml(ev.color) + '66">MOVED</span>'
         : ev.type === 'touch'
         ? '<span class="activity-tag activity-tag-touch">TOUCH</span>'
         : '<span class="activity-tag activity-tag-idea">IDEA</span>';
@@ -387,12 +387,12 @@
         'previous one</span>';
       return '<div class="funnel-row">' +
         '<div class="funnel-row-head">' +
-        '<span class="stage-dot" style="background:' + r.stage.color + '"></span>' +
+        '<span class="stage-dot" style="background:' + escapeHtml(r.stage.color) + '"></span>' +
         '<span class="funnel-label">' + escapeHtml(r.stage.label) + '</span>' +
         '<span class="funnel-count font-mono">' + r.reached + ' of ' + total + '</span>' +
         '</div>' +
         '<div class="funnel-track"><div class="funnel-fill" style="width:' + widthPct + '%;background:' +
-        r.stage.color + '"></div></div>' +
+        escapeHtml(r.stage.color) + '"></div></div>' +
         conversionHtml +
         '</div>';
     }).join('');
@@ -444,7 +444,7 @@
           ' completed move' + (r.n === 1 ? '' : 's') + '</span>'
         : '<span class="velocity-value velocity-value-empty font-mono">No completed moves logged yet</span>';
       return '<div class="velocity-row">' +
-        '<span class="velocity-dot" style="background:' + r.stage.color + '"></span>' +
+        '<span class="velocity-dot" style="background:' + escapeHtml(r.stage.color) + '"></span>' +
         '<span class="velocity-label">' + escapeHtml(r.stage.label) + '</span>' +
         valueHtml +
         '</div>';
@@ -583,7 +583,7 @@
       }
       return '<div class="column">' +
         '<div class="column-head">' +
-        '<span class="stage-dot" style="background:' + stage.color + '"></span>' +
+        '<span class="stage-dot" style="background:' + escapeHtml(stage.color) + '"></span>' +
         '<h2>' + escapeHtml(stage.label) + '</h2>' +
         '<span class="column-count font-mono">' + inStage.length + '</span>' +
         '</div>' +
