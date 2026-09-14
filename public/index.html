@@ -101,7 +101,7 @@
     border: 1px solid var(--hairline);
     background: rgba(255,255,255,0.03);
   }
-  #chatInput:disabled, #sendChat:disabled { opacity: 0.5; cursor: not-allowed; }
+  #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
   .graph-node.dimmed, .cluster-card.dimmed { opacity: 0.16; }
   .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
   .cat-label { cursor: pointer; }
@@ -1111,16 +1111,33 @@ document.getElementById('toggleBtn').addEventListener('click', async () => {
   // the response would land on whatever `activeCluster` refers to *then*,
   // silently flipping the wrong project's automation state.
   const cluster = activeCluster;
+  const btn = document.getElementById('toggleBtn');
   const newState = !cluster.enabled;
-  const res = await fetch(`/api/toggles/${cluster.toggleId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: newState })
-  });
-  const data = await res.json();
-  cluster.enabled = data.enabled;
-  if (activeCluster === cluster) updateToggleBtn();
-  loadClusters();
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/toggles/${cluster.toggleId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: newState })
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    cluster.enabled = data.enabled;
+    if (activeCluster === cluster) updateToggleBtn();
+    loadClusters();
+  } catch (e) {
+    // Every other write/read in this file shows a real error instead of
+    // silently doing nothing (errorBanner, the chat "Error reaching the
+    // assistant" bubble); this toggle was the one write path that didn't,
+    // leaving a failed click looking identical to a successful one.
+    if (activeCluster === cluster) {
+      btn.textContent = "Couldn't update, try again";
+      btn.style.color = statusColor('broken');
+      setTimeout(() => { if (activeCluster === cluster) updateToggleBtn(); }, 2400);
+    }
+  } finally {
+    if (activeCluster === cluster) btn.disabled = false;
+  }
 });
 
 document.getElementById('closeModal').addEventListener('click', closeModalAndReturnFocus);
