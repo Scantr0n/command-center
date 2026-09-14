@@ -715,11 +715,20 @@ function renderTaxTracker(sales) {
 
   const undated = sales.filter(s => !s.saleDate);
   const thisYear = sales.filter(s => s.saleDate && Number(s.saleDate.slice(0, 4)) === year);
+  // A sale with no platform, or one validate.js would already reject as
+  // unrecognized, still lands here on a hand-edit typo since that check only
+  // runs when someone remembers to run `npm run validate`. Track these
+  // separately rather than tallying them into byPlatform under an
+  // untracked key, where they would silently never reach the table below
+  // (it only ever renders PAYOUT_PLATFORMS rows), same "never drop real
+  // data without saying so" rule the undated-sale note above already
+  // follows, and this table specifically feeds 1099-K threshold tracking.
+  const unrecognizedPlatform = thisYear.filter(s => !PAYOUT_PLATFORMS.includes(s.platform));
 
   const byPlatform = {};
   PAYOUT_PLATFORMS.forEach(p => { byPlatform[p] = { gross: 0, count: 0 }; });
   thisYear.forEach(s => {
-    if (!byPlatform[s.platform]) byPlatform[s.platform] = { gross: 0, count: 0 };
+    if (!PAYOUT_PLATFORMS.includes(s.platform)) return;
     byPlatform[s.platform].gross += s.salePrice || 0;
     byPlatform[s.platform].count += 1;
   });
@@ -750,13 +759,15 @@ function renderTaxTracker(sales) {
     </tr>`;
   }).join('');
 
+  const noteParts = [];
   if (undated.length) {
-    note.hidden = false;
-    note.textContent = `${undated.length} sale(s) in sales.json have no saleDate logged and aren't counted toward the ${year} totals above until dated.`;
-  } else {
-    note.hidden = true;
-    note.textContent = '';
+    noteParts.push(`${undated.length} sale(s) in sales.json have no saleDate logged and aren't counted toward the ${year} totals above until dated.`);
   }
+  if (unrecognizedPlatform.length) {
+    noteParts.push(`${unrecognizedPlatform.length} sale(s) dated in ${year} have a missing or unrecognized "platform" and aren't counted toward any row above until fixed, run \`npm run validate\` to find them.`);
+  }
+  note.hidden = noteParts.length === 0;
+  note.textContent = noteParts.join(' ');
 }
 
 document.getElementById('searchInput').addEventListener('input', (e) => {
