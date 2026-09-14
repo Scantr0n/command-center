@@ -259,6 +259,7 @@ async function loadCards() {
     renderDataQuality();
     renderStalePricing();
     renderDuplicates();
+    renderGradeLadderFlags();
     renderBatchFilter();
     renderInsuranceSummary();
     applyFiltersAndRender();
@@ -848,6 +849,37 @@ function renderDuplicates() {
       <span class="dq-why">${group.length} ROWS MATCH ON NAME/YEAR/GRADER/GRADE</span>
     </button>
   `).join('')).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
+// Reuses CGTValidateCore.findGradeLadderInversions, the same rule validate.js
+// runs on the command line, rendered as a clickable panel like the
+// duplicates one above. Flags a higher numeric grade of the same real card
+// priced lower than a lower grade of it, since that is far more often a
+// price or grade typed against the wrong row than a genuine market quirk.
+function renderGradeLadderFlags() {
+  const section = document.getElementById('gradeLadderSection');
+  const list = document.getElementById('gradeLadderList');
+  if (!window.CGTValidateCore) {
+    section.hidden = true;
+    return;
+  }
+  const flags = CGTValidateCore.findGradeLadderInversions(cards.filter(c => !isExample(c)));
+
+  if (!flags.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flags.map(({ lower, higher }) => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(higher.id)}">
+      <span class="dq-name">${escapeHtml(higher.cardName || 'Untitled card')}${higher.year ? ' (' + escapeHtml(String(higher.year)) + ')' : ''}</span>
+      <span class="dq-meta">${escapeHtml(higher.gradingCompany)} ${escapeHtml(String(higher.grade))}: ${escapeHtml(formatUsd(higher.estimatedValue))}</span>
+      <span class="dq-why">LOWER THAN ITS OWN ${escapeHtml(String(lower.grade))} AT ${escapeHtml(formatUsd(lower.estimatedValue))}</span>
+    </button>
+  `).join('');
   list.querySelectorAll('.data-quality-row').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.id));
   });

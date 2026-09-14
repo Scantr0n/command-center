@@ -53,7 +53,10 @@
         <code>comp-estimate</code> with no <code>compNote</code> explaining what it is based on, and bad dates.
         It also warns (not an error, since owning two real copies of the same card and grade is a real thing)
         when the same card name, year, grading company, and grade shows up on more than one row, in case a row
-        got copy-pasted and only the id was changed.</p>
+        got copy-pasted and only the id was changed. It runs the same warning (again, not an error, since a real
+        low-pop anomaly can genuinely outsell a common higher grade) when a higher numeric grade of the same card
+        is priced below a lower grade of it, in case a price or grade got typed against the wrong row; this one
+        also shows up on the dashboard itself under "Possible grade/price mix-ups" when it finds anything.</p>
       <p>A priced card gets a <code>stale</code> badge once its <code>datePriced</code> is more than 180 days old.
         That is not an error, card market prices just drift over months, and it is a nudge to re-check the price
         next time you are in this hub, not something to fix immediately.</p>
@@ -272,6 +275,14 @@
     <div class="data-quality-list" id="duplicatesList"></div>
   </section>
 
+  <section id="gradeLadderSection" hidden>
+    <h2 class="section-title">Possible grade/price mix-ups</h2>
+    <p class="section-subtitle">A higher numeric grade of the same real card (same name, year, sport, grading
+      company) priced lower than a lower grade of it. Could be a genuine market quirk, but usually means a price or
+      a grade got typed against the wrong row.</p>
+    <div class="data-quality-list" id="gradeLadderList"></div>
+  </section>
+
   <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Inventory</h2>
@@ -345,8 +356,10 @@
 
   <footer class="page-foot font-mono">
     Data source: <code>/cgt/data/cards.json</code>, <code>/cgt/data/submissions.json</code>, and
-    <code>/cgt/data/candidates.json</code>, all edited by hand until a real backend is wired in. Real inventory
-    data (card names, grades, prices) lives in a separate local tracker file and still needs to be imported here.
+    <code>/cgt/data/candidates.json</code>, all edited by hand until a real backend is wired in. The real hockey/
+    baseball/football backlog has been imported into <code>cards.json</code>; <code>submissions.json</code> and
+    <code>candidates.json</code> still only hold their placeholder example rows and need real entries logged by
+    hand (or import CSV) as batches actually go out and raw cards actually get weighed.
   </footer>
 </div>
 

@@ -168,7 +168,61 @@
         'same card logged twice under two different ids.');
     });
 
+    findGradeLadderInversions(cards).forEach(({ lower, higher }) => {
+      warnings.push('possible grade/price mix-up: "' + (higher.cardName || higher.id) + '" at ' + higher.gradingCompany +
+        ' ' + higher.grade + ' (' + (higher.id || '(missing id)') + ') is priced at $' + higher.estimatedValue +
+        ', below the same card at the lower grade ' + lower.grade + ' ($' + lower.estimatedValue + ', ' +
+        (lower.id || '(missing id)') + '). Could be a real market anomaly, but check the two rows were not priced ' +
+        'or typed against the wrong grade.');
+    });
+
     return { errors, warnings };
+  }
+
+  // Groups real priced cards by cardName + year + sport + gradingCompany
+  // (grade left out of the key on purpose, unlike findDuplicateGroups above,
+  // since this check is comparing across grades of the same card rather than
+  // looking for the same grade logged twice) and flags any pair where the
+  // numerically higher grade is priced lower than the same card at a lower
+  // grade. A higher grade selling for less than a lower grade of the exact
+  // same card is unusual enough to be worth a second look, most often because
+  // a price or a grade got typed against the wrong row rather than a real
+  // market quirk. Only compares cards with a real numeric grade and a real
+  // estimatedValue; "Authentic"/no-grade rows and unpriced rows are skipped
+  // rather than guessed at. A warning, not an error, since a real anomaly
+  // (a low-pop lower grade outselling a common higher grade) does happen.
+  function findGradeLadderInversions(cards) {
+    function gradeNumber(grade) {
+      if (grade == null) return null;
+      const n = parseFloat(grade);
+      return Number.isNaN(n) ? null : n;
+    }
+
+    const byCombo = new Map();
+    (cards || []).forEach(c => {
+      if (!c.cardName || !c.year || !c.sport || !c.gradingCompany || c.estimatedValue == null) return;
+      const gradeNum = gradeNumber(c.grade);
+      if (gradeNum == null) return;
+      const key = c.cardName.trim().toLowerCase() + '|' + c.year + '|' + c.sport + '|' + c.gradingCompany;
+      if (!byCombo.has(key)) byCombo.set(key, []);
+      byCombo.get(key).push({ card: c, gradeNum });
+    });
+
+    const flags = [];
+    byCombo.forEach(group => {
+      if (group.length < 2) return;
+      group.sort((a, b) => a.gradeNum - b.gradeNum);
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const lower = group[i];
+          const higher = group[j];
+          if (higher.gradeNum > lower.gradeNum && higher.card.estimatedValue < lower.card.estimatedValue) {
+            flags.push({ lower: lower.card, higher: higher.card });
+          }
+        }
+      }
+    });
+    return flags;
   }
 
   // Validates the separate "cards sent off and not back yet" log
@@ -333,7 +387,7 @@
   }
 
   return {
-    validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, isDateOrNull, DATE_RE,
-    SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES, CANDIDATE_DECISIONS
+    validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findGradeLadderInversions,
+    isDateOrNull, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES, CANDIDATE_DECISIONS
   };
 });
