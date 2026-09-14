@@ -888,15 +888,32 @@
   // lines are common here (name + company, or a full next-action sentence),
   // and unfolded lines are technically invalid even though most calendar
   // apps tolerate them.
+  // RFC 5545 folds at 75 octets, not 75 characters, and a multi-byte UTF-8
+  // character must never be split across the fold. This pipeline logs real
+  // prospect names/notes for Chinese social platforms, so counting JS string
+  // length here (UTF-16 code units) instead of UTF-8 bytes would cut a
+  // non-ASCII character in half the moment a name or note pushed a line past
+  // 75 of those units, producing a line some calendar apps reject on import.
+  const icsEncoder = new TextEncoder();
   function icsFoldLine(line) {
-    if (line.length <= 75) return line;
-    let out = line.slice(0, 75);
-    let rest = line.slice(75);
-    while (rest.length > 0) {
-      out += '\r\n ' + rest.slice(0, 74);
-      rest = rest.slice(74);
+    if (icsEncoder.encode(line).length <= 75) return line;
+    const segments = [];
+    let seg = '';
+    let segBytes = 0;
+    let budget = 75;
+    for (const ch of line) { // for...of walks by code point, never a lone surrogate half
+      const chBytes = icsEncoder.encode(ch).length;
+      if (segBytes + chBytes > budget) {
+        segments.push(seg);
+        seg = '';
+        segBytes = 0;
+        budget = 74; // continuation lines carry a leading space, counted separately below
+      }
+      seg += ch;
+      segBytes += chBytes;
     }
-    return out;
+    if (seg) segments.push(seg);
+    return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
   }
 
   // One all-day VEVENT per prospect with a real nextNudgeDate, meant to be
