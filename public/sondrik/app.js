@@ -199,7 +199,8 @@
       freshnessHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +
       '</div>' +
-      '<div class="chart-scroll">' +
+      '<div class="chart-scroll" tabindex="0" aria-label="' +
+        escapeHtml('Scrollable ' + (metric.label || 'download') + ' history chart') + '">' +
       '<div class="compare-bars" role="img" aria-label="' +
         escapeHtml((metric.label || 'Download') + ' history by check date: ' + chartSummary) + '">' +
         barsHtml +

@@ -73,7 +73,7 @@ header.page-head .sub {
   gap: 6px;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.back-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.back-link:hover, .back-link:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: none; }
 
 .page-head-actions {
   display: flex;
@@ -92,7 +92,7 @@ header.page-head .sub {
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.print-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: none; }
 
 .attention-pill {
   font-size: 0.75rem;
@@ -106,7 +106,11 @@ header.page-head .sub {
   align-items: center;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.attention-pill:hover { border-color: rgba(224,160,48,0.6); background: rgba(224,160,48,0.16); }
+.attention-pill:hover, .attention-pill:focus-visible {
+  border-color: rgba(224,160,48,0.6);
+  background: rgba(224,160,48,0.16);
+  outline: none;
+}
 
 .callout {
   border: 1px solid var(--hairline);
@@ -159,6 +163,7 @@ header.page-head .sub {
   color: #E0A030;
 }
 .next-step-item:hover { border-color: var(--hairlineHover); }
+.next-step-item a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 10px; }
 .next-step-text { font-size: 0.85rem; line-height: 1.5; }
 
 .schema-help {
@@ -173,6 +178,11 @@ header.page-head .sub {
   font-size: 0.8rem;
   color: var(--sub);
   list-style: none;
+}
+.schema-help summary:focus-visible {
+  color: var(--ink);
+  background: rgba(255,255,255,0.03);
+  outline: none;
 }
 .schema-help summary::-webkit-details-marker { display: none; }
 .schema-help summary::before {
@@ -311,6 +321,12 @@ section { margin-bottom: 36px; }
 }
 .chart-scroll.can-scroll-left::before { opacity: 1; }
 .chart-scroll.can-scroll-right::after { opacity: 1; }
+/* tabindex="0" on this wrapper (set in app.js) lets a keyboard user actually
+   scroll the chart with arrow keys once it grows wider than the page, the
+   same way a mouse/trackpad user already can by dragging. Needs its own
+   visible focus state since it has no other affordance to show it's the
+   thing that just received focus. */
+.chart-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .compare-bars {
   display: flex;
   align-items: flex-end;
