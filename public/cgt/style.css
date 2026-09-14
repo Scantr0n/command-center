@@ -372,7 +372,13 @@ header.page-head .sub {
 .chip[aria-pressed="true"] { color: var(--ink); background: rgba(255,255,255,0.06); border-color: var(--hairlineHover); }
 .chip-count { color: var(--dim); }
 .chip[aria-pressed="true"] .chip-count { color: var(--sub); }
-.chip-zero { opacity: 0.45; }
+/* A dimmed chip used to be plain `opacity: 0.45` on the whole button, which
+   drags its text down with it: composited over this page's dark panels that
+   measured at a 2.24:1 contrast ratio, well under WCAG AA's 4.5:1 for normal
+   text. Dims only the border/background now and keeps the text at the real,
+   already-vetted --dim color (5.07:1 against --void, 4.52:1 against
+   --panelLight, the two backgrounds a chip actually sits on here). */
+.chip-zero { color: var(--dim); border-color: rgba(255,255,255,0.035); background: rgba(255,255,255,0.02); }
 .chip-sale[aria-pressed="true"] { background: rgba(61,220,132,0.12); color: #3DDC84; border-color: rgba(61,220,132,0.4); }
 .chip-comp[aria-pressed="true"] { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
 
