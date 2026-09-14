@@ -122,6 +122,8 @@ header.page-head .sub {
   line-height: 1.5;
 }
 .callout strong { color: var(--ink); }
+.callout-good { border-color: rgba(61,220,132,0.28); background: rgba(61,220,132,0.05); }
+.callout-good strong { color: #3DDC84; }
 
 /* Offline banner: distinct from the connection strip below, which reports
    whether Alpha itself is reachable. This reports whether Jack's own device

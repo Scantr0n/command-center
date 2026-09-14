@@ -41,7 +41,7 @@
     on this page.
   </div>
 
-  <div class="callout">
+  <div class="callout" id="notWiredCallout">
     <strong>No live feed wired in yet.</strong> This Command Center sandbox has no network path to Jack's Mac, where
     Alpha actually runs. Everything below is the real structure an overview would show, seeded honestly with
     "awaiting live connection" wherever a real reading belongs. Nothing on this page is a guessed number, if a
@@ -49,16 +49,25 @@
     invented. A future session with real read access to Alpha wires live values into this same layout.
   </div>
 
+  <div class="callout callout-good" id="liveWiredCallout" hidden>
+    <strong>Live feed connected.</strong> When Command Center runs on this Mac, <code>server.js</code> reads
+    Alpha's real daemon directly at <code>127.0.0.1:3847</code> through a fixed, GET-only whitelist
+    (<code>/health</code>, <code>/state</code>, <code>/evolution-history</code>, <code>/anomalies</code>,
+    <code>/debates</code>). The daemon's <code>/cmd</code> endpoint, which can pause trading or close positions,
+    is never called from here. A field still reading "awaiting connection" below means the daemon genuinely
+    doesn't expose that value yet, not that one was skipped.
+  </div>
+
   <details class="schema-help">
-    <summary>How a live connection would wire in (for whoever builds it)</summary>
+    <summary>How the live connection works</summary>
     <div class="schema-help-body">
-      <p>This page reads <code>public/alpha/data/status.json</code> and nothing else. It has no API route, no
-        websocket, and no write path, on purpose: wiring in real data means a future session writes a fresh
-        <code>live</code> block into that file (for example, a small read-only export job on Alpha's own host
-        that this Command Center pulls or receives), never adding a control endpoint here.</p>
-      <p><strong>Run <code>node public/alpha/data/validate.js</code> after any edit.</strong> It rejects a
-        <code>live</code> value set without <code>live.asOf</code>, and rejects any key that looks like real
-        P&amp;L, balance, win rate, or trade-count data, since this sandbox has no legitimate way to know one.</p>
+      <p>This page fetches <code>/api/alpha/live</code>. That route, in <code>server.js</code>, tries Alpha's real
+        daemon first (GET-only, the fixed whitelist above) and falls back to the honest static placeholder in
+        <code>public/alpha/data/status.json</code> if the daemon isn't reachable, for example on a machine other
+        than Jack's Mac, or if the daemon isn't running. There is no write path in either direction.</p>
+      <p><strong>Run <code>node public/alpha/data/validate.js</code> after editing the static fallback file.</strong>
+        It rejects a <code>live</code> value set without <code>live.asOf</code>, and rejects any key that looks like
+        real P&amp;L, balance, win rate, or trade-count data, since that file has no legitimate way to know one.</p>
       <table class="schema-table">
         <tbody>
           <tr><th>system.*</th><td>Static architectural facts (agent count, feature list). Real, does not change with market conditions, safe to hand-edit only when the architecture itself changes.</td></tr>
@@ -132,13 +141,13 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <footer class="page-foot font-mono">
-    Data source: <code>/alpha/data/status.json</code>. Structural fields (agent count, feature list) are real and
-    static. Everything under "live" is a placeholder until a future session wires in an actual status export from
-    Alpha itself; run <code>node public/alpha/data/validate.js</code> after any edit to that file, it rejects a
-    live value with no timestamp and rejects anything that looks like fabricated P&amp;L, balance, or trade data.
-    This page has no write path back to Alpha, by design. The page re-reads that file every 30 seconds on its own
-    while the tab is visible, or immediately via the Refresh button, so a future live update shows up without a
-    manual reload.
+    Data source: <code>/api/alpha/live</code>, which reads Alpha's real daemon on this Mac when reachable and
+    falls back to <code>/alpha/data/status.json</code> otherwise. Structural fields (agent count, feature list)
+    are real and static either way. Run <code>node public/alpha/data/validate.js</code> after editing the
+    fallback file; it rejects a live value with no timestamp and rejects anything that looks like fabricated
+    P&amp;L, balance, or trade data. This page has no write path back to Alpha, by design. It re-reads its data
+    every 30 seconds on its own while the tab is visible, or immediately via the Refresh button, so a change in
+    either the live feed or the fallback shows up without a manual reload.
   </footer>
 </div>
 

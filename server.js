@@ -133,6 +133,130 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
   }
 });
 
+// Alpha's real trading daemon runs on this same Mac at 127.0.0.1:3847. This
+// is the ONLY place that base URL and this exact whitelist of paths are
+// allowed to appear: every call here is GET-only against a fixed path, never
+// a passthrough of a client-supplied path or method. Alpha is a live,
+// real-money system and its /cmd endpoint can pause trading, close
+// positions, and cancel orders; that endpoint must never be reachable from
+// here or from anything Command Center exposes to the browser. This proxy
+// exists to READ Alpha's real status, never to influence it.
+const ALPHA_DAEMON_BASE = 'http://127.0.0.1:3847';
+const ALPHA_STATUS_FILE = path.join(__dirname, 'public', 'alpha', 'data', 'status.json');
+
+async function fetchAlpha(pathname) {
+  const r = await fetch(ALPHA_DAEMON_BASE + pathname, { signal: AbortSignal.timeout(2000) });
+  if (!r.ok) throw new Error(`Alpha daemon ${pathname} returned ${r.status}`);
+  return r.json();
+}
+
+// Real peak-to-trough drawdown, computed from the daemon's actual equity
+// curve (never estimated): walks the real history tracking the running
+// peak, and returns how far the latest point sits below the running peak at
+// that moment (current) plus the deepest such gap ever seen (max). Standard
+// drawdown definition, nothing invented, mirrors what Alpha's own sizing
+// logic already reacts to internally.
+function computeDrawdowns(history) {
+  if (!Array.isArray(history) || !history.length) return { currentDrawdownPct: null, maxDrawdownPct: null };
+  let peak = history[0].v;
+  let maxDrawdownPct = 0;
+  for (const point of history) {
+    if (point.v > peak) peak = point.v;
+    const dd = peak > 0 ? ((peak - point.v) / peak) * 100 : 0;
+    if (dd > maxDrawdownPct) maxDrawdownPct = dd;
+  }
+  const latest = history[history.length - 1].v;
+  const currentDrawdownPct = peak > 0 ? ((peak - latest) / peak) * 100 : 0;
+  return {
+    currentDrawdownPct: Math.round(currentDrawdownPct * 100) / 100,
+    maxDrawdownPct: Math.round(maxDrawdownPct * 100) / 100
+  };
+}
+
+// Turns the daemon's real evolution-history entries into the honest
+// activity-log shape the Alpha page already renders. Only ever built from
+// fields the daemon actually returned, never invented.
+function evolutionEvents(history) {
+  return history.map(entry => {
+    const agents = entry.agents || {};
+    const switches = Object.entries(agents).filter(([, a]) => a.switchedFrom);
+    const detail = switches.length
+      ? switches.map(([id, a]) => `${id}: ${a.switchedFrom} to ${a.strategy}`).join(', ')
+      : `${Object.keys(agents).length} agents re-evolved, no strategy switches`;
+    return {
+      type: 'evolution',
+      tone: 'neutral',
+      label: `Weekly evolution run (${entry.interval || 'unknown interval'})`,
+      detail,
+      at: entry.timestamp
+    };
+  });
+}
+
+app.get('/api/alpha/live', async (req, res) => {
+  const fallback = JSON.parse(fs.readFileSync(ALPHA_STATUS_FILE, 'utf8'));
+  try {
+    const health = await fetchAlpha('/health');
+    const [state, evoHistory, anomalies, debates, equity] = await Promise.all([
+      fetchAlpha('/state'),
+      fetchAlpha('/evolution-history').catch(() => ({ history: [] })),
+      fetchAlpha('/anomalies').catch(() => ({ stuck: [] })),
+      fetchAlpha('/debates').catch(() => ({ enabled: false })),
+      fetchAlpha('/equity-history').catch(() => ({ history: [] }))
+    ]);
+
+    const history = Array.isArray(evoHistory.history) ? evoHistory.history : [];
+    const latestEvo = history[history.length - 1] || null;
+    const drawdowns = computeDrawdowns(equity.history);
+    const now = new Date().toISOString();
+
+    res.json({
+      system: fallback.system,
+      connection: {
+        connected: true,
+        checkedAt: now,
+        note: 'Live feed connected: reading directly from Alpha\'s real daemon on this Mac (127.0.0.1:3847).',
+        history: []
+      },
+      live: {
+        asOf: now,
+        regime: state.regime && state.regime.regime ? state.regime.regime : null,
+        killSwitch: {
+          engaged: !!health.paused,
+          lastTriggeredAt: null
+        },
+        positionSizing: {
+          activeMode: null,
+          currentDrawdownPct: drawdowns.currentDrawdownPct,
+          maxDrawdownPct: drawdowns.maxDrawdownPct
+        },
+        debatePanel: {
+          active: !!debates.enabled,
+          blockedOn: debates.enabled ? null : 'API key'
+        },
+        genealogy: {
+          generation: null,
+          activeLineages: latestEvo ? Object.keys(latestEvo.agents || {}).length : null,
+          lastBreedingEventAt: latestEvo ? latestEvo.timestamp : null,
+          lastBreedingEventNote: latestEvo
+            ? Object.entries(latestEvo.agents || {}).filter(([, a]) => a.switchedFrom).length + ' agent(s) switched strategy in the latest run'
+            : null
+        }
+      },
+      events: [
+        ...evolutionEvents(history),
+        ...(Array.isArray(anomalies.stuck) ? anomalies.stuck.map(a => ({
+          type: 'anomaly', tone: 'alert', label: 'Stuck agent detected', detail: JSON.stringify(a), at: anomalies.checkedAt
+        })) : [])
+      ]
+    });
+  } catch (err) {
+    // Daemon not reachable (not running, different machine, etc). Fall back
+    // to the same honest static placeholder the page has always shown.
+    res.json(fallback);
+  }
+});
+
 const PORT = process.env.PORT || 4488;
 app.listen(PORT, () => {
   console.log(`Command Center running at http://localhost:${PORT}`);

@@ -150,6 +150,13 @@ function renderConnection(data) {
   const checkedAt = data.connection && data.connection.checkedAt;
   const history = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
 
+  const notWired = document.getElementById('notWiredCallout');
+  const liveWired = document.getElementById('liveWiredCallout');
+  if (notWired && liveWired) {
+    notWired.hidden = !!data.connection.connected;
+    liveWired.hidden = !data.connection.connected;
+  }
+
   if (!data.connection.connected || !asOf) {
     dot.className = 'conn-dot down';
     label.textContent = 'Not connected';
@@ -370,7 +377,7 @@ function renderGenealogy(data) {
     <div class="stat-row">
       ${statTile(g.generation != null ? escapeHtml(String(g.generation)) : 'awaiting connection', 'Generation', null, g.generation == null)}
       ${statTile(g.activeLineages != null ? escapeHtml(String(g.activeLineages)) : 'awaiting connection', 'Active lineages', null, g.activeLineages == null)}
-      ${statTile(g.lastBreedingEventAt ? escapeHtml(g.lastBreedingEventAt) : 'awaiting connection', 'Last breeding event', g.lastBreedingEventNote || null, !g.lastBreedingEventAt)}
+      ${statTile(g.lastBreedingEventAt ? escapeHtml(timeAgo(g.lastBreedingEventAt) || g.lastBreedingEventAt) : 'awaiting connection', 'Last breeding event', g.lastBreedingEventNote || null, !g.lastBreedingEventAt)}
     </div>
   `;
 }
@@ -494,10 +501,12 @@ let lastStatusData = null;
 async function loadStatus() {
   const requestId = ++latestStatusRequestId;
   try {
-    // Cache-bust: this file is meant to change out from under the page
-    // (a future session or export job rewrites it), a cached 304 would
-    // make the glance view lie about how fresh the data is.
-    const res = await fetch('/alpha/data/status.json?t=' + Date.now());
+    // Server decides whether Alpha's real daemon is reachable and returns
+    // either a live-mapped reading or the same honest static placeholder,
+    // same merge-with-fallback pattern as /api/clusters. Cache-bust: the
+    // underlying data is meant to change out from under the page, a cached
+    // 304 would make the glance view lie about how fresh it is.
+    const res = await fetch('/api/alpha/live?t=' + Date.now());
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
