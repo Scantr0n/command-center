@@ -160,6 +160,15 @@
     <div class="data-quality-list data-quality-list-stale" id="stalledList"></div>
   </section>
 
+  <section id="duplicatesSection" hidden>
+    <h2 class="section-title">Possible duplicates</h2>
+    <p class="section-note">Same name and company logged on more than one entry. Could be a real second contact at
+      the same company, or a copy-pasted row from the "Log new prospect" generator that only got a new id. That
+      generator only guards against an exact id collision, not a near-duplicate person, same check
+      <code>validate.js</code> runs.</p>
+    <div class="data-quality-list" id="duplicatesList"></div>
+  </section>
+
   <section id="dataQualitySection" hidden>
     <h2 class="section-title">Needs backfill</h2>
     <div class="data-quality-list" id="dataQualityList"></div>

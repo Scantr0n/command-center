@@ -269,6 +269,45 @@
     wireRowsToModal(stalledEl);
   }
 
+  const duplicatesEl = document.getElementById('duplicatesList');
+  const duplicatesSection = document.getElementById('duplicatesSection');
+
+  // Same duplicate-detection convention already used elsewhere in this
+  // project (e.g. CGT's findDuplicateGroups): group by a normalized key of
+  // the fields that actually identify who a prospect is, name + company,
+  // case/whitespace-insensitive, and flag any group with more than one
+  // member. The real risk this catches: the "Log new prospect" generator
+  // only guards against an exact id collision (npUniqueId), so hand-typing
+  // the same person into a second entry under a slightly different id would
+  // otherwise go unnoticed. Mirrored in validate.js so the two never drift.
+  function findDuplicateProspects(prospects) {
+    const byKey = new Map();
+    (prospects || []).forEach(p => {
+      if (!p.name) return;
+      const key = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(p);
+    });
+    return [...byKey.values()].filter(group => group.length > 1);
+  }
+
+  function renderDuplicates(prospects) {
+    const groups = findDuplicateProspects(prospects);
+    if (groups.length === 0) {
+      duplicatesSection.hidden = true;
+      return;
+    }
+    duplicatesSection.hidden = false;
+    duplicatesEl.innerHTML = groups.map(group => group.map(p =>
+      '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
+      '<strong>' + escapeHtml(p.name) + '</strong>' +
+      '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+      '<span class="dq-why">' + group.length + ' ENTRIES MATCH ON NAME + COMPANY</span>' +
+      '</button>'
+    ).join('')).join('');
+    wireRowsToModal(duplicatesEl);
+  }
+
   function renderDataQuality(stages, prospects) {
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
 
@@ -1757,6 +1796,16 @@
           '", they would render as separate filter chips. Pick one spelling.');
       }
     }
+    if (p.name) {
+      const nameKey = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
+      const match = allProspects.find(x => x.name &&
+        x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === nameKey);
+      if (match) {
+        warnings.push('An existing entry already has this same name and company ("' + match.name +
+          (match.company ? ', ' + match.company : '') + '", id "' + match.id + '"). If this is really the same ' +
+          'person, edit that entry instead of adding a second one.');
+      }
+    }
     return warnings;
   }
 
@@ -1922,6 +1971,7 @@
       renderChannelFilterCounts(allProspects);
       renderCategoryFilter(allProspects);
       renderStalled(allStages, allProspects);
+      renderDuplicates(allProspects);
       renderDataQuality(allStages, allProspects);
       renderActivityFeed(allProspects, allStages);
       renderFunnel(allStages, allProspects);

@@ -232,6 +232,24 @@ function main() {
     }
   });
 
+  // Mirrors findDuplicateProspects in app.js: same person can end up logged
+  // twice under different ids (e.g. a copy-pasted "Log new prospect" entry),
+  // since the only uniqueness check that generator runs is on id itself.
+  const byNameCompany = new Map();
+  prospects.forEach(p => {
+    if (!p.name) return;
+    const key = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
+    if (!byNameCompany.has(key)) byNameCompany.set(key, []);
+    byNameCompany.get(key).push(p);
+  });
+  byNameCompany.forEach(group => {
+    if (group.length > 1) {
+      warnings.push('possible duplicate prospect: ' + group.map(p => p.id).join(', ') +
+        ' all share the same name and company ("' + group[0].name +
+        (group[0].company ? ', ' + group[0].company : '') + '"). If this is really the same person, merge into one entry.');
+    }
+  });
+
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
     warnings.forEach(w => console.warn('  - ' + w));
