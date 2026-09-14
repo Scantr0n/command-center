@@ -100,7 +100,11 @@ const PRICE_STALE_AFTER_DAYS = 180;
 
 function daysSince(isoDate) {
   if (!isoDate) return null;
-  const then = new Date(isoDate + 'T00:00:00Z').getTime();
+  // Local midnight, not UTC (no trailing Z), same convention as Sondrik's
+  // daysBetween and the main dashboard's relativeTime: datePriced is logged
+  // against Jack's own calendar day, so anchoring to UTC midnight instead
+  // overstates the age by up to a day for anyone west of UTC.
+  const then = new Date(isoDate + 'T00:00:00').getTime();
   if (Number.isNaN(then)) return null;
   const now = Date.now();
   return Math.floor((now - then) / 86400000);
