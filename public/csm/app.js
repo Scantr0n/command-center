@@ -933,7 +933,10 @@
       descLines.push('CSM pipeline: ' + location.origin + '/csm/');
       const lines = [
         'BEGIN:VEVENT',
-        'UID:' + p.id + '-' + p.nextNudgeDate + '@csm.command-center',
+        // UID is TEXT-valued too, same as SUMMARY/DESCRIPTION below, so a
+        // hand-edited prospect id containing a raw newline, comma, or
+        // semicolon can't inject an extra structural line into the export.
+        'UID:' + icsEscapeText(p.id) + '-' + p.nextNudgeDate + '@csm.command-center',
         'DTSTAMP:' + dtstamp,
         'DTSTART;VALUE=DATE:' + p.nextNudgeDate.replace(/-/g, ''),
         'SUMMARY:' + icsEscapeText('Nudge: ' + p.name + (p.company ? ' (' + p.company + ')' : '')),
