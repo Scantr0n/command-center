@@ -72,6 +72,15 @@
   }
   .search-input { transition: border-color 0.15s ease, background 0.15s ease; }
   .search-input:focus { border-color: var(--hairlineHover) !important; }
+  /* Same "/" -focuses-search hint GitHub's own search box shows, so the
+     shortcut the keydown handler below already implements is actually
+     discoverable instead of only working for someone who already knew. */
+  #searchKbdHint {
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--hairline);
+    background: rgba(255,255,255,0.03);
+  }
   #chatInput:disabled, #sendChat:disabled { opacity: 0.5; cursor: not-allowed; }
   .graph-node.dimmed, .cluster-card.dimmed { opacity: 0.16; }
   .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
@@ -146,6 +155,9 @@
           <button id="searchClearBtn" type="button" aria-label="Clear search" tabindex="-1"
             class="hidden absolute inset-y-0 right-1.5 flex items-center text-sm leading-none"
             style="color: var(--faint)">&times;</button>
+          <kbd id="searchKbdHint" aria-hidden="true"
+            class="absolute inset-y-0 right-1.5 flex items-center text-[10px] font-mono leading-none pointer-events-none"
+            style="color: var(--faint)">/</kbd>
         </div>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
         <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
@@ -725,6 +737,11 @@ function applyFilters() {
     el.setAttribute('opacity', !activeCategory || isActive ? '1' : '0.4');
   });
   document.getElementById('searchClearBtn').classList.toggle('hidden', !term);
+  // Hidden once there's a term to clear instead (the clear button takes over
+  // that same corner), and while the box is focused, same as GitHub's own
+  // "/" search hint, since anyone looking at a focused, empty box already
+  // found it.
+  document.getElementById('searchKbdHint').classList.toggle('hidden', !!term || document.activeElement === document.getElementById('searchInput'));
   document.getElementById('filterStatus').textContent = anyFilterActive
     ? `${matchCount} project${matchCount === 1 ? '' : 's'} match${matchCount === 1 ? 'es' : ''}${activeCategory ? ` in ${activeCategory}` : ''}${term ? ` for "${term}"` : ''}`
     : '';
@@ -764,6 +781,11 @@ searchInputEl.addEventListener('keydown', (e) => {
     applyFilters();
   }
 });
+// The "/" hint's focused/unfocused half of its visibility rule (the has-a-
+// term half is already covered by applyFilters on every keystroke) has
+// nothing else to trigger a re-render on, so it needs its own listeners.
+searchInputEl.addEventListener('focus', applyFilters);
+searchInputEl.addEventListener('blur', applyFilters);
 document.getElementById('searchClearBtn').addEventListener('click', () => {
   searchInputEl.value = '';
   searchTerm = '';
