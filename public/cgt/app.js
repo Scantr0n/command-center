@@ -268,6 +268,15 @@ function renderStats() {
   const activeExampleSubmission = submissions.some(s => s.status !== 'returned' && isExampleSubmission(s));
   const cardsOutForGrading = activeSubmissions.reduce((s, x) => s + (x.cardCount || 0), 0);
 
+  // Grading fees are logged per batch (submissions.json), not per card, since
+  // a single invoice covers the whole submission rather than any one card
+  // coming back from it. Summed across every real submission regardless of
+  // status (active or returned) since a fee was actually paid either way,
+  // unlike cardsOutForGrading above which only makes sense for active ones.
+  const realSubmissions = submissions.filter(s => !isExampleSubmission(s));
+  const submissionsWithCost = realSubmissions.filter(s => s.cost != null);
+  const totalGradingFees = submissionsWithCost.reduce((s, x) => s + x.cost, 0);
+
   const tiles = [
     { value: real.length, label: 'Cards logged', sub: cards.length !== real.length ? '+ 1 example row' : null },
     { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
@@ -277,6 +286,13 @@ function renderStats() {
       sub: activeSubmissions.length
         ? activeSubmissions.length + ' submission(s) in progress'
         : 'nothing real submitted yet' + (activeExampleSubmission ? ' (+ 1 example row)' : '')
+    },
+    {
+      value: submissionsWithCost.length ? formatUsd(totalGradingFees) : '$0',
+      label: 'Grading fees paid',
+      sub: submissionsWithCost.length
+        ? submissionsWithCost.length + ' of ' + realSubmissions.length + ' submission(s) with a fee logged'
+        : (realSubmissions.length ? 'no fees logged yet' : 'nothing real submitted yet')
     },
     // Splitting the dollar total by basis, not just the card count, makes the
     // "how much of this is a real sale vs. an estimate" question answerable
@@ -472,7 +488,12 @@ function renderSubmissions() {
     const days = daysSince(s.submittedDate);
     const daysText = days == null ? 'no date logged' : days + ' day' + (days === 1 ? '' : 's') + ' in queue';
     const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
-    const metaParts = [s.gradingCompany, s.serviceLevel, s.cardCount != null ? s.cardCount + ' card' + (s.cardCount === 1 ? '' : 's') : null].filter(Boolean);
+    const metaParts = [
+      s.gradingCompany,
+      s.serviceLevel,
+      s.cardCount != null ? s.cardCount + ' card' + (s.cardCount === 1 ? '' : 's') : null,
+      s.cost != null ? formatUsd(s.cost) + ' fee' : null
+    ].filter(Boolean);
     return `
       <div class="submission-row">
         <span class="submission-days font-mono">${escapeHtml(daysText)}</span>

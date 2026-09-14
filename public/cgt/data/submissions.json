@@ -10,7 +10,8 @@
       "trackingNumber": null,
       "status": "in-queue",
       "returnedDate": null,
-      "notes": "Placeholder only, exists to verify the submissions list and days-in-queue calc render correctly. Not a real submission. Delete this row once real submission data is logged."
+      "cost": 45,
+      "notes": "Placeholder only, exists to verify the submissions list, days-in-queue calc, and grading-fee stat render correctly. Not a real submission. Delete this row once real submission data is logged."
     }
   ]
 }

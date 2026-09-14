@@ -172,6 +172,12 @@
         }
       }
 
+      if (s.cost !== null && s.cost !== undefined) {
+        if (typeof s.cost !== 'number' || Number.isNaN(s.cost) || s.cost < 0) {
+          errors.push(where + ': "cost" must be a non-negative number or null');
+        }
+      }
+
       if (!isDateOrNull(s.submittedDate)) {
         errors.push(where + ': "submittedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.submittedDate));
       }

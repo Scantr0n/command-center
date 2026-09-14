@@ -123,6 +123,7 @@
           <tr><th>trackingNumber</th><td>Optional, the shipping tracking number for this batch</td></tr>
           <tr><th>status</th><td>One of: <code>submitted</code>, <code>in-queue</code>, <code>grading</code>, <code>shipped-back</code>, <code>returned</code></td></tr>
           <tr><th>returnedDate</th><td>ISO date this batch actually arrived back. Required once <code>status</code> is <code>returned</code>, otherwise leave <code>null</code></td></tr>
+          <tr><th>cost</th><td>USD number, what was actually paid to the grading company for this batch (service fee plus shipping/insurance if bundled into one charge). Optional and independent of any card's own <code>costBasis</code> in <code>cards.json</code>: a grading fee applies to the whole batch, not one specific card, so it is not split across the cards that come back from it. Leave <code>null</code> until the real invoiced amount is known. Powers the "Grading fees paid" summary tile.</td></tr>
           <tr><th>notes</th><td>Free-text notes</td></tr>
         </tbody>
       </table>
@@ -136,6 +137,7 @@
   "trackingNumber": null,
   "status": "submitted",
   "returnedDate": null,
+  "cost": null,
   "notes": null
 }</pre>
     </div>
