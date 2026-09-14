@@ -43,6 +43,24 @@
     return -daysUntil(iso);
   }
 
+  // True when hand-typed dates in a log don't actually increase in the order
+  // sorting them as strings produces. Catches two real hand-edit slips: a
+  // genuine out-of-order date, and a non-zero-padded date like "2026-9-5"
+  // (sorts after "2026-10-01" lexically despite coming first chronologically,
+  // and fails to parse at all via daysUntil, which shows up here as NaN).
+  // computeStageVelocity below already skips exactly this case per pair
+  // rather than let it produce a negative dwell time; this is the same check
+  // reused so the per-prospect timeline (renderStageHistory/renderOutreachLog)
+  // can flag it too instead of just quietly showing "-12d in stage" or "NaNd".
+  function hasOutOfOrderDates(entries) {
+    const dated = (entries || []).filter(e => e && e.date).slice().sort((a, b) => a.date.localeCompare(b.date));
+    for (let i = 0; i < dated.length - 1; i++) {
+      const diff = daysUntil(dated[i + 1].date) - daysUntil(dated[i].date);
+      if (!(diff >= 0)) return true;
+    }
+    return false;
+  }
+
   function stallInfo(p, stageById) {
     const stageDef = stageById[p.stage];
     if (!stageDef || stageDef.staleAfterDays == null || !p.stageEnteredDate) return null;
@@ -110,7 +128,11 @@
       const dwellEnd = next ? next.date : null;
       let dwellText;
       if (dwellStart && dwellEnd) {
-        dwellText = (daysUntil(dwellEnd) - daysUntil(dwellStart)) + 'd in stage';
+        const dwellDays = daysUntil(dwellEnd) - daysUntil(dwellStart);
+        // A negative value here means the two dates are out of order (a
+        // hand-typed formatting slip, see hasOutOfOrderDates), not a real
+        // negative dwell time, so it's left blank rather than shown as-is.
+        dwellText = dwellDays >= 0 ? dwellDays + 'd in stage' : '';
       } else if (dwellStart) {
         dwellText = daysSince(dwellStart) + 'd in stage so far';
       } else {
@@ -144,9 +166,9 @@
     const rowsHtml = sorted.map((entry, i) => {
       const label = OUTREACH_TYPE_LABEL[entry.type] || entry.type || 'Touch';
       const prev = sorted[i - 1];
-      const gapText = prev && prev.date && entry.date
-        ? (daysUntil(entry.date) - daysUntil(prev.date)) + 'd since last touch'
-        : '';
+      const gapDays = prev && prev.date && entry.date ? daysUntil(entry.date) - daysUntil(prev.date) : null;
+      // Same out-of-order-date guard as renderStageHistory's dwellText above.
+      const gapText = gapDays != null && gapDays >= 0 ? gapDays + 'd since last touch' : '';
       return '<li class="timeline-row">' +
         '<span class="timeline-dot" style="background:#5EC8D8"></span>' +
         '<span class="timeline-body">' +
@@ -259,6 +281,8 @@
         }
         const snapStale = socialSnapshotStaleInfo(p);
         if (snapStale) reasons.push(snapStale.days + 'D OLD SOCIAL SNAPSHOT, DUE FOR REFRESH');
+        if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');
+        if (hasOutOfOrderDates(p.outreachLog)) reasons.push('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING');
         return { p, reasons };
       })
       .filter(x => x.reasons.length > 0);
