@@ -1189,6 +1189,75 @@ function wireChecklist() {
   });
 }
 
+// Photo audit tool: runs entirely client-side, nothing selected here is
+// uploaded or persisted. Mirrors the real two-part check from the 48-draft
+// Depop audit logged above: a raw-dimension flag for anything wider than
+// tall (the automated sideways/landscape check), plus a thumbnail grid so
+// the actual visual review pass that caught the Haggar pants bug can be
+// re-run on the next batch.
+function initPhotoAudit() {
+  const input = document.getElementById('photoAuditInput');
+  const grid = document.getElementById('photoAuditGrid');
+  const summary = document.getElementById('photoAuditSummary');
+  if (!input) return;
+
+  input.addEventListener('change', () => {
+    const files = Array.from(input.files || []);
+    grid.querySelectorAll('.photo-audit-card img').forEach(img => URL.revokeObjectURL(img.src));
+    grid.innerHTML = '';
+    summary.textContent = '';
+    if (!files.length) return;
+
+    let loaded = 0;
+    let flagged = 0;
+    const results = new Array(files.length);
+
+    files.forEach((file, i) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        loaded++;
+        const isLandscape = img.naturalWidth > img.naturalHeight;
+        if (isLandscape) flagged++;
+        results[i] = { file, url, w: img.naturalWidth, h: img.naturalHeight, isLandscape, failed: false };
+        renderPhotoAuditResults(results, loaded, files.length, flagged);
+      };
+      img.onerror = () => {
+        loaded++;
+        results[i] = { file, url, failed: true };
+        renderPhotoAuditResults(results, loaded, files.length, flagged);
+      };
+      img.src = url;
+    });
+  });
+}
+
+function renderPhotoAuditResults(results, loaded, total, flagged) {
+  const grid = document.getElementById('photoAuditGrid');
+  const summary = document.getElementById('photoAuditSummary');
+  summary.textContent = loaded < total
+    ? `Checking ${loaded}/${total} photo(s)...`
+    : `${total} photo(s) checked, ${flagged} flagged for possible sideways/landscape orientation. ` +
+      `Click any photo to open it full-size for the visual review pass, an automated flag alone caught nothing in the real audit.`;
+
+  grid.innerHTML = results.map(r => {
+    if (!r) return '';
+    if (r.failed) {
+      return `<div class="photo-audit-card"><div class="photo-audit-meta"><span class="photo-audit-name">${escapeHtml(r.file.name)}</span><span class="badge badge-due">couldn't read image</span></div></div>`;
+    }
+    return `
+      <a class="photo-audit-card${r.isLandscape ? ' photo-audit-flagged' : ''}" href="${r.url}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(r.file.name)} full-size">
+        <img src="${r.url}" alt="${escapeHtml(r.file.name)}" loading="lazy">
+        <div class="photo-audit-meta">
+          <span class="photo-audit-name">${escapeHtml(r.file.name)}</span>
+          <span class="photo-audit-dims">${r.w}&times;${r.h}${r.isLandscape ? ' <span class="badge badge-due">check orientation</span>' : ''}</span>
+        </div>
+      </a>
+    `;
+  }).join('');
+}
+
 wireCalc();
 wireChecklist();
+initPhotoAudit();
 loadData();

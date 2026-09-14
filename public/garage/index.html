@@ -406,6 +406,22 @@
     <div class="activity-list" id="activityList"></div>
   </section>
 
+  <section id="photoAuditSection">
+    <h2 class="section-title">Photo audit tool</h2>
+    <div class="callout">
+      Client-side only, nothing picked here gets uploaded or saved anywhere, the files never leave this browser
+      tab. Runs the same two-part check that caught the real Haggar corduroy pants bug in the 48-draft Depop
+      audit: an automated flag on any photo whose raw pixel dimensions are wider than they are tall (a common
+      sign a portrait product shot got saved sideways), plus a thumbnail grid laid out for the full visual
+      review pass that actually caught that bug, since the dimension check alone wouldn't have. Click any photo
+      to open it full-size. Re-run this before publishing the next batch out of the 48 ready-to-post drafts.
+    </div>
+    <label for="photoAuditInput" class="print-btn font-mono photo-audit-label">Choose photos to audit&hellip;</label>
+    <input type="file" id="photoAuditInput" accept="image/*" multiple class="photo-audit-input" aria-label="Choose photos to audit">
+    <div id="photoAuditSummary" class="cell-muted photo-audit-summary"></div>
+    <div class="photo-audit-grid" id="photoAuditGrid"></div>
+  </section>
+
   <section>
     <h2 class="section-title">Pre-publish checklist</h2>
     <div class="callout">

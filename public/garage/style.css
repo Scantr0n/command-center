@@ -705,12 +705,69 @@ footer.page-foot {
 .modal-payout-table td:first-child { color: var(--sub); }
 .modal-payout-table td:last-child { text-align: right; }
 
+/* Photo audit tool: a plain file input styled to match the page's other
+   buttons, hidden behind a <label> since the native file-picker control
+   can't be restyled directly, same trick used broadly for custom upload UI. */
+.photo-audit-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.photo-audit-label { display: inline-block; cursor: pointer; }
+.photo-audit-input:focus-visible + .photo-audit-summary,
+.photo-audit-label:has(+ .photo-audit-input:focus-visible) {
+  outline: 2px solid var(--hairlineHover);
+}
+.photo-audit-summary { margin: 10px 0 0; font-size: 0.8rem; min-height: 1em; }
+.photo-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.photo-audit-card {
+  display: block;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+.photo-audit-card:hover, .photo-audit-card:focus-visible { border-color: var(--hairlineHover); }
+.photo-audit-card.photo-audit-flagged { border-color: rgba(224,160,48,0.4); }
+.photo-audit-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: var(--panelLight);
+}
+.photo-audit-meta {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.photo-audit-name {
+  font-size: 0.72rem;
+  color: var(--sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-audit-dims { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--dim); }
+
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, #calcSection {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, #calcSection, #photoAuditSection {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
