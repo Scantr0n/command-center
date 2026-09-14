@@ -239,16 +239,29 @@
   }
 
   // Looks up the real current value behind a goal's target. Only "downloads"
-  // has real numbers behind it so far (see VALID_GOAL_METRICS in validate.js);
-  // any other metric name would have nothing real to compare the target
-  // against, so this returns null rather than guessing at zero.
-  function currentMetricValue(metricName, downloadsData) {
-    if (metricName !== 'downloads') return null;
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length === 0) return null;
-    const latest = checks[checks.length - 1];
-    return { count: latest.count, asOf: latest.date };
+  // and "leads" have real numbers behind them so far (see VALID_GOAL_METRICS
+  // in validate.js); any other metric name would have nothing real to
+  // compare the target against, so this returns null rather than guessing
+  // at zero.
+  function currentMetricValue(metricName, downloadsData, leadsData) {
+    if (metricName === 'downloads') {
+      const metric = (downloadsData && downloadsData.metric) || {};
+      const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      if (checks.length === 0) return null;
+      const latest = checks[checks.length - 1];
+      return { count: latest.count, asOf: latest.date };
+    }
+    if (metricName === 'leads') {
+      // Total real leads logged so far, same count the Channels section
+      // already shows per-channel. asOf is the most recently logged lead's
+      // date, or null if none of them have a real loggedDate yet, rather
+      // than defaulting to today and implying a freshness that isn't real.
+      const leads = (leadsData && leadsData.leads) || [];
+      if (leads.length === 0) return null;
+      const dates = leads.map(l => l.loggedDate).filter(Boolean).sort();
+      return { count: leads.length, asOf: dates.length ? dates[dates.length - 1] : null };
+    }
+    return null;
   }
 
   // Renders the real target-vs-actual goal Jack has logged, if any. This is
@@ -257,7 +270,7 @@
   // (days left) for whether it's on track, at risk, or overdue. An empty
   // goals.json (the honest default until Jack sets a real target) renders
   // as a plain empty state rather than a fabricated placeholder goal.
-  function renderGoals(goalsData, downloadsData) {
+  function renderGoals(goalsData, downloadsData, leadsData) {
     const goals = (goalsData && goalsData.goals) || [];
     if (goals.length === 0) {
       goalsSection.innerHTML = '<div class="empty-state">No goal set yet. Add one to ' +
@@ -265,7 +278,7 @@
       return;
     }
     goalsSection.innerHTML = goals.map(g => {
-      const current = currentMetricValue(g.metric, downloadsData);
+      const current = currentMetricValue(g.metric, downloadsData, leadsData);
       const currentCount = current ? current.count : 0;
       // A target of 0 (or a negative typo) would otherwise divide out to
       // NaN/Infinity here, which Math.max/min don't clamp away, so guard it
@@ -285,7 +298,7 @@
 
       const setLabel = g.setDate ? 'Goal set ' + fmtDate(g.setDate) : 'No set date logged';
       const currentNote = current
-        ? 'Current: ' + currentCount + ' as of ' + fmtDate(current.asOf)
+        ? 'Current: ' + currentCount + (current.asOf ? ' as of ' + fmtDate(current.asOf) : ', no date logged on the latest one')
         : 'No real data logged for this metric yet';
 
       return '<div class="goal-card">' +
@@ -579,7 +592,7 @@
     if (goals.length > 0) {
       lines.push('');
       goals.forEach(g => {
-        const current = currentMetricValue(g.metric, downloadsData);
+        const current = currentMetricValue(g.metric, downloadsData, leadsData);
         const currentCount = current ? current.count : 0;
         lines.push('Goal: ' + g.label + ', ' + currentCount + ' / ' + g.target +
           (g.targetDate ? ' by ' + fmtDate(g.targetDate) : ''));
@@ -699,7 +712,7 @@
     }
 
     if (goalsData) {
-      renderGoals(goalsData, downloadsData);
+      renderGoals(goalsData, downloadsData, leadsData);
     } else {
       goalsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load goal data: ' +
         escapeHtml(goalsResult.reason.message) + '</div>';

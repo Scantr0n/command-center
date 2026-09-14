@@ -75,8 +75,9 @@
             stale copy of it; for a <code>leads</code> link, only leads whose <code>channelId</code> matches this
             channel's <code>id</code> count toward it.</td></tr>
           <tr><th>goals.json</th><td>Only add an entry once Jack has actually set a real target, an empty
-            <code>goals</code> array is the honest default. <code>metric</code> must be <code>"downloads"</code>,
-            the only metric with real numbers behind it so far. <code>target</code> is the real number Jack is
+            <code>goals</code> array is the honest default. <code>metric</code> must be <code>"downloads"</code>
+            or <code>"leads"</code>, the only two metrics with real numbers behind them so far.
+            <code>target</code> is the real number Jack is
             aiming for, <code>targetDate</code> the real date he's aiming for it by (or <code>null</code> if
             open-ended). Set <code>setDate</code> to the actual date the goal was set, not today's date by
             default, so the progress bar isn't silently backdated.</td></tr>

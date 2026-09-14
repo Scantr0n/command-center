@@ -147,11 +147,11 @@ function main() {
     }
   });
 
-  // goals.json (validated after downloads.json, since the only supported
-  // metric right now is "downloads"; a goal against an unsupported metric
-  // has nothing real to show progress against, so that's an error, not a
-  // warning)
-  const VALID_GOAL_METRICS = new Set(['downloads']);
+  // goals.json (validated after downloads.json and leads.json, since those
+  // are the only two metrics with real numbers behind them so far; a goal
+  // against an unsupported metric has nothing real to show progress against,
+  // so that's an error, not a warning)
+  const VALID_GOAL_METRICS = new Set(['downloads', 'leads']);
   const seenGoalIds = new Set();
   (goalsData.goals || []).forEach((g, idx) => {
     const where = 'goals[' + idx + ']' + (g && g.id ? ' (' + g.id + ')' : '');
