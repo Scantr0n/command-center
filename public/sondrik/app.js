@@ -199,7 +199,11 @@
       freshnessHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +
       '</div>' +
-      '<div class="chart-scroll" tabindex="0" aria-label="' +
+      // role="group" is required for aria-label to take effect here: a plain
+      // div's implicit role ("generic") prohibits an author-supplied name,
+      // so without it screen readers silently drop this label when the
+      // wrapper receives keyboard focus (axe-core: aria-prohibited-attr).
+      '<div class="chart-scroll" tabindex="0" role="group" aria-label="' +
         escapeHtml('Scrollable ' + (metric.label || 'download') + ' history chart') + '">' +
       '<div class="compare-bars" role="img" aria-label="' +
         escapeHtml((metric.label || 'Download') + ' history by check date: ' + chartSummary) + '">' +
