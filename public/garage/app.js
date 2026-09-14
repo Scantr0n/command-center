@@ -135,6 +135,7 @@ async function loadData() {
   if (listingsData) {
     listings = listingsData.listings || [];
     renderStats(listings, stages, sales);
+    renderDelistList(listings);
     renderDataQuality(listings);
     applyFiltersAndRender();
     renderCoverage(listings);
@@ -144,6 +145,7 @@ async function loadData() {
   } else {
     listings = [];
     document.getElementById('statRow').innerHTML = '';
+    document.getElementById('delistSection').hidden = true;
     document.getElementById('dataQualitySection').hidden = true;
     document.getElementById('listingTableBody').innerHTML = '';
     document.getElementById('coverageTableBody').innerHTML = '';
@@ -355,6 +357,41 @@ function relistGuidanceHtml(l, days) {
 
 function relistGuidanceText(l, days) {
   return relistGuidanceParts(l, days).map(part => part.text).join('; ');
+}
+
+// Same items the "Needs delisting elsewhere" stat tile already counts (sold
+// on at least one platform, still live on at least one other), but as an
+// actual clickable list instead of just a number, matching the "Needs
+// backfill" data-quality list's own click-through-to-record pattern. Without
+// this, finding *which* items were at risk of a double sale meant scanning
+// the whole listings table by eye for the sold-elsewhere badge styling.
+function buildAtRiskListings(listings) {
+  return listings.filter(l => (l.soldOn || []).length > 0 && remainingPlatforms(l).length > 0);
+}
+
+function renderDelistList(listings) {
+  const section = document.getElementById('delistSection');
+  const list = document.getElementById('delistList');
+  const atRisk = buildAtRiskListings(listings);
+
+  if (!atRisk.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = atRisk.map(l => {
+    const soldLabels = (l.soldOn || []).map(p => PLATFORM_LABELS[p] || p).join(', ');
+    const stillLive = remainingPlatforms(l).map(p => PLATFORM_LABELS[p] || p).join(', ');
+    return `
+    <button type="button" class="data-quality-row" data-listing-id="${escapeHtml(l.id)}">
+      <span class="dq-name">${escapeHtml(l.title || 'Untitled item')}</span>
+      <span class="dq-why">SOLD ON ${escapeHtml(soldLabels.toUpperCase())}, STILL LIVE ON ${escapeHtml(stillLive.toUpperCase())}</span>
+    </button>
+  `;
+  }).join('');
+  list.querySelectorAll('[data-listing-id]').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.listingId));
+  });
 }
 
 // Flags real listings missing an optional-but-load-bearing field: a live
