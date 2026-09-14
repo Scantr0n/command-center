@@ -230,6 +230,12 @@ function main() {
       }
     }
 
+    if (s.shippingCost !== null && s.shippingCost !== undefined) {
+      if (typeof s.shippingCost !== 'number' || s.shippingCost < 0) {
+        errors.push(where + ': "shippingCost" must be a non-negative number or null');
+      }
+    }
+
     if (!isDateOrNull(s.saleDate)) {
       errors.push(where + ': "saleDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.saleDate));
     }

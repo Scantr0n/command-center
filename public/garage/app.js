@@ -224,10 +224,10 @@ function renderStats(listings, stages, sales) {
     return days != null && days >= RELIST_FRESH_DAYS;
   }).length;
   const realizedRevenue = sales.reduce((s, sale) => s + (sale.salePrice || 0), 0);
-  const salesWithCost = sales.filter(sale => sale.costBasis != null);
+  const salesWithCost = sales.filter(sale => sale.costBasis != null || sale.shippingCost != null);
   const realizedProfit = salesWithCost.reduce((s, sale) => {
     const net = estimateNetPayout(sale.platform, sale.salePrice);
-    return s + ((net != null ? net : (sale.salePrice || 0)) - sale.costBasis);
+    return s + ((net != null ? net : (sale.salePrice || 0)) - (sale.costBasis || 0) - (sale.shippingCost || 0));
   }, 0);
 
   const tiles = [
@@ -242,7 +242,7 @@ function renderStats(listings, stages, sales) {
     { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 },
     { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
     { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },
-    { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis, ${salesWithCost.length}/${sales.length} sale(s) have a cost logged` : 'No sale has a cost basis logged yet' }
+    { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have at least one logged` : 'No sale has a cost basis or shipping cost logged yet' }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -827,7 +827,8 @@ function renderSales(sales) {
 
   tbody.innerHTML = sorted.map(s => {
     const net = estimateNetPayout(s.platform, s.salePrice);
-    const profit = net != null && s.costBasis != null ? net - s.costBasis : null;
+    const hasEither = s.costBasis != null || s.shippingCost != null;
+    const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
     return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(s.title || 'Untitled item')}</div></td>
@@ -835,6 +836,7 @@ function renderSales(sales) {
       <td class="cell-value${s.salePrice == null ? ' empty' : ''}">${s.salePrice != null ? formatUsd(s.salePrice) : 'not set'}</td>
       <td class="cell-value${net == null ? ' empty' : ''}">${net != null ? formatUsd(net) : 'unknown'}</td>
       <td class="cell-value${s.costBasis == null ? ' empty' : ''}">${s.costBasis != null ? formatUsd(s.costBasis) : 'not logged'}</td>
+      <td class="cell-value${s.shippingCost == null ? ' empty' : ''}">${s.shippingCost != null ? formatUsd(s.shippingCost) : 'not logged'}</td>
       <td class="cell-value${profit == null ? ' empty' : (profit < 0 ? ' cell-value-loss' : '')}">${profit != null ? formatUsd(profit) : 'not logged'}</td>
       <td class="cell-muted">${s.saleDate ? escapeHtml(s.saleDate) : '<span class="cell-value empty">not logged</span>'}</td>
     </tr>

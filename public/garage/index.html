@@ -64,6 +64,7 @@
           <tr><th>salePrice</th><td>USD price it actually sold for, a non-negative number (can differ from the asking price on an accepted offer)</td></tr>
           <tr><th>askingPrice</th><td>USD asking price at time of sale, or <code>null</code> if not tracked</td></tr>
           <tr><th>costBasis</th><td>USD cost of acquiring the sold item, a non-negative number or <code>null</code>. Usually copied over from the matching listing's own <code>costBasis</code> at the time it sold; drives the real profit column in the sales log, stays <code>null</code> until known.</td></tr>
+          <tr><th>shippingCost</th><td>USD actually spent shipping this sale out (postage, box, mailer), a non-negative number or <code>null</code>. Only real on a platform where the seller pays for shipping rather than the buyer covering it separately (see the shipping note on the price calculator above); leave <code>null</code> until the real receipt is known, it also feeds the profit column in the sales log.</td></tr>
           <tr><th>saleDate</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
         </tbody>
       </table>
@@ -348,8 +349,9 @@
       shows what's actually been hand-logged in <code>sales.json</code> after a real sale. Logging a sale here
       is separate from marking that platform in the item's <code>soldOn</code> array above, a real sale needs
       both done, one to log the sale itself and one to flag that item for delisting elsewhere. Profit is only
-      shown once a real <code>costBasis</code> is logged for that sale, it stays honestly blank otherwise
-      rather than assuming a cost of $0.
+      shown once a real <code>costBasis</code> or <code>shippingCost</code> is logged for that sale, it stays
+      honestly blank otherwise rather than assuming either one is $0, and only ever subtracts the one(s) that
+      are actually logged.
     </div>
     <div class="table-wrap">
       <table class="card-table" id="salesTable">
@@ -360,6 +362,7 @@
             <th>Sale price</th>
             <th>Est. net payout</th>
             <th>Cost basis</th>
+            <th>Shipping paid</th>
             <th>Profit</th>
             <th>Date</th>
           </tr>
