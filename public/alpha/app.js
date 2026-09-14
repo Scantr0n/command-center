@@ -265,7 +265,13 @@ function renderStats(data) {
   tiles.push(statTile(
     debateActive ? 'Active' : 'Pending',
     'Debate panel',
-    debateActive ? null : 'Blocked on: ' + (live.debatePanel.blockedOn || 'unknown'),
+    // live.debatePanel itself, not just .active, is read again here (not
+    // reused from debateActive above), since every other live.* sub-object
+    // (killSwitch, positionSizing, genealogy) is allowed to be null/missing
+    // per validate.js's own guards, and debatePanel was the one exception
+    // that assumed it would always be present, which would throw the moment
+    // it wasn't.
+    debateActive ? null : 'Blocked on: ' + ((live.debatePanel && live.debatePanel.blockedOn) || 'unknown'),
     !debateActive
   ));
 
