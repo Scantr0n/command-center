@@ -263,7 +263,10 @@
     goalsSection.innerHTML = goals.map(g => {
       const current = currentMetricValue(g.metric, downloadsData);
       const currentCount = current ? current.count : 0;
-      const pct = Math.max(0, Math.min(100, Math.round((currentCount / g.target) * 100)));
+      // A target of 0 (or a negative typo) would otherwise divide out to
+      // NaN/Infinity here, which Math.max/min don't clamp away, so guard it
+      // explicitly rather than rendering "NaN%".
+      const pct = g.target > 0 ? Math.max(0, Math.min(100, Math.round((currentCount / g.target) * 100))) : 0;
 
       let paceHtml = '';
       if (g.targetDate) {
