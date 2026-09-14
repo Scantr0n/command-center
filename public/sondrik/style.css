@@ -493,8 +493,10 @@ section { margin-bottom: 36px; }
   color: var(--dim);
 }
 .release-relative {
+  /* No opacity reduction: --dim on --panel is already only 4.77:1, the
+     WCAG AA floor for text this small, so any further fade drops it
+     below the threshold (axe-core color-contrast flagged this at 0.75). */
   color: var(--dim);
-  opacity: 0.75;
 }
 .release-badge {
   font-family: 'JetBrains Mono', monospace;
