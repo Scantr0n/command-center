@@ -23,6 +23,21 @@ function isDateOrNull(v) {
   return v === null || v === undefined || (typeof v === 'string' && DATE_RE.test(v));
 }
 
+// Catches the most plausible hand-edit slip in a file with no other input
+// validation: typing last year's habit into the year field (e.g. "2025-09-07"
+// a week after New Year's) or transposing a digit. A 1-day allowance avoids
+// flagging a same-day entry made in a timezone ahead of this machine's.
+// Only checked against dates that record something that already happened
+// (a ship date, a check date, a logged date); a goal's targetDate is
+// supposed to be in the future, so it is never passed here.
+function isFutureDate(v) {
+  if (!v || !DATE_RE.test(v)) return false;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return new Date(v + 'T00:00:00') > tomorrow;
+}
+
 function main() {
   const errors = [];
   const warnings = [];
@@ -68,6 +83,7 @@ function main() {
     else if (seenVersions.has(r.version)) errors.push(where + ': duplicate version "' + r.version + '"');
     else seenVersions.add(r.version);
     if (!isDateOrNull(r.date)) errors.push(where + ': "date" is not a YYYY-MM-DD date or null: ' + JSON.stringify(r.date));
+    else if (isFutureDate(r.date)) warnings.push(where + ': "date" (' + r.date + ') is in the future, a shipped release should have a real past ship date, check for a typo');
     if (!r.date) warnings.push(where + ': no ship date logged yet');
     if (!r.summary) warnings.push(where + ': no summary logged yet');
   });
@@ -85,6 +101,7 @@ function main() {
     else if (c.date) {
       if (seenDates.has(c.date)) errors.push(where + ': duplicate check date "' + c.date + '"');
       seenDates.add(c.date);
+      if (isFutureDate(c.date)) warnings.push(where + ': "date" (' + c.date + ') is in the future, a real check should be dated when it was actually run, check for a typo');
       if (prevDate && c.date < prevDate) {
         warnings.push(where + ': checks are not in chronological order (this check predates the one before it)');
       }
@@ -129,6 +146,7 @@ function main() {
     else seenLeadIds.add(l.id);
     if (!l.summary) errors.push(where + ': missing "summary"');
     if (!isDateOrNull(l.loggedDate)) errors.push(where + ': "loggedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(l.loggedDate));
+    else if (isFutureDate(l.loggedDate)) warnings.push(where + ': "loggedDate" (' + l.loggedDate + ') is in the future, a lead should be logged on the day it actually came in, check for a typo');
     // channelId attributes this lead to a channel card's count (see
     // renderChannels in app.js); a channelId that doesn't match any real
     // channel would silently attribute the lead to nothing, so it's an
@@ -167,6 +185,7 @@ function main() {
     }
     if (!isDateOrNull(g.targetDate)) errors.push(where + ': "targetDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(g.targetDate));
     if (!isDateOrNull(g.setDate)) errors.push(where + ': "setDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(g.setDate));
+    else if (isFutureDate(g.setDate)) warnings.push(where + ': "setDate" (' + g.setDate + ') is in the future, a goal should be set as of the day Jack actually set it, check for a typo');
     if (!g.setDate) warnings.push(where + ': no setDate logged, cannot tell when this target was actually set');
   });
 

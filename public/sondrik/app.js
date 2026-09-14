@@ -609,7 +609,7 @@
   // Builds a plain-text snapshot from the same real data files already on
   // the page, for Jack to paste into a build log or status update himself.
   // Purely a clipboard copy, nothing here ever transmits anywhere on its own.
-  function buildStatusUpdate(releasesData, downloadsData, leadsData, goalsData) {
+  function buildStatusUpdate(releasesData, downloadsData, leadsData, goalsData, channelsData) {
     const lines = ['Sondrik status snapshot, generated ' + fmtDate(todayIso())];
 
     const releases = ((releasesData && releasesData.releases) || []).slice()
@@ -658,6 +658,18 @@
         lines.push('Goal: ' + g.label + ', ' + currentCount + ' / ' + g.target +
           (g.targetDate ? ' by ' + fmtDate(g.targetDate) : ''));
       });
+    }
+
+    // Not-tracked channels don't have a real number to add to the snapshot
+    // above, but leaving them out silently would let a reader assume the
+    // downloads/leads figures already cover every channel Jack is watching.
+    // Tracked and manual-log channels are skipped here, their real numbers
+    // are already the downloads/lead lines above, repeating them would just
+    // be the same fact twice.
+    const gaps = ((channelsData && channelsData.channels) || []).filter(c => c.status === 'not-tracked');
+    if (gaps.length > 0) {
+      lines.push('');
+      lines.push('Not tracked yet: ' + gaps.map(c => c.name || 'Unnamed channel').join(', ') + '.');
     }
 
     return lines.join('\n');
@@ -808,7 +820,7 @@
 
     if (releasesData || downloadsData || leadsData || goalsData) {
       copyStatusBtn.addEventListener('click', () => {
-        const text = buildStatusUpdate(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {});
+        const text = buildStatusUpdate(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {}, channelsData || {});
         copyText(text).then(() => {
           const original = copyStatusBtn.textContent;
           copyStatusBtn.textContent = 'Copied!';
