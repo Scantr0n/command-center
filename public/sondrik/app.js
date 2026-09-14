@@ -663,7 +663,13 @@
     if (channelsResult.status === 'rejected') failures.push('channels.json: ' + channelsResult.reason.message);
     if (goalsResult.status === 'rejected') failures.push('goals.json: ' + goalsResult.reason.message);
 
-    if (releasesData || downloadsData || leadsData) {
+    // goalsData is included here (and below) because renderTimeline/
+    // renderLastUpdated/buildStatusUpdate all genuinely read it (a GOAL SET
+    // timeline event, a goal's setDate feeding "last updated"), so if
+    // releases/downloads/leads all fail to load but goals.json succeeds,
+    // that real data should still render instead of the section reporting
+    // a total failure it didn't actually have.
+    if (releasesData || downloadsData || leadsData || goalsData) {
       renderTimeline(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {});
       renderLastUpdated(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {});
       if (failures.length) {
@@ -720,7 +726,7 @@
       nextStepsList.innerHTML = '<div class="empty-state" role="alert">Could not compute next steps, data failed to load.</div>';
     }
 
-    if (releasesData || downloadsData || leadsData) {
+    if (releasesData || downloadsData || leadsData || goalsData) {
       copyStatusBtn.addEventListener('click', () => {
         const text = buildStatusUpdate(releasesData || {}, downloadsData || {}, leadsData || {}, goalsData || {});
         copyText(text).then(() => {
