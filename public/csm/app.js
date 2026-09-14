@@ -622,8 +622,10 @@
           '</div></div>';
       }
       // Same empty-bar-below-threshold rule as computeCategoryEffectiveness's
-      // render function above.
-      const widthPct = r.contacted < CHANNEL_EFF_MIN_N_FOR_RATE ? 0 : Math.max(2, Math.round((r.advanced / r.contacted) * 100));
+      // render function above, plus the same zero-advanced guard: without it,
+      // Math.max(2, ...) floors a genuine 0-of-N rate up to a fabricated 2%.
+      const widthPct = r.contacted < CHANNEL_EFF_MIN_N_FOR_RATE ? 0
+        : r.advanced > 0 ? Math.max(2, Math.round((r.advanced / r.contacted) * 100)) : 0;
       const rateHtml = r.contacted >= CHANNEL_EFF_MIN_N_FOR_RATE
         ? '<span class="channel-eff-rate font-mono">' + widthPct + '% reached active exploration</span>'
         : '<span class="channel-eff-rate font-mono">Sample too small for a rate (n=' + r.contacted + ')</span>';
