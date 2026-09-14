@@ -1323,7 +1323,16 @@ function initPhotoAudit() {
   const summary = document.getElementById('photoAuditSummary');
   if (!input) return;
 
+  // Large batches (the real 48-photo Depop audit this mirrors) take real
+  // time to decode, so a re-selection made before the previous batch
+  // finishes loading must not let that previous batch's late img.onload
+  // callbacks render over the new one. Same monotonic-run-id guard as
+  // index.html's loadClusters/sendChat, scoped to this input instead of
+  // the whole page.
+  let auditRunId = 0;
+
   input.addEventListener('change', () => {
+    const runId = ++auditRunId;
     const files = Array.from(input.files || []);
     grid.querySelectorAll('.photo-audit-card img').forEach(img => URL.revokeObjectURL(img.src));
     grid.innerHTML = '';
@@ -1338,6 +1347,7 @@ function initPhotoAudit() {
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
+        if (runId !== auditRunId) { URL.revokeObjectURL(url); return; }
         loaded++;
         const isLandscape = img.naturalWidth > img.naturalHeight;
         if (isLandscape) flagged++;
@@ -1345,6 +1355,7 @@ function initPhotoAudit() {
         renderPhotoAuditResults(results, loaded, files.length, flagged);
       };
       img.onerror = () => {
+        if (runId !== auditRunId) { URL.revokeObjectURL(url); return; }
         loaded++;
         results[i] = { file, url, failed: true };
         renderPhotoAuditResults(results, loaded, files.length, flagged);
