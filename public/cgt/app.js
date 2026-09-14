@@ -370,12 +370,18 @@ function buildValueGroupsByYear() {
     .sort((a, b) => Number(b.label) - Number(a.label));
 }
 
-function renderBreakdownList(title, groups) {
+// formatValue and emptyText are overridable since this same row/bar layout
+// also drives the grading-turnaround card below, where the value is a day
+// count with a returned-submission tally attached, not a plain dollar figure.
+function renderBreakdownList(title, groups, opts) {
+  opts = opts || {};
+  const formatValue = opts.formatValue || (g => formatUsd(g.value));
+  const emptyText = opts.emptyText || 'No priced real cards yet.';
   if (!groups.length) {
     return `
       <div class="breakdown-card">
         <h3 class="breakdown-title font-mono">${escapeHtml(title)}</h3>
-        <p class="breakdown-empty">No priced real cards yet.</p>
+        <p class="breakdown-empty">${escapeHtml(emptyText)}</p>
       </div>
     `;
   }
@@ -386,7 +392,7 @@ function renderBreakdownList(title, groups) {
       <span class="breakdown-bar-track">
         <span class="breakdown-bar-fill" style="width:${max ? (g.value / max * 100) : 0}%"></span>
       </span>
-      <span class="breakdown-value font-mono">${formatUsd(g.value)}</span>
+      <span class="breakdown-value font-mono">${escapeHtml(formatValue(g))}</span>
     </div>
   `).join('');
   return `
@@ -397,13 +403,56 @@ function renderBreakdownList(title, groups) {
   `;
 }
 
+// Calendar days between a submission actually shipping out and actually
+// arriving back, only counted once both real dates are on record and the
+// batch is marked returned, so a submission still in queue never
+// contributes a partial number that would understate the real wait.
+function computeTurnaroundDays(s) {
+  if (s.status !== 'returned' || !s.submittedDate || !s.returnedDate) return null;
+  const start = new Date(s.submittedDate + 'T00:00:00').getTime();
+  const end = new Date(s.returnedDate + 'T00:00:00').getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  return Math.round((end - start) / 86400000);
+}
+
+// Averages real turnaround per grading company, which is the practical
+// question this data answers over time: which grader has actually been
+// fastest for cards Jack has sent, not a published/advertised turnaround
+// time. min/max are carried alongside the average since one outlier batch
+// (e.g. a holiday-season slowdown) can otherwise make an average look more
+// consistent than the real spread was.
+function buildTurnaroundByGrader() {
+  const byGrader = new Map();
+  submissions.forEach(s => {
+    if (isExampleSubmission(s)) return;
+    const days = computeTurnaroundDays(s);
+    if (days == null) return;
+    const key = s.gradingCompany || 'Unknown';
+    if (!byGrader.has(key)) byGrader.set(key, []);
+    byGrader.get(key).push(days);
+  });
+  return [...byGrader.entries()]
+    .map(([grader, list]) => ({
+      label: grader,
+      value: Math.round(list.reduce((a, b) => a + b, 0) / list.length),
+      count: list.length,
+      min: Math.min(...list),
+      max: Math.max(...list)
+    }))
+    .sort((a, b) => a.value - b.value);
+}
+
 function renderValueBreakdown() {
   const el = document.getElementById('breakdownGrid');
   el.innerHTML =
     renderBreakdownList('By sport', buildValueGroups('sport')) +
     renderBreakdownList('By grading company', buildValueGroups('gradingCompany')) +
     renderBreakdownList('By grade', buildValueGroupsByGrade()) +
-    renderBreakdownList('By year', buildValueGroupsByYear());
+    renderBreakdownList('By year', buildValueGroupsByYear()) +
+    renderBreakdownList('Avg. grading turnaround', buildTurnaroundByGrader(), {
+      formatValue: g => g.value + 'd avg (' + g.min + '-' + g.max + 'd, ' + g.count + ' returned)',
+      emptyText: 'No returned submissions with both dates logged yet.'
+    });
 }
 
 // Pulls "what got priced when" out of every card's own datePriced/backlogBatch
