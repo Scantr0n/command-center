@@ -1159,7 +1159,7 @@
       '<div class="inline-gen-warn" id="modalMoveWarn" hidden></div>' +
       '<div class="np-output-head">' +
       '<span class="field-label" style="margin:0">Paste into <code>stageHistory</code></span>' +
-      '<button type="button" id="modalMoveCopy" class="print-btn font-mono">Copy</button>' +
+      '<button type="button" id="modalMoveCopy" class="print-btn font-mono" aria-live="polite">Copy</button>' +
       '</div>' +
       '<pre class="np-output font-mono" id="modalMoveOutput"></pre>' +
       '</div></div>';
@@ -1176,7 +1176,7 @@
       '<div class="inline-gen-warn" id="modalIdeaWarn" hidden></div>' +
       '<div class="np-output-head">' +
       '<span class="field-label" style="margin:0">Paste into <code>contentIdeas</code></span>' +
-      '<button type="button" id="modalIdeaCopy" class="print-btn font-mono">Copy</button>' +
+      '<button type="button" id="modalIdeaCopy" class="print-btn font-mono" aria-live="polite">Copy</button>' +
       '</div>' +
       '<pre class="np-output font-mono" id="modalIdeaOutput"></pre>' +
       '</div></div>';
@@ -1199,7 +1199,7 @@
       '<div class="inline-gen-warn" id="modalTouchWarn" hidden></div>' +
       '<div class="np-output-head">' +
       '<span class="field-label" style="margin:0">Paste into <code>outreachLog</code></span>' +
-      '<button type="button" id="modalTouchCopy" class="print-btn font-mono">Copy</button>' +
+      '<button type="button" id="modalTouchCopy" class="print-btn font-mono" aria-live="polite">Copy</button>' +
       '</div>' +
       '<pre class="np-output font-mono" id="modalTouchOutput"></pre>' +
       '</div></div>';
