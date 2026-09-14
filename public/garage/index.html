@@ -374,7 +374,10 @@
   </section>
 
   <section>
-    <h2 class="section-title">Sales log</h2>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Sales log</h2>
+      <button type="button" id="salesCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
     <div class="callout">
       Every real completed sale, one row per platform a sale happened on. Nothing here is estimated, this only
       shows what's actually been hand-logged in <code>sales.json</code> after a real sale. Logging a sale here

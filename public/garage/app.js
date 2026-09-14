@@ -1,4 +1,5 @@
 let listings = [];
+let salesLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 let sortKey = null;
@@ -179,9 +180,11 @@ async function loadData() {
   }
 
   if (salesData) {
+    salesLog = sales;
     renderSales(sales);
     renderTaxTracker(sales);
   } else {
+    salesLog = [];
     document.getElementById('salesTableBody').innerHTML = '';
     const empty = document.getElementById('salesTableEmpty');
     empty.hidden = false;
@@ -1268,6 +1271,44 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'garage-listings-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const SALES_CSV_COLUMNS = [
+  ['title', 'Item'], ['platform', 'Platform'], ['salePrice', 'Sale price'], ['askingPrice', 'Asking price'],
+  ['netPayout', 'Est. net payout'], ['costBasis', 'Cost basis'], ['shippingCost', 'Shipping paid'],
+  ['profit', 'Profit'], ['saleDate', 'Sale date']
+];
+
+// Exports every real logged sale, same computed net-payout/profit columns as
+// the on-page sales table (recomputed fresh, not cached), so a full sale
+// history with real numbers can leave the browser for bookkeeping or taxes.
+// Unlike the listings CSV export above this isn't filtered by the page's
+// search/platform controls, since the sales log has no filter UI of its own,
+// this exports the full real sales.json.
+document.getElementById('salesCsvBtn').addEventListener('click', () => {
+  const rows = salesLog.map(s => {
+    const net = estimateNetPayout(s.platform, s.salePrice);
+    const hasEither = s.costBasis != null || s.shippingCost != null;
+    const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
+    return {
+      ...s,
+      platform: PLATFORM_LABELS[s.platform] || s.platform || '',
+      netPayout: net != null ? net.toFixed(2) : '',
+      profit: profit != null ? profit.toFixed(2) : ''
+    };
+  });
+  const header = SALES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(s => SALES_CSV_COLUMNS.map(([key]) => csvField(s[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-sales-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
