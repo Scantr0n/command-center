@@ -61,6 +61,26 @@
   .cat-filter-chip { cursor: pointer; transition: opacity 0.15s ease; border: none; }
   .cat-filter-chip:hover { opacity: 0.8; }
 
+  /* On a narrow viewport, 9 wrapped category chips push the graph/grid
+     several screens down before any project is visible. Below the point
+     wrapping stops being cheap (tablet-ish and up keep the original wrapped
+     grid), scroll the row horizontally instead, same one-line-of-filters
+     pattern as any mobile category rail. flex-shrink:0 keeps a chip from
+     getting squeezed as the row scrolls; the native scrollbar hidden since
+     a partially cut-off chip at the edge is enough of a scroll affordance
+     without an extra visible bar. */
+  @media (max-width: 640px) {
+    #categoryFilterRow {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    #categoryFilterRow::-webkit-scrollbar { display: none; }
+    #categoryFilterRow .tag-chip { flex-shrink: 0; }
+  }
+
   /* Atmosphere: faint radar grid + vignette behind the graph, restrained not gimmicky */
   #graphView {
     position: relative;
