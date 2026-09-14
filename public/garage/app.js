@@ -141,12 +141,15 @@ async function loadData() {
 
   if (salesData) {
     renderSales(sales);
+    renderTaxTracker(sales);
   } else {
     document.getElementById('salesTableBody').innerHTML = '';
     const empty = document.getElementById('salesTableEmpty');
     empty.hidden = false;
     empty.setAttribute('role', 'alert');
     empty.textContent = "Couldn't load sales data: " + salesResult.reason.message;
+    document.getElementById('taxTrackerBody').innerHTML =
+      '<tr><td colspan="6" class="table-empty" role="alert">Failed to load sales data: ' + escapeHtml(salesResult.reason.message) + '</td></tr>';
   }
 
   initTableScrollShadows();
@@ -685,6 +688,67 @@ function renderSales(sales) {
     </tr>
   `;
   }).join('');
+}
+
+const TAX_1099K_USD_THRESHOLD = 20000;
+const TAX_1099K_TXN_THRESHOLD = 200;
+
+// Federal 1099-K threshold as of the 2026 tax year: more than $20,000 in
+// gross payments AND more than 200 transactions, per platform, restored
+// permanently by the One Big Beautiful Bill Act (July 2025), no sunset date.
+// Only real sales.json rows count here, current calendar year only, since
+// the threshold resets each January and an undated or prior-year sale can't
+// honestly be attributed to "this year's" total.
+function renderTaxTracker(sales) {
+  const tbody = document.getElementById('taxTrackerBody');
+  const note = document.getElementById('taxTrackerNote');
+  const year = new Date().getFullYear();
+  document.getElementById('taxTrackerYear').textContent = String(year);
+
+  const undated = sales.filter(s => !s.saleDate);
+  const thisYear = sales.filter(s => s.saleDate && Number(s.saleDate.slice(0, 4)) === year);
+
+  const byPlatform = {};
+  PAYOUT_PLATFORMS.forEach(p => { byPlatform[p] = { gross: 0, count: 0 }; });
+  thisYear.forEach(s => {
+    if (!byPlatform[s.platform]) byPlatform[s.platform] = { gross: 0, count: 0 };
+    byPlatform[s.platform].gross += s.salePrice || 0;
+    byPlatform[s.platform].count += 1;
+  });
+
+  tbody.innerHTML = PAYOUT_PLATFORMS.map(p => {
+    const d = byPlatform[p];
+    const grossPct = Math.min(100, (d.gross / TAX_1099K_USD_THRESHOLD) * 100);
+    const txnPct = Math.min(100, (d.count / TAX_1099K_TXN_THRESHOLD) * 100);
+    const met = d.gross > TAX_1099K_USD_THRESHOLD && d.count > TAX_1099K_TXN_THRESHOLD;
+    return `
+    <tr>
+      <td><span class="badge badge-${escapeHtml(p)}">${escapeHtml(PLATFORM_LABELS[p] || p)}</span></td>
+      <td class="cell-value">${formatUsd(d.gross)} <span class="cell-muted">/ ${formatUsd(TAX_1099K_USD_THRESHOLD)}</span></td>
+      <td>
+        <div class="tax-progress-row">
+          <div class="tax-progress-track"><div class="tax-progress-fill" style="width:${grossPct}%"></div></div>
+          <span class="tax-progress-pct font-mono">${grossPct.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td class="cell-value">${d.count} <span class="cell-muted">/ ${TAX_1099K_TXN_THRESHOLD}</span></td>
+      <td>
+        <div class="tax-progress-row">
+          <div class="tax-progress-track"><div class="tax-progress-fill" style="width:${txnPct}%"></div></div>
+          <span class="tax-progress-pct font-mono">${txnPct.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td class="${met ? 'tax-status-met' : 'cell-muted'}">${met ? 'Meets both, expect a 1099-K' : 'Below threshold'}</td>
+    </tr>`;
+  }).join('');
+
+  if (undated.length) {
+    note.hidden = false;
+    note.textContent = `${undated.length} sale(s) in sales.json have no saleDate logged and aren't counted toward the ${year} totals above until dated.`;
+  } else {
+    note.hidden = true;
+    note.textContent = '';
+  }
 }
 
 document.getElementById('searchInput').addEventListener('input', (e) => {

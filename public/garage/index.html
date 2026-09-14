@@ -305,6 +305,34 @@
   </section>
 
   <section>
+    <h2 class="section-title">Tax / 1099-K threshold tracker</h2>
+    <div class="callout">
+      <strong>Not tax advice.</strong> As of the 2026 tax year, the federal Form 1099-K reporting threshold is
+      back to <strong>more than $20,000 in gross payments AND more than 200 transactions</strong>, per platform,
+      restored permanently by the One Big Beautiful Bill Act (July 2025). A platform only has to send a 1099-K
+      once <em>both</em> numbers are crossed, but every dollar of real profit is taxable income regardless of
+      whether a form gets issued. This reads only real rows from <code>sales.json</code> for the current
+      calendar year, it does not estimate or project future sales.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="taxTrackerTable">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Gross sales, <span id="taxTrackerYear"></span></th>
+            <th>Toward $20,000</th>
+            <th>Transactions</th>
+            <th>Toward 200</th>
+            <th>1099-K status</th>
+          </tr>
+        </thead>
+        <tbody id="taxTrackerBody"></tbody>
+      </table>
+    </div>
+    <p class="tax-tracker-note" id="taxTrackerNote" hidden></p>
+  </section>
+
+  <section>
     <h2 class="section-title">Quality &amp; fixes log</h2>
     <div class="activity-list" id="activityList"></div>
   </section>
