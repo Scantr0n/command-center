@@ -571,10 +571,20 @@ function renderSubmissions() {
     return;
   }
 
+  // Cross-references this grader's own real turnaround history (already
+  // computed for the "Avg. grading turnaround" breakdown) against how long
+  // this active submission has actually been out, so a batch running past
+  // that grader's own average gets flagged instead of just quietly aging in
+  // the list. Requires at least 2 returned submissions from that grader
+  // before trusting the average enough to flag anything against it.
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+
   const rows = active.map(s => {
     const meta = SUBMISSION_STATUS_META[s.status] || { label: s.status, cls: 'badge-status-queue' };
     const days = daysSince(s.submittedDate);
     const daysText = days == null ? 'no date logged' : days + ' day' + (days === 1 ? '' : 's') + ' in queue';
+    const graderStats = s.gradingCompany && turnaroundByGrader.get(s.gradingCompany);
+    const runningLong = days != null && graderStats && graderStats.count >= 2 && days > graderStats.value;
     const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
     const metaParts = [
       s.gradingCompany,
@@ -584,10 +594,11 @@ function renderSubmissions() {
     ].filter(Boolean);
     return `
       <div class="submission-row">
-        <span class="submission-days font-mono">${escapeHtml(daysText)}</span>
+        <span class="submission-days font-mono${runningLong ? ' submission-days-late' : ''}">${escapeHtml(daysText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
+        ${runningLong ? `<span class="badge badge-late" title="${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} is ${graderStats.value} days">past ${escapeHtml(s.gradingCompany)} avg (${graderStats.value}d)</span>` : ''}
         ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
       </div>
     `;
