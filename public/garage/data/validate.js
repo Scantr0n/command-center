@@ -5,8 +5,10 @@
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
- * is actually one of the listing's own platforms, every pipeline stage
- * count is a real whole number, and every activity log entry is labeled
+ * (or linked in "listingUrls") is actually one of the listing's own
+ * platforms, every logged listing URL is a real http(s) link rather than a
+ * placeholder, every pipeline stage count is a real whole number, and every
+ * activity log entry is labeled
  * with a type so a bug fix and a photo audit are never mixed up. It also
  * cross-checks pipeline.json's "draft"/"live"/"sold" stage counts against
  * what listings.json actually contains, since the two files are hand-edited
@@ -87,6 +89,26 @@ function main() {
           errors.push(where + ': platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
         }
       });
+    }
+
+    if (l.listingUrls !== undefined && l.listingUrls !== null) {
+      if (typeof l.listingUrls !== 'object' || Array.isArray(l.listingUrls)) {
+        errors.push(where + ': "listingUrls" must be an object keyed by platform, or omitted');
+      } else {
+        Object.keys(l.listingUrls).forEach(p => {
+          const v = l.listingUrls[p];
+          if (!PLATFORMS.includes(p)) {
+            errors.push(where + ': listingUrls platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
+          } else if (Array.isArray(l.platforms) && !l.platforms.includes(p)) {
+            errors.push(where + ': listingUrls platform "' + p + '" is not in this listing\'s "platforms"');
+          }
+          if (v !== null && v !== undefined) {
+            if (typeof v !== 'string' || !/^https?:\/\//.test(v)) {
+              errors.push(where + ': listingUrls.' + p + ' must be a real http(s) URL string, or null until logged');
+            }
+          }
+        });
+      }
     }
 
     if (l.soldOn !== undefined) {

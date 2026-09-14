@@ -50,6 +50,7 @@
           <tr><th>costBasis</th><td>USD cost of actually acquiring this item (what it was paid for), a non-negative number or <code>null</code>. Drives real profit figures separate from the fee-only payout estimates below, leave <code>null</code> until you have the real number, never guess it.</td></tr>
           <tr><th>platforms</th><td>Array of any of: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, <code>depop</code></td></tr>
           <tr><th>soldOn</th><td>Array, subset of <code>platforms</code>, marking which of them the item has actually sold on so it can be manually delisted from the rest. Leave <code>[]</code> until a real sale happens on one platform while the item is still live on others.</td></tr>
+          <tr><th>listingUrls</th><td>Optional object keyed by platform (each key a subset of <code>platforms</code>), value the real live listing URL as a string once it's been copied over, or <code>null</code> until logged. Powers a direct "View listing" link per platform in the item detail view, never invent a URL, leave it <code>null</code> rather than guess.</td></tr>
           <tr><th>status</th><td>One of: <code>draft</code>, <code>ready-to-post</code>, <code>live</code>, <code>sold</code></td></tr>
           <tr><th>datePublished</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet. Also drives the "Relist reminders" section below, log the real date an item first went live to get relist guidance for it.</td></tr>
           <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
@@ -73,6 +74,7 @@
   "costBasis": null,
   "platforms": [],
   "soldOn": [],
+  "listingUrls": {},
   "status": "draft",
   "datePublished": null,
   "notes": null

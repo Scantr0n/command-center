@@ -352,12 +352,20 @@ function renderRelist(listings) {
   }).join('');
 }
 
-function platformBadges(platforms, soldOn) {
+// listingUrls is optional and only honored here (the modal detail view),
+// not in the table/coverage rows, since those rows are themselves clickable
+// to open the modal and a nested <a> inside a clickable row is both an
+// accessibility trap and a click-target conflict.
+function platformBadges(platforms, soldOn, listingUrls) {
   const sold = soldOn || [];
   return (platforms || []).map(p => {
     const isSold = sold.includes(p);
     const cls = isSold ? 'badge badge-sold-elsewhere' : `badge badge-${escapeHtml(p)}`;
     const label = escapeHtml(PLATFORM_LABELS[p] || p) + (isSold ? ' (sold)' : '');
+    const url = !isSold && listingUrls ? listingUrls[p] : null;
+    if (url) {
+      return `<a class="${cls} badge-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" title="Open the real ${escapeHtml(PLATFORM_LABELS[p] || p)} listing">${label} <span aria-hidden="true">&#8599;</span></a>`;
+    }
     return `<span class="${cls}">${label}</span>`;
   }).join('');
 }
@@ -851,7 +859,7 @@ function openModal(id) {
   const rows = [];
   rows.push(fieldRow('Asking price', l.price != null ? formatUsd(l.price) : 'Not set', l.price == null));
   rows.push(fieldRow('Cost basis', l.costBasis != null ? formatUsd(l.costBasis) : 'Not logged', l.costBasis == null));
-  rows.push(fieldRow('Platforms', (l.platforms || []).length ? platformBadges(l.platforms, l.soldOn) : 'None logged', !(l.platforms || []).length));
+  rows.push(fieldRow('Platforms', (l.platforms || []).length ? platformBadges(l.platforms, l.soldOn, l.listingUrls) : 'None logged', !(l.platforms || []).length));
   rows.push(fieldRow('Published', l.datePublished ? escapeHtml(l.datePublished) : 'Not logged yet', !l.datePublished));
 
   const modalDays = daysSincePublished(l.datePublished);

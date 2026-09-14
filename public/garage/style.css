@@ -484,6 +484,17 @@ table.card-table {
 .badge-due { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
 .badge-hold { background: rgba(76,154,255,0.12); color: #4C9AFF; border-color: rgba(76,154,255,0.35); }
 
+.badge-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 0.1s ease;
+}
+.badge-link:hover, .badge-link:focus-visible {
+  filter: brightness(1.3);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .table-empty {
   padding: 40px 20px;
   text-align: center;

@@ -7,6 +7,7 @@
       "costBasis": null,
       "platforms": ["ebay", "vinted", "poshmark", "depop"],
       "soldOn": [],
+      "listingUrls": { "ebay": null, "vinted": null, "poshmark": null, "depop": null },
       "status": "live",
       "datePublished": null,
       "notes": null
@@ -18,6 +19,7 @@
       "costBasis": null,
       "platforms": ["ebay", "vinted", "poshmark", "depop"],
       "soldOn": [],
+      "listingUrls": { "ebay": null, "vinted": null, "poshmark": null, "depop": null },
       "status": "live",
       "datePublished": null,
       "notes": null
@@ -29,6 +31,7 @@
       "costBasis": null,
       "platforms": ["ebay"],
       "soldOn": [],
+      "listingUrls": { "ebay": null },
       "status": "live",
       "datePublished": null,
       "notes": null
