@@ -114,6 +114,7 @@ function main() {
     if (!Array.isArray(history)) {
       errors.push('connection.history: must be an array (empty is fine, it starts that way honestly)');
     } else {
+      let previousAt = null;
       history.forEach((entry, i) => {
         const where = `connection.history[${i}]`;
         if (!entry || typeof entry !== 'object') {
@@ -122,6 +123,17 @@ function main() {
         }
         if (!isIsoDatetimeOrNull(entry.at) || entry.at == null) {
           errors.push(where + '.at: required, must be a valid ISO datetime (every check needs a real timestamp)');
+        } else {
+          // The page reads this array oldest-first without re-sorting (the
+          // tick strip renders it in place, and mostRecentConnectedAt() scans
+          // backward from the end assuming the end is newest), so an
+          // out-of-order append would silently misrender rather than error.
+          const at = new Date(entry.at).getTime();
+          if (previousAt != null && at < previousAt) {
+            errors.push(where + '.at: out of order, connection.history must be append-only, oldest first ' +
+              '(this entry is earlier than connection.history[' + (i - 1) + '].at)');
+          }
+          previousAt = at;
         }
         if (typeof entry.connected !== 'boolean') {
           errors.push(where + '.connected: required, must be true or false (a real connectivity result, never null/unknown)');
