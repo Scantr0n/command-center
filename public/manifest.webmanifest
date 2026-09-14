@@ -35,6 +35,12 @@
       "short_name": "CGT",
       "description": "Graded card inventory and pricing",
       "url": "/cgt/"
+    },
+    {
+      "name": "Alpha Trading Bot",
+      "short_name": "Alpha",
+      "description": "Live trading daemon status",
+      "url": "/alpha/"
     }
   ]
 }
