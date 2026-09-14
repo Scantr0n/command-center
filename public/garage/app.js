@@ -563,6 +563,7 @@ function readOptionalNonNegativeInput(el) {
 function renderCalc() {
   const input = document.getElementById('calcPriceInput');
   const costInput = document.getElementById('calcCostInput');
+  const costError = document.getElementById('calcCostError');
   const tbody = document.getElementById('calcTableBody');
   const empty = document.getElementById('calcTableEmpty');
   const table = document.getElementById('calcTable');
@@ -571,6 +572,13 @@ function renderCalc() {
   const price = raw === '' ? null : Number(raw);
   const cost = readOptionalNonNegativeInput(costInput);
   const hasCost = cost != null && cost !== undefined;
+  // undefined (as opposed to null) means something was typed but it wasn't a
+  // valid non-negative number, e.g. a negative cost, which the input's own
+  // min="0" doesn't actually block from being typed. Say so instead of
+  // silently dropping the profit column with no indication why.
+  const costInvalid = cost === undefined;
+  costError.hidden = !costInvalid;
+  costError.textContent = costInvalid ? 'Enter a valid cost of $0 or more, ignoring it for now.' : '';
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;

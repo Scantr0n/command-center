@@ -337,6 +337,9 @@ section { margin-bottom: 36px; }
 .calc-price-input::-webkit-outer-spin-button,
 .calc-price-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
+.calc-cost-field { display: flex; flex-direction: column; gap: 4px; }
+.calc-cost-error { color: #E56464; font-size: 0.72rem; margin: 0; }
+
 /* Table */
 .table-wrap {
   position: relative;
