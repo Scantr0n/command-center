@@ -644,6 +644,7 @@ footer.page-foot {
   border-top: 1px solid var(--hairline);
   padding-top: 16px;
 }
+.data-freshness-stale { color: #E0A030; }
 
 /* Detail modal, same pattern as the CSM and CGT hubs */
 .modal-overlay {

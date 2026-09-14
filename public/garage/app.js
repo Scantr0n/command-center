@@ -77,11 +77,34 @@ function formatUsd(n) {
   return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+// Also captures the real server "Last-Modified" header, which express.static
+// sets from each JSON file's own on-disk mtime, so the page can honestly show
+// when the hand-edited data was actually last touched without needing a
+// separate timestamp field maintained by hand in every file (which could
+// itself go stale or get forgotten on an edit).
 function fetchJson(url) {
   return fetch(url).then(r => {
     if (!r.ok) throw new Error(url.split('/').pop() + ' returned ' + r.status);
-    return r.json();
+    const lastModifiedHeader = r.headers.get('last-modified');
+    const lastModified = lastModifiedHeader ? new Date(lastModifiedHeader) : null;
+    return r.json().then(data => ({ data, lastModified }));
   });
+}
+
+// Latest mtime across whichever data files actually loaded, so a typo'd or
+// missing file can't hide a stale sibling file's real edit date.
+function renderDataFreshness(lastModifiedDates) {
+  const el = document.getElementById('dataFreshness');
+  const known = lastModifiedDates.filter(d => d && !Number.isNaN(d.getTime()));
+  if (!known.length) {
+    el.textContent = '';
+    return;
+  }
+  const latest = new Date(Math.max(...known.map(d => d.getTime())));
+  const daysAgo = Math.floor((Date.now() - latest.getTime()) / 86400000);
+  const when = daysAgo <= 0 ? 'today' : daysAgo === 1 ? '1 day ago' : daysAgo + ' days ago';
+  el.textContent = ` Last hand-edited ${when} (${latest.toISOString().slice(0, 10)}).`;
+  el.classList.toggle('data-freshness-stale', daysAgo > 14);
 }
 
 // Each of the three files is a hand-edited record that can be typo'd at any
@@ -98,12 +121,16 @@ async function loadData() {
     fetchJson('/garage/data/activity.json'),
     fetchJson('/garage/data/sales.json')
   ]);
-  const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value : null;
-  const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value : null;
-  const activityData = activityResult.status === 'fulfilled' ? activityResult.value : null;
-  const salesData = salesResult.status === 'fulfilled' ? salesResult.value : null;
+  const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
+  const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
+  const activityData = activityResult.status === 'fulfilled' ? activityResult.value.data : null;
+  const salesData = salesResult.status === 'fulfilled' ? salesResult.value.data : null;
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
+
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult]
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value.lastModified));
 
   if (listingsData) {
     listings = listingsData.listings || [];
