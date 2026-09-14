@@ -613,6 +613,13 @@ table.card-table {
 }
 .cert-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
 
+.field-note {
+  font-size: 0.7rem;
+  color: var(--dim);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 footer.page-foot {
   margin-top: 40px;
   font-size: 0.72rem;

@@ -136,6 +136,21 @@ function certLookupLink(c) {
   return null;
 }
 
+// A real, stable eBay search URL pattern (the _nkw keyword param has worked
+// this way for over a decade), built from the card's own real fields so it
+// never fabricates anything, just points at where the actual comps would be.
+// LH_Sold + LH_Complete narrow it to completed sales, which is what pricing
+// research actually needs, not active asking prices. As of a July 2026 eBay
+// change these two params now redirect a signed-out visitor to eBay login
+// before showing results, so the link text says that plainly rather than
+// pretending it always works with no account.
+function compSearchLink(c) {
+  if (!c.cardName) return null;
+  const parts = [c.year, c.cardName, c.gradingCompany, c.grade != null ? 'grade ' + c.grade : null].filter(Boolean);
+  const url = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(parts.join(' ')) + '&LH_Sold=1&LH_Complete=1';
+  return { url, text: 'Search eBay sold comps for this card' };
+}
+
 function isStale(c) {
   if (c.estimatedValue == null || !c.datePriced) return false;
   const age = daysSince(c.datePriced);
@@ -784,6 +799,13 @@ function openModal(id) {
     body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
   }
   body += field('Storage location', activeCard.storageLocation, !activeCard.storageLocation);
+  const comp = compSearchLink(activeCard);
+  if (comp) {
+    body += `<div class="field-row">
+      <a href="${escapeHtml(comp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(comp.text)} &rarr;</a>
+      <div class="field-note">Opens an eBay sold-listings search built from this card's own name/year/grade. eBay now requires you to be signed in to see sold results.</div>
+    </div>`;
+  }
   body += field('Estimated value', activeCard.estimatedValue != null ? formatUsd(activeCard.estimatedValue) : null, activeCard.estimatedValue == null);
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
   body += field('Cost basis (what was paid)', activeCard.costBasis != null ? formatUsd(activeCard.costBasis) : null, activeCard.costBasis == null);
