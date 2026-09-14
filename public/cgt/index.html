@@ -183,6 +183,14 @@
     <div class="data-quality-list" id="stalePricingList"></div>
   </section>
 
+  <section id="duplicatesSection" hidden>
+    <h2 class="section-title">Possible duplicates</h2>
+    <p class="section-subtitle">Same card name, year, grading company, and grade on more than one row. Could be a
+      genuinely owned second copy, or a row that got copy-pasted and only the id changed. Same check
+      <code class="inline-code">validate.js</code> runs, surfaced here so it doesn't require the command line to see.</p>
+    <div class="data-quality-list" id="duplicatesList"></div>
+  </section>
+
   <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Inventory</h2>
@@ -270,6 +278,7 @@
   </div>
 </div>
 
+<script src="/cgt/data/validate-core.js"></script>
 <script src="/cgt/app.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>
 </body>

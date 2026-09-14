@@ -170,6 +170,7 @@ header.page-head .sub {
   color: var(--sub);
   margin: 0 0 14px;
 }
+.section-subtitle { color: var(--sub); font-size: 0.8rem; line-height: 1.6; margin: -8px 0 14px; }
 
 /* Stat tiles */
 .stat-row {

@@ -239,6 +239,7 @@ async function loadCards() {
     renderPricingActivity();
     renderDataQuality();
     renderStalePricing();
+    renderDuplicates();
     renderBatchFilter();
     renderInsuranceSummary();
     applyFiltersAndRender();
@@ -690,6 +691,38 @@ function renderStalePricing() {
       <span class="dq-why">PRICED ${daysSince(c.datePriced)} DAYS AGO</span>
     </button>
   `).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
+// Reuses the exact same duplicate-detection rule validate.js runs on the
+// command line (CGTValidateCore.findDuplicateGroups, shared so the two
+// never drift apart), just rendered as a clickable panel instead of a CLI
+// warning, so seeing "these two rows might be the same card" doesn't
+// require running a script. Excludes the example row like every other
+// real-data panel here.
+function renderDuplicates() {
+  const section = document.getElementById('duplicatesSection');
+  const list = document.getElementById('duplicatesList');
+  if (!window.CGTValidateCore) {
+    section.hidden = true;
+    return;
+  }
+  const groups = CGTValidateCore.findDuplicateGroups(cards.filter(c => !isExample(c)));
+
+  if (!groups.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = groups.map(({ cards: group }) => group.map(c => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</span>
+      <span class="dq-meta">${escapeHtml([c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '))}</span>
+      <span class="dq-why">${group.length} ROWS MATCH ON NAME/YEAR/GRADER/GRADE</span>
+    </button>
+  `).join('')).join('');
   list.querySelectorAll('.data-quality-row').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.id));
   });
