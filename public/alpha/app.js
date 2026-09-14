@@ -68,14 +68,24 @@ function updateGlanceIndicators(cls) {
 // detailed section. Derived entirely from fields the page already has
 // (connection state, reading freshness, kill-switch state), never from
 // anything invented. Kill switch engaged always wins: it is the one state
-// Jack would want to see even from across the room.
-function computeHeadline(data) {
+// Jack would want to see even from across the room, current or last known.
+// isLastKnown marks that `data.live` has been substituted with a cached
+// last-known-connected reading (see loadLastKnown below); the headline must
+// say so explicitly rather than let a stale reading pass as current.
+function computeHeadline(data, isLastKnown) {
   const live = data.live || {};
   const asOf = live.asOf;
   const killEngaged = live.killSwitch && live.killSwitch.engaged;
 
   if (killEngaged === true) {
-    return { level: 'critical', text: 'KILL SWITCH ENGAGED', asOf };
+    return {
+      level: 'critical',
+      text: isLastKnown ? 'KILL SWITCH ENGAGED (last known, now disconnected)' : 'KILL SWITCH ENGAGED',
+      asOf
+    };
+  }
+  if (isLastKnown) {
+    return { level: 'lastknown', text: 'Disconnected - showing last known state from ' + (timeAgo(asOf) || 'earlier'), asOf };
   }
   if (!data.connection.connected || !asOf) {
     return { level: 'awaiting', text: 'Awaiting live connection', asOf };
@@ -84,6 +94,78 @@ function computeHeadline(data) {
   if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale', asOf };
   if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging', asOf };
   return { level: 'good', text: 'Connected', asOf };
+}
+
+// A momentary disconnect from Alpha's real daemon shouldn't blank the page
+// back to "awaiting connection" the instant it happens: that throws away a
+// real reading Jack just had a moment ago for no reason other than a blip.
+// Real status-dashboard UX (Statuspage-style freshness indicators, and the
+// general "value plus the time it was observed" pattern) keeps showing the
+// last real value with an explicit, honest age on it rather than reverting
+// to unknown. This cache is deliberately narrow: only the slow-changing,
+// non-monetary fields (kill switch, regime, drawdown %, debate panel,
+// genealogy). Account and open positions are excluded on purpose, even
+// though they live right next to these fields in the same live payload:
+// those are real-money figures that can be wrong within seconds of going
+// stale, and showing a frozen dollar amount as if it might still be current
+// is exactly the "stale data wearing the clothes of live data" failure mode
+// this page exists to avoid. Those two sections keep reverting straight to
+// "awaiting connection" the instant the daemon drops, same as always.
+const LAST_KNOWN_KEY = 'alpha:lastKnownState';
+
+function saveLastKnown(data) {
+  const live = data.live;
+  if (!live || !live.asOf) return;
+  try {
+    localStorage.setItem(LAST_KNOWN_KEY, JSON.stringify({
+      asOf: live.asOf,
+      regime: live.regime,
+      killSwitch: live.killSwitch,
+      positionSizing: live.positionSizing,
+      debatePanel: live.debatePanel,
+      genealogy: live.genealogy
+    }));
+  } catch (e) {
+    // Private browsing / storage blocked: just skip caching, page still
+    // works exactly as it does today.
+  }
+}
+
+function loadLastKnown() {
+  try {
+    const raw = localStorage.getItem(LAST_KNOWN_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function renderLastKnownBanner(lastKnown) {
+  const banner = document.getElementById('lastKnownBanner');
+  if (!banner) return;
+  banner.hidden = !lastKnown;
+  if (!lastKnown) return;
+  const age = timeAgo(lastKnown.asOf) || 'earlier';
+  document.getElementById('lastKnownBannerDetail').textContent =
+    'Kill switch, regime, drawdown, debate panel, and genealogy below are the last real reading Alpha gave, from ' +
+    age + ' (' + formatAbsolute(lastKnown.asOf) + '), not current. Account and positions are left at ' +
+    '"awaiting connection" instead, since those can change every second and a frozen dollar figure would be ' +
+    'misleading rather than merely old.';
+}
+
+function setLastKnownTag(id, lastKnown) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = !lastKnown;
+  if (!lastKnown) return;
+  el.textContent = 'LAST KNOWN · ' + (timeAgo(lastKnown.asOf) || 'EARLIER').toUpperCase();
+  el.title = 'Disconnected. This reading was taken at ' + formatAbsolute(lastKnown.asOf) + ', not current.';
+}
+
+function updateLastKnownTags(lastKnown) {
+  setLastKnownTag('summaryLastKnownTag', lastKnown);
+  setLastKnownTag('psLastKnownTag', lastKnown);
+  setLastKnownTag('genealogyLastKnownTag', lastKnown);
 }
 
 function renderHeadline(level, text, asOf) {
@@ -373,15 +455,15 @@ function renderAccount(data) {
   }
   const dayGood = acct.dayChangeDollar >= 0;
   row.innerHTML = [
-    statTile(escapeHtml(fmtDollar(acct.equity) || '—'), 'Equity', null, false),
+    statTile(escapeHtml(fmtDollar(acct.equity) || '-'), 'Equity', null, false),
     statTile(
-      `<span class="${dayGood ? 'pl-good' : 'pl-bad'}">${escapeHtml((fmtDollar(acct.dayChangeDollar) || '—'))}</span>`,
+      `<span class="${dayGood ? 'pl-good' : 'pl-bad'}">${escapeHtml((fmtDollar(acct.dayChangeDollar) || '-'))}</span>`,
       'Day change',
       fmtPct(acct.dayChangePct) || null,
       false
     ),
-    statTile(escapeHtml(fmtDollar(acct.buyingPower) || '—'), 'Buying power', null, false),
-    statTile(escapeHtml(fmtDollar(acct.cash) || '—'), 'Cash', acct.cash < 0 ? 'Negative: margin in use' : null, false)
+    statTile(escapeHtml(fmtDollar(acct.buyingPower) || '-'), 'Buying power', null, false),
+    statTile(escapeHtml(fmtDollar(acct.cash) || '-'), 'Cash', acct.cash < 0 ? 'Negative: margin in use' : null, false)
   ].join('');
 }
 
@@ -414,10 +496,10 @@ function renderPositions(data) {
         <td class="pos-symbol font-mono">${escapeHtml(p.symbol)}</td>
         <td class="font-mono pos-side-${escapeHtml(p.side)}">${escapeHtml(p.side)}</td>
         <td class="font-mono pos-num">${escapeHtml(String(Math.abs(p.qty)))}</td>
-        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.avgEntryPrice) || '—')}</td>
-        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.currentPrice) || '—')}</td>
-        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.marketValue) || '—')}</td>
-        <td class="font-mono pos-num ${good ? 'pl-good' : 'pl-bad'}">${escapeHtml(fmtDollar(p.unrealizedPl) || '—')}
+        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.avgEntryPrice) || '-')}</td>
+        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.currentPrice) || '-')}</td>
+        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.marketValue) || '-')}</td>
+        <td class="font-mono pos-num ${good ? 'pl-good' : 'pl-bad'}">${escapeHtml(fmtDollar(p.unrealizedPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(p.unrealizedPlPct) || '')}</span>
         </td>
       </tr>
@@ -580,8 +662,12 @@ let latestStatusRequestId = 0;
 
 // Kept purely so the "Copy status" button below can build its plain-text
 // summary from the same real data already on screen, never a second fetch
-// or a separately maintained copy of it.
+// or a separately maintained copy of it. lastStatusIsLastKnown travels with
+// it so the summary's headline line agrees with what renderHeadline already
+// put on screen, rather than recomputing computeHeadline() without knowing
+// this is a cached reading and calling it "awaiting connection" again.
 let lastStatusData = null;
+let lastStatusIsLastKnown = false;
 
 async function loadStatus() {
   const requestId = ++latestStatusRequestId;
@@ -595,21 +681,39 @@ async function loadStatus() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
-    lastStatusData = data;
     document.getElementById('copyStatusBtn').disabled = false;
     lastLoadedAt = new Date().toISOString();
     updateOfflineBanner();
-    const headline = computeHeadline(data);
+
+    if (data.connection && data.connection.connected) saveLastKnown(data);
+    const lastKnown = (!data.connection || !data.connection.connected) ? loadLastKnown() : null;
+    // Only the three sections built from the cached fields (stats,
+    // position sizing, genealogy) read effectiveData; connection, account
+    // and positions always read the real `data` so those never show a
+    // frozen reading as current. See the LAST_KNOWN_KEY comment above.
+    const effectiveData = lastKnown ? {
+      ...data,
+      live: { ...data.live, ...lastKnown }
+    } : data;
+    // "Copy status" builds its plain-text summary from whatever was last
+    // rendered, so it should say the same last-known kill-switch/regime
+    // values the page itself is showing, not silently disagree with them.
+    lastStatusData = effectiveData;
+    lastStatusIsLastKnown = !!lastKnown;
+
+    const headline = computeHeadline(effectiveData, !!lastKnown);
     noteHeadlineForToast(headline.level, headline.text);
     renderHeadline(headline.level, headline.text, headline.asOf);
+    renderLastKnownBanner(lastKnown);
+    updateLastKnownTags(lastKnown);
     renderConnection(data);
     renderConnectionHistory(data);
-    renderStats(data);
+    renderStats(effectiveData);
     renderAccount(data);
     renderPositions(data);
-    renderPositionSizing(data);
+    renderPositionSizing(effectiveData);
     renderArchitecture(data);
-    renderGenealogy(data);
+    renderGenealogy(effectiveData);
     renderEventLog(data);
   } catch (e) {
     if (requestId !== latestStatusRequestId) return;
@@ -651,7 +755,7 @@ refreshBtn.addEventListener('click', async () => {
 // same fields already rendered on the page, in the same "awaiting
 // connection" wording used everywhere else here, never a fresh guess.
 function buildStatusSummary(data) {
-  const headline = computeHeadline(data);
+  const headline = computeHeadline(data, lastStatusIsLastKnown);
   const live = data.live || {};
   const ps = live.positionSizing || {};
   const acct = live.account;

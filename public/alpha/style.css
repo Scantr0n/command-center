@@ -110,6 +110,12 @@ header.page-head .sub {
 .headline-status.critical { border-color: rgba(224,80,80,0.4); }
 .headline-status.critical .headline-dot { background: #E05050; box-shadow: 0 0 0 3px rgba(224,80,80,0.22); }
 .headline-status.critical .headline-text { color: #F2B8B8; }
+/* Distinct from "awaiting" (never yet connected): this is a real reading
+   the page had a moment ago, now aging while disconnected. Calmer than the
+   amber "caution" state since it's expected, not degrading in real time. */
+.headline-status.lastknown { border-color: rgba(124,168,224,0.35); }
+.headline-status.lastknown .headline-dot { background: #7CA8E0; box-shadow: 0 0 0 3px rgba(124,168,224,0.18); }
+.headline-status.lastknown .headline-text { color: #B7CCEB; }
 
 .callout {
   border: 1px solid var(--hairline);
@@ -143,6 +149,50 @@ header.page-head .sub {
   line-height: 1.5;
 }
 .offline-banner strong { color: #F2D9B0; }
+
+/* Last-known-state banner: distinct blue from the amber offline banner and
+   red scope banner, since this isn't a problem, it's an honest "this is
+   aged" caveat on data the page is still choosing to show. See app.js
+   saveLastKnown/loadLastKnown for exactly which fields this ever applies
+   to (never account or positions). */
+.lastknown-banner {
+  border: 1px solid rgba(124,168,224,0.3);
+  background: rgba(124,168,224,0.05);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 0.8rem;
+  color: #A9C2E8;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.lastknown-banner strong { color: #CFE0F5; }
+
+/* Small inline marker on a section title when that section is showing a
+   cached last-known reading rather than what the connection strip above it
+   reports right now, so a reader skimming past the top banner still can't
+   mistake it for current. */
+.lastknown-tag {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  color: #7CA8E0;
+  background: rgba(124,168,224,0.1);
+  border: 1px solid rgba(124,168,224,0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-transform: none;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+/* The unconditional `display: inline-block` above has the same specificity
+   as the UA stylesheet's `[hidden] { display: none }`, so without this it
+   wins the cascade by source order and the tag renders as an empty pill
+   even while genuinely hidden. */
+.lastknown-tag[hidden] {
+  display: none;
+}
 
 /* Read-only-scope banner: deliberately the loudest thing on the page. */
 .scope-banner {

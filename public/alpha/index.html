@@ -34,6 +34,10 @@
     <strong>This device is offline.</strong> <span id="offlineBannerDetail">Showing the last snapshot it saw; that may not reflect Alpha's current state.</span>
   </div>
 
+  <div class="lastknown-banner" id="lastKnownBanner" role="status" aria-atomic="true" hidden>
+    <strong>Disconnected, showing last known state.</strong> <span id="lastKnownBannerDetail"></span>
+  </div>
+
   <div class="scope-banner">
     <strong>Read-only, on purpose.</strong> Alpha is a real, live, money-trading daemon running on a separate
     machine. This page can only ever display its status, never start, stop, configure, or otherwise influence it.
@@ -68,6 +72,12 @@
       <p><strong>Run <code>node public/alpha/data/validate.js</code> after editing the static fallback file.</strong>
         It rejects a <code>live</code> value set without <code>live.asOf</code>, and rejects any key that looks like
         real P&amp;L, balance, win rate, or trade-count data, since that file has no legitimate way to know one.</p>
+      <p>This browser tab also remembers the last real, connected reading of the slow-changing fields (kill switch,
+        regime, drawdown, debate panel, genealogy) in its own <code>localStorage</code>, purely client-side. If the
+        daemon drops momentarily, those sections keep showing that last real reading with an explicit "last known,
+        aged" label instead of blanking to "awaiting connection". Account and positions never do this: they revert
+        to "awaiting connection" immediately, since a frozen dollar figure is misleading in a way an old kill-switch
+        reading is not.</p>
       <table class="schema-table">
         <tbody>
           <tr><th>system.*</th><td>Static architectural facts (agent count, feature list). Real, does not change with market conditions, safe to hand-edit only when the architecture itself changes.</td></tr>
@@ -108,12 +118,12 @@
   </section>
 
   <section>
-    <h2 class="section-title">Summary</h2>
+    <h2 class="section-title">Summary <span class="lastknown-tag" id="summaryLastKnownTag" hidden></span></h2>
     <div class="stat-row" id="statRow"></div>
   </section>
 
   <section>
-    <h2 class="section-title">Position sizing</h2>
+    <h2 class="section-title">Position sizing <span class="lastknown-tag" id="psLastKnownTag" hidden></span></h2>
     <div class="ps-panel" id="positionSizingPanel"></div>
   </section>
 
@@ -133,7 +143,7 @@
   </section>
 
   <section>
-    <h2 class="section-title">Genealogy wall</h2>
+    <h2 class="section-title">Genealogy wall <span class="lastknown-tag" id="genealogyLastKnownTag" hidden></span></h2>
     <div class="empty-panel" id="genealogyPanel">
       <div class="empty-panel-title font-mono">AWAITING LIVE CONNECTION</div>
       <div class="empty-panel-sub">
