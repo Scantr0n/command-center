@@ -45,9 +45,11 @@
     <p class="import-help">The first row must be a header row. Column names don't need to match the schema exactly,
       the next step lets you map each one, and any column you don't map is ignored.</p>
     <div class="import-input-row">
+      <label class="sr-only" for="csvFile">Choose CSV file</label>
       <input type="file" id="csvFile" accept=".csv,text/csv" class="import-file-input font-mono">
       <button type="button" id="downloadTemplateBtn" class="print-btn font-mono">Download blank template CSV</button>
     </div>
+    <label class="sr-only" for="csvPaste">Paste CSV text</label>
     <textarea id="csvPaste" class="import-textarea font-mono" rows="6" placeholder="Or paste CSV text here, e.g.&#10;Card,Year,Sport,Grader,Grade,Cert #,Value,Basis,Comp note,Source,Date priced,Batch,Notes&#10;2021 Topps Chrome Julio Rodriguez RC,2021,baseball,PSA,10,12345678,450,recent-sale,,eBay sold Aug 2026 3 comps,2026-08-08,2026-08-08-full-backlog,"></textarea>
     <button type="button" id="parseBtn" class="print-btn font-mono import-primary-btn">Parse CSV</button>
     <p class="import-error" id="parseError" hidden role="alert"></p>

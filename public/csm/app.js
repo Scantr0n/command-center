@@ -1434,7 +1434,9 @@
   function stageMoveGeneratorHtml() {
     return '<div class="inline-gen">' +
       '<div class="inline-gen-row">' +
+      '<label class="sr-only" for="modalMoveStage">Target stage</label>' +
       '<select id="modalMoveStage" class="np-input inline-gen-select"></select>' +
+      '<label class="sr-only" for="modalMoveDate">Date of stage move</label>' +
       '<input type="date" id="modalMoveDate" class="np-input inline-gen-date">' +
       '<button type="button" id="modalMoveGenerate" class="print-btn font-mono">+ Log stage move</button>' +
       '</div>' +
@@ -1451,7 +1453,9 @@
   function ideaGeneratorHtml() {
     return '<div class="inline-gen">' +
       '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<label class="sr-only" for="modalIdeaDate">Date idea logged</label>' +
       '<input type="date" id="modalIdeaDate" class="np-input inline-gen-date">' +
+      '<label class="sr-only" for="modalIdeaText">Content idea</label>' +
       '<input type="text" id="modalIdeaText" class="np-input" placeholder="Content idea, logged today">' +
       '<button type="button" id="modalIdeaGenerate" class="print-btn font-mono">+ Log idea</button>' +
       '</div>' +
@@ -1468,14 +1472,17 @@
   function outreachLogGeneratorHtml() {
     return '<div class="inline-gen">' +
       '<div class="inline-gen-row">' +
+      '<label class="sr-only" for="modalTouchType">Touch type</label>' +
       '<select id="modalTouchType" class="np-input inline-gen-select">' +
       '<option value="initial-send">Initial send</option>' +
       '<option value="nudge">Nudge</option>' +
       '</select>' +
+      '<label class="sr-only" for="modalTouchDate">Date of touch</label>' +
       '<input type="date" id="modalTouchDate" class="np-input inline-gen-date">' +
       '<button type="button" id="modalTouchGenerate" class="print-btn font-mono">+ Log touch</button>' +
       '</div>' +
       '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<label class="sr-only" for="modalTouchNote">Note, optional</label>' +
       '<input type="text" id="modalTouchNote" class="np-input" placeholder="Note, optional (e.g. which channel, what was said)">' +
       '</div>' +
       '<div id="modalTouchResult" class="inline-gen-result" hidden>' +
