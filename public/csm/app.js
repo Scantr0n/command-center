@@ -1413,6 +1413,66 @@
   ];
   let npLastFocusedEl = null;
 
+  // The new-prospect form has 18 real fields (verified hook, reply status,
+  // notes...) and no backend to save to, so an accidental Escape, overlay
+  // click, or tab reload otherwise throws all of it away with no way back.
+  // Autosaving to localStorage (this browser only, never sent anywhere) is
+  // real client-side reliability, not a live backend and not a guessed value,
+  // so it does not conflict with this page's no-fake-data rule.
+  const NP_DRAFT_KEY = 'csm-np-draft-v1';
+  const npDraftBanner = document.getElementById('npDraftBanner');
+  const npDraftBannerTime = document.getElementById('npDraftBannerTime');
+  const npDiscardDraftBtn = document.getElementById('npDiscardDraftBtn');
+  let npDraftSaveTimer = null;
+
+  function npReadFormValues() {
+    const values = { npStage: npStageSelect.value };
+    NP_FIELD_IDS.forEach(id => { values[id] = document.getElementById(id).value; });
+    return values;
+  }
+
+  function npWriteFormValues(values) {
+    if (values.npStage) npStageSelect.value = values.npStage;
+    NP_FIELD_IDS.forEach(id => {
+      if (id in values) document.getElementById(id).value = values[id];
+    });
+  }
+
+  function npHasAnyValue(values) {
+    return NP_FIELD_IDS.some(id => (values[id] || '').trim() !== '');
+  }
+
+  function npSaveDraft() {
+    try {
+      const values = npReadFormValues();
+      if (!npHasAnyValue(values)) { npClearDraft(); return; }
+      localStorage.setItem(NP_DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), values }));
+    } catch (e) { /* localStorage unavailable (private window, blocked storage): draft protection just no-ops */ }
+  }
+
+  function npLoadDraft() {
+    try {
+      const raw = localStorage.getItem(NP_DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function npClearDraft() {
+    try { localStorage.removeItem(NP_DRAFT_KEY); } catch (e) { /* see npSaveDraft */ }
+    npDraftBanner.hidden = true;
+  }
+
+  document.querySelector('.np-form').addEventListener('input', () => {
+    clearTimeout(npDraftSaveTimer);
+    npDraftSaveTimer = setTimeout(npSaveDraft, 400);
+  });
+
+  npDiscardDraftBtn.addEventListener('click', () => {
+    npClearDraft();
+    npResetForm();
+    document.getElementById('npName').focus();
+  });
+
   function npSlugify(name, company) {
     const base = [company, name].filter(Boolean).join('-');
     return base.toLowerCase()
@@ -1538,6 +1598,14 @@
     npPopulateStageOptions();
     npPopulateCategoryList();
     npResetForm();
+    const draft = npLoadDraft();
+    if (draft && npHasAnyValue(draft.values || {})) {
+      npWriteFormValues(draft.values);
+      npDraftBannerTime.textContent = new Date(draft.savedAt).toLocaleString();
+      npDraftBanner.hidden = false;
+    } else {
+      npDraftBanner.hidden = true;
+    }
     npOverlay.hidden = false;
     lockBodyScroll();
     document.getElementById('npName').focus();
@@ -1589,7 +1657,7 @@
   npCopyBtn.addEventListener('click', () => {
     const original = npCopyBtn.textContent;
     copyText(npOutputEl.textContent)
-      .then(() => { npCopyBtn.textContent = 'Copied'; })
+      .then(() => { npCopyBtn.textContent = 'Copied'; npClearDraft(); })
       .catch(() => { npCopyBtn.textContent = "Couldn't copy"; })
       .finally(() => { setTimeout(() => { npCopyBtn.textContent = original; }, 1800); });
   });

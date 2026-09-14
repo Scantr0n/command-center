@@ -218,6 +218,12 @@
     <p class="np-disclaimer">This generates JSON text only, right here in your browser. It does not save,
       submit, or contact anyone. Copy the result into <code>public/csm/data/prospects.json</code> by hand.</p>
 
+    <div id="npDraftBanner" class="np-draft-banner" hidden>
+      <span>Restored an unsaved draft from <span id="npDraftBannerTime"></span>, this form is autosaved to this
+        browser only (never sent anywhere) so an accidental close doesn't lose real research.</span>
+      <button type="button" id="npDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+    </div>
+
     <div class="np-form">
       <div class="form-row">
         <label for="npName">Name *</label>

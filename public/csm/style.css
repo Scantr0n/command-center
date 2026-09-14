@@ -798,6 +798,22 @@ header.page-head .sub {
   color: var(--ink);
 }
 
+.np-draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--sub);
+  line-height: 1.5;
+  background: rgba(94,200,216,0.08);
+  border: 1px solid rgba(94,200,216,0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+.np-draft-banner span { flex: 1 1 260px; }
+
 .np-form {
   display: flex;
   flex-direction: column;
