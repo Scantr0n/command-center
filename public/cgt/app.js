@@ -93,6 +93,27 @@ function isExample(c) {
   return c.id === 'example-row-not-real';
 }
 
+// priceHistory holds prior researched prices for a card, oldest first, logged
+// when a re-check changes the number instead of silently overwriting it. This
+// reads the most recent prior entry (regardless of what order it was actually
+// written in the JSON) so a hand-edited file that didn't bother sorting the
+// array still compares against the right one.
+function lastPriceHistoryEntry(c) {
+  if (!c.priceHistory || !c.priceHistory.length) return null;
+  return c.priceHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).pop();
+}
+
+// Same "only compute when both real numbers exist" rule as computeGainLoss:
+// a card with no priceHistory yet (priced exactly once) has no trend to show,
+// not a 0% change.
+function computeValueTrend(c) {
+  const prev = lastPriceHistoryEntry(c);
+  if (!prev || c.estimatedValue == null) return null;
+  const abs = c.estimatedValue - prev.value;
+  const pct = prev.value > 0 ? (abs / prev.value) * 100 : null;
+  return { abs, pct, prevValue: prev.value, prevDate: prev.date };
+}
+
 function isExampleSubmission(s) {
   return s.id === 'example-submission-not-real';
 }
@@ -277,6 +298,15 @@ function renderStats() {
   const submissionsWithCost = realSubmissions.filter(s => s.cost != null);
   const totalGradingFees = submissionsWithCost.reduce((s, x) => s + x.cost, 0);
 
+  // Only counts cards that have actually been re-priced (a priceHistory entry
+  // to compare the current number against), the same real-data-only rule as
+  // every other tile: a card priced exactly once has no trend yet, it isn't
+  // counted as "flat".
+  const trended = real.map(c => ({ c, trend: computeValueTrend(c) })).filter(x => x.trend);
+  const trendingUp = trended.filter(x => x.trend.abs > 0).length;
+  const trendingDown = trended.filter(x => x.trend.abs < 0).length;
+  const trendingFlat = trended.length - trendingUp - trendingDown;
+
   const tiles = [
     { value: real.length, label: 'Cards logged', sub: cards.length !== real.length ? '+ 1 example row' : null },
     { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
@@ -308,6 +338,14 @@ function renderStats() {
       cls: withCostBasis.length ? (netGainLoss >= 0 ? 'positive' : 'negative') : null
     },
     { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
+    {
+      value: trended.length ? (trendingUp + ' up / ' + trendingDown + ' down') : 'n/a',
+      label: 'Price trend since last check',
+      sub: trended.length
+        ? (trendingFlat ? trendingFlat + ' unchanged' : null)
+        : 'no cards re-priced yet',
+      cls: trended.length ? (trendingUp > trendingDown ? 'positive' : (trendingDown > trendingUp ? 'negative' : null)) : null
+    },
     { value: bySportBreakdown || 'n/a', label: 'Cards by sport', sub: null }
   ];
 
@@ -724,6 +762,20 @@ function renderInsuranceSummary() {
   `;
 }
 
+// Compact up/down/flat indicator next to a card's value in the table, so a
+// re-priced card's direction is visible at a glance without opening the
+// modal, the same "at a glance" convention collectibles trackers like Card
+// Ladder use for portfolio value movement. Hidden entirely (not just muted)
+// when there is nothing real to compare against.
+function valueTrendBadge(c) {
+  const trend = computeValueTrend(c);
+  if (!trend) return '';
+  const pctText = trend.pct != null ? ' (' + (trend.pct >= 0 ? '+' : '') + trend.pct.toFixed(0) + '%)' : '';
+  if (trend.abs > 0) return ` <span class="value-trend up" title="Up from ${escapeHtml(formatUsd(trend.prevValue))} on ${escapeHtml(trend.prevDate)}">&#9650;${escapeHtml(pctText)}</span>`;
+  if (trend.abs < 0) return ` <span class="value-trend down" title="Down from ${escapeHtml(formatUsd(trend.prevValue))} on ${escapeHtml(trend.prevDate)}">&#9660;${escapeHtml(pctText)}</span>`;
+  return ` <span class="value-trend flat" title="Unchanged from ${escapeHtml(trend.prevDate)}">&#8213;</span>`;
+}
+
 function basisBadge(c) {
   if (c.estimatedValue == null) return '<span class="cell-value empty">not priced</span>';
   if (c.valuationBasis === 'recent-sale') return '<span class="badge badge-sale">recent sale</span>';
@@ -914,7 +966,7 @@ function applyFiltersAndRender() {
       <td class="cell-muted">${c.sport ? `<span class="badge badge-sport">${escapeHtml(c.sport)}</span>` : '<span class="cell-value empty">unknown</span>'}</td>
       <td class="cell-muted">${c.gradingCompany ? escapeHtml(c.gradingCompany) : '<span class="cell-value empty">unknown</span>'}</td>
       <td class="cell-muted">${c.grade != null ? escapeHtml(String(c.grade)) : '<span class="cell-value empty">unknown</span>'}</td>
-      <td class="cell-value${c.estimatedValue == null ? ' empty' : ''}">${c.estimatedValue != null ? formatUsd(c.estimatedValue) : 'not priced'}</td>
+      <td class="cell-value${c.estimatedValue == null ? ' empty' : ''}">${c.estimatedValue != null ? formatUsd(c.estimatedValue) : 'not priced'}${valueTrendBadge(c)}</td>
       <td>${basisBadge(c)}</td>
       <td class="cell-muted">${c.datePriced ? escapeHtml(c.datePriced) : '<span class="cell-value empty">n/a</span>'}${isStale(c) ? ' <span class="badge badge-stale" title="Priced more than 180 days ago, worth a re-check">stale</span>' : ''}</td>
     </tr>
@@ -959,6 +1011,40 @@ function field(label, value, isEmpty) {
   `;
 }
 
+// Renders the "how this card's price has moved" list in the detail modal:
+// every prior priceHistory entry oldest first, then the current price with
+// the change from the immediately preceding one. Returns the "not logged"
+// empty state (same look as every other field row) rather than skipping the
+// row entirely, so a card with only one price on record still shows why
+// there's nothing to plot yet instead of the row just silently disappearing.
+function renderPriceHistoryField(c) {
+  const history = (c.priceHistory || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (!history.length) {
+    return field('Price history', null, true);
+  }
+  const rows = history.map(h => `
+    <div class="price-history-row">
+      <span class="ph-date font-mono">${escapeHtml(h.date)}</span>
+      <span>${escapeHtml(formatUsd(h.value))}</span>
+      <span class="ph-basis">${h.basis === 'recent-sale' ? 'recent sale' : h.basis === 'comp-estimate' ? 'comp estimate' : 'unlabeled'}</span>
+    </div>
+  `).join('');
+  const trend = computeValueTrend(c);
+  const currentRow = c.estimatedValue != null ? `
+    <div class="price-history-row price-history-current">
+      <span class="ph-date font-mono">${escapeHtml(c.datePriced || 'current')}</span>
+      <span>${escapeHtml(formatUsd(c.estimatedValue))}</span>
+      <span>${trend ? valueTrendBadge(c) : ''}</span>
+    </div>
+  ` : '';
+  return `
+    <div class="field-row">
+      <div class="field-label">Price history</div>
+      <div class="price-history-list">${rows}${currentRow}</div>
+    </div>
+  `;
+}
+
 // Locks background scroll behind the modal overlay. Reserves the width the
 // scrollbar was taking up as body padding first, so hiding it doesn't shift
 // the layout sideways by a few pixels while the modal is open.
@@ -997,6 +1083,7 @@ function openModal(id) {
   }
   body += field('Estimated value', activeCard.estimatedValue != null ? formatUsd(activeCard.estimatedValue) : null, activeCard.estimatedValue == null);
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
+  body += renderPriceHistoryField(activeCard);
   body += field('Cost basis (what was paid)', activeCard.costBasis != null ? formatUsd(activeCard.costBasis) : null, activeCard.costBasis == null);
   const gl = computeGainLoss(activeCard);
   if (gl) {
@@ -1197,6 +1284,8 @@ const CSV_COLUMNS = [
   [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'], [c => c.gradingCompany, 'Grading company'],
   [c => c.grade, 'Grade'], [c => c.certNumber, 'Cert number'], [c => c.storageLocation, 'Storage location'],
   [c => c.estimatedValue, 'Estimated value'],
+  [c => computeValueTrend(c)?.prevValue ?? null, 'Previous value'],
+  [c => computeValueTrend(c)?.abs ?? null, 'Change since last check'],
   [c => c.valuationBasis, 'Valuation basis'], [c => c.compNote, 'Comp note'], [c => c.sourceNote, 'Source'],
   [c => c.costBasis, 'Cost basis'], [c => computeGainLoss(c)?.abs ?? null, 'Gain/loss'],
   [c => c.datePriced, 'Date priced'], [c => c.backlogBatch, 'Backlog batch'], [c => c.notes, 'Notes']

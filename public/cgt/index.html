@@ -54,6 +54,14 @@
       <p>A priced card gets a <code>stale</code> badge once its <code>datePriced</code> is more than 180 days old.
         That is not an error, card market prices just drift over months, and it is a nudge to re-check the price
         next time you are in this hub, not something to fix immediately.</p>
+      <p><strong>When you re-check a price on a card that already has one on record, don't just overwrite
+        <code>estimatedValue</code>.</strong> First push the card's current <code>estimatedValue</code>,
+        <code>datePriced</code>, and <code>valuationBasis</code> into a new entry at the end of its
+        <code>priceHistory</code> array, then set the new researched numbers as the current fields. This is the
+        same "never silently lose a real number" rule as everything else here, applied to re-pricing: it's what
+        lets the card's detail view show how its price has actually moved instead of only ever showing the latest
+        number with no memory of what it changed from. A card that has only ever been priced once has no history
+        yet, that's normal, leave <code>priceHistory</code> off entirely or as an empty array.</p>
       <p>If <code>gradingCompany</code> is <code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>,
         or <code>KSA</code>, the card's detail view links out to that company's real cert-verification tool
         (PSA and BGS link straight to the cert when <code>certNumber</code> is filled in, the others open the
@@ -75,6 +83,7 @@
           <tr><th>costBasis</th><td>USD number, what was actually paid for the card. Optional and independent of <code>estimatedValue</code>: log it when known, leave <code>null</code> when not. Powers the "Unrealized gain / loss" summary tile and the detail view, only computed for cards where both this and <code>estimatedValue</code> are on record.</td></tr>
           <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
           <tr><th>backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
+          <tr><th>priceHistory</th><td>Optional array of <code>{ "value": number, "date": "YYYY-MM-DD", "basis": "recent-sale" | "comp-estimate" }</code> objects, one per prior real price this card has had, each dated before the current <code>datePriced</code>. Leave off or empty until the card has actually been re-priced once; see the note above on how to fill it in when that happens. Powers the up/down indicator next to the value in the table, the price-history list in the detail view, and the "Price trend since last check" summary tile.</td></tr>
         </tbody>
       </table>
       <pre class="schema-example font-mono">{
@@ -93,6 +102,7 @@
   "costBasis": null,
   "datePriced": null,
   "backlogBatch": null,
+  "priceHistory": [],
   "notes": null
 }</pre>
     </div>

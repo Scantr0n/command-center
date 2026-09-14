@@ -482,6 +482,28 @@ table.card-table {
 .badge-status-shipped { background: rgba(90,160,255,0.1); color: #5AA0FF; border-color: rgba(90,160,255,0.3); }
 .badge-status-returned { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
 
+/* Compact up/down/flat marker next to a card's value once it has been
+   re-priced at least once (see priceHistory in app.js). Same green/red as
+   the Unrealized gain/loss stat tile so "up" and "down" read consistently
+   everywhere on the page, not just in one spot. */
+.value-trend { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; white-space: nowrap; }
+.value-trend.up { color: #3DDC84; }
+.value-trend.down { color: #E0503C; }
+.value-trend.flat { color: var(--dim); }
+
+.price-history-list { display: flex; flex-direction: column; gap: 2px; }
+.price-history-row {
+  display: grid;
+  grid-template-columns: 84px 1fr 1fr;
+  gap: 8px;
+  font-size: 0.8rem;
+  padding: 2px 0;
+  color: var(--sub);
+}
+.price-history-row .ph-date { color: var(--dim); }
+.price-history-row .ph-basis { color: var(--dim); font-size: 0.72rem; }
+.price-history-row.price-history-current { color: var(--ink); border-top: 1px dashed var(--hairline); margin-top: 2px; padding-top: 6px; }
+
 /* Reuses the pricing-activity feed's list/row shape for the "out for
    grading" list, same rationale: one chronological feed reads better than
    scanning a table for a field. */

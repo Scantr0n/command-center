@@ -109,6 +109,38 @@
         errors.push(where + ': "datePriced" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.datePriced));
       }
 
+      // priceHistory holds prior researched prices for this card, so a
+      // re-check overwrites estimatedValue/datePriced/valuationBasis but the
+      // old numbers are moved here first rather than lost. Optional: a card
+      // that has only ever been priced once has no history yet, and that's
+      // not an error.
+      if (c.priceHistory !== null && c.priceHistory !== undefined) {
+        if (!Array.isArray(c.priceHistory)) {
+          errors.push(where + ': "priceHistory" must be an array or null');
+        } else {
+          c.priceHistory.forEach((h, hIdx) => {
+            const hWhere = where + '.priceHistory[' + hIdx + ']';
+            if (typeof h.value !== 'number' || Number.isNaN(h.value) || h.value < 0) {
+              errors.push(hWhere + ': "value" must be a non-negative number');
+            }
+            if (!DATE_RE.test(h.date || '')) {
+              errors.push(hWhere + ': "date" is not a YYYY-MM-DD date: ' + JSON.stringify(h.date));
+            } else if (c.datePriced && h.date >= c.datePriced) {
+              errors.push(hWhere + ': dated ' + h.date + ', which is not before the card\'s current datePriced (' +
+                c.datePriced + '). priceHistory should only hold prices from before the current one.');
+            }
+            if (h.basis !== undefined && h.basis !== null && !VALUATION_BASES.includes(h.basis)) {
+              errors.push(hWhere + ': basis "' + h.basis + '" is not "recent-sale" or "comp-estimate"');
+            }
+          });
+          if (c.priceHistory.length && c.estimatedValue == null) {
+            warnings.push(where + ': has "priceHistory" logged but no current "estimatedValue". Probably means ' +
+              'the card was re-checked and found unsellable/unpriceable, worth a note explaining why rather than ' +
+              'just leaving the current price blank.');
+          }
+        }
+      }
+
       // The batch filter chip list (public/cgt/app.js, renderBatchFilter) sorts
       // batches by a plain string sort on the label, newest first. That only
       // produces newest-first order when every label leads with an ISO date, so

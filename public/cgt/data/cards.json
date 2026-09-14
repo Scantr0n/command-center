@@ -16,7 +16,10 @@
       "costBasis": 18,
       "datePriced": "2026-08-08",
       "backlogBatch": "2026-08-08-full-backlog",
-      "notes": "Delete this row once real inventory data is wired in from the tracker file."
+      "priceHistory": [
+        { "value": 18, "date": "2026-03-01", "basis": "comp-estimate" }
+      ],
+      "notes": "Delete this row once real inventory data is wired in from the tracker file. priceHistory here exists only to verify the price-trend indicator and modal history list render correctly."
     }
   ]
 }
