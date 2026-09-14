@@ -5,6 +5,7 @@
   const goalsSection = document.getElementById('goalsSection');
   const channelsSection = document.getElementById('channelsSection');
   const leadsSection = document.getElementById('leadsSection');
+  const snapshotStrip = document.getElementById('snapshotStrip');
   const nextStepsList = document.getElementById('nextStepsList');
   const csvBtn = document.getElementById('csvBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
@@ -103,6 +104,66 @@
         undated.map(itemHtml).join('') + '</ul>';
     }
     timelineSection.innerHTML = html;
+  }
+
+  // A glanceable top-of-page strip of the real headline numbers already
+  // computed elsewhere on the page (latest download count, leads logged,
+  // days since the last release), so a visitor gets the current state in
+  // one look instead of scrolling every section to piece it together.
+  // Downloads and leads come from unrelated channels (GitHub releases vs.
+  // a Reddit comment) with no confirmed link between them, they are shown
+  // as independent facts side by side, never as a funnel one feeds into
+  // the next.
+  function renderSnapshot(releasesData, downloadsData, leadsData) {
+    const chips = [];
+
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length > 0) {
+      const latest = checks[checks.length - 1];
+      chips.push({
+        number: String(latest.count),
+        label: metric.label || 'downloads',
+        meta: latest.date ? 'as of ' + fmtDate(latest.date) : 'no date logged'
+      });
+    } else {
+      chips.push({ number: '0', label: metric.label || 'downloads', meta: 'no checks logged yet' });
+    }
+
+    const leads = (leadsData && leadsData.leads) || [];
+    const pendingApproval = leads.filter(l => {
+      const o = l.outreach || {};
+      return !o.sent && o.approvalStatus === 'awaiting-approval';
+    }).length;
+    chips.push({
+      number: String(leads.length),
+      label: leads.length === 1 ? 'lead in the queue' : 'leads in the queue',
+      meta: pendingApproval > 0
+        ? pendingApproval + (pendingApproval === 1 ? ' draft awaiting approval' : ' drafts awaiting approval')
+        : (leads.length > 0 ? 'no outreach pending' : 'none logged yet')
+    });
+
+    const dated = ((releasesData && releasesData.releases) || []).filter(r => r.date)
+      .slice().sort((a, b) => b.date.localeCompare(a.date));
+    if (dated.length > 0) {
+      const latestRelease = dated[0];
+      const age = Math.max(0, daysBetween(latestRelease.date, todayIso()));
+      chips.push({
+        number: String(age),
+        label: (age === 1 ? 'day since v' : 'days since v') + latestRelease.version,
+        meta: 'shipped ' + fmtDate(latestRelease.date)
+      });
+    } else {
+      chips.push({ number: '-', label: 'days since last release', meta: 'no ship date logged yet' });
+    }
+
+    snapshotStrip.innerHTML = chips.map(c =>
+      '<div class="snapshot-chip">' +
+      '<div class="snapshot-chip-number font-display">' + escapeHtml(c.number) + '</div>' +
+      '<div class="snapshot-chip-label">' + escapeHtml(c.label) + '</div>' +
+      '<div class="snapshot-chip-meta">' + escapeHtml(c.meta) + '</div>' +
+      '</div>'
+    ).join('');
   }
 
   function renderReleases(data) {
@@ -693,6 +754,12 @@
     } else {
       timelineSection.innerHTML = '<div class="empty-state" role="alert">Failed to load timeline data: ' +
         failures.map(escapeHtml).join('; ') + '</div>';
+    }
+
+    if (releasesData || downloadsData || leadsData) {
+      renderSnapshot(releasesData, downloadsData, leadsData);
+    } else {
+      snapshotStrip.innerHTML = '<div class="empty-state" role="alert">Could not compute the snapshot, data failed to load.</div>';
     }
 
     if (releasesData) {

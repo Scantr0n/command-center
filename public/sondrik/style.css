@@ -124,6 +124,44 @@ header.page-head .sub {
 }
 .callout strong { color: var(--ink); }
 
+/* At-a-glance snapshot strip: the real headline numbers from Traction,
+   Engagement queue, and Latest release, side by side, so a visitor gets the
+   current state in one look instead of having to scroll through every
+   section to piece it together. Independent stats, not a funnel, downloads
+   (GitHub) and leads (Reddit) are separate channels with no confirmed link
+   between them, so they are shown as parallel facts, never as stages one
+   feeds into the next. */
+.snapshot-section { margin-bottom: 32px; }
+.snapshot-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+.snapshot-chip {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: var(--panel);
+}
+.snapshot-chip-number {
+  font-weight: 800;
+  font-size: 1.8rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.snapshot-chip-label {
+  color: var(--sub);
+  font-size: 0.78rem;
+  margin-top: 6px;
+}
+.snapshot-chip-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  color: var(--dim);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
 /* Next steps checklist */
 .next-steps-section { margin-bottom: 32px; }
 .next-steps-list {
@@ -738,12 +776,14 @@ footer.page-foot {
   }
   .callout strong { color: #111; }
 
-  .release-card, .stat-tile, .lead-card, .timeline, .channel-card, .goal-card {
+  .release-card, .stat-tile, .lead-card, .timeline, .channel-card, .goal-card, .snapshot-chip {
     background: none;
     border: 1px solid #ccc;
     break-inside: avoid;
   }
-  .release-summary, .stat-label, .lead-summary, .timeline-title, .channel-name, .goal-label { color: #333; }
+  .release-summary, .stat-label, .lead-summary, .timeline-title, .channel-name, .goal-label, .snapshot-chip-number { color: #111; }
+  .snapshot-chip-label { color: #333; }
+  .snapshot-chip-meta { color: #555; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
   .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .last-updated, .last-updated-stale, .channel-note,
   .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-note { color: #555; }
