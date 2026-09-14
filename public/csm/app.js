@@ -339,7 +339,7 @@
     }).join('');
     activityFeedEl.innerHTML =
       '<div class="activity-list' + (needsToggle ? ' is-collapsed' : '') + '" id="activityList">' + rowsHtml + '</div>' +
-      (needsToggle ? '<button type="button" class="activity-toggle font-mono" id="activityToggle">Show all ' +
+      (needsToggle ? '<button type="button" class="activity-toggle font-mono" id="activityToggle" aria-expanded="false" aria-controls="activityList">Show all ' +
         events.length + '</button>' : '');
     const toggleBtn = document.getElementById('activityToggle');
     const listEl = document.getElementById('activityList');
@@ -347,6 +347,7 @@
       toggleBtn.addEventListener('click', () => {
         const collapsed = listEl.classList.toggle('is-collapsed');
         toggleBtn.textContent = collapsed ? 'Show all ' + events.length : 'Show fewer';
+        toggleBtn.setAttribute('aria-expanded', String(!collapsed));
       });
     }
   }

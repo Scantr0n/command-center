@@ -423,13 +423,14 @@ function renderPricingActivity() {
     </div>
   `).join('');
   el.innerHTML = `<div class="activity-list${needsToggle ? ' is-collapsed' : ''}" id="pricingActivityList">${rowsHtml}</div>` +
-    (needsToggle ? `<button type="button" class="activity-toggle font-mono" id="pricingActivityToggle">Show all ${events.length}</button>` : '');
+    (needsToggle ? `<button type="button" class="activity-toggle font-mono" id="pricingActivityToggle" aria-expanded="false" aria-controls="pricingActivityList">Show all ${events.length}</button>` : '');
   const toggleBtn = document.getElementById('pricingActivityToggle');
   const listEl = document.getElementById('pricingActivityList');
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
       const collapsed = listEl.classList.toggle('is-collapsed');
       toggleBtn.textContent = collapsed ? `Show all ${events.length}` : 'Show fewer';
+      toggleBtn.setAttribute('aria-expanded', String(!collapsed));
     });
   }
 }
