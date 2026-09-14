@@ -268,8 +268,12 @@
       Quick what-if calculator, not tied to any logged listing. Type an asking price to see the estimated net
       payout on each platform before a draft even exists. Uses the same fee formulas as the payout table above,
       toggle a platform off if this item wouldn't go there. Add what the item actually cost to get it (thrifted
-      price, wholesale cost, etc.) to see real estimated profit alongside the fee-only payout, that field is
-      optional and purely a scratch calculation, it doesn't get saved anywhere.
+      price, wholesale cost, etc.) and what it actually costs to ship (postage, box, mailer) to see real
+      estimated profit alongside the fee-only payout. Shipping only matters on a platform where the seller pays
+      for it out of the sale, most resellers offer "free shipping" on eBay and Depop and eat that cost, while
+      Poshmark and Vinted both charge the buyer a separate shipping fee on top of the price, so leave shipping
+      cost out for those if the buyer is really covering it. Both fields are optional and purely a scratch
+      calculation, neither gets saved anywhere.
     </div>
     <div class="calc-row">
       <div class="calc-price-input-wrap">
@@ -298,6 +302,21 @@
             aria-label="What this item cost to acquire, optional">
         </div>
         <p class="calc-cost-error" id="calcCostError" hidden role="alert"></p>
+      </div>
+      <div class="calc-cost-field">
+        <div class="calc-price-input-wrap">
+          <label for="calcShippingInput" class="calc-price-prefix font-mono">shipping $</label>
+          <input
+            type="number"
+            id="calcShippingInput"
+            class="calc-price-input font-mono"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="optional"
+            aria-label="What shipping actually costs to send this item, optional, only if the seller pays it">
+        </div>
+        <p class="calc-cost-error" id="calcShippingError" hidden role="alert"></p>
       </div>
       <div class="filter-row" id="calcPlatformToggle" role="group" aria-label="Platforms to include in calculator" style="margin-bottom:0">
         <button type="button" class="chip" data-platform="ebay" aria-pressed="true">eBay</button>

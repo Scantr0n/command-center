@@ -707,6 +707,8 @@ function renderCalc() {
   const input = document.getElementById('calcPriceInput');
   const costInput = document.getElementById('calcCostInput');
   const costError = document.getElementById('calcCostError');
+  const shippingInput = document.getElementById('calcShippingInput');
+  const shippingError = document.getElementById('calcShippingError');
   const tbody = document.getElementById('calcTableBody');
   const empty = document.getElementById('calcTableEmpty');
   const table = document.getElementById('calcTable');
@@ -714,7 +716,7 @@ function renderCalc() {
   const raw = input.value.trim();
   const price = raw === '' ? null : Number(raw);
   const cost = readOptionalNonNegativeInput(costInput);
-  const hasCost = cost != null && cost !== undefined;
+  const shipping = readOptionalNonNegativeInput(shippingInput);
   // undefined (as opposed to null) means something was typed but it wasn't a
   // valid non-negative number, e.g. a negative cost, which the input's own
   // min="0" doesn't actually block from being typed. Say so instead of
@@ -722,6 +724,15 @@ function renderCalc() {
   const costInvalid = cost === undefined;
   costError.hidden = !costInvalid;
   costError.textContent = costInvalid ? 'Enter a valid cost of $0 or more, ignoring it for now.' : '';
+  const shippingInvalid = shipping === undefined;
+  shippingError.hidden = !shippingInvalid;
+  shippingError.textContent = shippingInvalid ? 'Enter a valid shipping cost of $0 or more, ignoring it for now.' : '';
+  // Profit shows once either cost or shipping is entered, treating the other
+  // as $0 rather than hiding the whole column, since a seller who only knows
+  // one of the two numbers still gets a real (if partial) profit estimate.
+  const hasCost = cost != null && cost !== undefined;
+  const hasShipping = shipping != null && shipping !== undefined;
+  const showProfit = hasCost || hasShipping;
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;
@@ -733,7 +744,7 @@ function renderCalc() {
   }
   table.hidden = false;
   empty.hidden = true;
-  profitHead.hidden = !hasCost;
+  profitHead.hidden = !showProfit;
 
   const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => ({
     p, net: estimateNetPayout(p, price)
@@ -743,13 +754,13 @@ function renderCalc() {
 
   tbody.innerHTML = rows.map(r => {
     const isBest = bestNet != null && !tiedForBest && r.net === bestNet;
-    const profit = hasCost ? r.net - cost : null;
+    const profit = showProfit ? r.net - (hasCost ? cost : 0) - (hasShipping ? shipping : 0) : null;
     return `
     <tr>
       <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
       <td class="cell-muted">${escapeHtml(CALC_FEE_DESCRIPTIONS[r.p])}</td>
       <td class="cell-value${isBest ? ' cell-value-best' : ''}">${formatUsd(r.net)}${isBest ? ' <span class="best-tag" title="Highest net payout at this price">best</span>' : ''}</td>
-      ${hasCost ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)}</td>` : ''}
+      ${showProfit ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)}</td>` : ''}
     </tr>
   `;
   }).join('');
@@ -758,6 +769,7 @@ function renderCalc() {
 function wireCalc() {
   document.getElementById('calcPriceInput').addEventListener('input', renderCalc);
   document.getElementById('calcCostInput').addEventListener('input', renderCalc);
+  document.getElementById('calcShippingInput').addEventListener('input', renderCalc);
   const container = document.getElementById('calcPlatformToggle');
   container.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
