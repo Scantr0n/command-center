@@ -665,6 +665,26 @@
     });
   }
 
+  // Reads the real "Last-Modified" header express.static already sends for
+  // each hand-edited JSON file, so the footer can honestly show when the
+  // data was actually last touched without a separate timestamp field that
+  // could itself go stale or get forgotten on an edit. Same pattern as the
+  // Garage hub's footer.
+  function renderDataFreshness(lastModifiedDates) {
+    const el = document.getElementById('dataFreshness');
+    if (!el) return;
+    const known = lastModifiedDates.filter(d => d && !Number.isNaN(d.getTime()));
+    if (!known.length) {
+      el.textContent = '';
+      return;
+    }
+    const latest = new Date(Math.max(...known.map(d => d.getTime())));
+    const daysAgo = Math.floor((Date.now() - latest.getTime()) / 86400000);
+    const when = daysAgo <= 0 ? 'today' : daysAgo === 1 ? '1 day ago' : daysAgo + ' days ago';
+    el.textContent = ' Last hand-edited ' + when + ' (' + latest.toISOString().slice(0, 10) + ').';
+    el.classList.toggle('data-freshness-stale', daysAgo > 14);
+  }
+
   function renderStats(stages, prospects) {
     const total = prospects.length;
     const parts = ['<span><strong>' + total + '</strong> total</span>'];
@@ -1672,18 +1692,24 @@
   Promise.allSettled([
     fetch('/csm/data/stages.json').then(r => {
       if (!r.ok) throw new Error('stages.json returned ' + r.status);
-      return r.json();
+      const lastModifiedHeader = r.headers.get('last-modified');
+      return r.json().then(data => ({ data, lastModified: lastModifiedHeader ? new Date(lastModifiedHeader) : null }));
     }),
     fetch('/csm/data/prospects.json').then(r => {
       if (!r.ok) throw new Error('prospects.json returned ' + r.status);
-      return r.json();
+      const lastModifiedHeader = r.headers.get('last-modified');
+      return r.json().then(data => ({ data, lastModified: lastModifiedHeader ? new Date(lastModifiedHeader) : null }));
     })
   ]).then(([stagesResult, prospectsResult]) => {
-    const stagesData = stagesResult.status === 'fulfilled' ? stagesResult.value : null;
-    const prospectsData = prospectsResult.status === 'fulfilled' ? prospectsResult.value : null;
+    const stagesData = stagesResult.status === 'fulfilled' ? stagesResult.value.data : null;
+    const prospectsData = prospectsResult.status === 'fulfilled' ? prospectsResult.value.data : null;
     allStages = (stagesData && stagesData.stages) || [];
     allProspects = (prospectsData && prospectsData.prospects) || [];
     byId = Object.fromEntries(allProspects.map(p => [p.id, p]));
+
+    renderDataFreshness([stagesResult, prospectsResult]
+      .filter(r => r.status === 'fulfilled')
+      .map(r => r.value.lastModified));
 
     const failures = [];
     if (stagesResult.status === 'rejected') failures.push('stages.json: ' + stagesResult.reason.message);

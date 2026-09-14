@@ -961,6 +961,7 @@ footer.page-foot {
   border-top: 1px solid var(--hairline);
   padding-top: 16px;
 }
+.data-freshness-stale { color: #E0A030; }
 
 /* Print / export to PDF: a plain, light, single-column handout.
    Interactive-only controls (search, chips, links, the schema editor
