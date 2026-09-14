@@ -430,7 +430,24 @@ async function loadStatus() {
   }
 }
 
-document.getElementById('refreshBtn').addEventListener('click', loadStatus);
+// Status-page UX guidance is consistent that a manual refresh action should
+// show its own loading state, distinct from the data-freshness indicators
+// elsewhere on the page: without it, a click on a same-origin fetch that
+// resolves in a few milliseconds gives no feedback at all that anything
+// happened, and a slower one (or a real future network hop once a live feed
+// exists) looks like the click did nothing.
+const refreshBtn = document.getElementById('refreshBtn');
+const REFRESH_BTN_DEFAULT_TEXT = refreshBtn.textContent;
+refreshBtn.addEventListener('click', async () => {
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = 'Refreshing…';
+  try {
+    await loadStatus();
+  } finally {
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = REFRESH_BTN_DEFAULT_TEXT;
+  }
+});
 
 // This is a glance-at-status page Jack checks without leaving Command
 // Center, so it re-reads status.json on its own rather than requiring a

@@ -72,7 +72,7 @@ header.page-head .sub {
   transition: border-color 0.15s ease, color 0.15s ease;
   height: fit-content;
 }
-.back-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.back-link:hover, .back-link:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
 
 /* Headline status: the single glance-first indicator, above and separate
    from the detailed connection strip further down the page. Research on
@@ -150,6 +150,7 @@ header.page-head .sub {
   list-style: none;
 }
 .schema-help summary::-webkit-details-marker { display: none; }
+.schema-help summary:focus-visible { color: var(--ink); background: rgba(255,255,255,0.03); outline: none; }
 .schema-help summary::before {
   content: '+ ';
   color: var(--dim);
@@ -247,7 +248,9 @@ header.page-head .sub {
   transition: border-color 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
 }
-.refresh-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.refresh-btn:hover, .refresh-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
+.refresh-btn:disabled { opacity: 0.6; cursor: default; }
+.refresh-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
 /* Connectivity history strip: a compact left-to-right (oldest to newest) row
    of per-check ticks, the same bar-strip pattern used by Statuspage,
@@ -554,7 +557,7 @@ header.page-head .sub {
   padding: 0;
   flex-shrink: 0;
 }
-.toast-close:hover { color: var(--ink); }
+.toast-close:hover, .toast-close:focus-visible { color: var(--ink); outline: none; }
 .toast-critical { border-left-color: #E05050; }
 .toast-caution { border-left-color: #E0A030; }
 .toast-good { border-left-color: #3DDC84; }
