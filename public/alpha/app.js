@@ -426,6 +426,11 @@ window.addEventListener('online', () => {
 // most recent before rendering, and drop its result otherwise.
 let latestStatusRequestId = 0;
 
+// Kept purely so the "Copy status" button below can build its plain-text
+// summary from the same real data already on screen, never a second fetch
+// or a separately maintained copy of it.
+let lastStatusData = null;
+
 async function loadStatus() {
   const requestId = ++latestStatusRequestId;
   try {
@@ -436,6 +441,8 @@ async function loadStatus() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
+    lastStatusData = data;
+    document.getElementById('copyStatusBtn').disabled = false;
     lastLoadedAt = new Date().toISOString();
     updateOfflineBanner();
     const headline = computeHeadline(data);
@@ -479,6 +486,62 @@ refreshBtn.addEventListener('click', async () => {
   } finally {
     refreshBtn.disabled = false;
     refreshBtn.textContent = REFRESH_BTN_DEFAULT_TEXT;
+  }
+});
+
+// "Copy status" gives Jack a one-click plain-text snapshot to paste
+// elsewhere (a text, a Slack message) without a screenshot, a common
+// pattern on status pages for sharing current state. Built only from the
+// same fields already rendered on the page, in the same "awaiting
+// connection" wording used everywhere else here, never a fresh guess.
+function buildStatusSummary(data) {
+  const headline = computeHeadline(data);
+  const live = data.live || {};
+  const ps = live.positionSizing || {};
+  const awaiting = 'awaiting connection';
+  const lines = [
+    'Alpha status, ' + formatAbsolute(new Date().toISOString()),
+    '- ' + headline.text + (headline.asOf ? ' (reading taken ' + formatAbsolute(headline.asOf) + ')' : ''),
+    '- Kill switch: ' + (live.killSwitch && live.killSwitch.engaged != null ? (live.killSwitch.engaged ? 'ENGAGED' : 'Clear') : awaiting),
+    '- Regime: ' + (live.regime || awaiting),
+    '- Position sizing mode: ' + (ps.activeMode || awaiting),
+    '- Current drawdown: ' + (typeof ps.currentDrawdownPct === 'number' ? ps.currentDrawdownPct + '%' : awaiting),
+    '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),
+    '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active) ? 'Active' : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
+  ];
+  return lines.join('\n');
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  // Fallback for a non-secure-context/older-browser view of this page,
+  // where the Clipboard API is unavailable.
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+}
+
+const copyStatusBtn = document.getElementById('copyStatusBtn');
+const COPY_STATUS_BTN_DEFAULT_TEXT = copyStatusBtn.textContent;
+copyStatusBtn.addEventListener('click', async () => {
+  if (!lastStatusData) return;
+  try {
+    await copyTextToClipboard(buildStatusSummary(lastStatusData));
+    copyStatusBtn.textContent = 'Copied';
+    showToast('good', 'Status summary copied to clipboard');
+  } catch (e) {
+    copyStatusBtn.textContent = 'Copy failed';
+    showToast('critical', "Couldn't copy status summary: " + e.message);
+  } finally {
+    setTimeout(() => { copyStatusBtn.textContent = COPY_STATUS_BTN_DEFAULT_TEXT; }, 2000);
   }
 });
 
