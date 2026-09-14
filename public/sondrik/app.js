@@ -357,6 +357,27 @@
         }
       }
 
+      // Compares actual progress to how much of the goal's own timeframe has
+      // elapsed (e.g. 40% of the days gone but only 10% of the target hit is
+      // a real behind-pace signal, not just a raw percent-of-target number).
+      // Only rendered once there is a real logged value for the metric
+      // (current, not just currentCount defaulting to 0) so an unlogged
+      // metric never reads as "behind pace" when it might just be untracked.
+      let paceStatusHtml = '';
+      if (current && g.setDate && g.targetDate) {
+        const totalDays = daysBetween(g.setDate, g.targetDate);
+        const elapsedDays = daysBetween(g.setDate, todayIso());
+        if (totalDays > 0 && elapsedDays > 0) {
+          const expectedPct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
+          const diff = pct - expectedPct;
+          const tier = diff <= -10 ? 'behind' : diff >= 10 ? 'ahead' : 'on';
+          const label = tier === 'behind' ? 'BEHIND PACE' : tier === 'ahead' ? 'AHEAD OF PACE' : 'ON PACE';
+          paceStatusHtml = '<div class="goal-pace-status goal-pace-status-' + tier + ' font-mono" ' +
+            'title="Based on ' + elapsedDays + ' of ' + totalDays + ' days elapsed, expected roughly ' + expectedPct + '% by now">' +
+            label + ' (EXPECTED ~' + expectedPct + '%)</div>';
+        }
+      }
+
       const setLabel = g.setDate ? 'Goal set ' + fmtDate(g.setDate) : 'No set date logged';
       const currentNote = current
         ? 'Current: ' + currentCount + (current.asOf ? ' as of ' + fmtDate(current.asOf) : ', no date logged on the latest one')
@@ -376,6 +397,7 @@
         '</div>' +
         '<div class="goal-current font-mono">' + escapeHtml(currentNote) + ', target ' + g.target + '</div>' +
         paceHtml +
+        paceStatusHtml +
         (g.note ? '<div class="goal-note">' + escapeHtml(g.note) + '</div>' : '') +
         '</div>';
     }).join('');
