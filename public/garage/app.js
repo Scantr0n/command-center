@@ -111,6 +111,7 @@ async function loadData() {
     renderDataQuality(listings);
     applyFiltersAndRender();
     renderCoverage(listings);
+    renderTitleFit(listings);
     renderRelist(listings);
     renderPayoutTable(listings);
   } else {
@@ -119,6 +120,7 @@ async function loadData() {
     document.getElementById('dataQualitySection').hidden = true;
     document.getElementById('listingTableBody').innerHTML = '';
     document.getElementById('coverageTableBody').innerHTML = '';
+    document.getElementById('titleFitTableBody').innerHTML = '';
     document.getElementById('relistTableBody').innerHTML = '';
     document.getElementById('payoutTableBody').innerHTML = '';
     errBox.hidden = false;
@@ -374,6 +376,59 @@ function renderDataQuality(listings) {
   list.querySelectorAll('[data-listing-id]').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.listingId));
   });
+}
+
+// Real published title-length caps as of September 2026, sourced from each
+// platform's own seller/help documentation (see the "Title & photo specs"
+// details on the page). eBay and Poshmark share an 80-char hard cap, Vinted
+// is tighter at 70. Depop has no published hard cap, its mobile search UI
+// just visibly truncates around 50 chars, so that's a soft warning tier,
+// not a hard "over" like the other three.
+const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
+const DEPOP_SOFT_LIMIT = 50;
+
+function titleFitCell(platform, title, platforms) {
+  if (!(platforms || []).includes(platform)) {
+    return '<span class="cell-value empty">not listed</span>';
+  }
+  const len = title.length;
+  if (platform === 'depop') {
+    return len > DEPOP_SOFT_LIMIT
+      ? `<span class="badge badge-hold" title="Depop has no hard cap, but mobile search truncates around ${DEPOP_SOFT_LIMIT} characters">${len}, may truncate</span>`
+      : `<span class="cell-muted">${len}, fits before truncation</span>`;
+  }
+  const limit = TITLE_HARD_LIMITS[platform];
+  return len > limit
+    ? `<span class="badge badge-due" title="${escapeHtml(PLATFORM_LABELS[platform] || platform)}'s title cap is ${limit} characters">${len}/${limit}, over</span>`
+    : `<span class="cell-muted">${len}/${limit}</span>`;
+}
+
+function renderTitleFit(listings) {
+  const tbody = document.getElementById('titleFitTableBody');
+  const empty = document.getElementById('titleFitTableEmpty');
+  const rows = listings.filter(l => l.status === 'live');
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No live listings to check title length for yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  tbody.innerHTML = rows.map(l => {
+    const title = l.title || '';
+    return `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(title || 'Untitled item')}</div></td>
+      <td class="cell-value">${title.length}</td>
+      <td>${titleFitCell('ebay', title, l.platforms)}</td>
+      <td>${titleFitCell('vinted', title, l.platforms)}</td>
+      <td>${titleFitCell('poshmark', title, l.platforms)}</td>
+      <td>${titleFitCell('depop', title, l.platforms)}</td>
+    </tr>
+  `;
+  }).join('');
 }
 
 function renderRelist(listings) {

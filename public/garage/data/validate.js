@@ -31,6 +31,11 @@ const PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
 const STATUSES = ['draft', 'ready-to-post', 'live', 'sold'];
 const STAGES = ['draft', 'ready-to-post', 'live', 'sold'];
 const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
+// Real published title-length hard caps as of September 2026 (see the "Title
+// & photo specs" reference on the Garage page itself for sourcing). Depop
+// has no published hard cap, only a soft mobile-truncation point, so it's
+// deliberately left out here rather than treated as a validation error.
+const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
@@ -133,6 +138,16 @@ function main() {
 
     if (!isDateOrNull(l.datePublished)) {
       errors.push(where + ': "datePublished" is not a YYYY-MM-DD date or null: ' + JSON.stringify(l.datePublished));
+    }
+
+    if (l.title && Array.isArray(l.platforms)) {
+      l.platforms.forEach(p => {
+        const limit = TITLE_HARD_LIMITS[p];
+        if (limit && l.title.length > limit) {
+          warnings.push(where + ': title is ' + l.title.length + ' chars, over ' +
+            p + '\'s ' + limit + '-char cap, it will get rejected or truncated there');
+        }
+      });
     }
   });
 

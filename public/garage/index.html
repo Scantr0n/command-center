@@ -156,6 +156,46 @@
   </section>
 
   <section>
+    <h2 class="section-title">Title fit by platform</h2>
+    <div class="callout">
+      Real published title-length caps per platform, sourced from each platform's own seller/help documentation
+      as of September 2026. eBay silently truncates a title past its cap at publish, Vinted and Poshmark reject
+      it outright, this is the same class of silent-failure problem as the eBay return-policy bug logged above,
+      catching it before publish is the point. This reads the real <code>title</code> already logged per item,
+      it isn't a separate field to maintain.
+    </div>
+    <details class="schema-help">
+      <summary>Title &amp; photo specs by platform</summary>
+      <div class="schema-help-body">
+        <table class="schema-table">
+          <tbody>
+            <tr><th>eBay</th><td>Title: 80-character hard cap. Photos: up to 24 free, 500px minimum on the longest side (1600px+ enables zoom), no watermarks/text/borders, must be the actual item (no stock photos on used goods).</td></tr>
+            <tr><th>Vinted</th><td>Title: 70-character hard cap. Photos: square-cropped thumbnail in feed/search, a non-square upload gets center-cropped.</td></tr>
+            <tr><th>Poshmark</th><td>Title: 80-character hard cap. Photos: up to 16, square-cropped cover thumbnail.</td></tr>
+            <tr><th>Depop</th><td>Title: no published hard cap, but mobile search visibly truncates around 50 characters, so front-load brand and item type. Photos: 1280px recommended, square cover crop.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <div class="table-wrap">
+      <table class="card-table" id="titleFitTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Title length</th>
+            <th>eBay</th>
+            <th>Vinted</th>
+            <th>Poshmark</th>
+            <th>Depop</th>
+          </tr>
+        </thead>
+        <tbody id="titleFitTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="titleFitTableEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section>
     <h2 class="section-title">Relist reminders</h2>
     <div class="callout">
       Platform-aware guidance on when to refresh a live listing that hasn't sold. eBay, Vinted, and Depop's
