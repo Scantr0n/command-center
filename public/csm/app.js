@@ -1109,6 +1109,181 @@
     document.body.style.paddingRight = '';
   }
 
+  // Builds one <input>/<textarea> plus its <label>, unwrapped (no outer
+  // .form-row), for use inside a .form-row-split/.form-row-split3 grid pair,
+  // matching the convention already established by the "Log new prospect"
+  // form markup in index.html.
+  function peInputInner(id, label, value, type) {
+    type = type || 'text';
+    const v = value == null ? '' : escapeHtml(String(value));
+    if (type === 'textarea') {
+      return '<div><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+        '<textarea id="' + id + '" class="np-input" rows="2">' + v + '</textarea></div>';
+    }
+    return '<div><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+      '<input type="' + type + '" id="' + id + '" class="np-input" value="' + v + '"' +
+      (type === 'number' ? ' min="0"' : '') + '></div>';
+  }
+
+  function peFieldRow(id, label, value, type) {
+    return '<div class="form-row">' + peInputInner(id, label, value, type) + '</div>';
+  }
+
+  // Editing an existing prospect's own scalar/object fields (category,
+  // verified hook, contact channel, nudge schedule, social snapshot, notes...)
+  // previously had no guided path at all: "Log new prospect" only builds a
+  // brand-new record, and the stage-move/idea/touch generators below only
+  // ever append to a log array, never correct a field that's already there.
+  // That left every one of those fields, once logged, editable only by hand-
+  // editing raw JSON with none of the warnings the rest of this page gives.
+  // This reuses the exact same guided-form -> JSON -> copy/paste convention,
+  // pre-filled with the current values, and outputs the prospect's *entire*
+  // record (id, stage, stageHistory, outreachLog, contentIdeas carried over
+  // untouched) so the result is a straight find-and-replace of one array
+  // entry in prospects.json, not a fragment that has to be merged by hand.
+  // "stage" itself is deliberately left out of this form: a real stage move
+  // needs a dated stageHistory entry, which only the "Log stage move"
+  // generator below produces, so changing stage here would silently skip
+  // the one audit trail this pipeline actually relies on.
+  function prospectEditFormHtml(p) {
+    const snap = p.socialSnapshot || {};
+    const ns = p.nudgeSchedule || {};
+    const cc = p.contactChannel || {};
+    return '<details class="schema-help">' +
+      '<summary>Edit this prospect&rsquo;s details</summary>' +
+      '<div class="schema-help-body">' +
+      '<p>Generates this prospect&rsquo;s full updated record with whatever fields below you change. ' +
+      '<code>id</code>, <code>stage</code>, <code>stageHistory</code>, <code>outreachLog</code>, and ' +
+      '<code>contentIdeas</code> carry over unchanged, use the generators further down to touch those. To move ' +
+      'this prospect to a different stage for real, use &ldquo;Log stage move&rdquo; below instead, not this ' +
+      'form, that is the only place a stage change gets a dated record.</p>' +
+      '<div class="np-form">' +
+      peFieldRow('peName', 'Name', p.name) +
+      peFieldRow('peCompany', 'Company', p.company) +
+      peFieldRow('peCategory', 'Category', p.category) +
+      peFieldRow('peStageEnteredDate', 'Stage entered date (corrects the date only, does not move stage)', p.stageEnteredDate, 'date') +
+      peFieldRow('peVerifiedHook', 'Verified hook', p.verifiedHook, 'textarea') +
+      '<div class="form-row form-row-split">' +
+      '<div><label for="peChannelType">Contact channel type</label>' +
+      '<select id="peChannelType" class="np-input">' +
+      '<option value=""' + (!cc.type ? ' selected' : '') + '>Not logged yet</option>' +
+      '<option value="named-decision-maker"' + (cc.type === 'named-decision-maker' ? ' selected' : '') + '>Named decision-maker</option>' +
+      '<option value="generic-inbox"' + (cc.type === 'generic-inbox' ? ' selected' : '') + '>Generic inbox</option>' +
+      '</select></div>' +
+      peInputInner('peChannelDetail', 'Contact channel detail', cc.detail) +
+      '</div>' +
+      '<div class="form-row form-row-split">' +
+      peInputInner('peSendDate', 'Send date', p.sendDate, 'date') +
+      peInputInner('peNextNudgeDate', 'Next nudge date', p.nextNudgeDate, 'date') +
+      '</div>' +
+      peFieldRow('peNextAction', 'Next action', p.nextAction) +
+      '<div class="form-row form-row-split">' +
+      peInputInner('peDoNotNudgeBefore', 'Do not nudge before', ns.doNotNudgeBefore, 'date') +
+      peInputInner('peNudgePoint', 'Nudge point', ns.nudgePoint, 'date') +
+      '</div>' +
+      peFieldRow('peReplyStatus', 'Reply status', p.replyStatus, 'textarea') +
+      '<div class="form-row form-row-split3">' +
+      peInputInner('peSocialPlatform', 'Social platform', snap.platform) +
+      peInputInner('peSocialFollowers', 'Followers', snap.followers, 'number') +
+      peInputInner('peSocialEngagementRate', 'Engagement %', snap.engagementRate, 'number') +
+      '</div>' +
+      peFieldRow('peSocialAsOfDate', 'Social snapshot as-of date (when the numbers above were actually pulled)', snap.asOfDate, 'date') +
+      peFieldRow('peNotes', 'Notes', p.notes, 'textarea') +
+      '</div>' +
+      '<button type="button" id="peGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
+      '<div id="peResult" class="np-result" hidden>' +
+      '<ul id="peWarnings" class="np-warnings"></ul>' +
+      '<div class="np-output-head">' +
+      '<span class="field-label" style="margin:0">Replace this prospect&rsquo;s whole entry with</span>' +
+      '<button type="button" id="peCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
+      '</div>' +
+      '<pre class="np-output font-mono" id="peOutput"></pre>' +
+      '</div>' +
+      '</div></details>';
+  }
+
+  function peVal(id) {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : v;
+  }
+
+  // Same class of warnings npBuildWarnings raises for a brand-new prospect,
+  // re-run here against the edited values so correcting an existing record
+  // gets the same backfill/consistency checks a new one does.
+  function peBuildWarnings(p, edited) {
+    const warnings = [];
+    if (p.stage !== 'researched' && !(edited.contactChannel && edited.contactChannel.type)) {
+      warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
+        'biggest driver of real reply rate, fill it in as soon as it is known.');
+    }
+    if (p.stage !== 'researched' && !edited.verifiedHook) {
+      warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
+        'is a real fit once known.');
+    }
+    const ns = edited.nudgeSchedule || {};
+    if (ns.doNotNudgeBefore && ns.nudgePoint && ns.doNotNudgeBefore > ns.nudgePoint) {
+      warnings.push('"Do not nudge before" is after "nudge point", swap them.');
+    }
+    if (ns.doNotNudgeBefore && edited.nextNudgeDate && edited.nextNudgeDate < ns.doNotNudgeBefore) {
+      warnings.push('"Next nudge date" is before "do not nudge before", the nudge queue would surface this ' +
+        'prospect too early.');
+    }
+    if (edited.nextNudgeDate && !edited.nextAction) {
+      warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
+        'common way real deals quietly stall.');
+    }
+    const snap = edited.socialSnapshot || {};
+    if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
+      warnings.push('Social numbers are logged without an as-of date. Every social number on this board must be ' +
+        'labeled with when it was actually pulled, never shown as if live.');
+    }
+    if (edited.category) {
+      const norm = edited.category.trim().toLowerCase();
+      const existing = allProspects.filter(x => x.id !== p.id).map(x => x.category).filter(Boolean);
+      const clash = existing.find(c => c.trim().toLowerCase() === norm && c !== edited.category);
+      if (clash) {
+        warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
+          clash + '", they would render as separate filter chips. Pick one spelling.');
+      }
+    }
+    return warnings;
+  }
+
+  function wireProspectEditForm(p) {
+    const generateBtn = document.getElementById('peGenerateBtn');
+    const resultEl = document.getElementById('peResult');
+    const warningsEl = document.getElementById('peWarnings');
+    const outputEl = document.getElementById('peOutput');
+    generateBtn.addEventListener('click', () => {
+      const edited = Object.assign({}, p, {
+        name: peVal('peName') || p.name,
+        company: peVal('peCompany'),
+        category: peVal('peCategory'),
+        stageEnteredDate: peVal('peStageEnteredDate'),
+        verifiedHook: peVal('peVerifiedHook'),
+        contactChannel: { type: peVal('peChannelType'), detail: peVal('peChannelDetail') },
+        sendDate: peVal('peSendDate'),
+        nextNudgeDate: peVal('peNextNudgeDate'),
+        nextAction: peVal('peNextAction'),
+        nudgeSchedule: { doNotNudgeBefore: peVal('peDoNotNudgeBefore'), nudgePoint: peVal('peNudgePoint') },
+        replyStatus: peVal('peReplyStatus'),
+        socialSnapshot: {
+          platform: peVal('peSocialPlatform'),
+          followers: peVal('peSocialFollowers') != null ? Number(peVal('peSocialFollowers')) : null,
+          engagementRate: peVal('peSocialEngagementRate') != null ? Number(peVal('peSocialEngagementRate')) : null,
+          asOfDate: peVal('peSocialAsOfDate')
+        },
+        notes: peVal('peNotes')
+      });
+      const warnings = peBuildWarnings(p, edited);
+      warningsEl.innerHTML = warnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+      outputEl.textContent = JSON.stringify(edited, null, 2) + ',';
+      resultEl.hidden = false;
+      resultEl.scrollIntoView({ block: 'nearest' });
+    });
+    wireCopyButton(document.getElementById('peCopyBtn'), outputEl);
+  }
+
   function openModal(id) {
     const p = byId[id];
     if (!p) return;
@@ -1117,6 +1292,7 @@
     modalCompany.textContent = p.company || 'Company not logged';
 
     const rows = [];
+    rows.push(prospectEditFormHtml(p));
     rows.push(fieldRow('Category', p.category ? escapeHtml(p.category) : 'Not logged yet', !p.category));
     rows.push(fieldRow('Verified hook', p.verifiedHook ? escapeHtml(p.verifiedHook) : 'Not logged yet', !p.verifiedHook));
     rows.push(fieldRow('Contact channel', channelBadge(p.contactChannel) +
@@ -1175,6 +1351,7 @@
 
     modalBody.innerHTML = rows.join('');
     modalOverlay.hidden = false;
+    wireProspectEditForm(p);
     wireStageMoveGenerator(p);
     wireIdeaGenerator(p);
     wireOutreachLogGenerator(p);
