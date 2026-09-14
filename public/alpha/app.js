@@ -199,11 +199,13 @@ const HISTORY_TICK_LIMIT = 60;
 function renderConnectionHistory(data) {
   const strip = document.getElementById('connHistoryStrip');
   const summary = document.getElementById('connUptimeSummary');
+  const range = document.getElementById('connHistoryRange');
   const history = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
 
   if (!history.length) {
     strip.innerHTML = `<span class="conn-history-empty">No connectivity checks recorded yet.</span>`;
     summary.textContent = '';
+    range.textContent = '';
     return;
   }
 
@@ -225,6 +227,17 @@ function renderConnectionHistory(data) {
   const pct = (upCount / recent.length) * 100;
   const pctText = Number.isInteger(pct) ? String(pct) : pct.toFixed(1);
   summary.textContent = `· ${pctText}% up (last ${recent.length} check${recent.length === 1 ? '' : 's'})`;
+
+  // The percentage above is scoped to whatever the tick strip is actually
+  // showing (capped at HISTORY_TICK_LIMIT), which real status pages always
+  // pair with the covered date range, since "92% up" reads very differently
+  // over a week than over the last five checks. Built from the same real
+  // entries the strip and percentage already use, never a separate figure.
+  const oldest = recent[0].at;
+  const newest = recent[recent.length - 1].at;
+  range.textContent = recent.length > 1
+    ? `Covers ${formatAbsolute(oldest)} → ${formatAbsolute(newest)}`
+    : `Single check, at ${formatAbsolute(oldest)}`;
 }
 
 function statTile(value, label, sub, awaiting) {

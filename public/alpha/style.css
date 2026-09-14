@@ -326,6 +326,11 @@ header.page-head .sub {
   color: var(--dim);
   font-style: italic;
 }
+.conn-history-range {
+  font-size: 0.65rem;
+  color: var(--dim);
+  margin-top: 6px;
+}
 
 /* Stat tiles */
 .stat-row {
