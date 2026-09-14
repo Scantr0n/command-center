@@ -250,6 +250,10 @@
         <a id="linkRow" class="hidden mt-3 text-xs font-mono px-3 py-1.5 rounded border hairline items-center gap-1.5 w-fit" style="color: var(--ink)">
           <span id="linkRowLabel"></span><span aria-hidden="true">&rarr;</span>
         </a>
+        <div id="relatedRow" class="hidden mt-3 flex items-center gap-2 flex-wrap">
+          <span class="text-xs font-mono" style="color: var(--sub)">Related:</span>
+          <div id="relatedChips" class="flex items-center gap-2 flex-wrap"></div>
+        </div>
       </div>
       <div id="chatMessages" class="flex-1 overflow-y-auto px-6 py-4 space-y-3 text-sm" role="log" aria-live="polite"></div>
       <div class="px-6 py-4 border-t hairline flex gap-2">
@@ -961,6 +965,28 @@ function openModal(id, opts = {}) {
   } else {
     linkRow.classList.add('hidden');
     linkRow.classList.remove('flex');
+  }
+
+  // relatedTo only ever renders as the graph's dashed connector line, which
+  // is invisible in Grid view (the persisted default for anyone who has ever
+  // switched to it), so a real, validated relationship could otherwise never
+  // surface at all for that user. Surfaces it here too, as clickable chips
+  // that jump straight to the related project's own modal.
+  const relatedRow = document.getElementById('relatedRow');
+  const relatedIds = activeCluster.relatedTo || [];
+  const relatedClusters = relatedIds.map(id => clusters.find(c => c.id === id)).filter(Boolean);
+  if (relatedClusters.length) {
+    document.getElementById('relatedChips').innerHTML = relatedClusters.map(c => `
+      <button type="button" class="tag-chip" data-related-id="${escapeHtml(c.id)}" style="background:${categoryColor(c.category)}1F; color:${categoryColor(c.category)}; cursor: pointer; border: none;">${escapeHtml(c.name)}</button>
+    `).join('');
+    document.querySelectorAll('#relatedChips [data-related-id]').forEach(el => {
+      el.addEventListener('click', () => openModal(el.dataset.relatedId));
+    });
+    relatedRow.classList.remove('hidden');
+    relatedRow.classList.add('flex');
+  } else {
+    relatedRow.classList.add('hidden');
+    relatedRow.classList.remove('flex');
   }
 
   document.getElementById('modalOverlay').classList.remove('hidden');
