@@ -93,6 +93,32 @@
     <div class="pipeline-row" id="pipelineRow"></div>
   </section>
 
+  <section id="paceSection">
+    <h2 class="section-title">Posting pace planner</h2>
+    <div class="callout">
+      Real cross-listing tooling guidance (Vendoo, Crosslist, and others): dumping a whole backlog onto a
+      platform in one day reads as spam to that platform's own search-ranking algorithm and risks a review
+      hold, while posting the same items spread over more days gets better reach per listing. This turns the
+      real <code>ready-to-post</code> count from <code>pipeline.json</code> into a plan, enter how many
+      listings actually get posted per day below. Nothing here is saved anywhere but this browser.
+    </div>
+    <div class="calc-row">
+      <div class="calc-price-input-wrap">
+        <label for="pacePerDayInput" class="calc-price-prefix font-mono">items/day</label>
+        <input
+          type="number"
+          id="pacePerDayInput"
+          class="calc-price-input font-mono"
+          min="1"
+          step="1"
+          inputmode="numeric"
+          placeholder="3"
+          aria-label="Listings posted per day">
+      </div>
+    </div>
+    <div id="paceResult" class="pace-result" aria-live="polite"></div>
+  </section>
+
   <section id="delistSection" hidden>
     <h2 class="section-title">Needs delisting elsewhere</h2>
     <div class="data-quality-list" id="delistList"></div>

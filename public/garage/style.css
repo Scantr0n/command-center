@@ -340,6 +340,18 @@ section { margin-bottom: 36px; }
 .calc-cost-field { display: flex; flex-direction: column; gap: 4px; }
 .calc-cost-error { color: #E56464; font-size: 0.72rem; margin: 0; }
 
+.pace-result-note {
+  font-size: 0.85rem;
+  color: var(--sub);
+  line-height: 1.6;
+  margin: 0;
+}
+.pace-result-figure {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* Table */
 .table-wrap {
   position: relative;
@@ -767,7 +779,7 @@ footer.page-foot {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, #calcSection, #photoAuditSection {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, #calcSection, #photoAuditSection, #paceSection {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }

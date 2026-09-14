@@ -3,6 +3,7 @@ let searchTerm = '';
 let activePlatform = 'all';
 let sortKey = null;
 let sortDir = 'asc';
+let currentStages = [];
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
@@ -158,10 +159,15 @@ async function loadData() {
   }
 
   if (pipelineData) {
+    currentStages = stages;
     renderPipeline(stages);
+    renderPacePlanner(stages);
   } else {
+    currentStages = [];
     document.getElementById('pipelineRow').innerHTML =
       '<div class="table-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(pipelineResult.reason.message) + '</div>';
+    document.getElementById('paceResult').innerHTML =
+      '<p class="pace-result-note" role="alert">Failed to load pipeline data: ' + escapeHtml(pipelineResult.reason.message) + '</p>';
   }
 
   if (activityData) {
@@ -267,6 +273,75 @@ function renderPipeline(stages) {
       <div class="pipeline-stage-note${s.note ? '' : ' empty'}">${s.note ? escapeHtml(s.note) : 'Nothing logged'}</div>
     </div>
   `).join('');
+}
+
+const PACE_STORAGE_KEY = 'garage-pace-per-day';
+
+function loadPaceRate() {
+  try {
+    const raw = localStorage.getItem(PACE_STORAGE_KEY);
+    const n = raw == null ? null : Number(raw);
+    return n && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+function savePaceRate(rate) {
+  try {
+    localStorage.setItem(PACE_STORAGE_KEY, String(rate));
+  } catch {
+    // Storage unavailable, the rate just won't persist across visits.
+  }
+}
+
+// Turns the real "ready-to-post" count from pipeline.json into a projected
+// clear date at a seller-entered daily rate. Plain calendar days, not
+// business days, since posting isn't tied to a work week here. Never
+// invents the backlog count itself, only does arithmetic on the real
+// pipeline stage.
+function renderPacePlanner(stages) {
+  const result = document.getElementById('paceResult');
+  const input = document.getElementById('pacePerDayInput');
+  const stage = stages.find(s => s.stage === 'ready-to-post');
+  const backlog = stage ? stage.count : 0;
+
+  if (!backlog) {
+    result.innerHTML = '<p class="pace-result-note">Nothing in "ready to post" right now, no pace to plan.</p>';
+    return;
+  }
+
+  const raw = input.value.trim();
+  const rate = raw === '' ? null : Number(raw);
+  if (raw === '' || Number.isNaN(rate) || rate <= 0) {
+    result.innerHTML = `<p class="pace-result-note">Enter how many of the real ${backlog} ready-to-post listing(s) actually get posted per day to see a projected clear date.</p>`;
+    return;
+  }
+
+  const days = Math.ceil(backlog / rate);
+  const finish = new Date();
+  finish.setDate(finish.getDate() + days);
+  const finishStr = finish.toISOString().slice(0, 10);
+  const dayWord = days === 1 ? 'day' : 'days';
+
+  result.innerHTML = `
+    <p class="pace-result-note">
+      <span class="pace-result-figure">${days} ${dayWord}</span> to clear the real
+      <span class="pace-result-figure">${backlog}</span>-listing backlog at
+      <span class="pace-result-figure">${rate}</span>/day, done around
+      <span class="pace-result-figure">${finishStr}</span> if today's pace holds.
+    </p>`;
+}
+
+function wirePacePlanner() {
+  const input = document.getElementById('pacePerDayInput');
+  const saved = loadPaceRate();
+  if (saved) input.value = String(saved);
+  input.addEventListener('input', () => {
+    const raw = input.value.trim();
+    const rate = raw === '' ? null : Number(raw);
+    if (rate && rate > 0) savePaceRate(rate);
+    renderPacePlanner(currentStages);
+  });
 }
 
 // Which of the four known platforms an item isn't listed on yet, used for
@@ -1306,5 +1381,6 @@ function renderPhotoAuditResults(results, loaded, total, flagged) {
 
 wireCalc();
 wireChecklist();
+wirePacePlanner();
 initPhotoAudit();
 loadData();
