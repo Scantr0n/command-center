@@ -1240,9 +1240,13 @@
   }
 
   function getFocusable() {
+    // offsetParent is null for anything inside a hidden ancestor, e.g. the
+    // stage-move/idea/outreach generators' result blocks (hidden until a
+    // Copy button appears in them), same check CGT and the main dashboard
+    // already use so Tab-wraparound can't land focus on an invisible button.
     return Array.from(document.getElementById('modal').querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )).filter(el => !el.hasAttribute('disabled'));
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
   }
 
   modalClose.addEventListener('click', closeModal);
@@ -1475,9 +1479,11 @@
     if (npOverlay.hidden) return;
     if (e.key === 'Escape') { npCloseModal(); return; }
     if (e.key === 'Tab') {
+      // Same offsetParent check as getFocusable() above: npResult starts
+      // hidden until the new-prospect JSON is generated.
       const focusable = Array.from(npModalEl().querySelectorAll(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )).filter(el => !el.hasAttribute('disabled'));
+      )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];

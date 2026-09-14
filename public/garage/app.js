@@ -885,9 +885,12 @@ function closeModal() {
 }
 
 function getModalFocusable() {
+  // offsetParent is null for anything inside a hidden ancestor, same check
+  // CGT and the main dashboard already use so Tab-wraparound can't land
+  // focus on an invisible button if a hidden block is ever added in here.
   return Array.from(document.getElementById('modal').querySelectorAll(
     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-  )).filter(el => !el.hasAttribute('disabled'));
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
 }
 
 modalClose.addEventListener('click', closeModal);
