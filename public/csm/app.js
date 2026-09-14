@@ -617,6 +617,19 @@
     statsEl.innerHTML = parts.join('');
   }
 
+  // Days since the most recent real outreach touch (initial send or nudge),
+  // separate from stallInfo's "days in stage": a prospect can sit in the
+  // same stage for a while yet have been touched recently (fresh), or be
+  // fresh into a stage yet have gone quiet on actual contact (neglected).
+  // Surfacing this on the card itself, not only inside the detail modal's
+  // outreach log, makes that distinction visible at a glance on the board.
+  function daysSinceLastTouch(p) {
+    const log = (p.outreachLog || []).filter(e => e && e.date);
+    if (log.length === 0) return null;
+    const lastDate = log.reduce((max, e) => (e.date > max ? e.date : max), log[0].date);
+    return daysSince(lastDate);
+  }
+
   function renderCard(p, stageById) {
     const info = stallInfo(p, stageById);
     const stallBadge = info
@@ -626,10 +639,14 @@
     const categoryBadge = p.category
       ? '<span class="badge badge-category">' + escapeHtml(p.category).toUpperCase() + '</span>'
       : '';
+    const lastTouchDays = daysSinceLastTouch(p);
+    const touchBadge = lastTouchDays != null
+      ? '<span class="badge badge-touch">' + lastTouchDays + 'D SINCE LAST TOUCH</span>'
+      : '';
     return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
-      '<div class="card-meta">' + categoryBadge + channelBadge(p.contactChannel) + stallBadge + '</div>' +
+      '<div class="card-meta">' + categoryBadge + channelBadge(p.contactChannel) + stallBadge + touchBadge + '</div>' +
       '</button>';
   }
 
