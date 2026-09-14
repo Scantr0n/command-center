@@ -176,8 +176,15 @@ function renderStats() {
   const saleValue = saleCards.reduce((s, c) => s + c.estimatedValue, 0);
   const compValue = compCards.reduce((s, c) => s + c.estimatedValue, 0);
   const stale = priced.filter(isStale).length;
-  const bySport = { hockey: 0, baseball: 0, football: 0 };
-  real.forEach(c => { if (bySport[c.sport] != null) bySport[c.sport]++; });
+  // Built from whatever sport values actually appear on real cards, not a
+  // hardcoded hockey/baseball/football list, so a card logged under any other
+  // sport still shows up here instead of being silently uncounted.
+  const bySportCounts = new Map();
+  real.forEach(c => { if (c.sport) bySportCounts.set(c.sport, (bySportCounts.get(c.sport) || 0) + 1); });
+  const bySportBreakdown = [...bySportCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([sport, count]) => sport.charAt(0).toUpperCase() + sport.slice(1) + ' ' + count)
+    .join(' / ');
 
   // Only counts cards where both a real purchase price and a real researched
   // value are on record, same rule as computeGainLoss. A card with only one
@@ -206,7 +213,7 @@ function renderStats() {
       cls: withCostBasis.length ? (netGainLoss >= 0 ? 'positive' : 'negative') : null
     },
     { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
-    { value: bySport.hockey + ' / ' + bySport.baseball + ' / ' + bySport.football, label: 'Hockey / baseball / football', sub: null }
+    { value: bySportBreakdown || 'n/a', label: 'Cards by sport', sub: null }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
