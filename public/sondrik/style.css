@@ -324,6 +324,7 @@ section { margin-bottom: 36px; }
   letter-spacing: 0.02em;
 }
 .freshness-fresh { color: var(--dim); }
+.freshness-aging { color: var(--accent); }
 .freshness-stale {
   color: #E0A030;
   font-weight: 500;

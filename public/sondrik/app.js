@@ -13,6 +13,17 @@
   const attentionPill = document.getElementById('attentionPill');
   const lastUpdatedSub = document.getElementById('lastUpdatedSub');
 
+  // Shared read of "how old is a real logged date" used by the traction
+  // freshness badge, the header's last-updated line, and the next-steps
+  // checklist, so all three agree on the same thresholds instead of each
+  // hardcoding its own copy that could drift out of sync if ever retuned.
+  // AGING gives a heads-up a few days before STALE actually blocks anything:
+  // the two real checks logged so far were 3 days apart, so a reader gets a
+  // quiet nudge partway through that real cadence rather than being told
+  // "STALE" the moment day 8 arrives with no warning.
+  const STALE_AFTER_DAYS = 7;
+  const AGING_AFTER_DAYS = 4;
+
   function escapeHtml(s) {
     const div = document.createElement('div');
     div.textContent = String(s);
@@ -212,12 +223,13 @@
     }
 
     const ageDays = daysBetween(latest.date, todayIso());
-    const STALE_AFTER_DAYS = 7;
     const isStale = ageDays > STALE_AFTER_DAYS;
+    const isAging = !isStale && ageDays > AGING_AFTER_DAYS;
     const ageLabel = ageDays <= 0 ? 'checked today' : ageDays === 1 ? 'checked 1 day ago' : 'checked ' + ageDays + ' days ago';
-    const freshnessHtml = '<div class="freshness-badge ' + (isStale ? 'freshness-stale' : 'freshness-fresh') + ' font-mono">' +
-      (isStale ? 'STALE, ' : '') + ageLabel.toUpperCase() +
-      (isStale ? ', RE-CHECK GITHUB API' : '') +
+    const freshnessTier = isStale ? 'freshness-stale' : isAging ? 'freshness-aging' : 'freshness-fresh';
+    const freshnessHtml = '<div class="freshness-badge ' + freshnessTier + ' font-mono">' +
+      (isStale ? 'STALE, ' : isAging ? 'AGING, ' : '') + ageLabel.toUpperCase() +
+      (isStale ? ', RE-CHECK GITHUB API' : isAging ? ', CHECK AGAIN SOON' : '') +
       '</div>';
 
     // The gap note between two bars should reflect the real span between those
@@ -472,7 +484,6 @@
     }
     const latest = dates.sort().pop();
     const rel = relativeDaysLabel(latest);
-    const STALE_AFTER_DAYS = 7;
     const isStale = daysBetween(latest, todayIso()) > STALE_AFTER_DAYS;
 
     lastUpdatedSub.hidden = false;
@@ -538,7 +549,6 @@
   // "not-tracked" channel), so those show up here on page load instead of
   // only when someone remembers to run the validator from the command line.
   function renderNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData) {
-    const STALE_AFTER_DAYS = 7;
     const steps = [];
 
     const releases = (releasesData && releasesData.releases) || [];
@@ -580,6 +590,12 @@
         steps.push({
           urgent: true,
           text: 'Pull a fresh ' + (metric.label || 'download') + ' count, the last one logged is ' + ageDays + ' days old.',
+          href: '#tractionSection'
+        });
+      } else if (ageDays > AGING_AFTER_DAYS) {
+        steps.push({
+          urgent: false,
+          text: 'The last ' + (metric.label || 'download') + ' count is ' + ageDays + ' days old, plan to pull a fresh one soon before it goes stale.',
           href: '#tractionSection'
         });
       }
