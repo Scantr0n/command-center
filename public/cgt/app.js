@@ -1,4 +1,5 @@
 let cards = [];
+let submissions = [];
 let activeCard = null;
 let lastFocusedEl = null;
 let searchTerm = '';
@@ -92,6 +93,32 @@ function isExample(c) {
   return c.id === 'example-row-not-real';
 }
 
+function isExampleSubmission(s) {
+  return s.id === 'example-submission-not-real';
+}
+
+// Display label and badge class per submissions.json status. "returned"
+// intentionally has no active-list styling need here since returned
+// submissions are excluded from the active list entirely (see
+// buildActiveSubmissions), it's only used if that ever changes.
+const SUBMISSION_STATUS_META = {
+  submitted: { label: 'Submitted', cls: 'badge-status-queue' },
+  'in-queue': { label: 'In queue', cls: 'badge-status-queue' },
+  grading: { label: 'Grading', cls: 'badge-status-grading' },
+  'shipped-back': { label: 'Shipped back', cls: 'badge-status-shipped' },
+  returned: { label: 'Returned', cls: 'badge-status-returned' }
+};
+
+// Only PSA has a confirmed public order-status page that works without
+// logging in (psacard.com/orderstatus, checked directly). BGS, SGC, CGC, and
+// KSA all gate their order-status/submission-tracking tools behind a login,
+// same as the cert-lookup situation in CERT_LOOKUP above, so rather than
+// guess at a link that might not actually show anything useful, those are
+// left out here entirely instead of pointing at a dead end.
+const ORDER_STATUS_LOOKUP = {
+  PSA: { url: 'https://www.psacard.com/orderstatus', text: 'Check status on psacard.com' }
+};
+
 // Card market prices drift over months, not days, so this is a much longer
 // window than the 7-day staleness check used elsewhere in Command Center
 // (e.g. the Sondrik download tracker). It just means "worth a re-check
@@ -161,14 +188,32 @@ function isStale(c) {
   return age != null && age > PRICE_STALE_AFTER_DAYS;
 }
 
+// submissions.json is fetched alongside cards.json rather than treated as
+// optional, since the "Grading submissions" section always renders (even if
+// only to show its own empty state) instead of silently staying blank when
+// the file is missing or briefly unreachable.
+async function loadSubmissions() {
+  try {
+    const res = await fetch('/cgt/data/submissions.json');
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const data = await res.json();
+    submissions = data.submissions || [];
+  } catch (e) {
+    submissions = [];
+    console.error("Couldn't load submissions.json: " + e.message);
+  }
+}
+
 async function loadCards() {
   const errBox = document.getElementById('tableEmpty');
+  await loadSubmissions();
   try {
     const res = await fetch('/cgt/data/cards.json');
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     cards = data.cards || [];
     renderStats();
+    renderSubmissions();
     renderValueBreakdown();
     renderPricingActivity();
     renderDataQuality();
@@ -215,9 +260,24 @@ function renderStats() {
   const netGainLoss = totalCurrentValue - totalCostBasis;
   const netGainLossPct = totalCostBasis > 0 ? (netGainLoss / totalCostBasis) * 100 : null;
 
+  // Only counts cardCount on active (non-returned, non-example) submissions,
+  // same "real data only" rule as every other tile here: a submission with
+  // no cardCount logged contributes 0 to the total but still counts toward
+  // the submission count in the sub-label, rather than being dropped silently.
+  const activeSubmissions = submissions.filter(s => s.status !== 'returned' && !isExampleSubmission(s));
+  const activeExampleSubmission = submissions.some(s => s.status !== 'returned' && isExampleSubmission(s));
+  const cardsOutForGrading = activeSubmissions.reduce((s, x) => s + (x.cardCount || 0), 0);
+
   const tiles = [
     { value: real.length, label: 'Cards logged', sub: cards.length !== real.length ? '+ 1 example row' : null },
     { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
+    {
+      value: activeSubmissions.length ? cardsOutForGrading : 0,
+      label: 'Cards out for grading',
+      sub: activeSubmissions.length
+        ? activeSubmissions.length + ' submission(s) in progress'
+        : 'nothing real submitted yet' + (activeExampleSubmission ? ' (+ 1 example row)' : '')
+    },
     // Splitting the dollar total by basis, not just the card count, makes the
     // "how much of this is a real sale vs. an estimate" question answerable
     // at a glance, which is the whole point of never blending the two silently.
@@ -372,6 +432,60 @@ function renderPricingActivity() {
       toggleBtn.textContent = collapsed ? `Show all ${events.length}` : 'Show fewer';
     });
   }
+}
+
+// Cards currently out for grading (status != "returned"), oldest submitted
+// first, since the longest-outstanding batch is the one most worth checking
+// on. A submission with no submittedDate sorts last rather than first, same
+// "unknown sinks to the bottom" rule sortRows uses for the main table.
+function buildActiveSubmissions() {
+  return submissions
+    .filter(s => s.status !== 'returned')
+    .slice()
+    .sort((a, b) => {
+      if (!a.submittedDate && !b.submittedDate) return 0;
+      if (!a.submittedDate) return 1;
+      if (!b.submittedDate) return -1;
+      return a.submittedDate.localeCompare(b.submittedDate);
+    });
+}
+
+// A separate feed from Pricing activity above: this is the front of the
+// pipeline (cards shipped off, not graded yet) rather than the back of it
+// (cards already priced). Kept in its own section since the two answer
+// different questions: "what's still out" vs. "what got priced recently".
+function renderSubmissions() {
+  const el = document.getElementById('submissionsFeed');
+  const active = buildActiveSubmissions();
+  const returnedCount = submissions.filter(s => s.status === 'returned' && !isExampleSubmission(s)).length;
+
+  if (!active.length) {
+    el.innerHTML = '<p class="submissions-empty" role="status">Nothing currently out for grading.' +
+      (returnedCount ? ' ' + returnedCount + ' past submission' + (returnedCount === 1 ? '' : 's') + ' logged as returned.' : '') +
+      '</p>';
+    return;
+  }
+
+  const rows = active.map(s => {
+    const meta = SUBMISSION_STATUS_META[s.status] || { label: s.status, cls: 'badge-status-queue' };
+    const days = daysSince(s.submittedDate);
+    const daysText = days == null ? 'no date logged' : days + ' day' + (days === 1 ? '' : 's') + ' in queue';
+    const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
+    const metaParts = [s.gradingCompany, s.serviceLevel, s.cardCount != null ? s.cardCount + ' card' + (s.cardCount === 1 ? '' : 's') : null].filter(Boolean);
+    return `
+      <div class="submission-row">
+        <span class="submission-days font-mono">${escapeHtml(daysText)}</span>
+        <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
+        <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
+        <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
+        ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  el.innerHTML = rows + (returnedCount
+    ? `<div class="submissions-returned-note">+ ${returnedCount} past submission${returnedCount === 1 ? '' : 's'} logged as returned</div>`
+    : '');
 }
 
 // Batches aren't a fixed vocabulary like sport/basis/grader, they're one per

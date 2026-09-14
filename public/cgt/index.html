@@ -98,9 +98,57 @@
     </div>
   </details>
 
+  <details class="schema-help">
+    <summary>How to log a grading submission (cards sent off, not back yet)</summary>
+    <div class="schema-help-body">
+      <p>A submission is a batch of cards currently at a grading company, before it has grades back. It is tracked
+        separately from <code>cards.json</code> because it has no grade, cert number, or price of its own yet.
+        Edit <code>public/cgt/data/submissions.json</code> by hand and add an object to the
+        <code>submissions</code> array. Once a batch actually comes back, add the real graded cards to
+        <code>cards.json</code> with their real cert numbers, and set this submission's <code>status</code> to
+        <code>"returned"</code> with a real <code>returnedDate</code> rather than deleting the row, so there is
+        still a record of how long that batch actually took.</p>
+      <p><strong>Run <code>node public/cgt/data/validate.js</code> after every edit.</strong> It validates
+        <code>submissions.json</code> the same way it validates <code>cards.json</code>: duplicate ids, a
+        <code>status</code> outside the known list, a <code>returnedDate</code> that disagrees with
+        <code>status</code>, and bad dates.</p>
+      <table class="schema-table">
+        <tbody>
+          <tr><th>id</th><td>Unique slug, e.g. <code>"2026-08-psa-regular-batch-1"</code></td></tr>
+          <tr><th>description</th><td>Plain text describing what's in the batch, e.g. <code>"12 cards, 2021 hockey rookies"</code></td></tr>
+          <tr><th>gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
+          <tr><th>serviceLevel</th><td>Optional, the paid tier as billed, e.g. <code>"Regular"</code>, <code>"Express"</code>, <code>"Value Bulk"</code></td></tr>
+          <tr><th>cardCount</th><td>Optional whole number, how many cards are in this batch</td></tr>
+          <tr><th>submittedDate</th><td>ISO date (<code>YYYY-MM-DD</code>) this batch was actually shipped out</td></tr>
+          <tr><th>trackingNumber</th><td>Optional, the shipping tracking number for this batch</td></tr>
+          <tr><th>status</th><td>One of: <code>submitted</code>, <code>in-queue</code>, <code>grading</code>, <code>shipped-back</code>, <code>returned</code></td></tr>
+          <tr><th>returnedDate</th><td>ISO date this batch actually arrived back. Required once <code>status</code> is <code>returned</code>, otherwise leave <code>null</code></td></tr>
+          <tr><th>notes</th><td>Free-text notes</td></tr>
+        </tbody>
+      </table>
+      <pre class="schema-example font-mono">{
+  "id": "example-company-batch-slug",
+  "gradingCompany": "PSA",
+  "serviceLevel": null,
+  "description": null,
+  "cardCount": null,
+  "submittedDate": null,
+  "trackingNumber": null,
+  "status": "submitted",
+  "returnedDate": null,
+  "notes": null
+}</pre>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Summary</h2>
     <div class="stat-row" id="statRow"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Grading submissions</h2>
+    <div class="submissions-feed" id="submissionsFeed"></div>
   </section>
 
   <section>
@@ -195,8 +243,9 @@
   </main>
 
   <footer class="page-foot font-mono">
-    Data source: <code>/cgt/data/cards.json</code>, edited by hand until a real backend is wired in. Real inventory
-    data (card names, grades, prices) lives in a separate local tracker file and still needs to be imported here.
+    Data source: <code>/cgt/data/cards.json</code> and <code>/cgt/data/submissions.json</code>, both edited by hand
+    until a real backend is wired in. Real inventory data (card names, grades, prices) lives in a separate local
+    tracker file and still needs to be imported here.
   </footer>
 </div>
 

@@ -473,6 +473,29 @@ table.card-table {
 .badge-sport { background: rgba(255,255,255,0.03); color: var(--sub); }
 .badge-stale { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
 
+/* Grading submission status badges: neutral while sitting in the queue,
+   amber while actively being graded (same "in progress" color as
+   badge-comp), blue once shipped back (on its way, not yet confirmed
+   received), green once returned (same "done" color as badge-sale). */
+.badge-status-queue { background: rgba(255,255,255,0.03); color: var(--sub); }
+.badge-status-grading { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
+.badge-status-shipped { background: rgba(90,160,255,0.1); color: #5AA0FF; border-color: rgba(90,160,255,0.3); }
+.badge-status-returned { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
+
+/* Reuses the pricing-activity feed's list/row shape for the "out for
+   grading" list, same rationale: one chronological feed reads better than
+   scanning a table for a field. */
+.submissions-feed { border: 1px solid var(--hairline); border-radius: 12px; padding: 6px 20px; margin-bottom: 32px; background: var(--panel); }
+.submission-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 0.82rem; }
+.submission-row:first-child { border-top: none; }
+.submission-days { color: var(--dim); font-size: 0.7rem; flex-shrink: 0; width: 92px; }
+.submission-who { flex-shrink: 0; color: var(--ink); }
+.submission-meta { color: var(--sub); }
+.submission-link { color: var(--sub); font-size: 0.72rem; }
+.submission-link:hover { color: var(--ink); }
+.submissions-empty { font-size: 0.85rem; color: var(--dim); padding: 12px 0; }
+.submissions-returned-note { font-size: 0.72rem; color: var(--dim); padding: 0 0 10px; }
+
 /* "Needs backfill" data-quality list, same amber-flag pattern and markup as
    the CSM hub's own data-quality panel, restyled with CGT's own tokens. */
 .data-quality-list {
@@ -792,6 +815,12 @@ code.inline-code {
   .activity-who { color: #111; }
   .activity-toggle { display: none !important; }
   .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: flex !important; }
+
+  .submissions-feed { background: none; border-color: #bbb; }
+  .submission-row { border-color: #ddd; }
+  .submission-days, .submission-meta { color: #444; }
+  .submission-who { color: #111; }
+  .submission-link { display: none; }
 
   .data-quality-list { background: none; border-color: #bbb; }
   .data-quality-row { border-color: #ddd; }

@@ -1,0 +1,16 @@
+{
+  "submissions": [
+    {
+      "id": "example-submission-not-real",
+      "gradingCompany": "PSA",
+      "serviceLevel": "Regular",
+      "description": "(example row, not real data)",
+      "cardCount": 12,
+      "submittedDate": "2026-07-01",
+      "trackingNumber": null,
+      "status": "in-queue",
+      "returnedDate": null,
+      "notes": "Placeholder only, exists to verify the submissions list and days-in-queue calc render correctly. Not a real submission. Delete this row once real submission data is logged."
+    }
+  ]
+}

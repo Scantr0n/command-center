@@ -19,6 +19,7 @@
   const SPORTS = ['hockey', 'baseball', 'football'];
   const GRADING_COMPANIES = ['PSA', 'BGS', 'SGC', 'CGC', 'HGA', 'KSA'];
   const VALUATION_BASES = ['recent-sale', 'comp-estimate'];
+  const SUBMISSION_STATUSES = ['submitted', 'in-queue', 'grading', 'shipped-back', 'returned'];
 
   function isDateOrNull(v) {
     return v === null || v === undefined || (typeof v === 'string' && DATE_RE.test(v));
@@ -130,5 +131,74 @@
     return { errors, warnings };
   }
 
-  return { validateCards, isDateOrNull, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES };
+  // Validates the separate "cards sent off and not back yet" log
+  // (public/cgt/data/submissions.json). This is a distinct real-world thing
+  // from a graded card row: a submission is a batch shipped to a grading
+  // company that has not returned with grades yet, so it has no grade,
+  // certNumber, or estimatedValue of its own. Once cards come back, real
+  // graded rows get added to cards.json (with real cert numbers) and this
+  // submission is marked "returned" rather than deleted, so there is still a
+  // record of how long that batch actually took.
+  function validateSubmissions(submissions) {
+    const errors = [];
+    const warnings = [];
+    const seenIds = new Set();
+
+    (submissions || []).forEach((s, idx) => {
+      const where = 'submissions[' + idx + ']' + (s && s.id ? ' (' + s.id + ')' : '');
+
+      if (!s.id) errors.push(where + ': missing "id"');
+      else if (seenIds.has(s.id)) errors.push(where + ': duplicate id "' + s.id + '"');
+      else seenIds.add(s.id);
+
+      if (!s.description) errors.push(where + ': missing "description"');
+
+      if (!s.gradingCompany) {
+        errors.push(where + ': missing "gradingCompany"');
+      } else if (!GRADING_COMPANIES.includes(s.gradingCompany)) {
+        warnings.push(where + ': gradingCompany "' + s.gradingCompany + '" is not one of the known companies (' +
+          GRADING_COMPANIES.join(', ') + '). Not an error, just double-check it is not a typo.');
+      }
+
+      if (!s.status) {
+        errors.push(where + ': missing "status"');
+      } else if (!SUBMISSION_STATUSES.includes(s.status)) {
+        errors.push(where + ': status "' + s.status + '" is not one of ' + SUBMISSION_STATUSES.join(', '));
+      }
+
+      if (s.cardCount !== null && s.cardCount !== undefined) {
+        if (!Number.isInteger(s.cardCount) || s.cardCount <= 0) {
+          errors.push(where + ': "cardCount" must be a positive whole number or null');
+        }
+      }
+
+      if (!isDateOrNull(s.submittedDate)) {
+        errors.push(where + ': "submittedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.submittedDate));
+      }
+      if (!isDateOrNull(s.returnedDate)) {
+        errors.push(where + ': "returnedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.returnedDate));
+      }
+
+      // These two fields should agree about whether the batch is actually
+      // back, since the days-in-queue display and the active/returned split
+      // in the UI both key off "status", not off returnedDate directly.
+      if (s.status === 'returned' && !s.returnedDate) {
+        warnings.push(where + ': status is "returned" but "returnedDate" is empty. Backfill when known.');
+      }
+      if (s.status && s.status !== 'returned' && s.returnedDate) {
+        warnings.push(where + ': has a "returnedDate" but status is "' + s.status + '", not "returned". ' +
+          'Probably needs its status updated too.');
+      }
+      if (s.status && s.status !== 'returned' && !s.submittedDate) {
+        warnings.push(where + ': has no "submittedDate", so days-in-queue can\'t be shown for it.');
+      }
+    });
+
+    return { errors, warnings };
+  }
+
+  return {
+    validateCards, validateSubmissions, isDateOrNull, DATE_RE,
+    SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES
+  };
 });
