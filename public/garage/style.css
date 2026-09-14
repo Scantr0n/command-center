@@ -502,6 +502,47 @@ table.card-table {
   font-size: 0.85rem;
 }
 
+/* "Needs backfill" data-quality list, same amber-flag pattern and markup as
+   the CSM/CGT hubs' own data-quality panels, restyled with Garage's tokens. */
+.data-quality-list {
+  border: 1px solid rgba(224,160,48,0.3);
+  background: rgba(224,160,48,0.04);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 8px;
+}
+.data-quality-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 0;
+  border-top: 1px solid rgba(224,160,48,0.15);
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.data-quality-row:first-of-type { border-top: none; }
+.data-quality-row:hover, .data-quality-row:focus-visible {
+  background: rgba(224,160,48,0.08);
+}
+.data-quality-row:focus-visible { outline: 1px solid rgba(224,160,48,0.5); outline-offset: -2px; }
+.data-quality-row .dq-why {
+  margin-left: auto;
+  color: #E0A030;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+}
+.data-quality-row .dq-name { font-weight: 600; color: var(--ink); }
+.data-quality-row .dq-meta { color: var(--sub); }
+
 /* Visually hidden but still announced, for the live filter-match count next
    to the platform chips, the same live-region pattern the main Command
    Center dashboard uses for its own search/category filter. */
@@ -696,6 +737,11 @@ footer.page-foot {
   .tax-progress-fill { background: #888; }
   .tax-progress-pct, .tax-tracker-note { color: #555 !important; }
   .tax-status-met { color: #111 !important; }
+
+  .data-quality-list { background: none; border-color: #bbb; }
+  .data-quality-row { border-color: #ddd; }
+  .data-quality-row .dq-name { color: #111; }
+  .data-quality-row .dq-meta, .data-quality-row .dq-why { color: #555; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }

@@ -108,6 +108,7 @@ async function loadData() {
   if (listingsData) {
     listings = listingsData.listings || [];
     renderStats(listings, stages, sales);
+    renderDataQuality(listings);
     applyFiltersAndRender();
     renderCoverage(listings);
     renderRelist(listings);
@@ -115,6 +116,7 @@ async function loadData() {
   } else {
     listings = [];
     document.getElementById('statRow').innerHTML = '';
+    document.getElementById('dataQualitySection').hidden = true;
     document.getElementById('listingTableBody').innerHTML = '';
     document.getElementById('coverageTableBody').innerHTML = '';
     document.getElementById('relistTableBody').innerHTML = '';
@@ -324,6 +326,54 @@ function relistGuidanceHtml(l, days) {
 
 function relistGuidanceText(l, days) {
   return relistGuidanceParts(l, days).map(part => part.text).join('; ');
+}
+
+// Flags real listings missing an optional-but-load-bearing field: a live
+// item with no datePublished can never get real relist guidance (see
+// relistGuidanceParts above, which requires it), and a live item with no
+// costBasis silently drops the profit column from its own payout-by-platform
+// table in the detail modal (see openModal). Neither is a validate.js error,
+// both are schema-documented "leave null until known, never guess" fields,
+// so nothing forces a hand-edit to notice the gap. Same "Needs backfill"
+// pattern as the CSM/CGT hubs' own data-quality panels, hidden entirely when
+// nothing is flagged rather than showing an empty box.
+function buildDataQualityFlags(listings) {
+  return listings
+    .filter(l => l.status === 'live')
+    .map(l => {
+      const reasons = [];
+      if (!l.datePublished) reasons.push('NO DATE PUBLISHED LOGGED (BLOCKS RELIST GUIDANCE)');
+      if (l.costBasis == null) reasons.push('NO COST BASIS LOGGED (BLOCKS PROFIT CALC)');
+      const missingUrlPlatforms = (l.platforms || []).filter(p =>
+        !(l.soldOn || []).includes(p) && !(l.listingUrls && l.listingUrls[p])
+      );
+      if (missingUrlPlatforms.length) {
+        reasons.push('NO LISTING URL FOR ' + missingUrlPlatforms.map(p => (PLATFORM_LABELS[p] || p).toUpperCase()).join(', '));
+      }
+      return { l, reasons };
+    })
+    .filter(x => x.reasons.length > 0);
+}
+
+function renderDataQuality(listings) {
+  const section = document.getElementById('dataQualitySection');
+  const list = document.getElementById('dataQualityList');
+  const flagged = buildDataQualityFlags(listings);
+
+  if (!flagged.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flagged.map(({ l, reasons }) => `
+    <button type="button" class="data-quality-row" data-listing-id="${escapeHtml(l.id)}">
+      <span class="dq-name">${escapeHtml(l.title || 'Untitled item')}</span>
+      <span class="dq-why">${escapeHtml(reasons.join(' · '))}</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('[data-listing-id]').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.listingId));
+  });
 }
 
 function renderRelist(listings) {
