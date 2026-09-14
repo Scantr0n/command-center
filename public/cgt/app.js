@@ -1,5 +1,6 @@
 let cards = [];
 let submissions = [];
+let candidates = [];
 let activeCard = null;
 let lastFocusedEl = null;
 let searchTerm = '';
@@ -225,15 +226,33 @@ async function loadSubmissions() {
   }
 }
 
+// candidates.json is fetched the same way submissions.json is: always, not
+// only when something already links to it, so the "Worth grading?" section
+// always renders (even if only its own empty state) instead of silently
+// staying blank when the file is briefly unreachable.
+async function loadCandidates() {
+  try {
+    const res = await fetch('/cgt/data/candidates.json');
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const data = await res.json();
+    candidates = data.candidates || [];
+  } catch (e) {
+    candidates = [];
+    console.error("Couldn't load candidates.json: " + e.message);
+  }
+}
+
 async function loadCards() {
   const errBox = document.getElementById('tableEmpty');
   await loadSubmissions();
+  await loadCandidates();
   try {
     const res = await fetch('/cgt/data/cards.json');
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     cards = data.cards || [];
     renderStats();
+    renderCandidates();
     renderSubmissions();
     renderValueBreakdown();
     renderPricingActivity();
@@ -299,6 +318,13 @@ function renderStats() {
   const submissionsWithCost = realSubmissions.filter(s => s.cost != null);
   const totalGradingFees = submissionsWithCost.reduce((s, x) => s + x.cost, 0);
 
+  // Only counts real (non-example) candidates that still have no logged
+  // decision, since one already marked submit/hold/sell-raw/pass has already
+  // been acted on and isn't "still being weighed" anymore.
+  const realCandidates = candidates.filter(c => !isExampleCandidate(c));
+  const openCandidates = realCandidates.filter(c => !c.decision);
+  const worthGradingCount = openCandidates.filter(c => computeGradingMath(c)?.verdict === 'worth-grading').length;
+
   // Only counts cards that have actually been re-priced (a priceHistory entry
   // to compare the current number against), the same real-data-only rule as
   // every other tile: a card priced exactly once has no trend yet, it isn't
@@ -324,6 +350,13 @@ function renderStats() {
       sub: submissionsWithCost.length
         ? submissionsWithCost.length + ' of ' + realSubmissions.length + ' submission(s) with a fee logged'
         : (realSubmissions.length ? 'no fees logged yet' : 'nothing real submitted yet')
+    },
+    {
+      value: openCandidates.length ? worthGradingCount : 0,
+      label: 'Candidates worth grading',
+      sub: openCandidates.length
+        ? 'of ' + openCandidates.length + ' still being weighed'
+        : (realCandidates.length ? 'all candidates already decided' : 'nothing real logged yet')
     },
     // Splitting the dollar total by basis, not just the card count, makes the
     // "how much of this is a real sale vs. an estimate" question answerable
@@ -537,6 +570,87 @@ function renderPricingActivity() {
       toggleBtn.setAttribute('aria-expanded', String(!collapsed));
     });
   }
+}
+
+function isExampleCandidate(c) {
+  return c.id === 'example-candidate-not-real';
+}
+
+// Applies the published "2x margin" rule of thumb for whether grading a raw
+// card is actually worth it (see e.g. CardGrade.io's and PreGradeCards' 2026
+// grading-ROI writeups): the expected gain over raw value should clear the
+// full cost of grading by at least 2x before committing, since the card
+// could come back at a lower grade than expected and a 1x-or-less margin
+// leaves no room for that risk. Returns null (not a verdict) whenever any of
+// the three real numbers this depends on hasn't actually been researched
+// yet, same "never guess at a missing input" rule as everything else here.
+const GRADING_RISK_MULTIPLE = 2;
+
+function computeGradingMath(c) {
+  if (c.rawValue == null || c.expectedGradedValue == null || c.estimatedGradingCost == null) return null;
+  const totalCost = c.estimatedGradingCost + (c.shippingCost || 0);
+  const expectedGain = c.expectedGradedValue - c.rawValue - totalCost;
+  let verdict;
+  if (expectedGain >= totalCost * GRADING_RISK_MULTIPLE) verdict = 'worth-grading';
+  else if (expectedGain > 0) verdict = 'marginal';
+  else verdict = 'not-worth';
+  return { totalCost, expectedGain, verdict };
+}
+
+const CANDIDATE_VERDICT_META = {
+  'worth-grading': { label: 'Worth grading', cls: 'badge-worth' },
+  marginal: { label: 'Marginal', cls: 'badge-marginal' },
+  'not-worth': { label: 'Not worth it', cls: 'badge-notworth' },
+  'needs-data': { label: 'Needs more data', cls: 'badge-needsdata' }
+};
+
+// Raw-card candidates being weighed against the real cost of grading them,
+// sorted by expected dollar gain (highest first) so the most clear-cut "yes,
+// send this one" cases lead the list; a candidate missing one of the three
+// real inputs the math needs sorts last, same "unknown sinks to the bottom"
+// rule the main table's sortRows uses.
+function buildRankedCandidates() {
+  return candidates
+    .map(c => ({ c, math: computeGradingMath(c) }))
+    .sort((a, b) => {
+      if (!a.math && !b.math) return 0;
+      if (!a.math) return 1;
+      if (!b.math) return -1;
+      return b.math.expectedGain - a.math.expectedGain;
+    });
+}
+
+function renderCandidates() {
+  const el = document.getElementById('candidatesFeed');
+  const ranked = buildRankedCandidates();
+
+  if (!ranked.length) {
+    el.innerHTML = '<p class="submissions-empty" role="status">No raw-card candidates logged yet.</p>';
+    return;
+  }
+
+  const rows = ranked.map(({ c, math }) => {
+    const verdictKey = math ? math.verdict : 'needs-data';
+    const meta = CANDIDATE_VERDICT_META[verdictKey];
+    const gainText = math ? formatSignedUsd(math.expectedGain) : 'n/a';
+    const metaParts = [
+      c.sport,
+      c.targetGradingCompany,
+      c.rawValue != null ? 'raw ' + formatUsd(c.rawValue) : null,
+      c.expectedGradedValue != null ? 'est. graded ' + formatUsd(c.expectedGradedValue) + (c.expectedGrade ? ' (' + c.expectedGrade + ')' : '') : null,
+      math ? 'costs ' + formatUsd(math.totalCost) : null
+    ].filter(Boolean);
+    return `
+      <div class="submission-row candidate-row">
+        <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
+        <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
+        <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
+        <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
+      </div>
+    `;
+  }).join('');
+
+  el.innerHTML = rows;
 }
 
 // Cards currently out for grading (status != "returned"), oldest submitted

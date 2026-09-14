@@ -489,6 +489,16 @@ table.card-table {
 .badge-late { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
 .submission-days-late { color: #E0A030; }
 
+/* "Worth grading?" verdict badges (see computeGradingMath in app.js), same
+   green/amber/red/neutral meanings as the other status colors on this page:
+   green = clears the 2x-margin rule, amber = a real but thin margin, red =
+   expected to lose money net of grading costs, neutral = missing a real
+   input so no verdict can be computed at all. */
+.badge-worth { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
+.badge-marginal { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
+.badge-notworth { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); }
+.badge-needsdata { background: rgba(255,255,255,0.03); color: var(--sub); }
+
 /* Compact up/down/flat marker next to a card's value once it has been
    re-priced at least once (see priceHistory in app.js). Same green/red as
    the Unrealized gain/loss stat tile so "up" and "down" read consistently
@@ -514,7 +524,7 @@ table.card-table {
 /* Reuses the pricing-activity feed's list/row shape for the "out for
    grading" list, same rationale: one chronological feed reads better than
    scanning a table for a field. */
-.submissions-feed { border: 1px solid var(--hairline); border-radius: 12px; padding: 6px 20px; margin-bottom: 32px; background: var(--panel); }
+.submissions-feed, .candidates-feed { border: 1px solid var(--hairline); border-radius: 12px; padding: 6px 20px; margin-bottom: 32px; background: var(--panel); }
 .submission-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 0.82rem; }
 .submission-row:first-child { border-top: none; }
 .submission-days { color: var(--dim); font-size: 0.7rem; flex-shrink: 0; width: 92px; }
@@ -845,7 +855,7 @@ code.inline-code {
   .activity-toggle { display: none !important; }
   .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: flex !important; }
 
-  .submissions-feed { background: none; border-color: #bbb; }
+  .submissions-feed, .candidates-feed { background: none; border-color: #bbb; }
   .submission-row { border-color: #ddd; }
   .submission-days, .submission-meta { color: #444; }
   .submission-who { color: #111; }

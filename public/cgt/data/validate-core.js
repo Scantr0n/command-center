@@ -20,6 +20,7 @@
   const GRADING_COMPANIES = ['PSA', 'BGS', 'SGC', 'CGC', 'HGA', 'KSA'];
   const VALUATION_BASES = ['recent-sale', 'comp-estimate'];
   const SUBMISSION_STATUSES = ['submitted', 'in-queue', 'grading', 'shipped-back', 'returned'];
+  const CANDIDATE_DECISIONS = ['submit', 'hold', 'sell-raw', 'pass'];
 
   function isDateOrNull(v) {
     return v === null || v === undefined || (typeof v === 'string' && DATE_RE.test(v));
@@ -242,8 +243,97 @@
     return { errors, warnings };
   }
 
+  // Validates the "should I actually send this off?" list
+  // (public/cgt/data/candidates.json). A candidate is a raw (ungraded) card
+  // being weighed against the real cost of grading it, tracked separately
+  // from both cards.json (already graded) and submissions.json (already
+  // shipped) since it has neither a grade nor a tracking number yet. Once a
+  // candidate is actually shipped, add a real row to submissions.json and
+  // set this row's "decision" to "submit" rather than deleting it, same
+  // "never silently lose a real number" rule as everything else here.
+  function validateCandidates(candidates) {
+    const errors = [];
+    const warnings = [];
+    const seenIds = new Set();
+
+    // Shared by both rawValue and expectedGradedValue below: each is an
+    // independent real-money estimate (what the card is worth raw right now,
+    // vs. what it would likely sell for at the expected grade) and each
+    // follows the exact same "never a silent guess" rule cards.json enforces
+    // on estimatedValue, so the checks are identical, just applied twice
+    // under two different field names.
+    function checkPricedField(c, where, valueField, basisField, noteField, label) {
+      const value = c[valueField];
+      if (value === null || value === undefined) {
+        if (c[basisField]) warnings.push(where + ': has a "' + basisField + '" but no "' + valueField + '". Probably a leftover field.');
+        return;
+      }
+      if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
+        errors.push(where + ': "' + valueField + '" must be a non-negative number or null');
+      }
+      if (!c[basisField]) {
+        errors.push(where + ': has a ' + label + ' but no "' + basisField + '". Every price must be labeled ' +
+          '"recent-sale" or "comp-estimate", never left ambiguous.');
+      } else if (!VALUATION_BASES.includes(c[basisField])) {
+        errors.push(where + ': "' + basisField + '" is not "recent-sale" or "comp-estimate"');
+      } else if (c[basisField] === 'comp-estimate' && !c[noteField]) {
+        errors.push(where + ': "' + basisField + '" is "comp-estimate" but "' + noteField + '" is empty. A ' +
+          'comp-based estimate must say what it was based on, not just carry the label.');
+      }
+    }
+
+    (candidates || []).forEach((c, idx) => {
+      const where = 'candidates[' + idx + ']' + (c && c.id ? ' (' + c.id + ')' : '');
+
+      if (!c.id) errors.push(where + ': missing "id"');
+      else if (seenIds.has(c.id)) errors.push(where + ': duplicate id "' + c.id + '"');
+      else seenIds.add(c.id);
+
+      if (!c.cardName) errors.push(where + ': missing "cardName"');
+
+      if (!c.sport) {
+        errors.push(where + ': missing "sport"');
+      } else if (!SPORTS.includes(c.sport)) {
+        errors.push(where + ': sport "' + c.sport + '" is not one of ' + SPORTS.join(', '));
+      }
+
+      if (c.targetGradingCompany !== null && c.targetGradingCompany !== undefined && !GRADING_COMPANIES.includes(c.targetGradingCompany)) {
+        warnings.push(where + ': targetGradingCompany "' + c.targetGradingCompany + '" is not one of the known ' +
+          'companies (' + GRADING_COMPANIES.join(', ') + '). Not an error, just double-check it is not a typo.');
+      }
+
+      checkPricedField(c, where, 'rawValue', 'rawValueBasis', 'rawValueNote', '"rawValue"');
+      checkPricedField(c, where, 'expectedGradedValue', 'gradedValueBasis', 'gradedValueNote', '"expectedGradedValue"');
+
+      if (c.estimatedGradingCost !== null && c.estimatedGradingCost !== undefined) {
+        if (typeof c.estimatedGradingCost !== 'number' || Number.isNaN(c.estimatedGradingCost) || c.estimatedGradingCost < 0) {
+          errors.push(where + ': "estimatedGradingCost" must be a non-negative number or null');
+        }
+      }
+      if (c.shippingCost !== null && c.shippingCost !== undefined) {
+        if (typeof c.shippingCost !== 'number' || Number.isNaN(c.shippingCost) || c.shippingCost < 0) {
+          errors.push(where + ': "shippingCost" must be a non-negative number or null');
+        }
+      }
+
+      if (!isDateOrNull(c.datePriced)) {
+        errors.push(where + ': "datePriced" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.datePriced));
+      }
+
+      if (c.decision !== null && c.decision !== undefined && !CANDIDATE_DECISIONS.includes(c.decision)) {
+        errors.push(where + ': decision "' + c.decision + '" is not one of ' + CANDIDATE_DECISIONS.join(', ') + ', or null');
+      }
+      if (c.decision === 'submit' && !c.decisionNote) {
+        warnings.push(where + ': decision is "submit" but no "decisionNote" logging the real submissions.json id ' +
+          'it turned into once shipped. Not required, just makes it easier to trace later.');
+      }
+    });
+
+    return { errors, warnings };
+  }
+
   return {
-    validateCards, validateSubmissions, findDuplicateGroups, isDateOrNull, DATE_RE,
-    SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES
+    validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, isDateOrNull, DATE_RE,
+    SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES, CANDIDATE_DECISIONS
   };
 });

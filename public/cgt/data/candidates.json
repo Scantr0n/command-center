@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "id": "example-candidate-not-real",
+      "cardName": "(example row, not real data)",
+      "year": 2021,
+      "sport": "hockey",
+      "rawValue": 40,
+      "rawValueBasis": "comp-estimate",
+      "rawValueNote": "Placeholder only, exists to verify the worth-grading verdict badge and math render correctly. Not a real card or price.",
+      "targetGradingCompany": "PSA",
+      "targetServiceLevel": "Regular",
+      "estimatedGradingCost": 20,
+      "shippingCost": 15,
+      "expectedGrade": "9-10",
+      "expectedGradedValue": 110,
+      "gradedValueBasis": "comp-estimate",
+      "gradedValueNote": "Placeholder only, exists to verify the worth-grading verdict badge and math render correctly. Not a real card or price.",
+      "datePriced": "2026-08-08",
+      "decision": null,
+      "decisionNote": null,
+      "notes": "Delete this row once real candidates are logged from the tracker file."
+    }
+  ]
+}

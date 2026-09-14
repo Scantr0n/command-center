@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
- * Validates cards.json and submissions.json against the field rules
- * documented in public/cgt/index.html. Run this after hand-editing either
- * file.
+ * Validates cards.json, submissions.json, and candidates.json against the
+ * field rules documented in public/cgt/index.html. Run this after
+ * hand-editing any of the three.
  *
  * The rule cards.json exists to enforce: every card with an estimatedValue
  * must say whether that number is a real recent sale or a comp-based
@@ -11,7 +11,10 @@
  * silent guessing this tracker is built to avoid, so it is an error, not a
  * warning. submissions.json tracks cards sent off for grading that have not
  * come back yet, kept separate from cards.json since a submission has no
- * grade or cert number of its own.
+ * grade or cert number of its own. candidates.json tracks raw cards still
+ * being weighed against the real cost of grading them, before a submission
+ * exists at all, and enforces the same never-a-silent-guess rule on both its
+ * raw-value and expected-graded-value estimates.
  *
  * The rules themselves live in validate-core.js, shared with the browser-side
  * CSV import tool (public/cgt/import.js) so both places enforce the same
@@ -23,7 +26,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { validateCards, validateSubmissions } = require('./validate-core.js');
+const { validateCards, validateSubmissions, validateCandidates } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 
@@ -72,10 +75,23 @@ function main() {
     }
   }
 
+  // candidates.json is optional for the same reason submissions.json is: an
+  // older checkout without it should still validate cleanly.
+  let candidatesData = { candidates: [] };
+  if (fs.existsSync(path.join(DATA_DIR, 'candidates.json'))) {
+    try {
+      candidatesData = loadJson('candidates.json');
+    } catch (e) {
+      console.error('Failed to read/parse candidates.json: ' + e.message);
+      process.exit(1);
+    }
+  }
+
   const cardsOk = checkFile('cards.json', cardsData.cards || [], validateCards);
   const submissionsOk = checkFile('submissions.json', submissionsData.submissions || [], validateSubmissions);
+  const candidatesOk = checkFile('candidates.json', candidatesData.candidates || [], validateCandidates);
 
-  process.exit(cardsOk && submissionsOk ? 0 : 1);
+  process.exit(cardsOk && submissionsOk && candidatesOk ? 0 : 1);
 }
 
 main();

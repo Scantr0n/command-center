@@ -153,9 +153,87 @@
     </div>
   </details>
 
+  <details class="schema-help">
+    <summary>How to log a "should I grade this?" candidate</summary>
+    <div class="schema-help-body">
+      <p>A candidate is a raw (ungraded) card being weighed against the real cost of grading it, before anything is
+        shipped. It is tracked separately from both <code>cards.json</code> (already graded) and
+        <code>submissions.json</code> (already shipped) since it has neither a grade nor a tracking number of its
+        own yet. Edit <code>public/cgt/data/candidates.json</code> by hand and add an object to the
+        <code>candidates</code> array. Leave any field with no real answer as <code>null</code>, same rule as
+        everywhere else. Once a candidate is actually shipped, add a real row to <code>submissions.json</code> and
+        set this row's <code>decision</code> to <code>"submit"</code> rather than deleting it, so there is still a
+        record of the reasoning behind sending it.</p>
+      <p><strong>Run <code>node public/cgt/data/validate.js</code> after every edit.</strong> It validates
+        <code>candidates.json</code> the same way it validates <code>cards.json</code>: duplicate ids, a missing or
+        unlabeled basis on either priced field, a comp-estimate with no note explaining what it is based on, and
+        bad dates.</p>
+      <p>The verdict shown on the dashboard (Worth grading / Marginal / Not worth it / Needs more data) applies the
+        common "2x margin" rule of thumb from real card-grading ROI writeups: expected gain (estimated graded value
+        minus raw value minus grading and shipping costs) should clear the total cost by at least 2x before it
+        counts as clearly worth it, since the card could come back at a lower grade than expected. A margin above
+        0 but under 2x shows as "Marginal" rather than "Worth grading", and any candidate missing one of the three
+        real numbers the math needs (<code>rawValue</code>, <code>expectedGradedValue</code>,
+        <code>estimatedGradingCost</code>) shows "Needs more data" rather than a guessed verdict.</p>
+      <table class="schema-table">
+        <tbody>
+          <tr><th>id</th><td>Unique slug, e.g. <code>"2022-upper-deck-rookie-raw"</code></td></tr>
+          <tr><th>cardName</th><td>Full card description</td></tr>
+          <tr><th>year</th><td>Card year</td></tr>
+          <tr><th>sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
+          <tr><th>rawValue</th><td>USD number, what the card is worth ungraded right now. Leave <code>null</code> until actually researched.</td></tr>
+          <tr><th>rawValueBasis</th><td><strong>Required whenever rawValue is set.</strong> <code>"recent-sale"</code> or <code>"comp-estimate"</code>, same rule as cards.json's <code>valuationBasis</code>.</td></tr>
+          <tr><th>rawValueNote</th><td><strong>Required when rawValueBasis is comp-estimate.</strong> What the estimate is based on.</td></tr>
+          <tr><th>targetGradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code>, whichever is being considered</td></tr>
+          <tr><th>targetServiceLevel</th><td>Optional, e.g. <code>"Regular"</code>, <code>"Express"</code></td></tr>
+          <tr><th>estimatedGradingCost</th><td>USD number, the grading company's real posted service fee for that tier. Leave <code>null</code> until checked against their real fee schedule.</td></tr>
+          <tr><th>shippingCost</th><td>Optional USD number, round-trip shipping and insurance if known separately from the service fee</td></tr>
+          <tr><th>expectedGrade</th><td>Plain text, the realistically expected grade or range, e.g. <code>"9"</code> or <code>"9-10"</code>, not an assumed perfect 10</td></tr>
+          <tr><th>expectedGradedValue</th><td>USD number, what the card would likely sell for at the expected grade. Leave <code>null</code> until actually researched.</td></tr>
+          <tr><th>gradedValueBasis</th><td><strong>Required whenever expectedGradedValue is set.</strong> <code>"recent-sale"</code> or <code>"comp-estimate"</code></td></tr>
+          <tr><th>gradedValueNote</th><td><strong>Required when gradedValueBasis is comp-estimate.</strong> What the estimate is based on.</td></tr>
+          <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this candidate was actually researched</td></tr>
+          <tr><th>decision</th><td>Optional, one of: <code>submit</code>, <code>hold</code>, <code>sell-raw</code>, <code>pass</code>. Leave <code>null</code> while still weighing it.</td></tr>
+          <tr><th>decisionNote</th><td>Optional free text, e.g. the real <code>submissions.json</code> id this turned into once shipped</td></tr>
+          <tr><th>notes</th><td>Free-text notes</td></tr>
+        </tbody>
+      </table>
+      <pre class="schema-example font-mono">{
+  "id": "example-company-card-slug-raw",
+  "cardName": null,
+  "year": null,
+  "sport": "hockey",
+  "rawValue": null,
+  "rawValueBasis": null,
+  "rawValueNote": null,
+  "targetGradingCompany": null,
+  "targetServiceLevel": null,
+  "estimatedGradingCost": null,
+  "shippingCost": null,
+  "expectedGrade": null,
+  "expectedGradedValue": null,
+  "gradedValueBasis": null,
+  "gradedValueNote": null,
+  "datePriced": null,
+  "decision": null,
+  "decisionNote": null,
+  "notes": null
+}</pre>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Summary</h2>
     <div class="stat-row" id="statRow"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Worth grading?</h2>
+    <p class="section-subtitle">Raw cards being weighed against the real cost of grading them, before anything is
+      shipped. Verdict uses the common "2x margin" rule (the expected gain over raw value should clear grading +
+      shipping costs by at least 2x, to leave room for coming back at a lower grade than expected), applied only to
+      real researched numbers, never a guess.</p>
+    <div class="candidates-feed" id="candidatesFeed"></div>
   </section>
 
   <section>
@@ -263,9 +341,9 @@
   </main>
 
   <footer class="page-foot font-mono">
-    Data source: <code>/cgt/data/cards.json</code> and <code>/cgt/data/submissions.json</code>, both edited by hand
-    until a real backend is wired in. Real inventory data (card names, grades, prices) lives in a separate local
-    tracker file and still needs to be imported here.
+    Data source: <code>/cgt/data/cards.json</code>, <code>/cgt/data/submissions.json</code>, and
+    <code>/cgt/data/candidates.json</code>, all edited by hand until a real backend is wired in. Real inventory
+    data (card names, grades, prices) lives in a separate local tracker file and still needs to be imported here.
   </footer>
 </div>
 
