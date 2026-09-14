@@ -19,6 +19,7 @@
   const activityFeedEl = document.getElementById('activityFeed');
   const velocityListEl = document.getElementById('velocityList');
   const funnelListEl = document.getElementById('funnelList');
+  const channelEffListEl = document.getElementById('channelEffList');
   const ACTIVITY_PREVIEW_COUNT = 8;
 
   printBtn.addEventListener('click', () => window.print());
@@ -445,6 +446,66 @@
         '<span class="velocity-dot" style="background:' + r.stage.color + '"></span>' +
         '<span class="velocity-label">' + escapeHtml(r.stage.label) + '</span>' +
         valueHtml +
+        '</div>';
+    }).join('');
+  }
+
+  // Counts, not rates, per contactChannel.type: how many prospects who have
+  // actually been contacted (stage past "researched") went on to reach real
+  // active exploration. "silent-replied" is deliberately excluded from the
+  // positive count, that stage covers both no-response and an unadvanced
+  // reply, so it cannot honestly be read as a signal either way. A minimum
+  // sample size gates showing a percentage at all, so a 1-of-1 record never
+  // renders as a misleading "100%".
+  const CHANNEL_EFF_MIN_N_FOR_RATE = 5;
+  function computeChannelEffectiveness(prospects) {
+    const order = ['named-decision-maker', 'generic-inbox', 'unlogged'];
+    const labels = {
+      'named-decision-maker': 'Named decision-maker',
+      'generic-inbox': 'Generic inbox',
+      'unlogged': 'Channel not logged'
+    };
+    const buckets = {};
+    order.forEach(key => { buckets[key] = { key, label: labels[key], contacted: 0, advanced: 0 }; });
+    prospects.forEach(p => {
+      if (p.stage === 'researched') return;
+      const rawType = p.contactChannel && p.contactChannel.type;
+      const key = buckets[rawType] ? rawType : 'unlogged';
+      buckets[key].contacted += 1;
+      const reachedExploration = p.stage === 'in-exploration' || p.stage === 'client' ||
+        (p.stageHistory || []).some(e => e && (e.stage === 'in-exploration' || e.stage === 'client'));
+      if (reachedExploration) buckets[key].advanced += 1;
+    });
+    return order.map(key => buckets[key]);
+  }
+
+  function renderChannelEffectiveness(prospects) {
+    const results = computeChannelEffectiveness(prospects);
+    const totalContacted = results.reduce((sum, r) => sum + r.contacted, 0);
+    if (totalContacted === 0) {
+      channelEffListEl.innerHTML = '<p class="channel-eff-empty">No prospects have moved past "researched" yet, ' +
+        'this fills in once outreach has actually gone out.</p>';
+      return;
+    }
+    channelEffListEl.innerHTML = results.map(r => {
+      if (r.contacted === 0) {
+        return '<div class="channel-eff-row">' +
+          '<div class="channel-eff-row-head">' +
+          '<span class="channel-eff-label">' + escapeHtml(r.label) + '</span>' +
+          '<span class="channel-eff-count-empty">No contacted prospects on this channel yet</span>' +
+          '</div></div>';
+      }
+      const widthPct = Math.max(2, Math.round((r.advanced / r.contacted) * 100));
+      const rateHtml = r.contacted >= CHANNEL_EFF_MIN_N_FOR_RATE
+        ? '<span class="channel-eff-rate font-mono">' + widthPct + '% reached active exploration</span>'
+        : '<span class="channel-eff-rate font-mono">Sample too small for a rate (n=' + r.contacted + ')</span>';
+      return '<div class="channel-eff-row">' +
+        '<div class="channel-eff-row-head">' +
+        '<span class="channel-eff-label">' + escapeHtml(r.label) + '</span>' +
+        '<span class="channel-eff-count font-mono">' + r.advanced + ' of ' + r.contacted + ' reached exploration</span>' +
+        '</div>' +
+        '<div class="channel-eff-track"><div class="channel-eff-fill" style="width:' + widthPct + '%"></div></div>' +
+        rateHtml +
         '</div>';
     }).join('');
   }
@@ -1409,6 +1470,7 @@
       renderActivityFeed(allProspects, allStages);
       renderFunnel(allStages, allProspects);
       renderStageVelocity(allStages, allProspects);
+      renderChannelEffectiveness(allProspects);
       applyFilter();
       if (failures.length) {
         boardEl.insertAdjacentHTML('afterbegin',
@@ -1423,6 +1485,7 @@
       activityFeedEl.innerHTML = '<p class="activity-empty" role="alert">Failed to load.</p>';
       funnelListEl.innerHTML = '<p class="funnel-empty" role="alert">Failed to load.</p>';
       velocityListEl.innerHTML = '<p class="velocity-empty" role="alert">Failed to load.</p>';
+      channelEffListEl.innerHTML = '<p class="channel-eff-empty" role="alert">Failed to load.</p>';
     }
   });
 })();

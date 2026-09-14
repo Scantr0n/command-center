@@ -259,6 +259,56 @@ header.page-head .sub {
 .velocity-value { color: var(--sub); font-size: 0.78rem; }
 .velocity-value-empty { color: var(--dim); font-style: italic; }
 
+/* Channel effectiveness: contacted vs reached-exploration counts by
+   contactChannel.type. Deliberately count-first, not rate-first, since
+   the real sample size here is small enough that a bare percentage would
+   overstate confidence. */
+.channel-eff-list {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 36px;
+  background: var(--panel);
+}
+.channel-eff-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.channel-eff-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--hairline);
+}
+.channel-eff-row:first-child { border-top: none; }
+.channel-eff-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+.channel-eff-label { flex: 1; font-weight: 500; }
+.channel-eff-count { color: var(--sub); font-size: 0.78rem; }
+.channel-eff-count-empty { color: var(--dim); font-style: italic; font-size: 0.78rem; }
+.channel-eff-track {
+  height: 6px;
+  border-radius: 4px;
+  background: var(--panelLight);
+  overflow: hidden;
+}
+.channel-eff-fill {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 2px;
+  background: #3DDC84;
+}
+.channel-eff-rate {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+
 /* Nudge queue */
 .nudge-queue {
   border: 1px solid var(--hairline);
@@ -964,6 +1014,12 @@ footer.page-foot {
   .funnel-count { color: #444; }
   .funnel-conversion { color: #666; }
   .funnel-track { background: #eee; border: 1px solid #ccc; }
+
+  .channel-eff-list { background: none; border-color: #bbb; }
+  .channel-eff-row { border-color: #ddd; }
+  .channel-eff-count { color: #444; }
+  .channel-eff-rate { color: #666; }
+  .channel-eff-track { background: #eee; border: 1px solid #ccc; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }
