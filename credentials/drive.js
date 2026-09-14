@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-// Deliberately NOT `require('googleapis')` — that barrel package eagerly
+// Deliberately NOT `require('googleapis')`, that barrel package eagerly
 // loads every Google API it ships (~250 of them) just to get Drive, which
 // measured 2+ minutes to require on this machine. Requiring only the Drive
 // API module and the shared OAuth2Client keeps startup fast.
