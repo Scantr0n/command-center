@@ -36,6 +36,8 @@
       "active": false,
       "blockedOn": "API key"
     },
+    "account": null,
+    "positions": [],
     "genealogy": {
       "generation": null,
       "activeLineages": null,

@@ -353,6 +353,91 @@ function renderPositionSizing(data) {
     drawdownMeter('MAX DRAWDOWN (PEAK TO TROUGH)', ps.maxDrawdownPct);
 }
 
+function fmtDollar(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtPct(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
+  return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+}
+
+function renderAccount(data) {
+  const row = document.getElementById('accountRow');
+  const acct = data.live && data.live.account;
+  if (!acct) {
+    row.innerHTML = statTile('awaiting connection', 'Equity', null, true);
+    return;
+  }
+  const dayGood = acct.dayChangeDollar >= 0;
+  row.innerHTML = [
+    statTile(escapeHtml(fmtDollar(acct.equity) || '—'), 'Equity', null, false),
+    statTile(
+      `<span class="${dayGood ? 'pl-good' : 'pl-bad'}">${escapeHtml((fmtDollar(acct.dayChangeDollar) || '—'))}</span>`,
+      'Day change',
+      fmtPct(acct.dayChangePct) || null,
+      false
+    ),
+    statTile(escapeHtml(fmtDollar(acct.buyingPower) || '—'), 'Buying power', null, false),
+    statTile(escapeHtml(fmtDollar(acct.cash) || '—'), 'Cash', acct.cash < 0 ? 'Negative: margin in use' : null, false)
+  ].join('');
+}
+
+// Position table follows the same convention every real trading-dashboard
+// UX writeup agrees on: percentage gain next to the dollar figure (relative
+// performance is what matters at a glance, not just the raw number), and
+// green/red color coding so a scan across many rows reads winners and
+// losers instantly rather than requiring reading each sign. Sorted by
+// market value (server-side) so the biggest real exposure leads.
+function renderPositions(data) {
+  const panel = document.getElementById('positionsPanel');
+  const positions = (data.live && Array.isArray(data.live.positions)) ? data.live.positions : [];
+
+  if (!positions.length) {
+    panel.innerHTML = `
+      <div class="empty-panel">
+        <div class="empty-panel-title font-mono">${data.connection.connected ? 'NO OPEN POSITIONS' : 'AWAITING LIVE CONNECTION'}</div>
+        <div class="empty-panel-sub">${data.connection.connected
+          ? 'Alpha is connected but not currently holding any positions.'
+          : 'Once connected, real open positions (symbol, quantity, entry, current price, unrealized P&amp;L) render here.'}</div>
+      </div>
+    `;
+    return;
+  }
+
+  const rows = positions.map(p => {
+    const good = p.unrealizedPl >= 0;
+    return `
+      <tr>
+        <td class="pos-symbol font-mono">${escapeHtml(p.symbol)}</td>
+        <td class="font-mono pos-side-${escapeHtml(p.side)}">${escapeHtml(p.side)}</td>
+        <td class="font-mono pos-num">${escapeHtml(String(Math.abs(p.qty)))}</td>
+        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.avgEntryPrice) || '—')}</td>
+        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.currentPrice) || '—')}</td>
+        <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.marketValue) || '—')}</td>
+        <td class="font-mono pos-num ${good ? 'pl-good' : 'pl-bad'}">${escapeHtml(fmtDollar(p.unrealizedPl) || '—')}
+          <span class="pos-plpct">${escapeHtml(fmtPct(p.unrealizedPlPct) || '')}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="pos-table-wrap">
+      <table class="pos-table">
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg entry</th><th>Current</th><th>Mkt value</th><th>Unrealized P&amp;L</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderArchitecture(data) {
   const grid = document.getElementById('archGrid');
   grid.innerHTML = data.system.features.map(f => `
@@ -520,6 +605,8 @@ async function loadStatus() {
     renderConnection(data);
     renderConnectionHistory(data);
     renderStats(data);
+    renderAccount(data);
+    renderPositions(data);
     renderPositionSizing(data);
     renderArchitecture(data);
     renderGenealogy(data);
@@ -567,12 +654,16 @@ function buildStatusSummary(data) {
   const headline = computeHeadline(data);
   const live = data.live || {};
   const ps = live.positionSizing || {};
+  const acct = live.account;
+  const positions = Array.isArray(live.positions) ? live.positions : [];
   const awaiting = 'awaiting connection';
   const lines = [
     'Alpha status, ' + formatAbsolute(new Date().toISOString()),
     '- ' + headline.text + (headline.asOf ? ' (reading taken ' + formatAbsolute(headline.asOf) + ')' : ''),
     '- Kill switch: ' + (live.killSwitch && live.killSwitch.engaged != null ? (live.killSwitch.engaged ? 'ENGAGED' : 'Clear') : awaiting),
     '- Regime: ' + (live.regime || awaiting),
+    '- Equity: ' + (acct ? fmtDollar(acct.equity) + ' (' + fmtPct(acct.dayChangePct) + ' today)' : awaiting),
+    '- Open positions: ' + (acct ? positions.length : awaiting),
     '- Position sizing mode: ' + (ps.activeMode || awaiting),
     '- Current drawdown: ' + (typeof ps.currentDrawdownPct === 'number' ? ps.currentDrawdownPct + '%' : awaiting),
     '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),

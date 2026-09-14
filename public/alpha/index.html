@@ -81,6 +81,8 @@
           <tr><th>live.positionSizing.currentDrawdownPct</th><td>Current drawdown as a number from 0 to 100, or <code>null</code>. Drives the drawdown meter, never a dollar figure.</td></tr>
           <tr><th>live.positionSizing.maxDrawdownPct</th><td>Deepest peak-to-trough drawdown observed, 0 to 100, or <code>null</code>. Always &gt;= currentDrawdownPct when both are set, since it can only be as small as the current reading. Shown as its own meter so a shallow current reading is never mistaken for a shallow episode.</td></tr>
           <tr><th>live.genealogy.*</th><td>Current generation, count of active lineages, and last breeding event, or <code>null</code> until known.</td></tr>
+          <tr><th>live.account</th><td>Equity, cash, buying power, and day change, or <code>null</code>. Only ever populated by the live daemon proxy in <code>server.js</code>, never hand-edited into the static fallback (its own validator forbids balance/equity-like keys there on purpose).</td></tr>
+          <tr><th>live.positions[]</th><td>Real open positions (symbol, side, qty, entry/current price, market value, unrealized P&amp;L), or an empty array. Same rule as <code>live.account</code>: live-proxy only.</td></tr>
           <tr><th>events[]</th><td>Append-only activity log: kill-switch triggers, regime changes, connection state changes. Each entry needs <code>at</code> (ISO datetime), <code>type</code>, and <code>label</code>; <code>detail</code> and <code>tone</code> (<code>"neutral"</code>, <code>"good"</code>, or <code>"alert"</code>) are optional. Starts empty, honestly, since this sandbox has no real history to seed it with.</td></tr>
         </tbody>
       </table>
@@ -113,6 +115,16 @@
   <section>
     <h2 class="section-title">Position sizing</h2>
     <div class="ps-panel" id="positionSizingPanel"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Account</h2>
+    <div class="stat-row" id="accountRow"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Positions</h2>
+    <div id="positionsPanel"></div>
   </section>
 
   <section>

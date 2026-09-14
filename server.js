@@ -173,6 +173,38 @@ function computeDrawdowns(history) {
   };
 }
 
+// Alpaca's real position/account payloads carry every internal margin and
+// ID field the broker tracks; only pulls the subset a glance-at-status page
+// actually needs; converts Alpaca's string numbers to real numbers once
+// here rather than in every render function.
+function mapPositions(rawPositions) {
+  return Object.values(rawPositions || {}).map(p => ({
+    symbol: p.symbol,
+    side: p.side,
+    qty: Number(p.qty),
+    avgEntryPrice: Number(p.avg_entry_price),
+    currentPrice: Number(p.current_price),
+    marketValue: Number(p.market_value),
+    unrealizedPl: Number(p.unrealized_pl),
+    unrealizedPlPct: Number(p.unrealized_plpc) * 100
+  })).sort((a, b) => b.marketValue - a.marketValue);
+}
+
+function mapAccount(rawAccount) {
+  if (!rawAccount) return null;
+  const equity = Number(rawAccount.equity);
+  const lastEquity = Number(rawAccount.last_equity);
+  return {
+    equity,
+    cash: Number(rawAccount.cash),
+    buyingPower: Number(rawAccount.buying_power),
+    portfolioValue: Number(rawAccount.portfolio_value),
+    dayChangeDollar: Number.isFinite(equity) && Number.isFinite(lastEquity) ? equity - lastEquity : null,
+    dayChangePct: Number.isFinite(equity) && Number.isFinite(lastEquity) && lastEquity !== 0
+      ? ((equity - lastEquity) / lastEquity) * 100 : null
+  };
+}
+
 // Turns the daemon's real evolution-history entries into the honest
 // activity-log shape the Alpha page already renders. Only ever built from
 // fields the daemon actually returned, never invented.
@@ -234,6 +266,8 @@ app.get('/api/alpha/live', async (req, res) => {
           active: !!debates.enabled,
           blockedOn: debates.enabled ? null : 'API key'
         },
+        account: mapAccount(state.account),
+        positions: mapPositions(state.positions),
         genealogy: {
           generation: null,
           activeLineages: latestEvo ? Object.keys(latestEvo.agents || {}).length : null,

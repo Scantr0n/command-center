@@ -429,6 +429,45 @@ header.page-head .sub {
 }
 .meter-value.awaiting { color: var(--dim); font-style: italic; font-size: 0.78rem; }
 
+/* Positions table */
+.pl-good { color: #3DDC84; }
+.pl-bad { color: #E05050; }
+.pos-table-wrap {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  overflow-x: auto;
+  margin-bottom: 32px;
+}
+.pos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.pos-table th {
+  text-align: left;
+  padding: 10px 14px;
+  color: var(--sub);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--panel);
+}
+.pos-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink);
+}
+.pos-table tbody tr:last-child td { border-bottom: none; }
+.pos-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+.pos-symbol { font-weight: 600; }
+.pos-num { text-align: right; }
+.pos-side-long { color: #3DDC84; text-transform: uppercase; font-size: 0.72rem; }
+.pos-side-short { color: #E0A030; text-transform: uppercase; font-size: 0.72rem; }
+.pos-plpct { display: block; font-size: 0.7rem; opacity: 0.75; }
+
 /* Architecture cards */
 .arch-grid {
   display: grid;
