@@ -209,7 +209,7 @@ function renderStats(data) {
   tiles.push(statTile(
     killEngaged == null ? awaiting : (killEngaged ? 'ENGAGED' : 'Clear'),
     'Kill switch',
-    killEngaged == null ? null : (live.killSwitch.lastTriggeredAt ? 'Last triggered ' + escapeHtml(live.killSwitch.lastTriggeredAt) : 'Never triggered'),
+    killEngaged == null ? null : (live.killSwitch.lastTriggeredAt ? 'Last triggered ' + (timeAgo(live.killSwitch.lastTriggeredAt) || formatAbsolute(live.killSwitch.lastTriggeredAt)) : 'Never triggered'),
     killEngaged == null
   ));
 
