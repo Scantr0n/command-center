@@ -510,7 +510,7 @@
     }).join('');
   }
 
-  function renderBoard(stages, prospects, allProspects, query, filtering) {
+  function renderBoard(stages, prospects, allProspects, displayQuery, filtering) {
     const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
     boardEl.innerHTML = stages.map(stage => {
       const inStage = prospects.filter(p => p.stage === stage.id).sort(byUrgency);
@@ -520,7 +520,7 @@
         cards = inStage.map(p => renderCard(p, stageById)).join('');
       } else if (filtering && totalInStage > 0) {
         cards = '<div class="column-empty" role="status">No matches' +
-          (query ? ' for "' + escapeHtml(query) + '"' : '') + ' in this stage.</div>';
+          (displayQuery ? ' for "' + escapeHtml(displayQuery) + '"' : '') + ' in this stage.</div>';
       } else {
         cards = '<div class="column-empty">No prospects in this stage yet.</div>';
       }
@@ -700,11 +700,11 @@
   // feedback (cards disappearing from columns) isn't perceivable
   // non-visually, same live region the main Command Center dashboard already
   // uses for its own search/category filter.
-  function announceFilterStatus(matchCount, query, filterActive) {
+  function announceFilterStatus(matchCount, displayQuery, filterActive) {
     const status = document.getElementById('filterStatus');
     status.textContent = filterActive
       ? matchCount + ' prospect' + (matchCount === 1 ? '' : 's') + ' match' + (matchCount === 1 ? 'es' : '') +
-        (query ? ' for "' + query + '"' : '')
+        (displayQuery ? ' for "' + displayQuery + '"' : '')
       : '';
   }
 
@@ -713,17 +713,18 @@
   }
 
   function applyFilter() {
-    const query = searchInput.value.trim().toLowerCase();
+    const rawQuery = searchInput.value.trim();
+    const query = rawQuery.toLowerCase();
     const filtered = allProspects.filter(p =>
       matchesChannel(p, channelFilter) &&
       matchesCategory(p, categoryFilter) &&
       matchesSearchTerm(p, query));
     lastFiltered = filtered;
     const filterActive = anyFilterActive();
-    renderBoard(allStages, filtered, allProspects, query, filterActive);
+    renderBoard(allStages, filtered, allProspects, rawQuery, filterActive);
     renderChannelFilterCounts(allProspects, query);
     updateCategoryFilterCounts(allProspects, query);
-    announceFilterStatus(filtered.length, query, filterActive);
+    announceFilterStatus(filtered.length, rawQuery, filterActive);
     document.getElementById('clearFiltersBtn').hidden = !filterActive;
     syncUrl();
   }
