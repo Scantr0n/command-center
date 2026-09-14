@@ -618,11 +618,14 @@ function applyFiltersAndRender() {
 
 // Finds which of an item's own listed platforms nets the most after fees, so
 // the payout table can point at the actual highest-payout choice rather than
-// making the seller compare four columns by eye. Ties (e.g. two platforms
+// making the seller compare four columns by eye. Only considers platforms the
+// item is actually still sellable on (remainingPlatforms), not every platform
+// it was ever listed to, since a platform it already sold on can't be a real
+// "best" recommendation, it's just a stale figure. Ties (e.g. two platforms
 // both net exactly the same) intentionally mark none, since there's no real
 // "best" to point to.
 function bestPayoutPlatform(l) {
-  const candidates = (l.platforms || [])
+  const candidates = remainingPlatforms(l)
     .map(p => ({ p, net: estimateNetPayout(p, l.price) }))
     .filter(c => c.net != null);
   if (candidates.length < 2) return null;
@@ -646,12 +649,14 @@ function renderPayoutTable(listings) {
 
   tbody.innerHTML = rows.map(l => {
     const best = bestPayoutPlatform(l);
+    const soldSet = new Set(l.soldOn || []);
     return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div></td>
       <td class="cell-value${l.price == null ? ' empty' : ''}">${l.price != null ? formatUsd(l.price) : 'not set'}</td>
       ${PAYOUT_PLATFORMS.map(p => {
         if (!(l.platforms || []).includes(p)) return '<td class="cell-value empty">not listed</td>';
+        if (soldSet.has(p)) return '<td class="cell-value empty" title="Already sold here, no longer sellable on this platform">sold here</td>';
         const net = estimateNetPayout(p, l.price);
         const isBest = p === best;
         return `<td class="cell-value${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>`;
@@ -1024,12 +1029,17 @@ function openModal(id) {
 
   const modalBest = bestPayoutPlatform(l);
   const hasCostBasis = l.costBasis != null;
+  const modalSoldSet = new Set(l.soldOn || []);
   const payoutHtml = (l.platforms || []).length
     ? '<table class="modal-payout-table">' + (l.platforms || []).map(p => {
+        const label = escapeHtml(PLATFORM_LABELS[p] || p);
+        if (modalSoldSet.has(p)) {
+          return `<tr><td>${label} (sold)</td><td class="cell-value empty" title="Already sold here, no longer sellable on this platform">sold here</td>${hasCostBasis ? '<td class="cell-value empty">not applicable</td>' : ''}</tr>`;
+        }
         const net = estimateNetPayout(p, l.price);
         const isBest = p === modalBest;
         const profit = net != null && hasCostBasis ? net - l.costBasis : null;
-        return `<tr><td>${escapeHtml(PLATFORM_LABELS[p] || p)}</td><td class="cell-value${net == null ? ' empty' : ''}${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>${hasCostBasis ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)} profit</td>` : ''}</tr>`;
+        return `<tr><td>${label}</td><td class="cell-value${net == null ? ' empty' : ''}${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>${hasCostBasis ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)} profit</td>` : ''}</tr>`;
       }).join('') + '</table>'
     : 'Not applicable, not listed anywhere yet.';
   rows.push(fieldRow('Est. net payout by platform', payoutHtml, !(l.platforms || []).length));
