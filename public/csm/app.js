@@ -588,7 +588,7 @@
       } else {
         cards = '<div class="column-empty">No prospects in this stage yet.</div>';
       }
-      return '<div class="column">' +
+      return '<div class="column" data-stage-id="' + escapeHtml(stage.id) + '">' +
         '<div class="column-head">' +
         '<span class="stage-dot" style="background:' + escapeHtml(stage.color) + '"></span>' +
         '<h2>' + escapeHtml(stage.label) + '</h2>' +
@@ -602,6 +602,58 @@
     boardEl.querySelectorAll('[data-prospect-id]').forEach(el => {
       el.addEventListener('click', () => openModal(el.getAttribute('data-prospect-id')));
     });
+    wireCardDragAndDrop();
+  }
+
+  // Kanban drag-to-restage, a standard pipeline-board interaction. Dragging a
+  // card to a different column never touches prospects.json or the rendered
+  // stage counts itself, that would show a stage move that was not actually
+  // logged anywhere. Instead a drop opens that prospect's own detail modal
+  // with the existing stage-move generator pre-set to the target stage and
+  // already generated, so the only thing dragging saves is the clicks to get
+  // there, never the honesty check on whether the move is real.
+  function wireCardDragAndDrop() {
+    boardEl.querySelectorAll('.card[data-prospect-id]').forEach(card => {
+      card.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', card.getAttribute('data-prospect-id'));
+        e.dataTransfer.effectAllowed = 'move';
+        card.classList.add('card-dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('card-dragging'));
+    });
+
+    boardEl.querySelectorAll('.column[data-stage-id]').forEach(column => {
+      column.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        column.classList.add('column-dragover');
+      });
+      column.addEventListener('dragleave', e => {
+        if (!column.contains(e.relatedTarget)) column.classList.remove('column-dragover');
+      });
+      column.addEventListener('drop', e => {
+        e.preventDefault();
+        column.classList.remove('column-dragover');
+        const id = e.dataTransfer.getData('text/plain');
+        const targetStageId = column.getAttribute('data-stage-id');
+        const p = byId[id];
+        if (!p || p.stage === targetStageId) return;
+        openModalForStageMove(id, targetStageId);
+      });
+    });
+  }
+
+  function openModalForStageMove(id, targetStageId) {
+    openModal(id);
+    const select = document.getElementById('modalMoveStage');
+    const dateInput = document.getElementById('modalMoveDate');
+    const generateBtn = document.getElementById('modalMoveGenerate');
+    if (!select || !dateInput || !generateBtn) return;
+    select.value = targetStageId;
+    dateInput.value = todayIso();
+    generateBtn.click();
+    const resultEl = document.getElementById('modalMoveResult');
+    if (resultEl) resultEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
   function renderChannelFilterCounts(prospects, query) {
@@ -650,7 +702,7 @@
     const touchBadge = lastTouchDays != null
       ? '<span class="badge badge-touch">' + lastTouchDays + 'D SINCE LAST TOUCH</span>'
       : '';
-    return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" data-prospect-id="' + escapeHtml(p.id) + '">' +
+    return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" draggable="true" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
       '<div class="card-meta">' + categoryBadge + channelBadge(p.contactChannel) + stallBadge + touchBadge + '</div>' +

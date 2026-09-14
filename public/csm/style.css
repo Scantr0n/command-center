@@ -626,6 +626,15 @@ header.page-head .sub {
 .card-stale { border-color: rgba(229,72,77,0.35); }
 .card-stale:hover, .card-stale:focus-visible { border-color: rgba(229,72,77,0.6); }
 
+.card[draggable="true"] { cursor: grab; }
+.card.card-dragging { opacity: 0.45; cursor: grabbing; }
+.column.column-dragover {
+  border-color: var(--hairlineHover);
+  background: rgba(255,255,255,0.03);
+  outline: 1px dashed var(--hairlineHover);
+  outline-offset: -2px;
+}
+
 .stalled-inline { color: #E5484D; }
 
 .data-quality-list-stale {
@@ -985,6 +994,7 @@ footer.page-foot {
 
   .column-empty { border-color: #ccc; color: #555; }
   .card-stale { border-color: #ccc; }
+  .column.column-dragover { outline: none; background: none; }
 
   .nudge-queue { background: none; border-color: #ccc; }
   .nudge-row { border-color: #ddd; }

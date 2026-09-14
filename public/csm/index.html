@@ -177,6 +177,10 @@
         placeholder="Filter by name, company, category, hook, notes, or contact detail..."
         aria-label="Filter prospects by name, company, category, verified hook, notes, or contact channel detail">
     </div>
+    <p class="section-note">Drag a card into a different column to prep that move: it opens the prospect's detail
+      with the stage-move snippet already generated, ready to copy into <code>stageHistory</code> (and the
+      prospect's own <code>stage</code> field, if the move is real). Dragging alone never changes what's stored,
+      nothing updates on the board until you paste the snippet in by hand.</p>
     <div class="channel-filter" id="channelFilter" role="group" aria-label="Filter by contact channel type">
       <span class="channel-filter-label font-mono">CHANNEL</span>
       <button type="button" class="chip" data-channel="all" data-label="All" aria-pressed="true">All</button>
