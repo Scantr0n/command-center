@@ -529,6 +529,27 @@ function fmtQty(n) {
   return String(Math.abs(n));
 }
 
+// Total invested and % of equity deployed are never fetched as their own
+// field: they're derived client-side from live.account.equity and the real
+// live.positions[].marketValue figures server.js already sends, the same
+// "only ever computed from fields the daemon actually returned" rule
+// computeDrawdowns follows server-side. account is only ever populated once
+// the live proxy is connected (see the schema-help table), so positions.length
+// being 0 at that point is a real "fully in cash" reading, not an unknown,
+// and totalInvested is safe to report as exactly $0 rather than "-".
+function computeExposure(acct, positions) {
+  if (!acct) return { totalInvested: null, pctDeployed: null };
+  const marketValues = positions
+    .map(p => p.marketValue)
+    .filter(v => typeof v === 'number' && Number.isFinite(v));
+  if (positions.length && !marketValues.length) return { totalInvested: null, pctDeployed: null };
+  const totalInvested = marketValues.reduce((sum, v) => sum + v, 0);
+  const pctDeployed = (typeof acct.equity === 'number' && Number.isFinite(acct.equity) && acct.equity > 0)
+    ? (totalInvested / acct.equity) * 100
+    : null;
+  return { totalInvested, pctDeployed };
+}
+
 function renderAccount(data) {
   const row = document.getElementById('accountRow');
   const acct = data.live && data.live.account;
@@ -543,6 +564,8 @@ function renderAccount(data) {
   // falsely reading as "up today". Only color it once there's a real number.
   const dayChangeIsNumber = typeof acct.dayChangeDollar === 'number' && Number.isFinite(acct.dayChangeDollar);
   const dayGoodClass = dayChangeIsNumber ? (acct.dayChangeDollar >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
+  const positions = (data.live && Array.isArray(data.live.positions)) ? data.live.positions : [];
+  const { totalInvested, pctDeployed } = computeExposure(acct, positions);
   row.innerHTML = [
     statTile(escapeHtml(fmtDollar(acct.equity) || '-'), 'Equity', null, false),
     statTile(
@@ -552,7 +575,13 @@ function renderAccount(data) {
       false
     ),
     statTile(escapeHtml(fmtDollar(acct.buyingPower) || '-'), 'Buying power', null, false),
-    statTile(escapeHtml(fmtDollar(acct.cash) || '-'), 'Cash', acct.cash < 0 ? 'Negative: margin in use' : null, false)
+    statTile(escapeHtml(fmtDollar(acct.cash) || '-'), 'Cash', acct.cash < 0 ? 'Negative: margin in use' : null, false),
+    statTile(
+      totalInvested != null ? escapeHtml(fmtDollar(totalInvested)) : 'awaiting connection',
+      'Invested',
+      pctDeployed != null ? pctDeployed.toFixed(1) + '% of equity' : null,
+      totalInvested == null
+    )
   ].join('');
 }
 
@@ -1004,6 +1033,11 @@ function buildStatusSummary(data) {
     '- Regime: ' + (live.regime || awaiting),
     '- Equity: ' + (acct ? (fmtDollar(acct.equity) || awaiting) + ' (' + (fmtPct(acct.dayChangePct) || awaiting) + ' today)' : awaiting),
     '- Open positions: ' + (acct ? positions.length : awaiting),
+    '- Invested: ' + (() => {
+      const { totalInvested, pctDeployed } = computeExposure(acct, positions);
+      if (totalInvested == null) return awaiting;
+      return (fmtDollar(totalInvested) || awaiting) + (pctDeployed != null ? ' (' + pctDeployed.toFixed(1) + '% of equity)' : '');
+    })(),
     '- Position sizing mode: ' + (ps.activeMode || awaiting),
     '- Current drawdown: ' + (typeof ps.currentDrawdownPct === 'number' ? ps.currentDrawdownPct + '%' : awaiting),
     '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),
