@@ -56,10 +56,13 @@ function freshnessClass(iso) {
 // Glance indicators: this is a page Jack checks without switching to its tab,
 // so the tab itself (favicon dot + title) should carry the same connection
 // state as the on-page dot, using the same colors, rather than only being
-// visible after clicking in.
-const GLANCE_COLORS = { live: '#3DDC84', stale: '#E0A030', down: '#7B8188', error: '#E05050' };
+// visible after clicking in. 'critical' (kill switch engaged) takes the same
+// priority here it takes everywhere else on this page (see computeHeadline):
+// a background tab showing a calm green dot while the kill switch is engaged
+// would defeat the entire point of a glance indicator.
+const GLANCE_COLORS = { live: '#3DDC84', stale: '#E0A030', down: '#7B8188', error: '#E05050', critical: '#E05050' };
 const GLANCE_TEXT = {
-  live: 'connected', stale: 'connected, stale', down: 'awaiting connection', error: 'error'
+  live: 'connected', stale: 'connected, stale', down: 'awaiting connection', error: 'error', critical: 'kill switch engaged'
 };
 
 function updateGlanceIndicators(cls) {
@@ -280,6 +283,10 @@ function effectiveConnHistory(data, clientHistory) {
   return serverHistory.length ? serverHistory : clientHistory;
 }
 
+// Returns the connection-freshness class ('down'/'live'/'stale') so the
+// caller can decide the tab's glance indicator alongside the separate,
+// higher-priority kill-switch check (see the GLANCE_COLORS comment above);
+// this function no longer sets that indicator itself.
 function renderConnection(data, clientHistory) {
   const dot = document.getElementById('connDot');
   const label = document.getElementById('connLabel');
@@ -318,8 +325,7 @@ function renderConnection(data, clientHistory) {
       : 'Connectivity has never been checked yet.') +
       (downSince ? ' • Continuously not connected since ' + formatAbsolute(downSince) : '') +
       (lastConnectedAt ? ' • Last seen connected at ' + formatAbsolute(lastConnectedAt) : '');
-    updateGlanceIndicators('down');
-    return;
+    return 'down';
   }
 
   const cls = freshnessClass(asOf);
@@ -334,7 +340,7 @@ function renderConnection(data, clientHistory) {
   sub.title = 'Reading taken at ' + formatAbsolute(asOf) +
     (checkedAt ? ' • Connectivity last checked ' + formatAbsolute(checkedAt) : '') +
     (upSince ? ' • Continuously connected since ' + formatAbsolute(upSince) : '');
-  updateGlanceIndicators(cls);
+  return cls;
 }
 
 // Uptime-strip pattern (Statuspage, UptimeRobot, etc): a compact row of
@@ -788,8 +794,12 @@ async function loadStatus() {
     renderHeadline(headline.level, headline.text, headline.asOf);
     renderLastKnownBanner(lastKnown);
     updateLastKnownTags(lastKnown);
-    renderConnection(data, clientConnHistory);
+    const connCls = renderConnection(data, clientConnHistory);
     renderConnectionHistory(data, clientConnHistory);
+    // Kill switch engaged outranks plain connection freshness for the one
+    // glance a background tab gives Jack, same priority it gets everywhere
+    // else on this page.
+    updateGlanceIndicators(headline.level === 'critical' ? 'critical' : connCls);
     renderStats(effectiveData);
     renderAccount(data);
     renderPositions(data);
