@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="#08090A"/>
+  <!-- Feeds apple-touch-icon.png and icon-192.png (manifest purpose "any"):
+       neither is cropped by an OS-applied adaptive mask the way icon-512's
+       "any maskable" purpose is, so this uses the artwork at its natural
+       scale instead of icon-maskable-source.svg's 0.82x safe-zone shrink.
+       The farthest point (the top-right dot, center + radius = 14.6 of 16)
+       already sits inside the 16-unit half-canvas on its own, so nothing
+       needs shrinking for a square icon; scaling it down anyway (as
+       build-icons.js used to, sharing the maskable source for every target)
+       just left visible dead space around the glyph on iOS home screens. -->
+  <line x1="16" y1="16" x2="26" y2="9" stroke="#3DDC84" stroke-width="1" stroke-opacity="0.55"/>
+  <line x1="16" y1="16" x2="7" y2="24" stroke="#4F9FD9" stroke-width="1" stroke-opacity="0.55"/>
+  <line x1="16" y1="16" x2="24" y2="23" stroke="#D9A441" stroke-width="1" stroke-opacity="0.55"/>
+  <circle cx="26" cy="9" r="2.4" fill="#3DDC84"/>
+  <circle cx="7" cy="24" r="2" fill="#4F9FD9"/>
+  <circle cx="24" cy="23" r="2" fill="#D9A441"/>
+  <circle cx="16" cy="16" r="5.5" fill="none" stroke="#9A9FA6" stroke-width="1.5"/>
+  <circle cx="16" cy="16" r="2.6" fill="#F5F6F7"/>
+</svg>
