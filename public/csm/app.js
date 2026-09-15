@@ -296,6 +296,7 @@
     const nudgeRows = computeNudgeRows(prospects);
     const overdueCount = nudgeRows.filter(r => r.days <= 0).length;
     const stalledCount = computeStalled(stages, prospects).length;
+    const coldSignalCount = computeColdSignal(prospects).length;
     const backfillCount = computeDataQualityFlags(stages, prospects).length;
     const duplicateCount = findDuplicateProspects(prospects).length;
 
@@ -310,6 +311,12 @@
       items.push({
         n: stalledCount, tone: 'warn', target: 'stalledList',
         label: stalledCount === 1 ? 'prospect stalled in stage' : 'prospects stalled in stage'
+      });
+    }
+    if (coldSignalCount) {
+      items.push({
+        n: coldSignalCount, tone: 'warn', target: 'coldSignalList',
+        label: coldSignalCount === 1 ? 'prospect may need a new approach' : 'prospects may need a new approach'
       });
     }
     if (backfillCount) {
@@ -421,6 +428,44 @@
       '</button>'
     ).join('')).join('');
     wireRowsToModal(duplicatesEl);
+  }
+
+  const coldSignalEl = document.getElementById('coldSignalList');
+  const coldSignalSection = document.getElementById('coldSignalSection');
+
+  // Real signal from cold-outreach practice, not something invented for this
+  // board: a contact who has received several real touches (initial send +
+  // nudges, from the same outreachLog already used above) while still sitting
+  // in outreach-sent (no reply, no stage move) is a sign the hook or channel
+  // isn't landing, not just that another identical nudge is due. Distinct
+  // from "stalled" (which only looks at time sitting in a stage regardless of
+  // how many touches happened) and from "needs backfill" (missing fields):
+  // this looks at real touch count vs. real stage movement.
+  const COLD_TOUCH_THRESHOLD = 3;
+
+  function computeColdSignal(prospects) {
+    return prospects
+      .filter(p => p.stage === 'outreach-sent')
+      .map(p => ({ p, touches: (p.outreachLog || []).filter(e => e && e.date).length }))
+      .filter(x => x.touches >= COLD_TOUCH_THRESHOLD)
+      .sort((a, b) => b.touches - a.touches);
+  }
+
+  function renderColdSignal(stages, prospects) {
+    const flagged = computeColdSignal(prospects);
+    if (flagged.length === 0) {
+      coldSignalSection.hidden = true;
+      return;
+    }
+    coldSignalSection.hidden = false;
+    coldSignalEl.innerHTML = flagged.map(({ p, touches }) =>
+      '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
+      '<strong>' + escapeHtml(p.name) + '</strong>' +
+      '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+      '<span class="dq-why">' + touches + ' REAL TOUCHES LOGGED, STILL WAITING ON A REPLY</span>' +
+      '</button>'
+    ).join('');
+    wireRowsToModal(coldSignalEl);
   }
 
   function computeDataQualityFlags(stages, prospects) {
@@ -2292,6 +2337,7 @@
       renderChannelFilterCounts(allProspects);
       renderCategoryFilter(allProspects);
       renderStalled(allStages, allProspects);
+      renderColdSignal(allStages, allProspects);
       renderDuplicates(allProspects);
       renderDataQuality(allStages, allProspects);
       renderActivityFeed(allProspects, allStages);
