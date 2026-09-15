@@ -33,6 +33,16 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  // Same shape check data/validate.js already runs before this data reaches
+  // the browser, kept here too since a hand-edit that skipped validate.js
+  // (a non-zero-padded "2026-9-5", for example) reaches daysUntil() as a
+  // string that parses to Invalid Date/NaN with no error, not a thrown one.
+  function isValidDateStr(iso) {
+    return typeof iso === 'string' && DATE_RE.test(iso) && !isNaN(new Date(iso + 'T00:00:00').getTime());
+  }
+
   function daysUntil(iso) {
     const target = new Date(iso + 'T00:00:00');
     const today = new Date();
@@ -198,22 +208,31 @@
   // with nothing here saying so. Surface those the same way an overdue nudge is.
   function computeNudgeRows(prospects) {
     const withDates = prospects
-      .filter(p => p.nextNudgeDate)
-      .map(p => ({ p, days: daysUntil(p.nextNudgeDate), unqueued: false }));
+      .filter(p => p.nextNudgeDate && isValidDateStr(p.nextNudgeDate))
+      .map(p => ({ p, days: daysUntil(p.nextNudgeDate), unqueued: false, badDate: false }));
+
+    // A nextNudgeDate that fails the same format check validate.js runs
+    // (typically a non-zero-padded hand-edit like "2026-9-5") still needs
+    // a real row here, not silence: it stays "on the queue" per the data,
+    // it just can't be given a real due date, so say so instead of letting
+    // it fall through to daysUntil's NaN and print "in NaNd".
+    const badDates = prospects
+      .filter(p => p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate))
+      .map(p => ({ p, days: Infinity, unqueued: false, badDate: true }));
 
     const unqueued = prospects
       .filter(p => {
         const point = p.nudgeSchedule && p.nudgeSchedule.nudgePoint;
-        return point && !p.nextNudgeDate && daysUntil(point) <= 0;
+        return point && !p.nextNudgeDate && isValidDateStr(point) && daysUntil(point) <= 0;
       })
-      .map(p => ({ p, days: daysUntil(p.nudgeSchedule.nudgePoint), unqueued: true }));
+      .map(p => ({ p, days: daysUntil(p.nudgeSchedule.nudgePoint), unqueued: true, badDate: false }));
 
-    return withDates.concat(unqueued).sort((a, b) => a.days - b.days);
+    return withDates.concat(unqueued).concat(badDates).sort((a, b) => a.days - b.days);
   }
 
   function renderNudgeQueue(prospects) {
     const rows = computeNudgeRows(prospects);
-    icsBtn.disabled = rows.filter(r => !r.unqueued).length === 0;
+    icsBtn.disabled = rows.filter(r => !r.unqueued && !r.badDate).length === 0;
 
     if (rows.length === 0) {
       nudgeEl.innerHTML = '<p class="nudge-empty">No nudge dates logged yet. Once a real send date and nudge ' +
@@ -221,9 +240,10 @@
       return;
     }
 
-    nudgeEl.innerHTML = rows.map(({ p, days, unqueued }) => {
+    nudgeEl.innerHTML = rows.map(({ p, days, unqueued, badDate }) => {
       let when, urgency;
-      if (unqueued) { when = Math.abs(days) + 'd past planned nudge point'; urgency = 'overdue'; }
+      if (badDate) { when = 'bad date'; urgency = 'overdue'; }
+      else if (unqueued) { when = Math.abs(days) + 'd past planned nudge point'; urgency = 'overdue'; }
       else if (days < 0) { when = Math.abs(days) + 'd overdue'; urgency = 'overdue'; }
       else if (days === 0) { when = 'today'; urgency = 'today'; }
       else if (days <= 2) { when = 'in ' + days + 'd'; urgency = 'soon'; }
@@ -231,11 +251,14 @@
       const notBefore = p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore
         ? ' &middot; do not nudge before ' + fmtDate(p.nudgeSchedule.doNotNudgeBefore)
         : '';
-      const dateShown = unqueued ? fmtDate(p.nudgeSchedule.nudgePoint) : fmtDate(p.nextNudgeDate);
-      const unqueuedNote = unqueued
-        ? '<div class="nudge-action nudge-action-missing">NOT ON THE QUEUE &middot; nudgeSchedule.nudgePoint ' +
-          'passed but nextNudgeDate was never set, log a real nextNudgeDate or this keeps going unseen</div>'
-        : '';
+      const dateShown = badDate ? escapeHtml(p.nextNudgeDate) : (unqueued ? fmtDate(p.nudgeSchedule.nudgePoint) : fmtDate(p.nextNudgeDate));
+      const unqueuedNote = badDate
+        ? '<div class="nudge-action nudge-action-missing">BAD DATE LOGGED &middot; nextNudgeDate "' +
+          escapeHtml(p.nextNudgeDate) + '" is not a valid YYYY-MM-DD date, fix it in the edit form</div>'
+        : (unqueued
+          ? '<div class="nudge-action nudge-action-missing">NOT ON THE QUEUE &middot; nudgeSchedule.nudgePoint ' +
+            'passed but nextNudgeDate was never set, log a real nextNudgeDate or this keeps going unseen</div>'
+          : '');
       const actionLine = p.nextAction
         ? '<div class="nudge-action">' + escapeHtml(p.nextAction) + '</div>'
         : (unqueued ? '' : '<div class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</div>');
@@ -244,7 +267,7 @@
         ? '<span class="nudge-touch-count font-mono">' + touchCount + ' touch' + (touchCount === 1 ? '' : 'es') +
           ' logged so far</span>'
         : '';
-      return '<div class="nudge-row nudge-' + urgency + (unqueued ? ' nudge-row-unqueued' : '') + '">' +
+      return '<div class="nudge-row nudge-' + urgency + (unqueued || badDate ? ' nudge-row-unqueued' : '') + '">' +
         '<div class="nudge-top">' +
         '<span class="nudge-urgency-dot"></span>' +
         '<strong>' + escapeHtml(p.name) + '</strong>' +
@@ -408,6 +431,7 @@
         if (snapStale) reasons.push(snapStale.days + 'D OLD SOCIAL SNAPSHOT, DUE FOR REFRESH');
         if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');
         if (hasOutOfOrderDates(p.outreachLog)) reasons.push('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING');
+        if (p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate)) reasons.push('NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING');
         return { p, reasons };
       })
       .filter(x => x.reasons.length > 0);
@@ -1195,7 +1219,11 @@
   // board's filtered slice, since a calendar reminder is still real and
   // still needed even for a prospect the current search/filter hides.
   icsBtn.addEventListener('click', () => {
-    const withDates = allProspects.filter(p => p.nextNudgeDate);
+    // isValidDateStr, not a bare truthy check: a malformed nextNudgeDate
+    // (e.g. a non-zero-padded "2026-9-5") would otherwise reach
+    // DTSTART;VALUE=DATE: below as garbled digits, an invalid VEVENT no
+    // calendar app can import.
+    const withDates = allProspects.filter(p => isValidDateStr(p.nextNudgeDate));
     if (withDates.length === 0) return;
     downloadFile(buildNudgeIcs(withDates), 'csm-nudges-' + todayIso() + '.ics', 'text/calendar;charset=utf-8;');
   });
