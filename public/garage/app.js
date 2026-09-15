@@ -677,6 +677,100 @@ function renderRelist(listings) {
   }).join('');
 }
 
+function addDaysToDateStr(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function todayDateStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Same due-date math as relistGuidanceParts above, turned into actual dated
+// reminders instead of a relative "Nd until due" badge. No live cross-listing
+// tool is connected here to relist automatically, this is the manual
+// substitute: a real calendar event on the day each item's freshness window
+// actually opens, computed only from a real logged datePublished. An
+// already-overdue date is pulled forward to today rather than exported in
+// the past, so the reminder still actually surfaces when imported.
+function buildRelistReminders(currentListings) {
+  const today = todayDateStr();
+  const reminders = [];
+  currentListings.filter(l => l.status === 'live' && l.datePublished).forEach(l => {
+    const platforms = remainingPlatforms(l);
+    if (!platforms.length) return;
+    const title = l.title || 'Untitled item';
+    const nonPoshmark = platforms.filter(p => p !== 'poshmark');
+    if (nonPoshmark.length) {
+      const due = addDaysToDateStr(l.datePublished, RELIST_FRESH_DAYS);
+      reminders.push({
+        id: `${l.id}-relist`,
+        date: due < today ? today : due,
+        summary: `Relist/renew: ${title}`,
+        description: `Refresh or renew on ${nonPoshmark.map(p => PLATFORM_LABELS[p] || p).join(', ')}, ` +
+          `${RELIST_FRESH_DAYS} days without a sale since it went live on ${l.datePublished}. Command Center Garage.`
+      });
+    }
+    if (platforms.includes('poshmark')) {
+      const due = addDaysToDateStr(l.datePublished, POSHMARK_HOLD_DAYS);
+      reminders.push({
+        id: `${l.id}-poshmark-relist`,
+        date: due < today ? today : due,
+        summary: `Poshmark relist eligible: ${title}`,
+        description: `Past Poshmark's ${POSHMARK_HOLD_DAYS}-day Excessive Listing Removal Policy window, ` +
+          `safe to relist the same item there now. Command Center Garage.`
+      });
+    }
+  });
+  return reminders;
+}
+
+function icsEscapeText(text) {
+  return String(text).replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+}
+
+// RFC 5545 requires folding any content line over 75 octets onto a
+// continuation line starting with a single space, applied here since the
+// description text can run past that on a multi-platform item.
+function icsFoldLine(line) {
+  if (line.length <= 75) return line;
+  let out = line.slice(0, 75);
+  let rest = line.slice(75);
+  while (rest.length) {
+    out += '\r\n ' + rest.slice(0, 74);
+    rest = rest.slice(74);
+  }
+  return out;
+}
+
+function icsDateStamp(date) {
+  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+}
+
+// One all-day VEVENT per reminder, each with a DISPLAY alarm at 9am on the
+// day so it actually shows up rather than sitting silent on an all-day row.
+function buildIcsCalendar(reminders) {
+  const stamp = icsDateStamp(new Date());
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Command Center//Garage Relist Reminders//EN', 'CALSCALE:GREGORIAN'];
+  reminders.forEach(r => {
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:garage-${r.id}-${r.date}@command-center.local`);
+    lines.push(`DTSTAMP:${stamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${r.date.replace(/-/g, '')}`);
+    lines.push(icsFoldLine(`SUMMARY:${icsEscapeText(r.summary)}`));
+    lines.push(icsFoldLine(`DESCRIPTION:${icsEscapeText(r.description)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(icsFoldLine(`DESCRIPTION:${icsEscapeText(r.summary)}`));
+    lines.push('TRIGGER:PT9H');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n') + '\r\n';
+}
+
 // listingUrls is optional and only honored here (the modal detail view),
 // not in the table/coverage rows, since those rows are themselves clickable
 // to open the modal and a nested <a> inside a clickable row is both an
@@ -1496,6 +1590,29 @@ document.querySelectorAll('th.sortable').forEach(th => {
 });
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+const relistIcsBtn = document.getElementById('relistIcsBtn');
+const RELIST_ICS_LABEL = relistIcsBtn.textContent;
+relistIcsBtn.addEventListener('click', () => {
+  const reminders = buildRelistReminders(listings);
+  if (!reminders.length) {
+    relistIcsBtn.textContent = 'No live items with a publish date logged yet';
+    setTimeout(() => { relistIcsBtn.textContent = RELIST_ICS_LABEL; }, 2400);
+    return;
+  }
+  const ics = buildIcsCalendar(reminders);
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-relist-reminders-' + new Date().toISOString().slice(0, 10) + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  relistIcsBtn.textContent = `Downloaded ${reminders.length} reminder${reminders.length === 1 ? '' : 's'}`;
+  setTimeout(() => { relistIcsBtn.textContent = RELIST_ICS_LABEL; }, 2400);
+});
 
 // Detail modal: click or Enter/Space a listing row to see the full record
 // (all platforms, sold-elsewhere status, per-platform net payout, notes)

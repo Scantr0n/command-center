@@ -417,14 +417,20 @@
   </section>
 
   <section>
-    <h2 class="section-title">Relist reminders</h2>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Relist reminders</h2>
+      <button type="button" id="relistIcsBtn" class="print-btn font-mono">Add to calendar (.ics)</button>
+    </div>
     <div class="callout">
       Platform-aware guidance on when to refresh a live listing that hasn't sold. eBay, Vinted, and Depop's
       search all favor listing recency, common reseller practice is to relist or renew after about 30 days
       without a sale. Poshmark is the exception: its Excessive Listing Removal Policy blocks relisting the
       <em>same</em> item again before day 60, doing it earlier risks the listing getting pulled instead of
       refreshed. This needs a real <code>datePublished</code> logged per item to compute anything, it stays
-      honestly blank until then, no guessed dates.
+      honestly blank until then, no guessed dates. No cross-listing tool is connected here to relist
+      automatically, so <strong>Add to calendar</strong> exports the real upcoming due dates below as a
+      downloadable <code>.ics</code> file, one event per item/platform, that imports into Google Calendar,
+      Apple Calendar, or Outlook so the reminder actually surfaces on the day it matters.
     </div>
     <div class="table-wrap">
       <table class="card-table" id="relistTable">
