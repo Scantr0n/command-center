@@ -191,6 +191,20 @@ function main() {
         warnings.push(where + ': outreachLog has ' + sendCount + ' "initial-send" entries, there should only ' +
           'ever be one, later touches should be logged as "nudge".');
       }
+      // sendDate and outreachLog are two separate records of the same real
+      // first-touch event (sendDate is what the modal/CSV show directly,
+      // outreachLog is the touch-by-touch log), so they can silently drift
+      // apart the same way stageHistory can drift from stage, checked below.
+      const initialSendEntry = (p.outreachLog || []).find(e => e && e.type === 'initial-send');
+      if (initialSendEntry && initialSendEntry.date && p.sendDate && initialSendEntry.date !== p.sendDate) {
+        warnings.push(where + ': sendDate (' + p.sendDate + ') does not match the "initial-send" date logged in ' +
+          'outreachLog (' + initialSendEntry.date + '). Keep them in sync, sendDate is what the modal and CSV ' +
+          'export show directly.');
+      }
+      if (initialSendEntry && initialSendEntry.date && !p.sendDate) {
+        warnings.push(where + ': outreachLog has an "initial-send" entry (' + initialSendEntry.date + ') but ' +
+          'sendDate is not set. Backfill sendDate to match, it is read on its own elsewhere on the board.');
+      }
     }
 
     if (!Array.isArray(p.stageHistory || [])) {
