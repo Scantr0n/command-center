@@ -14,6 +14,9 @@
   const attentionPill = document.getElementById('attentionPill');
   const newSincePill = document.getElementById('newSincePill');
   const lastUpdatedSub = document.getElementById('lastUpdatedSub');
+  const printBtn = document.getElementById('printBtn');
+
+  printBtn.addEventListener('click', () => window.print());
 
   // "New since your last visit" is a per-browser convenience, not a second
   // copy of any real fact: it only compares real logged dates already on the
