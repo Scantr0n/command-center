@@ -123,7 +123,14 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
         max_tokens: 500,
         system: systemPrompt,
         messages
-      })
+      }),
+      // Same timeout guard as the Alpha proxy below, for the same reason: an
+      // API call with none at all leaves the request (and the modal's typing
+      // indicator, which only clears in sendChat's own finally block once
+      // this settles) hanging forever instead of failing into the chat's
+      // existing "Error reaching the assistant" state. 25s, not Alpha's 2s,
+      // since a real completion legitimately takes longer than a status ping.
+      signal: AbortSignal.timeout(25000)
     });
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json({ error: data });
