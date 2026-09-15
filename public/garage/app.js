@@ -673,9 +673,13 @@ function platformBadges(platforms, soldOn, listingUrls) {
   }).join('');
 }
 
+// Matches CGT/CSM's own search depth (cardName+certNumber+storageLocation,
+// name+company+verifiedHook+notes): title alone missed the one other real
+// free-text field a listing carries, so a distinctive flaw or brand
+// mentioned only in notes was unfindable by search.
 function matchesSearchTerm(l, term) {
   term = term.trim().toLowerCase();
-  return !term || (l.title || '').toLowerCase().includes(term);
+  return !term || (l.title || '').toLowerCase().includes(term) || (l.notes || '').toLowerCase().includes(term);
 }
 function matchesPlatformValue(l, platform) {
   return platform === 'all' || (l.platforms || []).includes(platform);
