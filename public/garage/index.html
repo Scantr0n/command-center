@@ -93,6 +93,57 @@
     </div>
   </details>
 
+  <details class="schema-help" id="quickLogTool">
+    <summary>Quick log a new listing (generates JSON to paste into listings.json, saves nothing)</summary>
+    <div class="schema-help-body">
+      <p>Fills in the same fields as the table above, runs the same checks <code>node public/garage/data/validate.js</code>
+        does (a non-empty <code>platforms</code>, a title over a platform's real hard character cap), then builds
+        the JSON object to paste into the <code>listings</code> array yourself. <code>soldOn</code> and
+        <code>listingUrls</code> always come out empty, a brand-new listing hasn't sold or been posted anywhere
+        yet; fill those in by hand once they're real. This never writes a file or sends anything, it only puts
+        text on your clipboard.</p>
+
+      <div class="quick-log-grid">
+        <form class="quick-log-form" id="quickListingForm">
+          <h3 class="quick-log-title font-mono">New listing &rarr; listings.json</h3>
+          <label class="quick-log-label" for="nlId">Id (unique slug)</label>
+          <input class="quick-log-input" type="text" id="nlId" placeholder="e.g. black-boots" required>
+          <label class="quick-log-label" for="nlTitle">Title</label>
+          <input class="quick-log-input" type="text" id="nlTitle" placeholder="Item name as it appears in the listing" required>
+          <label class="quick-log-label" for="nlPrice">Asking price, USD (optional)</label>
+          <input class="quick-log-input" type="number" id="nlPrice" min="0" step="0.01">
+          <label class="quick-log-label" for="nlCostBasis">Cost basis, USD (optional)</label>
+          <input class="quick-log-input" type="number" id="nlCostBasis" min="0" step="0.01">
+          <label class="quick-log-label" id="nlPlatformsLabel">Platforms (at least one)</label>
+          <div class="quick-log-checkbox-row" role="group" aria-labelledby="nlPlatformsLabel">
+            <label class="quick-log-checkbox"><input type="checkbox" class="nl-platform" value="ebay"> eBay</label>
+            <label class="quick-log-checkbox"><input type="checkbox" class="nl-platform" value="vinted"> Vinted</label>
+            <label class="quick-log-checkbox"><input type="checkbox" class="nl-platform" value="poshmark"> Poshmark</label>
+            <label class="quick-log-checkbox"><input type="checkbox" class="nl-platform" value="depop"> Depop</label>
+          </div>
+          <label class="quick-log-label" for="nlStatus">Status</label>
+          <select class="quick-log-input" id="nlStatus" required>
+            <option value="draft">Draft</option>
+            <option value="ready-to-post">Ready to post</option>
+            <option value="live">Live</option>
+            <option value="sold">Sold</option>
+          </select>
+          <label class="quick-log-label" for="nlDatePublished">Date published (optional, leave blank until it actually goes live)</label>
+          <input class="quick-log-input" type="date" id="nlDatePublished">
+          <label class="quick-log-label" for="nlLocation">Storage location (optional)</label>
+          <input class="quick-log-input" type="text" id="nlLocation" placeholder="e.g. Bin 3">
+          <label class="quick-log-label" for="nlNotes">Notes (optional)</label>
+          <input class="quick-log-input" type="text" id="nlNotes">
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="nlWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="nlOutput" readonly rows="12" hidden aria-label="Generated listing JSON, ready to paste into the listings array"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="nlCopyBtn" hidden>Copy JSON</button>
+          <p class="quick-log-hint" id="quickLogLive" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Summary</h2>
     <div class="stat-row" id="statRow"></div>

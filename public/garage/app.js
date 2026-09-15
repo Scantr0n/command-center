@@ -1877,11 +1877,104 @@ function renderPhotoAuditResults(results, loaded, total, flagged) {
   }).join('');
 }
 
+// Quick-log tool: builds one candidate listing from the form and checks it
+// against the same rules validate.js enforces (a unique id, a non-empty
+// platforms array, a title over a platform's real character cap), so a
+// mistake surfaces here instead of only on the next `node validate.js` run.
+// Garage has no shared browser-safe validator module the way CGT does, so
+// these checks are kept in sync with validate.js by hand, same pattern as
+// Sondrik's and CSM's own quick-log tools. soldOn and listingUrls always
+// come out empty, a brand-new listing hasn't sold or been posted anywhere
+// yet. Never writes listings.json itself, Command Center's dashboards have
+// no backend to save to; this only builds paste-ready JSON for the clipboard.
+function wireQuickLogTool() {
+  const form = document.getElementById('quickListingForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('nlWarnings');
+  const output = document.getElementById('nlOutput');
+  const copyBtn = document.getElementById('nlCopyBtn');
+  const live = document.getElementById('quickLogLive');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('nlId').value.trim();
+    const title = document.getElementById('nlTitle').value.trim();
+    const price = readOptionalNonNegativeInput(document.getElementById('nlPrice'));
+    const costBasis = readOptionalNonNegativeInput(document.getElementById('nlCostBasis'));
+    const platforms = Array.from(document.querySelectorAll('.nl-platform:checked')).map(el => el.value);
+    const status = document.getElementById('nlStatus').value;
+    const datePublished = document.getElementById('nlDatePublished').value || null;
+    const location = document.getElementById('nlLocation').value.trim() || null;
+    const notes = document.getElementById('nlNotes').value.trim() || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (listings.some(l => l.id === id)) {
+      blockers.push('"' + id + '" is already used by another listing, ids must be unique.');
+    }
+    if (!title) blockers.push('A title is required.');
+    if (!platforms.length) blockers.push('Select at least one platform.');
+    // undefined (as opposed to null) means something was typed but it wasn't
+    // a valid non-negative number, same distinction the price calculator
+    // above already makes with this same helper.
+    if (price === undefined) blockers.push('Enter a valid asking price of $0 or more, or leave it blank.');
+    if (costBasis === undefined) blockers.push('Enter a valid cost basis of $0 or more, or leave it blank.');
+
+    if (title && platforms.length) {
+      platforms.forEach(p => {
+        const limit = TITLE_HARD_LIMITS[p];
+        if (limit && title.length > limit) {
+          advisory.push('Title is ' + title.length + ' chars, over ' + PLATFORM_LABELS[p] + '\'s ' + limit +
+            '-char cap, it will get rejected or truncated there.');
+        }
+      });
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const candidate = {
+      id,
+      title,
+      price: price === undefined ? null : price,
+      costBasis: costBasis === undefined ? null : costBasis,
+      platforms,
+      soldOn: [],
+      listingUrls: platforms.reduce((o, p) => { o[p] = null; return o; }, {}),
+      status,
+      datePublished,
+      notes,
+      location
+    };
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(candidate, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Listing JSON copied to clipboard.';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 wireCalc();
 wireOfferGuide();
 wireMessageTemplates();
 wireChecklist();
 wirePacePlanner();
+wireQuickLogTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
 loadData();
