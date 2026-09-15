@@ -2636,8 +2636,11 @@
       }
       // The generator's stage dropdown is built from allStages (npPopulateStageOptions),
       // so it needs stages.json specifically, not just any data, to be usable.
-      document.getElementById('newProspectBtn').disabled = !stagesData;
+      const newProspectBtn = document.getElementById('newProspectBtn');
+      newProspectBtn.disabled = !stagesData;
+      newProspectBtn.title = stagesData ? '' : "Can't log a new prospect, stages.json failed to load (see the error above)";
     } else {
+      document.getElementById('newProspectBtn').title = "Can't log a new prospect, pipeline data failed to load (see below)";
       boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + failures.map(escapeHtml).join('; ') + '</div>';
       boardListEl.innerHTML = '<p class="board-list-empty" role="alert">Failed to load pipeline data: ' + failures.map(escapeHtml).join('; ') + '</p>';
       nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
