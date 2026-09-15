@@ -555,6 +555,11 @@ header.page-head .sub {
 }
 .category-filter[hidden] { display: none; }
 
+.view-toggle {
+  display: flex;
+  gap: 6px;
+}
+
 /* Board */
 .board {
   display: grid;
@@ -563,9 +568,54 @@ header.page-head .sub {
   overflow-x: auto;
   padding-bottom: 8px;
 }
+.board[hidden] { display: none; }
 @media (max-width: 1000px) {
   .board { grid-template-columns: 1fr; }
 }
+
+/* Board: list view */
+.board-list-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.board-list-wrap[hidden] { display: none; }
+
+.board-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  min-width: 760px;
+}
+.board-list-table th, .board-list-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+.board-list-table th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  cursor: pointer;
+  user-select: none;
+  background: var(--panelLight);
+}
+.board-list-table th:hover, .board-list-table th:focus-visible { color: var(--ink); }
+.board-list-table th[aria-sort="ascending"], .board-list-table th[aria-sort="descending"] { color: var(--ink); }
+.board-list-table tbody tr { cursor: pointer; transition: background 0.12s ease; }
+.board-list-table tbody tr:hover, .board-list-table tbody tr:focus-visible {
+  background: var(--panelLight);
+  outline: none;
+}
+.board-list-table tbody tr:last-child td { border-bottom: none; }
+.board-list-row-stale td:first-child { box-shadow: inset 2px 0 0 #E5484D; }
+.board-list-name { font-weight: 500; }
+.board-list-company { color: var(--sub); font-size: 0.76rem; margin-top: 2px; }
+.board-list-unlogged { color: var(--dim); font-style: italic; }
+.board-list-empty { padding: 20px; color: var(--dim); font-size: 0.85rem; margin: 0; }
 
 .column {
   background: var(--panel);
@@ -1003,7 +1053,7 @@ footer.page-foot {
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
   .print-btn, .back-link, .search-input, .channel-filter, .category-filter, .schema-help,
-  .modal-overlay, .attention-bar {
+  .modal-overlay, .attention-bar, .view-toggle, .board-list-wrap {
     display: none !important;
   }
 
@@ -1018,7 +1068,7 @@ footer.page-foot {
   .stats-bar, .stats-bar strong { color: #333; }
 
   .board {
-    display: block;
+    display: block !important;
     overflow: visible;
   }
   .column {

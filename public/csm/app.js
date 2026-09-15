@@ -1,5 +1,8 @@
 (function () {
   const boardEl = document.getElementById('board');
+  const boardListWrapEl = document.getElementById('boardListWrap');
+  const boardListEl = document.getElementById('boardList');
+  const viewToggleEl = document.getElementById('viewToggle');
   const nudgeEl = document.getElementById('nudgeQueue');
   const statsEl = document.getElementById('statsBar');
   const searchInput = document.getElementById('searchInput');
@@ -837,6 +840,140 @@
     if (resultEl) resultEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
+  // Table alternative to the kanban board: same filtered prospects, but shown
+  // as one sortable list across every stage instead of grouped into columns.
+  // Kanban is best for at-a-glance triage of where deals sit; a flat sortable
+  // table is better for detail-driven work like "who is most overdue for a
+  // nudge across the whole pipeline", which a column-grouped board can't
+  // answer without scanning every column. Real, well-documented CRM UX
+  // pattern (e.g. Pipeline CRM, HubSpot), not invented for this project.
+  function channelSortRank(channel) {
+    const type = channel && channel.type;
+    if (type === 'named-decision-maker') return 0;
+    if (type === 'generic-inbox') return 1;
+    return 2;
+  }
+
+  function listComparator(key, dir, stageById, stageOrderIndex) {
+    const mul = dir === 'desc' ? -1 : 1;
+    return (a, b) => {
+      let av, bv;
+      switch (key) {
+        case 'stage':
+          av = stageOrderIndex[a.stage]; bv = stageOrderIndex[b.stage];
+          av = av == null ? 999 : av; bv = bv == null ? 999 : bv;
+          break;
+        case 'category':
+          av = (a.category || '').toLowerCase(); bv = (b.category || '').toLowerCase();
+          break;
+        case 'channel':
+          av = channelSortRank(a.contactChannel); bv = channelSortRank(b.contactChannel);
+          break;
+        case 'nextNudge':
+          av = a.nextNudgeDate || '9999-99-99'; bv = b.nextNudgeDate || '9999-99-99';
+          break;
+        case 'stalled': {
+          const ai = stallInfo(a, stageById), bi = stallInfo(b, stageById);
+          av = ai ? ai.days : -1; bv = bi ? bi.days : -1;
+          break;
+        }
+        case 'lastTouch': {
+          const at = daysSinceLastTouch(a), bt = daysSinceLastTouch(b);
+          av = at == null ? -1 : at; bv = bt == null ? -1 : bt;
+          break;
+        }
+        case 'name':
+        default:
+          av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase();
+      }
+      if (av < bv) return -1 * mul;
+      if (av > bv) return 1 * mul;
+      return (a.name || '').localeCompare(b.name || '');
+    };
+  }
+
+  let listSortKey = 'nextNudge';
+  let listSortDir = 'asc';
+
+  function renderBoardList(stages, prospects, allProspects, displayQuery, filtering) {
+    if (!prospects.length) {
+      boardListEl.innerHTML = '<p class="board-list-empty" role="status">' +
+        (filtering
+          ? 'No matches' + (displayQuery ? ' for "' + escapeHtml(displayQuery) + '"' : '') + '.'
+          : 'No prospects logged yet.') +
+        '</p>';
+      return;
+    }
+
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    const stageOrderIndex = Object.fromEntries(stages.map((s, i) => [s.id, i]));
+    const sorted = prospects.slice().sort(listComparator(listSortKey, listSortDir, stageById, stageOrderIndex));
+
+    const headers = [
+      { key: 'name', label: 'Prospect' },
+      { key: 'stage', label: 'Stage' },
+      { key: 'category', label: 'Category' },
+      { key: 'channel', label: 'Channel' },
+      { key: 'nextNudge', label: 'Next nudge' },
+      { key: 'stalled', label: 'Time in stage' },
+      { key: 'lastTouch', label: 'Last touch' }
+    ];
+    const headHtml = headers.map(h => {
+      const active = h.key === listSortKey;
+      const ariaSort = active ? (listSortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      const arrow = active ? (listSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+      return '<th data-sort-key="' + h.key + '" aria-sort="' + ariaSort + '" tabindex="0" role="button">' +
+        escapeHtml(h.label) + arrow + '</th>';
+    }).join('');
+
+    const rowsHtml = sorted.map(p => {
+      const stage = stageById[p.stage];
+      const info = stallInfo(p, stageById);
+      const lastTouchDays = daysSinceLastTouch(p);
+      return '<tr class="board-list-row' + (info && info.isStale ? ' board-list-row-stale' : '') +
+        '" data-prospect-id="' + escapeHtml(p.id) + '" tabindex="0">' +
+        '<td><div class="board-list-name">' + escapeHtml(p.name) + '</div><div class="board-list-company">' +
+        escapeHtml(p.company || 'Company not logged') + '</div></td>' +
+        '<td>' + (stage
+          ? '<span class="stage-dot" style="background:' + escapeHtml(stage.color) + '"></span> ' + escapeHtml(stage.label)
+          : '<span class="board-list-unlogged">Unknown stage</span>') + '</td>' +
+        '<td>' + (p.category ? escapeHtml(p.category) : '<span class="board-list-unlogged">Not logged</span>') + '</td>' +
+        '<td>' + channelBadge(p.contactChannel) + '</td>' +
+        '<td>' + (p.nextNudgeDate ? escapeHtml(fmtDate(p.nextNudgeDate)) : '<span class="board-list-unlogged">Not queued</span>') + '</td>' +
+        '<td>' + (info ? info.days + 'd' + (info.isStale ? ' (stalled)' : '') : '<span class="board-list-unlogged">Unlogged</span>') + '</td>' +
+        '<td>' + (lastTouchDays != null ? lastTouchDays + 'd ago' : '<span class="board-list-unlogged">No touches logged</span>') + '</td>' +
+        '</tr>';
+    }).join('');
+
+    boardListEl.innerHTML = '<table class="board-list-table"><thead><tr>' + headHtml + '</tr></thead><tbody>' +
+      rowsHtml + '</tbody></table>';
+
+    boardListEl.querySelectorAll('th[data-sort-key]').forEach(th => {
+      const key = th.getAttribute('data-sort-key');
+      const activate = () => {
+        if (listSortKey === key) {
+          listSortDir = listSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          listSortKey = key;
+          listSortDir = (key === 'stalled' || key === 'lastTouch') ? 'desc' : 'asc';
+        }
+        renderBoardList(stages, prospects, allProspects, displayQuery, filtering);
+      };
+      th.addEventListener('click', activate);
+      th.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+      });
+    });
+
+    boardListEl.querySelectorAll('tr[data-prospect-id]').forEach(row => {
+      const open = () => openModal(row.getAttribute('data-prospect-id'));
+      row.addEventListener('click', open);
+      row.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    });
+  }
+
   function renderChannelFilterCounts(prospects, query) {
     channelFilterEl.querySelectorAll('.chip').forEach(chip => {
       const key = chip.getAttribute('data-channel');
@@ -916,6 +1053,29 @@
   let channelFilter = 'all';
   let categoryFilter = 'all';
   let lastFiltered = [];
+  let viewMode = 'board';
+  let lastFilterArgs = null;
+
+  function setViewMode(mode, skipUrlSync) {
+    viewMode = mode === 'list' ? 'list' : 'board';
+    viewToggleEl.querySelectorAll('.chip').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.getAttribute('data-view') === viewMode));
+    });
+    boardEl.hidden = viewMode !== 'board';
+    boardListWrapEl.hidden = viewMode !== 'list';
+    if (lastFilterArgs) {
+      if (viewMode === 'list') {
+        renderBoardList(allStages, lastFilterArgs.filtered, allProspects, lastFilterArgs.rawQuery, lastFilterArgs.filterActive);
+      } else {
+        renderBoard(allStages, lastFilterArgs.filtered, allProspects, lastFilterArgs.rawQuery, lastFilterArgs.filterActive);
+      }
+    }
+    if (!skipUrlSync) syncUrl();
+  }
+
+  viewToggleEl.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => setViewMode(btn.getAttribute('data-view')));
+  });
 
   // Filter/search state is mirrored into the URL so a specific slice of the
   // pipeline (e.g. "named decision-makers in the outreach-sent stage") can be
@@ -927,9 +1087,11 @@
     const q = params.get('q');
     const channel = params.get('channel');
     const category = params.get('category');
+    const view = params.get('view');
     if (q) searchInput.value = q;
     if (channel && VALID_CHANNELS.includes(channel)) channelFilter = channel;
     if (category) categoryFilter = category;
+    if (view === 'list') viewMode = 'list';
   }
 
   function syncUrl() {
@@ -938,6 +1100,7 @@
     if (query) params.set('q', query);
     if (channelFilter !== 'all') params.set('channel', channelFilter);
     if (categoryFilter !== 'all') params.set('category', categoryFilter);
+    if (viewMode === 'list') params.set('view', 'list');
     const qs = params.toString();
     const url = location.pathname + (qs ? '?' + qs : '');
     history.replaceState(null, '', url);
@@ -1055,7 +1218,12 @@
       matchesSearchTerm(p, query));
     lastFiltered = filtered;
     const filterActive = anyFilterActive();
-    renderBoard(allStages, filtered, allProspects, rawQuery, filterActive);
+    lastFilterArgs = { filtered, rawQuery, filterActive };
+    if (viewMode === 'list') {
+      renderBoardList(allStages, filtered, allProspects, rawQuery, filterActive);
+    } else {
+      renderBoard(allStages, filtered, allProspects, rawQuery, filterActive);
+    }
     renderChannelFilterCounts(allProspects, query);
     updateCategoryFilterCounts(allProspects, query);
     announceFilterStatus(filtered.length, rawQuery, filterActive);
@@ -1748,6 +1916,7 @@
   channelFilterEl.querySelectorAll('.chip').forEach(chip => {
     chip.setAttribute('aria-pressed', String(chip.getAttribute('data-channel') === channelFilter));
   });
+  setViewMode(viewMode, true);
 
   // Falls back to a hidden textarea + execCommand for browsers/contexts where
   // the async Clipboard API isn't available, same as CGT and Garage's own
@@ -2117,6 +2286,7 @@
       document.getElementById('newProspectBtn').disabled = !stagesData;
     } else {
       boardEl.innerHTML = '<div class="column-empty" role="alert">Failed to load pipeline data: ' + failures.map(escapeHtml).join('; ') + '</div>';
+      boardListEl.innerHTML = '<p class="board-list-empty" role="alert">Failed to load pipeline data: ' + failures.map(escapeHtml).join('; ') + '</p>';
       nudgeEl.innerHTML = '<p class="nudge-empty">Failed to load.</p>';
       activityFeedEl.innerHTML = '<p class="activity-empty" role="alert">Failed to load.</p>';
       funnelListEl.innerHTML = '<p class="funnel-empty" role="alert">Failed to load.</p>';

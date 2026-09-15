@@ -185,6 +185,10 @@
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Pipeline</h2>
       <div class="stats-bar" id="statsBar" aria-live="polite"></div>
+      <div class="view-toggle" id="viewToggle" role="group" aria-label="Pipeline display">
+        <button type="button" class="chip" data-view="board" aria-pressed="true">Board</button>
+        <button type="button" class="chip" data-view="list" aria-pressed="false">List</button>
+      </div>
       <button type="button" id="clearFiltersBtn" class="print-btn font-mono" hidden>Clear filters</button>
       <input
         type="search"
@@ -196,7 +200,9 @@
     <p class="section-note">Drag a card into a different column to prep that move: it opens the prospect's detail
       with the stage-move snippet already generated, ready to copy into <code>stageHistory</code> (and the
       prospect's own <code>stage</code> field, if the move is real). Dragging alone never changes what's stored,
-      nothing updates on the board until you paste the snippet in by hand.</p>
+      nothing updates on the board until you paste the snippet in by hand. Switch to <strong>List</strong> above to
+      compare every prospect across all stages at once in a sortable table, click a column header to sort by it,
+      click again to reverse.</p>
     <div class="channel-filter" id="channelFilter" role="group" aria-label="Filter by contact channel type">
       <span class="channel-filter-label font-mono">CHANNEL</span>
       <button type="button" class="chip" data-channel="all" data-label="All" aria-pressed="true">All</button>
@@ -209,6 +215,9 @@
     </div>
     <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
     <div class="board" id="board"></div>
+    <div class="board-list-wrap" id="boardListWrap" hidden>
+      <div id="boardList"></div>
+    </div>
   </section>
   </main>
 
