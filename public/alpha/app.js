@@ -869,7 +869,7 @@ function buildStatusSummary(data) {
     '- ' + headline.text + (headline.asOf ? ' (reading taken ' + formatAbsolute(headline.asOf) + ')' : ''),
     '- Kill switch: ' + (live.killSwitch && live.killSwitch.engaged != null ? (live.killSwitch.engaged ? 'ENGAGED' : 'Clear') : awaiting),
     '- Regime: ' + (live.regime || awaiting),
-    '- Equity: ' + (acct ? fmtDollar(acct.equity) + ' (' + fmtPct(acct.dayChangePct) + ' today)' : awaiting),
+    '- Equity: ' + (acct ? (fmtDollar(acct.equity) || awaiting) + ' (' + (fmtPct(acct.dayChangePct) || awaiting) + ' today)' : awaiting),
     '- Open positions: ' + (acct ? positions.length : awaiting),
     '- Position sizing mode: ' + (ps.activeMode || awaiting),
     '- Current drawdown: ' + (typeof ps.currentDrawdownPct === 'number' ? ps.currentDrawdownPct + '%' : awaiting),
