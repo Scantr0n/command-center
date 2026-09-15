@@ -888,7 +888,7 @@
   // other update to these files (see the "How to log a real update" details
   // above). Warnings here mirror validate.js's own checks (future dates,
   // duplicate ids/dates) so a mistake surfaces before it's even pasted in.
-  function initQuickLogTool(channelsData, downloadsData, leadsData) {
+  function initQuickLogTool(channelsData, downloadsData, leadsData, releasesData, goalsData) {
     const qcForm = document.getElementById('quickCheckForm');
     const qcDate = document.getElementById('qcDate');
     const qcCount = document.getElementById('qcCount');
@@ -1016,6 +1016,117 @@
         qlCopyBtn.textContent = 'Copied!';
         quickLogLive.textContent = 'Lead JSON copied to clipboard.';
         setTimeout(() => { qlCopyBtn.textContent = original; }, 1800);
+      }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
+    });
+
+    // Same generate-only, save-nothing pattern as the two forms above,
+    // covering the two record types (releases, goals) that previously had
+    // no quick-log form at all, only the hand-edit instructions in the
+    // schema-help table. Warnings mirror validate.js's own checks for each
+    // file (duplicate version/id, a future-dated real event) so a mistake
+    // surfaces here instead of only on the next `node validate.js` run.
+    const qrForm = document.getElementById('quickReleaseForm');
+    const qrVersion = document.getElementById('qrVersion');
+    const qrDate = document.getElementById('qrDate');
+    const qrType = document.getElementById('qrType');
+    const qrSummary = document.getElementById('qrSummary');
+    const qrWarnings = document.getElementById('qrWarnings');
+    const qrOutput = document.getElementById('qrOutput');
+    const qrCopyBtn = document.getElementById('qrCopyBtn');
+
+    qrDate.value = todayIso();
+    qrDate.max = todayIso();
+
+    qrForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const version = qrVersion.value.trim();
+      const date = qrDate.value;
+      const type = qrType.value.trim();
+      const summary = qrSummary.value.trim();
+      const blockers = [];
+
+      if (!version) blockers.push('Version is required.');
+      const existingVersions = new Set(((releasesData && releasesData.releases) || []).map(r => r.version));
+      if (version && existingVersions.has(version)) {
+        blockers.push('"' + version + '" is already logged, the validator rejects duplicate versions.');
+      }
+      if (!date) blockers.push('Ship date is required, this is when it actually shipped.');
+      if (!summary) blockers.push('A summary is required, what actually changed in this release.');
+
+      if (blockers.length) {
+        qrWarnings.textContent = blockers.join(' ');
+        qrOutput.hidden = true;
+        qrCopyBtn.hidden = true;
+        return;
+      }
+      qrWarnings.textContent = '';
+
+      const obj = { version, date, type: type || null, summary, notes: null };
+      qrOutput.value = JSON.stringify(obj, null, 2) + ',';
+      qrOutput.hidden = false;
+      qrCopyBtn.hidden = false;
+    });
+
+    qrCopyBtn.addEventListener('click', () => {
+      copyText(qrOutput.value).then(() => {
+        const original = qrCopyBtn.textContent;
+        qrCopyBtn.textContent = 'Copied!';
+        quickLogLive.textContent = 'Release JSON copied to clipboard.';
+        setTimeout(() => { qrCopyBtn.textContent = original; }, 1800);
+      }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
+    });
+
+    const qgForm = document.getElementById('quickGoalForm');
+    const qgId = document.getElementById('qgId');
+    const qgLabel = document.getElementById('qgLabel');
+    const qgMetric = document.getElementById('qgMetric');
+    const qgTarget = document.getElementById('qgTarget');
+    const qgTargetDate = document.getElementById('qgTargetDate');
+    const qgSetDate = document.getElementById('qgSetDate');
+    const qgWarnings = document.getElementById('qgWarnings');
+    const qgOutput = document.getElementById('qgOutput');
+    const qgCopyBtn = document.getElementById('qgCopyBtn');
+
+    qgSetDate.value = todayIso();
+    qgSetDate.max = todayIso();
+
+    qgForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const id = qgId.value.trim();
+      const label = qgLabel.value.trim();
+      const metric = qgMetric.value;
+      const target = Number(qgTarget.value);
+      const targetDate = qgTargetDate.value || null;
+      const setDate = qgSetDate.value;
+      const blockers = [];
+
+      if (!id) blockers.push('An id is required.');
+      const existingIds = new Set(((goalsData && goalsData.goals) || []).map(g => g.id));
+      if (id && existingIds.has(id)) blockers.push('"' + id + '" is already used by another goal, ids must be unique.');
+      if (!label) blockers.push('A label is required.');
+      if (!(Number.isFinite(target) && target > 0)) blockers.push('Target must be a positive number, this is the real number Jack is aiming for.');
+      if (!setDate) blockers.push('Set date is required, the actual date this target was set.');
+
+      if (blockers.length) {
+        qgWarnings.textContent = blockers.join(' ');
+        qgOutput.hidden = true;
+        qgCopyBtn.hidden = true;
+        return;
+      }
+      qgWarnings.textContent = '';
+
+      const obj = { id, label, metric, target, targetDate, setDate, note: null };
+      qgOutput.value = JSON.stringify(obj, null, 2) + ',';
+      qgOutput.hidden = false;
+      qgCopyBtn.hidden = false;
+    });
+
+    qgCopyBtn.addEventListener('click', () => {
+      copyText(qgOutput.value).then(() => {
+        const original = qgCopyBtn.textContent;
+        qgCopyBtn.textContent = 'Copied!';
+        quickLogLive.textContent = 'Goal JSON copied to clipboard.';
+        setTimeout(() => { qgCopyBtn.textContent = original; }, 1800);
       }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
     });
   }
@@ -1158,6 +1269,6 @@
       copyPublicBtn.disabled = true;
     }
 
-    initQuickLogTool(channelsData || {}, downloadsData || {}, leadsData || {});
+    initQuickLogTool(channelsData || {}, downloadsData || {}, leadsData || {}, releasesData || {}, goalsData || {});
   });
 })();

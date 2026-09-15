@@ -95,7 +95,7 @@
   </details>
 
   <details class="schema-help" id="quickLogTool">
-    <summary>Quick log a download check or a lead (generates JSON to paste, saves nothing)</summary>
+    <summary>Quick log a download check, lead, release, or goal (generates JSON to paste, saves nothing)</summary>
     <div class="schema-help-body">
       <p>Fills in the same fields as the table above, then builds the exact JSON object to paste into the right
         file yourself. This never writes a file or sends anything, it only puts text on your clipboard.</p>
@@ -135,6 +135,45 @@
           <button type="button" class="print-btn quick-log-copy" id="qlCopyBtn" hidden>Copy JSON</button>
           <p class="quick-log-hint">Outreach fields always come out unset (no draft, not sent). Draft an approval-gated message the same
             way every other lead's outreach is drafted, never through this form.</p>
+        </form>
+
+        <form class="quick-log-form" id="quickReleaseForm">
+          <h3 class="quick-log-title font-mono">Release &rarr; releases.json</h3>
+          <label class="quick-log-label" for="qrVersion">Version</label>
+          <input class="quick-log-input" type="text" id="qrVersion" placeholder="e.g. 0.3.8" required>
+          <label class="quick-log-label" for="qrDate">Ship date</label>
+          <input class="quick-log-input" type="date" id="qrDate" required>
+          <label class="quick-log-label" for="qrType">Type (optional)</label>
+          <input class="quick-log-input" type="text" id="qrType" placeholder="e.g. bugfix, feature">
+          <label class="quick-log-label" for="qrSummary">Summary</label>
+          <input class="quick-log-input" type="text" id="qrSummary" required>
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="qrWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="qrOutput" readonly rows="6" hidden aria-label="Generated release JSON, ready to paste into releases"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="qrCopyBtn" hidden>Copy JSON</button>
+        </form>
+
+        <form class="quick-log-form" id="quickGoalForm">
+          <h3 class="quick-log-title font-mono">Goal &rarr; goals.json</h3>
+          <label class="quick-log-label" for="qgId">Id (short, unique, kebab-case)</label>
+          <input class="quick-log-input" type="text" id="qgId" placeholder="e.g. downloads-100-oct" required>
+          <label class="quick-log-label" for="qgLabel">Label</label>
+          <input class="quick-log-input" type="text" id="qgLabel" placeholder="e.g. 100 downloads" required>
+          <label class="quick-log-label" for="qgMetric">Metric</label>
+          <select class="quick-log-input" id="qgMetric">
+            <option value="downloads">downloads</option>
+            <option value="leads">leads</option>
+          </select>
+          <label class="quick-log-label" for="qgTarget">Target (real number Jack is aiming for)</label>
+          <input class="quick-log-input" type="number" id="qgTarget" min="1" step="1" required>
+          <label class="quick-log-label" for="qgTargetDate">Target date (optional, open-ended if blank)</label>
+          <input class="quick-log-input" type="date" id="qgTargetDate">
+          <label class="quick-log-label" for="qgSetDate">Date this goal was actually set</label>
+          <input class="quick-log-input" type="date" id="qgSetDate" required>
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="qgWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="qgOutput" readonly rows="9" hidden aria-label="Generated goal JSON, ready to paste into goals"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="qgCopyBtn" hidden>Copy JSON</button>
         </form>
       </div>
       <div class="sr-only-live" role="status" aria-live="polite" id="quickLogLive"></div>
