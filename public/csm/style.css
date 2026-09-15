@@ -900,6 +900,41 @@ header.page-head .sub {
 }
 .np-draft-banner span { flex: 1 1 260px; }
 
+.np-mode-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.np-quick-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.np-quick-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1.1fr 0.9fr 1.6fr auto;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .np-quick-row { grid-template-columns: 1fr 1fr; }
+  .np-quick-row-remove { grid-column: 2; justify-self: end; }
+}
+.np-quick-row-remove {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  color: var(--sub);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.np-quick-row-remove:hover { border-color: rgba(229,72,77,0.5); color: #E5484D; }
+
 .np-form {
   display: flex;
   flex-direction: column;

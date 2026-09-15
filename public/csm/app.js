@@ -2054,6 +2054,9 @@
   const npCopyBtn = document.getElementById('npCopyBtn');
   const npStageSelect = document.getElementById('npStage');
   const npCategoryList = document.getElementById('npCategoryList');
+  const npModeToggle = document.getElementById('npModeToggle');
+  const npFullFormWrap = document.getElementById('npFullFormWrap');
+  const npQuickAddWrap = document.getElementById('npQuickAddWrap');
   const NP_FIELD_IDS = [
     'npName', 'npCompany', 'npCategory', 'npStageEnteredDate', 'npVerifiedHook',
     'npChannelType', 'npChannelDetail', 'npSendDate', 'npNextNudgeDate', 'npNextAction',
@@ -2120,6 +2123,246 @@
     npClearDraft();
     npResetForm();
     document.getElementById('npName').focus();
+  });
+
+  // Full-form vs. quick-add are two entry points into the same "generate
+  // paste-ready JSON, save nothing" flow, not two separate features: the
+  // full form covers every field for one prospect at a time, quick add
+  // trades that depth for speed across several rows at once (see
+  // npQuickAddWrap below). Switching modes never clears the other mode's
+  // draft, both keep autosaving independently.
+  function setNpMode(mode) {
+    const isQuick = mode === 'quick';
+    npFullFormWrap.hidden = isQuick;
+    npQuickAddWrap.hidden = !isQuick;
+    npModeToggle.querySelectorAll('.chip').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.getAttribute('data-np-mode') === mode));
+    });
+  }
+  npModeToggle.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => setNpMode(btn.getAttribute('data-np-mode')));
+  });
+
+  // Quick add: several freshly-researched candidates in one pass (name,
+  // company, category, verified hook only), all logged at the "researched"
+  // stage. This is the real bottleneck the full 18-field form creates for a
+  // plain research pass, a known CRM pattern (a stripped-down "quick add"
+  // entry point alongside the full record form, e.g. LeadSquared's Quick Add
+  // Lead) rather than something invented for this board. Every other field
+  // stays null/[] until that prospect's own full-form edit fills it in for
+  // real, same "leave it null, never guess" rule as everywhere else here.
+  const npQuickRowsEl = document.getElementById('npQuickRows');
+  const npQuickAddRowBtn = document.getElementById('npQuickAddRowBtn');
+  const npQuickDateInput = document.getElementById('npQuickDate');
+  const npQuickGenerateBtn = document.getElementById('npQuickGenerateBtn');
+  const npQuickResult = document.getElementById('npQuickResult');
+  const npQuickWarningsEl = document.getElementById('npQuickWarnings');
+  const npQuickOutputEl = document.getElementById('npQuickOutput');
+  const npQuickCopyBtn = document.getElementById('npQuickCopyBtn');
+  const npQuickDraftBanner = document.getElementById('npQuickDraftBanner');
+  const npQuickDraftBannerTime = document.getElementById('npQuickDraftBannerTime');
+  const npQuickDiscardDraftBtn = document.getElementById('npQuickDiscardDraftBtn');
+  const NP_QUICK_ROW_FIELDS = ['name', 'company', 'category', 'verifiedHook'];
+  const NP_QUICK_DRAFT_KEY = 'csm-np-quick-draft-v1';
+  let npQuickRowSeq = 0;
+  let npQuickDraftSaveTimer = null;
+
+  function npQuickRowHtml(rowId, values) {
+    values = values || {};
+    // escapeHtml alone leaves a literal " in place (safe in text content, not
+    // inside an attribute), so a restored draft value containing a quote
+    // (e.g. a nicknamed name) could otherwise break out of value="..." here.
+    const v = f => escapeHtml(values[f] || '').replace(/"/g, '&quot;');
+    return '<div class="np-quick-row" data-quick-row data-row-id="' + rowId + '">' +
+      '<label class="sr-only" for="' + rowId + '-name">Name</label>' +
+      '<input type="text" id="' + rowId + '-name" class="np-input" data-field="name" placeholder="Name *" value="' + v('name') + '">' +
+      '<label class="sr-only" for="' + rowId + '-company">Company</label>' +
+      '<input type="text" id="' + rowId + '-company" class="np-input" data-field="company" placeholder="Company" value="' + v('company') + '">' +
+      '<label class="sr-only" for="' + rowId + '-category">Category</label>' +
+      '<input type="text" id="' + rowId + '-category" class="np-input" data-field="category" placeholder="Category" list="npCategoryList" value="' + v('category') + '">' +
+      '<label class="sr-only" for="' + rowId + '-hook">Verified hook</label>' +
+      '<input type="text" id="' + rowId + '-hook" class="np-input" data-field="verifiedHook" placeholder="Verified hook (why they fit)" value="' + v('verifiedHook') + '">' +
+      '<button type="button" class="np-quick-row-remove" aria-label="Remove this row">&times;</button>' +
+      '</div>';
+  }
+
+  function npQuickAddRow(values) {
+    npQuickRowSeq += 1;
+    const rowId = 'npq' + npQuickRowSeq;
+    npQuickRowsEl.insertAdjacentHTML('beforeend', npQuickRowHtml(rowId, values));
+    const rowEl = npQuickRowsEl.querySelector('[data-row-id="' + rowId + '"]');
+    rowEl.querySelector('.np-quick-row-remove').addEventListener('click', () => {
+      // Removing the only row would leave no way to add a first candidate
+      // without hunting for the "+ Add another row" button again, so the
+      // last row clears in place instead of disappearing.
+      if (npQuickRowsEl.children.length > 1) {
+        rowEl.remove();
+      } else {
+        rowEl.querySelectorAll('input').forEach(inp => { inp.value = ''; });
+      }
+      npQuickSaveDraft();
+    });
+    return rowEl;
+  }
+
+  npQuickAddRowBtn.addEventListener('click', () => {
+    npQuickAddRow();
+    npQuickRowsEl.lastElementChild.querySelector('input[data-field="name"]').focus();
+  });
+
+  function npQuickResetRows(rowsValues) {
+    npQuickRowsEl.innerHTML = '';
+    npQuickRowSeq = 0;
+    const seed = rowsValues && rowsValues.length ? rowsValues : [{}];
+    seed.forEach(values => npQuickAddRow(values));
+  }
+
+  function npQuickReadRows() {
+    return Array.from(npQuickRowsEl.querySelectorAll('[data-quick-row]')).map(rowEl => {
+      const values = {};
+      NP_QUICK_ROW_FIELDS.forEach(f => {
+        values[f] = rowEl.querySelector('[data-field="' + f + '"]').value.trim();
+      });
+      return values;
+    });
+  }
+
+  function npQuickHasAnyValue(rowsValues) {
+    return rowsValues.some(values => NP_QUICK_ROW_FIELDS.some(f => values[f]));
+  }
+
+  function npQuickSaveDraft() {
+    try {
+      const rowsValues = npQuickReadRows();
+      const date = npQuickDateInput.value;
+      if (!npQuickHasAnyValue(rowsValues) && !date) { npQuickClearDraft(); return; }
+      localStorage.setItem(NP_QUICK_DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), date, rowsValues }));
+    } catch (e) { /* localStorage unavailable: same no-op as npSaveDraft above */ }
+  }
+
+  function npQuickLoadDraft() {
+    try {
+      const raw = localStorage.getItem(NP_QUICK_DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function npQuickClearDraft() {
+    try { localStorage.removeItem(NP_QUICK_DRAFT_KEY); } catch (e) { /* see npQuickSaveDraft */ }
+    npQuickDraftBanner.hidden = true;
+  }
+
+  npQuickRowsEl.addEventListener('input', () => {
+    clearTimeout(npQuickDraftSaveTimer);
+    npQuickDraftSaveTimer = setTimeout(npQuickSaveDraft, 400);
+  });
+  npQuickDateInput.addEventListener('input', npQuickSaveDraft);
+
+  npQuickDiscardDraftBtn.addEventListener('click', () => {
+    npQuickClearDraft();
+    npQuickResetRows();
+    npQuickDateInput.value = todayIso();
+    npQuickResult.hidden = true;
+    npQuickRowsEl.querySelector('input[data-field="name"]').focus();
+  });
+
+  // Same duplicate-id and duplicate-name-and-company checks npBuildWarnings
+  // runs for the full form, plus one quick add doesn't need to worry about
+  // otherwise: two rows in the same batch describing the same person (a
+  // copy/paste slip while moving fast through a list), checked against each
+  // other, not just against prospects already on the board.
+  function npQuickBuildProspects(rowsValues, researchedDate) {
+    const results = [];
+    const seenIdsThisBatch = new Set(Object.keys(byId));
+    const seenKeysThisBatch = new Map();
+    rowsValues.forEach(values => {
+      const name = values.name;
+      if (!name) return;
+      const company = values.company || null;
+      const category = values.category || null;
+      const verifiedHook = values.verifiedHook || null;
+      const baseId = npSlugify(name, company);
+      let id = baseId;
+      let n = 2;
+      while (seenIdsThisBatch.has(id)) { id = baseId + '-' + n; n++; }
+      const isDuplicateId = id !== baseId;
+      seenIdsThisBatch.add(id);
+
+      const warnings = [];
+      if (isDuplicateId) {
+        warnings.push('An id starting with "' + baseId + '" already exists, this one was suffixed to "' + id +
+          '" to avoid a duplicate. Rename it to something more readable if you want.');
+      }
+      const nameKey = name.trim().toLowerCase() + '|' + (company || '').trim().toLowerCase();
+      const existingMatch = allProspects.find(x => x.name &&
+        x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === nameKey);
+      if (existingMatch) {
+        warnings.push('An existing entry already has this same name and company ("' + existingMatch.name +
+          (existingMatch.company ? ', ' + existingMatch.company : '') + '", id "' + existingMatch.id +
+          '"). If this is really the same person, edit that entry instead of adding a second one.');
+      } else if (seenKeysThisBatch.has(nameKey)) {
+        warnings.push('Another row in this same batch already has this name and company ("' + name +
+          (company ? ', ' + company : '') + '"). If this is really the same person, remove the duplicate row.');
+      }
+      seenKeysThisBatch.set(nameKey, id);
+      if (category) {
+        const norm = category.trim().toLowerCase();
+        const existingCats = allProspects.map(x => x.category).filter(Boolean);
+        const clash = existingCats.find(c => c.trim().toLowerCase() === norm && c !== category);
+        if (clash) {
+          warnings.push('Category "' + category + '" differs in casing/spacing from existing category "' + clash +
+            '", they would render as separate filter chips. Pick one spelling.');
+        }
+      }
+
+      const p = {
+        id,
+        name,
+        company,
+        category,
+        stage: 'researched',
+        stageEnteredDate: researchedDate || null,
+        verifiedHook,
+        contactChannel: { type: null, detail: null },
+        sendDate: null,
+        nextNudgeDate: null,
+        nextAction: null,
+        nudgeSchedule: { doNotNudgeBefore: null, nudgePoint: null },
+        replyStatus: null,
+        socialSnapshot: { platform: null, followers: null, engagementRate: null, asOfDate: null },
+        contentIdeas: [],
+        stageHistory: researchedDate ? [{ date: researchedDate, stage: 'researched' }] : [],
+        outreachLog: [],
+        notes: null
+      };
+      results.push({ p, warnings });
+    });
+    return results;
+  }
+
+  npQuickGenerateBtn.addEventListener('click', () => {
+    const rowsValues = npQuickReadRows();
+    const researchedDate = npQuickDateInput.value || null;
+    const built = npQuickBuildProspects(rowsValues, researchedDate);
+    if (built.length === 0) {
+      npQuickWarningsEl.innerHTML = '<li>Enter a name in at least one row first.</li>';
+      npQuickOutputEl.textContent = '';
+      npQuickResult.hidden = false;
+      return;
+    }
+    const allWarnings = built.flatMap(({ p, warnings }) => warnings.map(w => p.name + ': ' + w));
+    npQuickWarningsEl.innerHTML = allWarnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+    npQuickOutputEl.textContent = built.map(({ p }) => JSON.stringify(p, null, 2) + ',').join('\n');
+    npQuickResult.hidden = false;
+    npQuickResult.scrollIntoView({ block: 'nearest' });
+  });
+
+  npQuickCopyBtn.addEventListener('click', () => {
+    const original = npQuickCopyBtn.textContent;
+    copyText(npQuickOutputEl.textContent)
+      .then(() => { npQuickCopyBtn.textContent = 'Copied'; npQuickClearDraft(); })
+      .catch(() => { npQuickCopyBtn.textContent = "Couldn't copy"; })
+      .finally(() => { setTimeout(() => { npQuickCopyBtn.textContent = original; }, 1800); });
   });
 
   function npSlugify(name, company) {
@@ -2257,6 +2500,7 @@
     npPopulateStageOptions();
     npPopulateCategoryList();
     npResetForm();
+    setNpMode('full');
     const draft = npLoadDraft();
     if (draft && npHasAnyValue(draft.values || {})) {
       npWriteFormValues(draft.values);
@@ -2265,6 +2509,22 @@
     } else {
       npDraftBanner.hidden = true;
     }
+
+    const quickDraft = npQuickLoadDraft();
+    if (quickDraft && (npQuickHasAnyValue(quickDraft.rowsValues || []) || quickDraft.date)) {
+      npQuickResetRows(quickDraft.rowsValues);
+      npQuickDateInput.value = quickDraft.date || todayIso();
+      npQuickDraftBannerTime.textContent = new Date(quickDraft.savedAt).toLocaleString();
+      npQuickDraftBanner.hidden = false;
+    } else {
+      npQuickResetRows();
+      npQuickDateInput.value = todayIso();
+      npQuickDraftBanner.hidden = true;
+    }
+    npQuickResult.hidden = true;
+    npQuickOutputEl.textContent = '';
+    npQuickWarningsEl.innerHTML = '';
+
     npOverlay.hidden = false;
     lockBodyScroll();
     document.getElementById('npName').focus();
