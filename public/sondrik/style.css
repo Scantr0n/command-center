@@ -93,6 +93,16 @@ header.page-head .sub {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: none; }
+/* csvBtn and copyStatusBtn get .disabled set by app.js when the data file
+   they depend on fails to load. Without this, a disabled button still shows
+   cursor: pointer and full-strength text, indistinguishable from a working
+   one, so a click that silently does nothing reads as broken rather than
+   as the honest "no data to export" state it actually is. */
+.print-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
 .attention-pill {
   font-size: 0.75rem;
