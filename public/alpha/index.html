@@ -27,6 +27,7 @@
         <span class="headline-text font-mono" id="headlineText">Loading...</span>
       </div>
       <button type="button" id="copyStatusBtn" class="refresh-btn font-mono" aria-live="polite" disabled>Copy status</button>
+      <button type="button" id="notifyBtn" class="refresh-btn font-mono" hidden aria-live="polite"></button>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
@@ -80,6 +81,12 @@
         aged" label instead of blanking to "awaiting connection". Account and positions never do this: they revert
         to "awaiting connection" immediately, since a frozen dollar figure is misleading in a way an old kill-switch
         reading is not.</p>
+      <p>"Enable critical alerts" turns on a native OS notification, using the browser's own Notification API, the
+        moment this tab's headline first shows the kill switch engaged or a page error, if this tab is not the one
+        currently focused. Nothing is sent anywhere for this: the browser shows the notification locally from
+        whatever this tab already has on screen, the same read-only data described above. The choice to enable it
+        is remembered per browser in <code>localStorage</code>; permission itself is controlled entirely by the
+        browser, and can be revoked at any time from its own site settings.</p>
       <div class="schema-table-wrap">
       <table class="schema-table">
         <tbody>

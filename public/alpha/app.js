@@ -716,6 +716,106 @@ function noteHeadlineForToast(level, text) {
   previousHeadlineLevel = level;
 }
 
+// Native OS-level notification, opt-in, for the one state on this page
+// genuinely worth interrupting Jack outside the tab for: the kill switch
+// engaging, or this page's own fetch failing (see the 'critical' level in
+// computeHeadline / the catch branch of loadStatus). This is purely the
+// browser's own Notification API showing a local notification built from
+// data already rendered on screen; nothing is sent anywhere, and there is
+// still no path from here back to Alpha. Kept separate from the in-page
+// toast (noteHeadlineForToast) since a toast only helps while the tab is
+// actually visible, which is exactly when a native notification is least
+// needed and most likely to feel redundant.
+const NOTIFY_PREF_KEY = 'alpha:notifyEnabled';
+
+function loadNotifyPref() {
+  try {
+    return localStorage.getItem(NOTIFY_PREF_KEY) === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+function saveNotifyPref(enabled) {
+  try {
+    localStorage.setItem(NOTIFY_PREF_KEY, enabled ? 'true' : 'false');
+  } catch (e) {
+    // Private browsing / storage blocked: the toggle still works for this
+    // page load, it just won't be remembered next visit.
+  }
+}
+
+const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+const notifyBtn = document.getElementById('notifyBtn');
+
+function renderNotifyBtn() {
+  if (!notifyBtn || !notifySupported) return;
+  const permission = Notification.permission;
+  if (permission === 'denied') {
+    notifyBtn.hidden = false;
+    notifyBtn.disabled = true;
+    notifyBtn.classList.remove('notify-on');
+    notifyBtn.textContent = 'Alerts blocked';
+    notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+    return;
+  }
+  const enabled = permission === 'granted' && loadNotifyPref();
+  notifyBtn.hidden = false;
+  notifyBtn.disabled = false;
+  notifyBtn.classList.toggle('notify-on', enabled);
+  notifyBtn.textContent = enabled ? 'Critical alerts on' : 'Enable critical alerts';
+  notifyBtn.title = enabled
+    ? 'A native notification fires if the kill switch engages or this page errors while this tab is unfocused. Click to turn off.'
+    : 'Get a native notification if the kill switch engages or this page errors while this tab is unfocused.';
+}
+
+if (notifyBtn && notifySupported) {
+  notifyBtn.addEventListener('click', async () => {
+    if (Notification.permission === 'denied') return;
+    if (Notification.permission === 'default') {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') {
+        saveNotifyPref(true);
+        showToast('good', 'Critical alerts enabled');
+      }
+      renderNotifyBtn();
+      return;
+    }
+    // Already granted: this button just toggles Jack's own preference,
+    // never re-prompts, since the browser permission itself already covers
+    // that question.
+    const nextEnabled = !loadNotifyPref();
+    saveNotifyPref(nextEnabled);
+    showToast('good', nextEnabled ? 'Critical alerts enabled' : 'Critical alerts turned off');
+    renderNotifyBtn();
+  });
+  renderNotifyBtn();
+}
+
+// Fires only on the transition into 'critical' (never on every poll while it
+// stays critical, same one-shot-per-transition shape as noteHeadlineForToast
+// above), and only while this tab isn't the one Jack is actually looking at,
+// since a native notification on top of the toast and the sticky red bar
+// would just be noise while the tab already has his attention.
+let previousNotifyLevel = null;
+
+function maybeFireCriticalNotification(level, text) {
+  if (!notifySupported) return;
+  const enteringCritical = level === 'critical' && previousNotifyLevel !== null && previousNotifyLevel !== 'critical';
+  previousNotifyLevel = level;
+  if (!enteringCritical) return;
+  if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
+  if (document.visibilityState === 'visible' && document.hasFocus()) return;
+  try {
+    const notification = new Notification('Alpha', { body: text, icon: '/icon-192.png', tag: 'alpha-critical' });
+    notification.onclick = () => { window.focus(); notification.close(); };
+  } catch (e) {
+    // Some browsers/OS notification permissions can still throw even once
+    // granted (e.g. a since-revoked OS-level permission); fail silently,
+    // the toast and sticky bar already carry this state on-page.
+  }
+}
+
 // Offline banner: navigator.onLine plus the real 'online'/'offline' window
 // events are the browser's own signal for whether this device has a network
 // path at all, a different question from whether Alpha is connected. This
@@ -802,6 +902,7 @@ async function loadStatus() {
 
     const headline = computeHeadline(effectiveData, !!lastKnown);
     noteHeadlineForToast(headline.level, headline.text);
+    maybeFireCriticalNotification(headline.level, headline.text);
     renderHeadline(headline.level, headline.text, headline.asOf);
     renderLastKnownBanner(lastKnown);
     updateLastKnownTags(lastKnown);
@@ -825,6 +926,7 @@ async function loadStatus() {
     // status.json, a real problem worth standing out from the everyday
     // "awaiting connection" gray, not blending into it.
     noteHeadlineForToast('critical', "Page error, couldn't load status.json");
+    maybeFireCriticalNotification('critical', "Alpha status page error, couldn't load status.json");
     renderHeadline('critical', "Page error, couldn't load status.json");
     document.getElementById('connDot').className = 'conn-dot error';
     document.getElementById('connLabel').textContent = "Couldn't load status.json";

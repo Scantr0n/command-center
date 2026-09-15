@@ -364,6 +364,12 @@ header.page-head .sub {
 .refresh-btn:disabled { opacity: 0.6; cursor: default; }
 .refresh-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
+/* Notify button: distinct "on" state so the header shows at a glance whether
+   critical-alert notifications are armed, same visual language as the good
+   headline/toast states elsewhere on the page (see headline-status.good). */
+.refresh-btn.notify-on { border-color: rgba(61,220,132,0.4); color: #3DDC84; }
+.refresh-btn.notify-on:hover, .refresh-btn.notify-on:focus-visible { border-color: rgba(61,220,132,0.6); color: #3DDC84; }
+
 /* Connectivity history strip: a compact left-to-right (oldest to newest) row
    of per-check ticks, the same bar-strip pattern used by Statuspage,
    UptimeRobot and similar uptime pages to show recent history at a glance
