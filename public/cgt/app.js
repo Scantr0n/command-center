@@ -467,6 +467,23 @@ function buildValueGroupsByYear() {
     .sort((a, b) => Number(b.label) - Number(a.label));
 }
 
+// Groups real priced cards' estimatedValue by backlogBatch, the label for
+// which real pricing sweep a card was researched in (e.g. one binder page or
+// one sport's backlog pass). Sorted newest batch first, same as "By year",
+// since a batch is a point in time rather than a value to rank; this answers
+// "how much did each real research session actually turn up", which is the
+// natural next question once the 2026-08-08 full backlog sweep is broken
+// into its component batches. Cards with no backlogBatch logged are skipped,
+// same as buildValueGroups skips a falsy field on any other breakdown.
+function buildValueGroupsByBatch() {
+  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c.backlogBatch);
+  const totals = new Map();
+  priced.forEach(c => totals.set(c.backlogBatch, (totals.get(c.backlogBatch) || 0) + c.estimatedValue));
+  return [...totals.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.label.localeCompare(a.label));
+}
+
 // formatValue and emptyText are overridable since this same row/bar layout
 // also drives the grading-turnaround card below, where the value is a day
 // count with a returned-submission tally attached, not a plain dollar figure.
@@ -546,6 +563,9 @@ function renderValueBreakdown() {
     renderBreakdownList('By grading company', buildValueGroups('gradingCompany')) +
     renderBreakdownList('By grade', buildValueGroupsByGrade()) +
     renderBreakdownList('By year', buildValueGroupsByYear()) +
+    renderBreakdownList('By pricing batch', buildValueGroupsByBatch(), {
+      emptyText: 'No priced real cards with a backlogBatch logged yet.'
+    }) +
     renderBreakdownList('Avg. grading turnaround', buildTurnaroundByGrader(), {
       formatValue: g => g.value + 'd avg (' + g.min + '-' + g.max + 'd, ' + g.count + ' returned)',
       emptyText: 'No returned submissions with both dates logged yet.'
