@@ -13,6 +13,7 @@
   const modalCompany = document.getElementById('modalCompany');
   const modalBody = document.getElementById('modalBody');
   const modalClose = document.getElementById('modalClose');
+  const modalCopyLinkBtn = document.getElementById('modalCopyLinkBtn');
   const printBtn = document.getElementById('printBtn');
   const csvBtn = document.getElementById('csvBtn');
   const icsBtn = document.getElementById('icsBtn');
@@ -1055,6 +1056,8 @@
   let lastFiltered = [];
   let viewMode = 'board';
   let lastFilterArgs = null;
+  let openProspectId = null;
+  let initialProspectId = null;
 
   function setViewMode(mode, skipUrlSync) {
     viewMode = mode === 'list' ? 'list' : 'board';
@@ -1088,10 +1091,12 @@
     const channel = params.get('channel');
     const category = params.get('category');
     const view = params.get('view');
+    const prospect = params.get('prospect');
     if (q) searchInput.value = q;
     if (channel && VALID_CHANNELS.includes(channel)) channelFilter = channel;
     if (category) categoryFilter = category;
     if (view === 'list') viewMode = 'list';
+    if (prospect) initialProspectId = prospect;
   }
 
   function syncUrl() {
@@ -1101,6 +1106,7 @@
     if (channelFilter !== 'all') params.set('channel', channelFilter);
     if (categoryFilter !== 'all') params.set('category', categoryFilter);
     if (viewMode === 'list') params.set('view', 'list');
+    if (openProspectId) params.set('prospect', openProspectId);
     const qs = params.toString();
     const url = location.pathname + (qs ? '?' + qs : '');
     history.replaceState(null, '', url);
@@ -1685,6 +1691,8 @@
     wireOutreachLogGenerator(p);
     lockBodyScroll();
     modalClose.focus();
+    openProspectId = p.id;
+    syncUrl();
   }
 
   // Small snippet generators embedded in the detail modal for the two
@@ -1873,6 +1881,8 @@
       lastFocusedEl.focus();
     }
     lastFocusedEl = null;
+    openProspectId = null;
+    syncUrl();
   }
 
   function getFocusable() {
@@ -1946,6 +1956,19 @@
       .catch(() => { copyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
       .finally(() => {
         setTimeout(() => { copyLinkBtn.textContent = COPY_LINK_LABEL; }, 1800);
+      });
+  });
+
+  // Deep link straight to one prospect's detail modal (?prospect=<id>, kept
+  // in sync with openProspectId by openModal/closeModal), so a specific
+  // prospect can be bookmarked or shared instead of only the whole board.
+  const MODAL_COPY_LINK_LABEL = modalCopyLinkBtn.textContent;
+  modalCopyLinkBtn.addEventListener('click', () => {
+    copyText(location.href)
+      .then(() => { modalCopyLinkBtn.textContent = 'Link copied'; })
+      .catch(() => { modalCopyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
+      .finally(() => {
+        setTimeout(() => { modalCopyLinkBtn.textContent = MODAL_COPY_LINK_LABEL; }, 1800);
       });
   });
 
@@ -2277,6 +2300,7 @@
       renderChannelEffectiveness(allProspects);
       renderCategoryEffectiveness(allProspects);
       applyFilter();
+      if (initialProspectId && byId[initialProspectId]) openModal(initialProspectId);
       if (failures.length) {
         boardEl.insertAdjacentHTML('afterbegin',
           '<div class="column-empty" role="alert">Showing partial data, failed to load: ' + failures.map(escapeHtml).join('; ') + '</div>');

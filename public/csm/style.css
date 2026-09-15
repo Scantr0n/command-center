@@ -784,7 +784,8 @@ header.page-head .sub {
   font-size: 1.2rem;
   margin: 0 0 2px;
 }
-.modal .modal-company { color: var(--sub); font-size: 0.85rem; margin-bottom: 16px; }
+.modal .modal-company { color: var(--sub); font-size: 0.85rem; margin-bottom: 8px; }
+.modal-copy-link { margin: 0 0 16px; }
 
 .field-row {
   padding: 10px 0;
