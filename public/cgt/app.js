@@ -279,6 +279,7 @@ async function loadCards() {
     renderValueBreakdown();
     renderBiggestMovers();
     renderPricingActivity();
+    renderUnpriced();
     renderDataQuality();
     renderStalePricing();
     renderDuplicates();
@@ -828,6 +829,37 @@ function renderBatchFilter() {
 // card with no cert number logged (so it can't be looked back up later).
 // Same "Needs backfill" pattern as the CSM hub's own data-quality panel,
 // hidden entirely when nothing is flagged rather than showing an empty box.
+// A card can be logged (name/year/sport known from the physical sweep) before
+// it's been individually researched for a price. Distinct from
+// buildDataQualityFlags below: those cards have a price on record but a
+// metadata gap, these have no price at all yet and would otherwise be
+// invisible outside the raw inventory table's "not priced" cell.
+function buildUnpricedFlags() {
+  return cards.filter(c => !isExample(c) && c.estimatedValue == null);
+}
+
+function renderUnpriced() {
+  const section = document.getElementById('unpricedSection');
+  const list = document.getElementById('unpricedList');
+  const unpriced = buildUnpricedFlags();
+
+  if (!unpriced.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = unpriced.map(c => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}</span>
+      <span class="dq-meta">${escapeHtml([c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '))}</span>
+      <span class="dq-why">NO PRICE LOGGED</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
 function buildDataQualityFlags() {
   return cards
     .filter(c => !isExample(c))
