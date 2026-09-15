@@ -1750,6 +1750,21 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // The two fields this project has found most predictive of a real reply
+  // (see the contact-channel callout in index.html). Warn right where
+  // outreach is actually about to be logged as sent, not only after the
+  // fact in the passive "Needs backfill" list further down the page.
+  function outreachReadinessWarnings(p) {
+    const warnings = [];
+    if (!p.verifiedHook) {
+      warnings.push('No verifiedHook logged yet for this prospect, the real reason this person/brand fits.');
+    }
+    if (!p.contactChannel || !p.contactChannel.type) {
+      warnings.push('contactChannel.type is not logged yet (named decision-maker vs. generic inbox), the single field most predictive of a real reply.');
+    }
+    return warnings;
+  }
+
   function stageMoveGeneratorHtml() {
     return '<div class="inline-gen">' +
       '<div class="inline-gen-row">' +
@@ -1845,13 +1860,17 @@
       }
       const history = p.stageHistory || [];
       const last = history[history.length - 1];
-      let warn = '';
+      const warnParts = [];
       if (last && last.date && date < last.date) {
-        warn = 'This date is before the last logged move (' + last.date + '). stageHistory must stay sorted oldest first.';
+        warnParts.push('This date is before the last logged move (' + last.date + '). stageHistory must stay sorted oldest first.');
       } else if (stage !== p.stage) {
-        warn = 'This prospect’s own "stage" field is still "' + p.stage + '". If this move already really ' +
-          'happened, also update this prospect’s "stage" and "stageEnteredDate" fields, not just stageHistory.';
+        warnParts.push('This prospect’s own "stage" field is still "' + p.stage + '". If this move already really ' +
+          'happened, also update this prospect’s "stage" and "stageEnteredDate" fields, not just stageHistory.');
       }
+      if (stage === 'outreach-sent') {
+        warnParts.push(...outreachReadinessWarnings(p));
+      }
+      const warn = warnParts.join(' ');
       warnEl.hidden = !warn;
       warnEl.textContent = warn;
       outputEl.textContent = JSON.stringify({ date, stage }, null, 2) + ',';
@@ -1905,10 +1924,14 @@
       }
       const log = p.outreachLog || [];
       const alreadySent = log.some(e => e.type === 'initial-send');
-      let warn = '';
+      const warnParts = [];
       if (type === 'initial-send' && alreadySent) {
-        warn = 'An "initial-send" touch is already logged for this prospect. If this is a follow-up, use "Nudge" instead.';
+        warnParts.push('An "initial-send" touch is already logged for this prospect. If this is a follow-up, use "Nudge" instead.');
       }
+      if (type === 'initial-send' && !alreadySent) {
+        warnParts.push(...outreachReadinessWarnings(p));
+      }
+      const warn = warnParts.join(' ');
       warnEl.hidden = !warn;
       warnEl.textContent = warn;
       const entry = { date, type };
