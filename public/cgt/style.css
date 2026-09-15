@@ -333,7 +333,9 @@ header.page-head .sub {
   border-radius: 8px;
   padding: 7px 12px;
   font-size: 0.78rem;
+  flex: 1 1 240px;
   min-width: 200px;
+  max-width: 480px;
   transition: border-color 0.15s ease;
 }
 .search-input:focus {
