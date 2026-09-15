@@ -9,6 +9,7 @@
   const nextStepsList = document.getElementById('nextStepsList');
   const csvBtn = document.getElementById('csvBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
+  const copyPublicBtn = document.getElementById('copyPublicBtn');
   const copyStatusLive = document.getElementById('copyStatusLive');
   const attentionPill = document.getElementById('attentionPill');
   const newSincePill = document.getElementById('newSincePill');
@@ -790,6 +791,51 @@
     return lines.join('\n');
   }
 
+  // Indie/solo founder dashboards commonly expose a one-tap "copy a
+  // build-in-public post" alongside an internal status log, since sharing real
+  // traction on X/Reddit is a normal part of that workflow. This is a
+  // separate, shorter composition from buildStatusUpdate above, not a
+  // trimmed copy of it: it drops internal-only detail (next steps, the
+  // approval-gated lead's draft/approval status) and instead writes the same
+  // real facts as a plain sentence or two meant to be posted publicly. It
+  // still only ever states what is already real and logged elsewhere on the
+  // page, and it is still just a clipboard copy, nothing here posts on its
+  // own behalf.
+  function buildPublicPost(releasesData, downloadsData, leadsData) {
+    const parts = [];
+
+    const releases = ((releasesData && releasesData.releases) || []).slice()
+      .filter(r => r.date)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    if (releases.length > 0) {
+      const r = releases[0];
+      parts.push('Sondrik v' + r.version + ' shipped ' + fmtDate(r.date) +
+        (r.summary ? ' (' + r.summary.replace(/\.$/, '') + ')' : '') + '.');
+    }
+
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length > 0) {
+      const latest = checks[checks.length - 1];
+      let line = latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date);
+      if (checks.length > 1) {
+        const first = checks[0];
+        line += ', up from ' + first.count + ' on ' + fmtDate(first.date);
+      }
+      parts.push(line + '.');
+    }
+
+    const leads = (leadsData && leadsData.leads) || [];
+    const testerOffers = leads.filter(l => l.type === 'beta-tester-offer');
+    if (testerOffers.length > 0) {
+      parts.push((testerOffers.length === 1 ? 'One' : String(testerOffers.length)) +
+        ' real reader offered to test it in exchange for lifetime access.');
+    }
+
+    if (parts.length === 0) return '';
+    return parts.join(' ');
+  }
+
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       return navigator.clipboard.writeText(text);
@@ -947,6 +993,22 @@
       });
     } else {
       copyStatusBtn.disabled = true;
+    }
+
+    const publicPostText = buildPublicPost(releasesData || {}, downloadsData || {}, leadsData || {});
+    if (publicPostText) {
+      copyPublicBtn.addEventListener('click', () => {
+        copyText(publicPostText).then(() => {
+          const original = copyPublicBtn.textContent;
+          copyPublicBtn.textContent = 'Copied!';
+          copyStatusLive.textContent = 'Build-in-public post copied to clipboard.';
+          setTimeout(() => { copyPublicBtn.textContent = original; }, 1800);
+        }).catch(() => {
+          copyStatusLive.textContent = 'Could not copy to clipboard.';
+        });
+      });
+    } else {
+      copyPublicBtn.disabled = true;
     }
   });
 })();
