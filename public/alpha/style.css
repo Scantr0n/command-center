@@ -672,6 +672,40 @@ header.page-head .sub {
   margin-top: 2px;
 }
 
+/* Kill switch engaged is the one state on this page Jack would want to see
+   even from across the room, current or last known (see computeHeadline's
+   own comment in app.js), but the headline pill it drives lives only in the
+   page header. On a page this long, scrolling down past Position sizing or
+   Positions puts that pill off-screen exactly while the page still has
+   plenty of critical state left to show. Real incident-banner UX (the
+   pattern behind every status page's "degraded/major outage" strip) keeps
+   that one top-line signal pinned to the viewport regardless of scroll
+   position; this mirrors that, fixed rather than sticky so it holds through
+   the whole page, and only ever appears for the kill-switch-engaged case,
+   never for the merely "connected"/"awaiting connection" states the header
+   pill already handles fine on its own. */
+.sticky-critical-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: #E05050;
+  color: #2A0808;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 10px 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+}
+.sticky-critical-bar[hidden] { display: none; }
+/* Fixed positioning above takes the bar out of document flow, so without
+   this the bar would simply overlap the top of the header instead of
+   pushing it down. Applied to body (not .wrap) so it also clears the
+   sticky bar on the shortest possible pages. */
+body.has-sticky-critical { padding-top: 40px; }
+
 /* Toasts: transient, informational only, never require action. */
 .toast-container {
   position: fixed;

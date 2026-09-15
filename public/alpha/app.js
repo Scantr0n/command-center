@@ -182,6 +182,15 @@ function renderHeadline(level, text, asOf) {
   el.className = 'headline-status ' + level;
   document.getElementById('headlineText').textContent = text;
   el.title = asOf ? 'Reading taken at ' + formatAbsolute(asOf) : '';
+
+  // See the .sticky-critical-bar comment in style.css: the header pill alone
+  // scrolls off-screen on a page this long, so the one state worth seeing
+  // from across the room gets its own bar pinned to the viewport instead.
+  const bar = document.getElementById('stickyCriticalBar');
+  const isCritical = level === 'critical';
+  bar.hidden = !isCritical;
+  bar.textContent = isCritical ? text : '';
+  document.body.classList.toggle('has-sticky-critical', isCritical);
 }
 
 // Scans connection.history for the most recent entry that was actually
