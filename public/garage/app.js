@@ -691,7 +691,10 @@ function platformBadges(platforms, soldOn, listingUrls) {
 // mentioned only in notes was unfindable by search.
 function matchesSearchTerm(l, term) {
   term = term.trim().toLowerCase();
-  return !term || (l.title || '').toLowerCase().includes(term) || (l.notes || '').toLowerCase().includes(term);
+  return !term
+    || (l.title || '').toLowerCase().includes(term)
+    || (l.notes || '').toLowerCase().includes(term)
+    || (l.location || '').toLowerCase().includes(term);
 }
 function matchesPlatformValue(l, platform) {
   return platform === 'all' || (l.platforms || []).includes(platform);
