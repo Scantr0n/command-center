@@ -1245,6 +1245,17 @@ function fieldRow(label, valueHtml, empty) {
   `;
 }
 
+// eBay's own documented search params: LH_Complete=1 returns every listing
+// that ended (sold or not), LH_Sold=1 narrows that to ones that actually
+// found a buyer, with the real final sale price shown instead of an asking
+// price. Only covers eBay, whose sold-listings search is public; Vinted,
+// Poshmark and Depop don't expose an equivalent public "sold" search URL,
+// so this deliberately isn't offered for those. eBay's own sold data only
+// covers roughly the last 90 days.
+function ebaySoldSearchUrl(title) {
+  return 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(title) + '&LH_Complete=1&LH_Sold=1';
+}
+
 function openModal(id) {
   const l = listings.find(item => item.id === id);
   if (!l) return;
@@ -1280,6 +1291,12 @@ function openModal(id) {
   rows.push(fieldRow('Est. net payout by platform', payoutHtml, !(l.platforms || []).length));
 
   rows.push(fieldRow('Storage location', l.location ? escapeHtml(l.location) : 'Not logged', !l.location));
+
+  const compsHtml = l.title
+    ? `<a class="badge badge-link" href="${escapeHtml(ebaySoldSearchUrl(l.title))}" target="_blank" rel="noopener noreferrer" title="Opens eBay's real sold-listings search for this title in a new tab">eBay sold listings for "${escapeHtml(l.title)}" <span aria-hidden="true">&#8599;</span></a>`
+    : 'Not applicable, no title logged.';
+  rows.push(fieldRow('Price research', compsHtml, !l.title));
+
   rows.push(fieldRow('Notes', l.notes ? escapeHtml(l.notes) : 'None', !l.notes));
 
   document.getElementById('modalBody').innerHTML = rows.join('');
