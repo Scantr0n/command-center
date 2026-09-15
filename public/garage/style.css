@@ -619,6 +619,38 @@ table.card-table {
   margin-top: 8px;
 }
 
+/* Buyer message templates */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.template-card {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.template-card-label {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.template-card-text {
+  color: var(--sub);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.template-card-copy {
+  align-self: flex-start;
+}
+
 .checklist {
   list-style: none;
   margin: 0 0 14px;

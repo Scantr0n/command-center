@@ -182,6 +182,7 @@ async function loadData() {
     renderRelist(listings);
     renderPayoutTable(listings);
     renderOfferItemChips(listings);
+    renderTemplateItemChips(listings);
   } else {
     listings = [];
     document.getElementById('statRow').innerHTML = '';
@@ -193,6 +194,7 @@ async function loadData() {
     document.getElementById('relistTableBody').innerHTML = '';
     document.getElementById('payoutTableBody').innerHTML = '';
     renderOfferItemChips([]);
+    renderTemplateItemChips([]);
     errBox.hidden = false;
     errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load Garage data: " + listingsResult.reason.message;
@@ -1130,6 +1132,104 @@ function wireOfferGuide() {
   renderOfferItemChips([]);
 }
 
+// Buyer message templates: canned replies for the handful of buyer
+// questions that repeat across every platform (availability, bundling,
+// price firmness, condition, shipping status), a documented reseller
+// time-saver. Copy-only, nothing here sends a real message.
+const MESSAGE_TEMPLATES = [
+  {
+    id: 'availability',
+    label: 'Is this still available?',
+    text: 'Hi! Yes, {item} is still available and ready to ship. Let me know if you have any other questions!'
+  },
+  {
+    id: 'bundle',
+    label: 'Bundle / combined shipping request',
+    text: "Thanks for asking! I'm happy to combine shipping on a bundle. Send over the other listing(s) you're interested in and I'll work out a combined price for {item} plus those before you check out."
+  },
+  {
+    id: 'firm-price',
+    label: '"Would you take less?" question',
+    text: "I appreciate the interest! {price} is where I have {item} priced for now. Feel free to send an actual offer through the platform's offer button and I'll take a look."
+  },
+  {
+    id: 'condition',
+    label: 'Condition / measurements question',
+    text: "Good question, {item} is described as accurately as I can in the listing. Let me know exactly which measurement or detail you're checking and I'll get you a real number rather than guessing."
+  },
+  {
+    id: 'shipping-status',
+    label: 'Shipping / handling time question',
+    text: "{item} ships within my normal handling time listed on the platform. Once it's out I'll upload real tracking so you can follow it the rest of the way."
+  },
+  {
+    id: 'shipped',
+    label: 'Item shipped notification',
+    text: "Good news, {item} is on its way! Tracking is uploaded to the order, let me know once it arrives safely."
+  }
+];
+
+let templateItemId = 'custom';
+
+function templateGuideSelectedListing() {
+  return templateItemId !== 'custom' ? listings.find(l => l.id === templateItemId) || null : null;
+}
+
+function fillTemplate(text) {
+  const l = templateGuideSelectedListing();
+  const item = l && l.title ? l.title : '[item]';
+  const price = l && l.price != null ? formatUsd(l.price) : '[price]';
+  return text.replace(/\{item\}/g, item).replace(/\{price\}/g, price);
+}
+
+function renderTemplateGrid() {
+  const grid = document.getElementById('templateGrid');
+  grid.innerHTML = MESSAGE_TEMPLATES.map(t => `
+    <div class="template-card">
+      <span class="template-card-label">${escapeHtml(t.label)}</span>
+      <p class="template-card-text">${escapeHtml(fillTemplate(t.text))}</p>
+      <button type="button" class="print-btn font-mono template-card-copy" data-template-id="${escapeHtml(t.id)}">Copy</button>
+    </div>
+  `).join('');
+}
+
+function onTemplateItemChange() {
+  document.getElementById('templateItemChips').querySelectorAll('.chip').forEach(c => {
+    c.setAttribute('aria-pressed', String(c.getAttribute('data-template-item') === templateItemId));
+  });
+  renderTemplateGrid();
+}
+
+function renderTemplateItemChips(currentListings) {
+  const container = document.getElementById('templateItemChips');
+  const live = currentListings.filter(l => l.status === 'live');
+  if (templateItemId !== 'custom' && !live.some(l => l.id === templateItemId)) templateItemId = 'custom';
+  container.innerHTML = [
+    `<button type="button" class="chip" data-template-item="custom" aria-pressed="${templateItemId === 'custom'}">Custom</button>`,
+    ...live.map(l => `<button type="button" class="chip" data-template-item="${escapeHtml(l.id)}" aria-pressed="${templateItemId === l.id}">${escapeHtml(l.title || 'Untitled item')}</button>`)
+  ].join('');
+  container.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click', () => {
+    templateItemId = chip.getAttribute('data-template-item');
+    onTemplateItemChange();
+  }));
+  onTemplateItemChange();
+}
+
+function wireMessageTemplates() {
+  renderTemplateItemChips([]);
+  document.getElementById('templateGrid').addEventListener('click', e => {
+    const btn = e.target.closest('.template-card-copy');
+    if (!btn) return;
+    const t = MESSAGE_TEMPLATES.find(m => m.id === btn.getAttribute('data-template-id'));
+    if (!t) return;
+    const original = btn.textContent;
+    copyText(fillTemplate(t.text))
+      .then(() => { btn.textContent = 'Copied'; })
+      .catch(() => { btn.textContent = "Couldn't copy"; })
+      .finally(() => { setTimeout(() => { btn.textContent = original; }, 1800); });
+  });
+}
+
 function renderActivity(events) {
   const list = document.getElementById('activityList');
   if (!events.length) {
@@ -1766,6 +1866,7 @@ function renderPhotoAuditResults(results, loaded, total, flagged) {
 
 wireCalc();
 wireOfferGuide();
+wireMessageTemplates();
 wireChecklist();
 wirePacePlanner();
 initPhotoAudit();
