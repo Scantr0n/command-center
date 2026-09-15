@@ -25,11 +25,20 @@ function timeAgo(iso) {
 // the relative-time text rather than printed inline, so the page stays
 // scannable while the exact moment is one hover away. Local time, since
 // it's Jack looking at his own screen.
+// Alpha runs on Jack's Mac; this page can be glanced at from any device, in
+// any timezone, including a phone far from that Mac. An absolute timestamp
+// with no timezone attached is genuinely ambiguous the moment the viewing
+// device's timezone isn't the assumed one, and on a real-money system that
+// ambiguity is exactly the kind of thing that erodes trust in a freshness
+// reading (status-page UX guidance is consistent that stale-looking data is
+// worse than downtime itself). timeZoneName: 'short' appends the browser's
+// own zone abbreviation (e.g. "CDT"), so "reading taken at 2:14:03 PM" never
+// has to be mentally reconciled against "which timezone is that".
 function formatAbsolute(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return String(iso);
   return d.toLocaleString(undefined, {
-    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit'
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
   });
 }
 
