@@ -273,6 +273,54 @@ header.page-head .sub {
   white-space: nowrap;
 }
 
+/* Biggest movers leaderboard: two breakdown-card-style panels, but rows are
+   clickable (jump to the card's modal) and colored by gain/loss like the
+   stat-tile positive/negative tiles, rather than a bar chart. */
+.movers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.movers-card {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.movers-empty {
+  font-size: 0.82rem;
+  color: var(--dim);
+  margin: 0;
+}
+.movers-list { display: flex; flex-direction: column; }
+.movers-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 0;
+  border-top: 1px solid var(--hairline);
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.movers-row:first-of-type { border-top: none; }
+.movers-row:hover, .movers-row:focus-visible { background: rgba(255,255,255,0.04); }
+.movers-row:focus-visible { outline: 1px solid rgba(155,140,255,0.5); outline-offset: -2px; }
+.movers-row .movers-name { font-weight: 600; color: var(--ink); }
+.movers-row .movers-meta { color: var(--sub); }
+.movers-row .movers-change { margin-left: auto; font-size: 0.75rem; white-space: nowrap; }
+.movers-row .movers-change.positive { color: #3DDC84; }
+.movers-row .movers-change.negative { color: #E0503C; }
+
 /* Pricing activity feed, same shape as the Recent Activity feed in
    CSM/Garage/Sondrik. */
 .activity-feed {
@@ -855,6 +903,13 @@ code.inline-code {
   .breakdown-label, .breakdown-value { color: #111 !important; }
   .breakdown-bar-track { background: #eee; }
   .breakdown-bar-fill { background: #888 !important; }
+
+  .movers-card { background: none; border: 1px solid #ccc; }
+  .movers-empty { color: #333 !important; }
+  .movers-row { border-color: #ddd; }
+  .movers-row .movers-name { color: #111; }
+  .movers-row .movers-meta { color: #555; }
+  .movers-row .movers-change.positive, .movers-row .movers-change.negative { color: #111 !important; }
 
   .activity-feed { background: none; border-color: #bbb; }
   .activity-row { border-color: #ddd; }

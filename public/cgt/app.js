@@ -266,6 +266,7 @@ async function loadCards() {
     renderCandidates();
     renderSubmissions();
     renderValueBreakdown();
+    renderBiggestMovers();
     renderPricingActivity();
     renderDataQuality();
     renderStalePricing();
@@ -537,6 +538,49 @@ function renderValueBreakdown() {
       formatValue: g => g.value + 'd avg (' + g.min + '-' + g.max + 'd, ' + g.count + ' returned)',
       emptyText: 'No returned submissions with both dates logged yet.'
     });
+}
+
+// "Biggest gainers/losers" leaderboard, the feature real collectible-portfolio
+// trackers (Collectr, Card Codex) lead with: which specific cards actually
+// moved the most, not just the up/down counts already in the stat row. Only
+// ever reads computeValueTrend's real prior price, so a card priced exactly
+// once (no priceHistory to compare against) never appears here.
+const MOVERS_LIST_LIMIT = 5;
+
+function buildBiggestMovers() {
+  const trended = cards
+    .filter(c => !isExample(c))
+    .map(c => ({ c, trend: computeValueTrend(c) }))
+    .filter(x => x.trend && x.trend.abs !== 0);
+  const gainers = trended.filter(x => x.trend.abs > 0).sort((a, b) => b.trend.abs - a.trend.abs).slice(0, MOVERS_LIST_LIMIT);
+  const losers = trended.filter(x => x.trend.abs < 0).sort((a, b) => a.trend.abs - b.trend.abs).slice(0, MOVERS_LIST_LIMIT);
+  return { gainers, losers };
+}
+
+function renderMoversList(entries, emptyText) {
+  if (!entries.length) return `<p class="movers-empty">${escapeHtml(emptyText)}</p>`;
+  return entries.map(({ c, trend }) => `
+    <button type="button" class="movers-row" data-id="${escapeHtml(c.id)}">
+      <span class="movers-name">${escapeHtml(c.cardName || 'Untitled card')}</span>
+      <span class="movers-meta">${escapeHtml([c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '))}</span>
+      <span class="movers-change font-mono ${trend.abs >= 0 ? 'positive' : 'negative'}">${escapeHtml(formatSignedUsd(trend.abs))}${trend.pct != null ? ' (' + (trend.pct >= 0 ? '+' : '') + trend.pct.toFixed(0) + '%)' : ''}</span>
+    </button>
+  `).join('');
+}
+
+function renderBiggestMovers() {
+  const section = document.getElementById('moversSection');
+  const { gainers, losers } = buildBiggestMovers();
+  if (!gainers.length && !losers.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  document.getElementById('moversGainersList').innerHTML = renderMoversList(gainers, 'No re-priced cards have gone up yet.');
+  document.getElementById('moversLosersList').innerHTML = renderMoversList(losers, 'No re-priced cards have gone down yet.');
+  section.querySelectorAll('.movers-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
 }
 
 // Pulls "what got priced when" out of every card's own datePriced/backlogBatch
