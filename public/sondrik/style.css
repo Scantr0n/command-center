@@ -111,6 +111,12 @@ header.page-head .sub {
   background: rgba(224,160,48,0.16);
   outline: none;
 }
+/* The unconditional display: inline-flex above overrides the browser's
+   default [hidden] { display: none } rule (a class selector outranks that
+   UA-stylesheet rule), so without this the pill still rendered as an empty
+   bordered capsule taking up header space whenever app.js set hidden=true
+   (e.g. no leads awaiting approval). */
+.attention-pill[hidden] { display: none; }
 
 /* "New since your last visit" pill: purely a per-browser localStorage
    comparison against real logged dates already on the page, never a second
@@ -134,6 +140,9 @@ header.page-head .sub {
   background: rgba(91,140,255,0.16);
   outline: none;
 }
+/* Same [hidden] override as .attention-pill above, this pill has the same
+   unconditional display declaration. */
+.new-since-pill[hidden] { display: none; }
 
 .timeline-new-badge {
   font-size: 0.6rem;
