@@ -251,6 +251,16 @@ async function loadData() {
   initTableScrollShadows();
 }
 
+// Purely a "you are here" pointer into the static seasonal reference table,
+// not computed from any logged listing/sale data.
+function renderSeasonalCalendarHighlight() {
+  const rows = document.querySelectorAll('#seasonalGuideTable tbody tr');
+  const currentMonth = new Date().getMonth();
+  rows.forEach(row => {
+    row.classList.toggle('is-current-month', Number(row.dataset.month) === currentMonth);
+  });
+}
+
 function remainingPlatforms(l) {
   const soldOn = l.soldOn || [];
   return (l.platforms || []).filter(p => !soldOn.includes(p));
@@ -1873,4 +1883,5 @@ wireMessageTemplates();
 wireChecklist();
 wirePacePlanner();
 initPhotoAudit();
+renderSeasonalCalendarHighlight();
 loadData();

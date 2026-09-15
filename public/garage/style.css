@@ -215,6 +215,15 @@ section { margin-bottom: 36px; }
 }
 .stat-tile-warn .stat-tile-value { color: #E0A030; }
 
+/* Seasonal calendar current-month row */
+#seasonalGuideTable tbody tr.is-current-month {
+  background: rgba(224,160,48,0.06);
+}
+#seasonalGuideTable tbody tr.is-current-month td:first-child {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Pipeline stages */
 .pipeline-row {
   display: grid;
