@@ -997,6 +997,10 @@
 
     const publicPostText = buildPublicPost(releasesData || {}, downloadsData || {}, leadsData || {});
     if (publicPostText) {
+      // A plain length count of the real composed text, not a guess: lets
+      // Jack see at a glance whether it fits a platform's post limit (X's
+      // free-tier limit is 280 characters) before he pastes it anywhere.
+      copyPublicBtn.title = publicPostText.length + ' characters';
       copyPublicBtn.addEventListener('click', () => {
         copyText(publicPostText).then(() => {
           const original = copyPublicBtn.textContent;
