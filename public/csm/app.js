@@ -2210,6 +2210,46 @@
     npQuickRowsEl.lastElementChild.querySelector('input[data-field="name"]').focus();
   });
 
+  // Real usage is pasting straight out of a research spreadsheet, not typing
+  // one candidate at a time. Tab-separated columns and newline-separated
+  // rows are the format every spreadsheet app (Sheets, Excel, Numbers) puts
+  // on the clipboard, so a paste containing either is spread across
+  // rows/columns starting at the focused cell, same convention as pasting
+  // into a spreadsheet or any grid-based bulk-add screen, instead of the
+  // whole blob landing in one field. A plain single-value paste (no tab, no
+  // newline) is left to the browser's default paste behavior.
+  function npQuickHandlePaste(e) {
+    const target = e.target;
+    if (!target || !target.matches('[data-field]')) return;
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!text || (!text.includes('\n') && !text.includes('\t'))) return;
+    e.preventDefault();
+    const lines = text.split(/\r\n|\r|\n/);
+    while (lines.length && lines[lines.length - 1] === '') lines.pop();
+    if (!lines.length) return;
+    const startFieldIndex = NP_QUICK_ROW_FIELDS.indexOf(target.getAttribute('data-field'));
+    const rows = Array.from(npQuickRowsEl.querySelectorAll('[data-quick-row]'));
+    const startRowIndex = rows.indexOf(target.closest('[data-quick-row]'));
+    let lastInput = target;
+    lines.forEach((line, i) => {
+      let rowEl = rows[startRowIndex + i];
+      if (!rowEl) {
+        rowEl = npQuickAddRow();
+        rows.push(rowEl);
+      }
+      line.split('\t').forEach((col, j) => {
+        const field = NP_QUICK_ROW_FIELDS[startFieldIndex + j];
+        if (!field) return;
+        const input = rowEl.querySelector('[data-field="' + field + '"]');
+        if (input) { input.value = col.trim(); lastInput = input; }
+      });
+    });
+    lastInput.scrollIntoView({ block: 'nearest' });
+    lastInput.focus();
+    npQuickSaveDraft();
+  }
+  npQuickRowsEl.addEventListener('paste', npQuickHandlePaste);
+
   function npQuickResetRows(rowsValues) {
     npQuickRowsEl.innerHTML = '';
     npQuickRowSeq = 0;
