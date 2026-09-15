@@ -158,6 +158,17 @@ function todayIso() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+// Projects an ISO date forward by a whole number of days, local calendar
+// semantics (no time-of-day component), same "local calendar date" rule as
+// todayIso/daysSince below. Used to turn a grader's own average turnaround
+// into a real projected date rather than leaving Jack to do the day-math on
+// a "days in queue" figure himself.
+function addDaysIso(isoDate, days) {
+  const d = new Date(isoDate + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function daysSince(isoDate) {
   if (!isoDate) return null;
   // Local midnight, not UTC (no trailing Z), same convention as Sondrik's
@@ -755,6 +766,13 @@ function renderSubmissions() {
     const daysText = days == null ? 'no date logged' : days + ' day' + (days === 1 ? '' : 's') + ' in queue';
     const graderStats = s.gradingCompany && turnaroundByGrader.get(s.gradingCompany);
     const runningLong = days != null && graderStats && graderStats.count >= 2 && days > graderStats.value;
+    // Only projected forward while the submission is still within that
+    // grader's own average window; once it's running long the "past avg"
+    // badge below already says so, and a projected date already in the past
+    // would just read as a broken estimate rather than a useful one.
+    const estReturnDate = (!runningLong && s.submittedDate && graderStats && graderStats.count >= 2)
+      ? addDaysIso(s.submittedDate, graderStats.value)
+      : null;
     const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
     const metaParts = [
       s.gradingCompany,
@@ -769,6 +787,7 @@ function renderSubmissions() {
         <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
         ${runningLong ? `<span class="badge badge-late" title="${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} is ${graderStats.value} days">past ${escapeHtml(s.gradingCompany)} avg (${graderStats.value}d)</span>` : ''}
+        ${estReturnDate ? `<span class="submission-meta font-mono" title="Based on ${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee from the grader">est. back ~${escapeHtml(estReturnDate)}</span>` : ''}
         ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
       </div>
     `;
