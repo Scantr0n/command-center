@@ -345,6 +345,12 @@ header.page-head .sub {
   text-transform: none;
   letter-spacing: normal;
 }
+.conn-history-source {
+  color: var(--dim);
+  text-transform: none;
+  letter-spacing: normal;
+  font-style: italic;
+}
 .conn-history-strip {
   display: flex;
   align-items: flex-end;

@@ -219,7 +219,50 @@ function formatDuration(ms) {
   return days + 'd' + (remHours ? ' ' + remHours + 'h' : '');
 }
 
-function renderConnection(data) {
+// server.js's live branch never actually persists connection.history (its
+// /api/alpha/live route hardcodes history: [] on every connected response,
+// see that route's own comment), and the static fallback file starts empty
+// and has no mechanism to grow, so the uptime-strip feature below would
+// otherwise show "no checks recorded yet" forever, on a real Mac with a real
+// daemon, indefinitely. This page already performs a genuine connectivity
+// check on every load, 30s interval tick, and tab-visibility change, so it
+// keeps its own honest record of those real results in this browser's
+// localStorage and uses that whenever the server hasn't sent a populated
+// history yet. If a future session wires in real server-side persistence,
+// that becomes authoritative again the moment it has any entries, since this
+// only fills the gap while the server-side array is empty.
+const CLIENT_CONN_HISTORY_KEY = 'alpha:clientConnHistory';
+const CLIENT_CONN_HISTORY_CAP = 500;
+
+function loadClientConnHistory() {
+  try {
+    const raw = localStorage.getItem(CLIENT_CONN_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function recordClientConnCheck(connected) {
+  const history = loadClientConnHistory();
+  history.push({ at: new Date().toISOString(), connected: !!connected });
+  const trimmed = history.slice(-CLIENT_CONN_HISTORY_CAP);
+  try {
+    localStorage.setItem(CLIENT_CONN_HISTORY_KEY, JSON.stringify(trimmed));
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // last-known-state cache above, the strip just stays empty.
+  }
+  return trimmed;
+}
+
+function effectiveConnHistory(data, clientHistory) {
+  const serverHistory = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
+  return serverHistory.length ? serverHistory : clientHistory;
+}
+
+function renderConnection(data, clientHistory) {
   const dot = document.getElementById('connDot');
   const label = document.getElementById('connLabel');
   const sub = document.getElementById('connSub');
@@ -230,7 +273,7 @@ function renderConnection(data) {
   // page actually surfaced it, so "not connected" gave no sense of whether a
   // check had ever run versus one never being attempted.
   const checkedAt = data.connection && data.connection.checkedAt;
-  const history = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
+  const history = effectiveConnHistory(data, clientHistory);
 
   const notWired = document.getElementById('notWiredCallout');
   const liveWired = document.getElementById('liveWiredCallout');
@@ -285,11 +328,17 @@ function renderConnection(data) {
 // stays a glance, not a scroll.
 const HISTORY_TICK_LIMIT = 60;
 
-function renderConnectionHistory(data) {
+function renderConnectionHistory(data, clientHistory) {
   const strip = document.getElementById('connHistoryStrip');
   const summary = document.getElementById('connUptimeSummary');
   const range = document.getElementById('connHistoryRange');
-  const history = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
+  const source = document.getElementById('connHistorySource');
+  const serverHistory = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
+  const history = serverHistory.length ? serverHistory : clientHistory;
+
+  if (source) {
+    source.textContent = (!serverHistory.length && history.length) ? '(recorded by this browser only)' : '';
+  }
 
   if (!history.length) {
     strip.innerHTML = `<span class="conn-history-empty">No connectivity checks recorded yet.</span>`;
@@ -697,6 +746,11 @@ async function loadStatus() {
 
     if (data.connection && data.connection.connected) saveLastKnown(data);
     const lastKnown = (!data.connection || !data.connection.connected) ? loadLastKnown() : null;
+    // Records this real check (a request to /api/alpha/live really did just
+    // resolve, with a real connected true/false in the response) regardless
+    // of outcome, so the uptime strip has genuine data to show even while
+    // Alpha's own daemon is unreachable, see effectiveConnHistory above.
+    const clientConnHistory = recordClientConnCheck(data.connection && data.connection.connected);
     // Only the three sections built from the cached fields (stats,
     // position sizing, genealogy) read effectiveData; connection, account
     // and positions always read the real `data` so those never show a
@@ -716,8 +770,8 @@ async function loadStatus() {
     renderHeadline(headline.level, headline.text, headline.asOf);
     renderLastKnownBanner(lastKnown);
     updateLastKnownTags(lastKnown);
-    renderConnection(data);
-    renderConnectionHistory(data);
+    renderConnection(data, clientConnHistory);
+    renderConnectionHistory(data, clientConnHistory);
     renderStats(effectiveData);
     renderAccount(data);
     renderPositions(data);
