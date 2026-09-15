@@ -497,6 +497,16 @@ table.card-table {
 .badge-fresh { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
 .badge-due { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
 .badge-hold { background: rgba(76,154,255,0.12); color: #4C9AFF; border-color: rgba(76,154,255,0.35); }
+.badge-decline { background: rgba(224,80,80,0.12); color: #E56464; border-color: rgba(224,80,80,0.35); }
+
+.offer-result-box {
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 2px 16px;
+  margin-top: 4px;
+}
+.offer-result-box .pace-result-note { padding: 10px 0; }
 
 .badge-link {
   text-decoration: none;

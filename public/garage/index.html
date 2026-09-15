@@ -428,6 +428,60 @@
     </div>
   </section>
 
+  <section id="offerGuideSection">
+    <h2 class="section-title">Offer response guide</h2>
+    <div class="callout">
+      Real reseller negotiation practice, a counteroffer ladder: accept a near-target offer outright, counter a
+      good-but-low one once, let a borderline offer's answer depend on how long the item's actually been listed
+      (reusing the same 30-day freshness window as the relist guidance above), and decline a deep lowball without
+      countering. This applies that framework to a real logged asking price, and the real cost basis if one's
+      logged, it is not a live read of any actual buyer offer, there is no live account connection to any
+      platform's offers inbox.
+    </div>
+    <details class="schema-help">
+      <summary>Offer mechanics by platform</summary>
+      <div class="schema-help-body">
+        <table class="schema-table">
+          <tbody>
+            <tr><th>eBay</th><td>Best Offer. A seller's counteroffer is valid 96 hours (4 days) for the buyer to respond, per eBay's March 2026 change (previously 24 hours). A seller-initiated offer sent to a buyer is valid 96 hours or until the listing sells, whichever comes first.</td></tr>
+            <tr><th>Vinted</th><td>Make an offer. No expiration on either side, an offer stays open until it's explicitly accepted or declined, the only one of the four with no time limit.</td></tr>
+            <tr><th>Poshmark</th><td>An Offer to Likers stays open 24 hours. A buyer-initiated offer lasts 48 hours or until the seller accepts, counters, or declines it, whichever comes first.</td></tr>
+            <tr><th>Depop</th><td>A buyer's offer, or a seller's counter to one, gives the other side 24 hours to accept, decline, or counter again. An accepted offer can be locked in as binding on the buyer for 24 hours.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <div class="filter-row" id="offerItemChips" role="group" aria-label="Item to evaluate an offer against"></div>
+    <div class="calc-row">
+      <div class="calc-price-input-wrap" id="offerCustomPriceWrap" hidden>
+        <label for="offerCustomPriceInput" class="calc-price-prefix font-mono">asking $</label>
+        <input
+          type="number"
+          id="offerCustomPriceInput"
+          class="calc-price-input font-mono"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0.00"
+          aria-label="Custom asking price to evaluate an offer against">
+      </div>
+      <div class="calc-price-input-wrap">
+        <label for="offerAmountInput" class="calc-price-prefix font-mono">offer $</label>
+        <input
+          type="number"
+          id="offerAmountInput"
+          class="calc-price-input font-mono"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0.00"
+          aria-label="Real offer amount received">
+      </div>
+    </div>
+    <div class="filter-row" id="offerPlatformChips" role="group" aria-label="Which platform the offer came in on"></div>
+    <div id="offerResult" class="offer-result-box" aria-live="polite"></div>
+  </section>
+
   <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Sales log</h2>

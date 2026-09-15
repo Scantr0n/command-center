@@ -181,6 +181,7 @@ async function loadData() {
     renderTitleFit(listings);
     renderRelist(listings);
     renderPayoutTable(listings);
+    renderOfferItemChips(listings);
   } else {
     listings = [];
     document.getElementById('statRow').innerHTML = '';
@@ -191,6 +192,7 @@ async function loadData() {
     document.getElementById('titleFitTableBody').innerHTML = '';
     document.getElementById('relistTableBody').innerHTML = '';
     document.getElementById('payoutTableBody').innerHTML = '';
+    renderOfferItemChips([]);
     errBox.hidden = false;
     errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load Garage data: " + listingsResult.reason.message;
@@ -972,6 +974,162 @@ function wireCalc() {
   renderCalc();
 }
 
+// Offer response guide: applies a real, documented counteroffer-ladder
+// framework (accept near-target, counter once on good-but-low, let a
+// borderline offer's answer depend on real listing age, decline a deep
+// lowball outright) to a real logged asking price. Reuses daysSincePublished
+// and RELIST_FRESH_DAYS from the relist guidance above rather than a second
+// staleness threshold, and estimateNetPayout/costBasis from the payout table
+// so the cost-basis check here can't drift from either.
+let offerItemId = 'custom';
+let offerPlatform = null;
+
+const OFFER_TIER_ACCEPT_PCT = 0.90;
+const OFFER_TIER_COUNTER_PCT = 0.75;
+const OFFER_TIER_BORDERLINE_PCT = 0.50;
+
+function offerGuideSelectedListing() {
+  return offerItemId !== 'custom' ? listings.find(l => l.id === offerItemId) || null : null;
+}
+
+function offerGuideAskingPrice() {
+  const l = offerGuideSelectedListing();
+  if (l) return l.price;
+  const raw = document.getElementById('offerCustomPriceInput').value.trim();
+  return raw === '' ? null : Number(raw);
+}
+
+function renderOfferPlatformChips(available) {
+  const container = document.getElementById('offerPlatformChips');
+  container.innerHTML = available.map(p => `
+    <button type="button" class="chip" data-offer-platform="${escapeHtml(p)}" aria-pressed="${p === offerPlatform}">${escapeHtml(PLATFORM_LABELS[p] || p)}</button>
+  `).join('');
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      offerPlatform = chip.getAttribute('data-offer-platform');
+      container.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+      renderOfferGuide();
+    });
+  });
+}
+
+function onOfferItemChange() {
+  document.getElementById('offerItemChips').querySelectorAll('.chip').forEach(c => {
+    c.setAttribute('aria-pressed', String(c.getAttribute('data-offer-item') === offerItemId));
+  });
+  document.getElementById('offerCustomPriceWrap').hidden = offerItemId !== 'custom';
+  const l = offerGuideSelectedListing();
+  const available = l ? remainingPlatforms(l) : PAYOUT_PLATFORMS;
+  if (!offerPlatform || !available.includes(offerPlatform)) {
+    offerPlatform = available[0] || null;
+  }
+  renderOfferPlatformChips(available);
+  renderOfferGuide();
+}
+
+function renderOfferItemChips(currentListings) {
+  const container = document.getElementById('offerItemChips');
+  const live = currentListings.filter(l => l.status === 'live');
+  if (offerItemId !== 'custom' && !live.some(l => l.id === offerItemId)) offerItemId = 'custom';
+  container.innerHTML = [
+    `<button type="button" class="chip" data-offer-item="custom" aria-pressed="${offerItemId === 'custom'}">Custom price</button>`,
+    ...live.map(l => `<button type="button" class="chip" data-offer-item="${escapeHtml(l.id)}" aria-pressed="${offerItemId === l.id}">${escapeHtml(l.title || 'Untitled item')}</button>`)
+  ].join('');
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      offerItemId = chip.getAttribute('data-offer-item');
+      onOfferItemChange();
+    });
+  });
+  onOfferItemChange();
+}
+
+function offerTier(pct) {
+  if (pct >= OFFER_TIER_ACCEPT_PCT) return 'accept';
+  if (pct >= OFFER_TIER_COUNTER_PCT) return 'counter';
+  if (pct >= OFFER_TIER_BORDERLINE_PCT) return 'borderline';
+  return 'decline';
+}
+
+function renderOfferGuide() {
+  const result = document.getElementById('offerResult');
+  const asking = offerGuideAskingPrice();
+  const l = offerGuideSelectedListing();
+
+  if (asking == null || Number.isNaN(asking) || asking <= 0) {
+    result.innerHTML = `<p class="pace-result-note">${
+      l ? 'This item has no asking price logged yet.' : 'Enter an asking price above to evaluate an offer against it.'
+    }</p>`;
+    return;
+  }
+  if (!offerPlatform) {
+    result.innerHTML = '<p class="pace-result-note">No platform available to evaluate an offer against.</p>';
+    return;
+  }
+  const offerRaw = document.getElementById('offerAmountInput').value.trim();
+  const offer = offerRaw === '' ? null : Number(offerRaw);
+  if (offer == null || Number.isNaN(offer) || offer < 0) {
+    result.innerHTML = '<p class="pace-result-note">Enter the real offer amount received to see where it falls on the ladder.</p>';
+    return;
+  }
+
+  const pct = offer / asking;
+  const pctLabel = Math.round(pct * 100) + '%';
+  const tier = offerTier(pct);
+  const days = l ? daysSincePublished(l.datePublished) : null;
+
+  let tierLabel, badgeClass, actionText, counterAmount = null;
+  if (tier === 'accept') {
+    tierLabel = 'Accept'; badgeClass = 'badge-fresh';
+    actionText = `At ${pctLabel} of asking, this is close enough to target, common ladder guidance is to accept rather than risk losing the sale over a small gap.`;
+  } else if (tier === 'counter') {
+    tierLabel = 'Counter once'; badgeClass = 'badge-due';
+    counterAmount = Math.round(offer + (asking - offer) * 0.5);
+    actionText = `At ${pctLabel} of asking, counter once rather than accept or decline outright, common ladder guidance splits the gap between the offer and asking.`;
+  } else if (tier === 'borderline') {
+    tierLabel = 'Borderline, use listing age'; badgeClass = 'badge-hold';
+    if (days != null && days >= RELIST_FRESH_DAYS) {
+      counterAmount = Math.round(offer + (asking - offer) * 0.25);
+      actionText = `At ${pctLabel} of asking and ${days} day(s) listed, past the ${RELIST_FRESH_DAYS}-day fresh window, common guidance leans toward accepting or countering close to their number, a stale listing has more to gain from finally moving than from holding the line.`;
+    } else {
+      counterAmount = Math.round(offer + (asking - offer) * 0.75);
+      actionText = days != null
+        ? `At ${pctLabel} of asking and only ${days} day(s) listed, inside the ${RELIST_FRESH_DAYS}-day fresh window, common guidance is to counter firmly, closer to asking, since there's little pressure yet to move it.`
+        : `At ${pctLabel} of asking with no listing date logged, defaulting to a firmer counter as if this were a fresh listing.`;
+    }
+  } else {
+    tierLabel = 'Decline'; badgeClass = 'badge-decline';
+    actionText = `At ${pctLabel} of asking, this is a deep lowball by ladder guidance, common practice is to decline without countering rather than anchor the negotiation that low.`;
+  }
+
+  const rows = [];
+  rows.push(fieldRow('Offer vs. asking', `${formatUsd(offer)} is ${pctLabel} of ${formatUsd(asking)}`));
+  rows.push(`<div class="field-row"><div class="field-label font-mono">Tier</div><div class="field-value"><span class="badge ${badgeClass}">${escapeHtml(tierLabel)}</span></div></div>`);
+  rows.push(fieldRow('Suggested action', escapeHtml(actionText)));
+  if (counterAmount != null) rows.push(fieldRow('Suggested counter', formatUsd(counterAmount)));
+
+  if (l && l.costBasis != null) {
+    const checkAmount = counterAmount != null ? counterAmount : offer;
+    const net = estimateNetPayout(offerPlatform, checkAmount);
+    if (net != null) {
+      const margin = net - l.costBasis;
+      const label = (counterAmount != null ? 'Counter' : 'Offer') + ' vs. cost basis';
+      rows.push(fieldRow(label, margin < 0
+        ? `Would net about ${formatUsd(net)} after estimated ${escapeHtml(PLATFORM_LABELS[offerPlatform] || offerPlatform)} fees, below the logged ${formatUsd(l.costBasis)} cost basis by ${formatUsd(Math.abs(margin))}.`
+        : `Would net about ${formatUsd(net)} after estimated ${escapeHtml(PLATFORM_LABELS[offerPlatform] || offerPlatform)} fees, about ${formatUsd(margin)} over the logged ${formatUsd(l.costBasis)} cost basis.`
+      ));
+    }
+  }
+
+  result.innerHTML = rows.join('');
+}
+
+function wireOfferGuide() {
+  document.getElementById('offerCustomPriceInput').addEventListener('input', renderOfferGuide);
+  document.getElementById('offerAmountInput').addEventListener('input', renderOfferGuide);
+  renderOfferItemChips([]);
+}
+
 function renderActivity(events) {
   const list = document.getElementById('activityList');
   if (!events.length) {
@@ -1607,6 +1765,7 @@ function renderPhotoAuditResults(results, loaded, total, flagged) {
 }
 
 wireCalc();
+wireOfferGuide();
 wireChecklist();
 wirePacePlanner();
 initPhotoAudit();
