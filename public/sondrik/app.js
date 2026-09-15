@@ -877,6 +877,146 @@
     URL.revokeObjectURL(url);
   }
 
+  // Quick-log tool: turns a small form into the exact JSON object to paste
+  // into downloads.json or leads.json by hand, same "generate paste-ready
+  // JSON, save nothing" pattern CSM's quick-add uses for prospects. Never
+  // writes a file and never calls a server, it only builds text and puts it
+  // on the clipboard; the real edit still happens by hand, same as every
+  // other update to these files (see the "How to log a real update" details
+  // above). Warnings here mirror validate.js's own checks (future dates,
+  // duplicate ids/dates) so a mistake surfaces before it's even pasted in.
+  function initQuickLogTool(channelsData, downloadsData, leadsData) {
+    const qcForm = document.getElementById('quickCheckForm');
+    const qcDate = document.getElementById('qcDate');
+    const qcCount = document.getElementById('qcCount');
+    const qcNote = document.getElementById('qcNote');
+    const qcWarnings = document.getElementById('qcWarnings');
+    const qcOutput = document.getElementById('qcOutput');
+    const qcCopyBtn = document.getElementById('qcCopyBtn');
+    const quickLogLive = document.getElementById('quickLogLive');
+
+    qcDate.value = todayIso();
+    qcDate.max = todayIso();
+
+    qcForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const date = qcDate.value;
+      const count = Number(qcCount.value);
+      const note = qcNote.value.trim();
+      const countValid = Number.isInteger(count) && count >= 0;
+      const blockers = [];
+      const advisory = [];
+
+      if (!date) blockers.push('Date is required, this is when you actually ran the check.');
+      if (!countValid) blockers.push('Count must be a whole number, zero or more.');
+
+      const existingChecks = ((downloadsData && downloadsData.metric && downloadsData.metric.checks) || []);
+      if (date && existingChecks.some(c => c.date === date)) {
+        blockers.push('There is already a check logged for ' + date + '. The validator rejects duplicate dates.');
+      }
+      const latest = existingChecks.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).pop();
+      if (latest && countValid && count < latest.count) {
+        advisory.push('This count (' + count + ') is lower than the last logged check (' + latest.count +
+          ' on ' + fmtDate(latest.date) + '). GitHub release download counts only go up, double check this is real.');
+      }
+
+      if (blockers.length) {
+        qcWarnings.textContent = blockers.join(' ');
+        qcOutput.hidden = true;
+        qcCopyBtn.hidden = true;
+        return;
+      }
+
+      const obj = { date, count };
+      if (note) obj.note = note;
+      qcWarnings.textContent = advisory.join(' ');
+
+      qcOutput.value = JSON.stringify(obj, null, 2) + ',';
+      qcOutput.hidden = false;
+      qcCopyBtn.hidden = false;
+    });
+
+    qcCopyBtn.addEventListener('click', () => {
+      copyText(qcOutput.value).then(() => {
+        const original = qcCopyBtn.textContent;
+        qcCopyBtn.textContent = 'Copied!';
+        quickLogLive.textContent = 'Download check JSON copied to clipboard.';
+        setTimeout(() => { qcCopyBtn.textContent = original; }, 1800);
+      }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
+    });
+
+    const qlForm = document.getElementById('quickLeadForm');
+    const qlId = document.getElementById('qlId');
+    const qlChannel = document.getElementById('qlChannel');
+    const qlSourceDetail = document.getElementById('qlSourceDetail');
+    const qlType = document.getElementById('qlType');
+    const qlSummary = document.getElementById('qlSummary');
+    const qlDate = document.getElementById('qlDate');
+    const qlWarnings = document.getElementById('qlWarnings');
+    const qlOutput = document.getElementById('qlOutput');
+    const qlCopyBtn = document.getElementById('qlCopyBtn');
+
+    qlDate.value = todayIso();
+    qlDate.max = todayIso();
+
+    const channels = (channelsData && channelsData.channels) || [];
+    qlChannel.innerHTML = '<option value="">No tracked channel / not sure</option>' +
+      channels.map(c => '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name || c.id) + '</option>').join('');
+
+    qlForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const id = qlId.value.trim();
+      const channelId = qlChannel.value || null;
+      const sourceDetail = qlSourceDetail.value.trim();
+      const type = qlType.value.trim();
+      const summary = qlSummary.value.trim();
+      const date = qlDate.value;
+      const blockers = [];
+
+      if (!id) blockers.push('An id is required.');
+      const existingIds = new Set(((leadsData && leadsData.leads) || []).map(l => l.id));
+      if (id && existingIds.has(id)) blockers.push('"' + id + '" is already used by another lead, ids must be unique.');
+      if (!summary) blockers.push('A summary is required.');
+      if (!date) blockers.push('Date logged is required.');
+
+      qlWarnings.textContent = blockers.join(' ');
+      if (blockers.length) {
+        qlOutput.hidden = true;
+        qlCopyBtn.hidden = true;
+        return;
+      }
+
+      const obj = {
+        id,
+        channelId,
+        source: channelId ? (channels.find(c => c.id === channelId) || {}).name || null : null,
+        sourceDetail: sourceDetail || null,
+        type: type || null,
+        summary,
+        loggedDate: date,
+        outreach: {
+          draftStatus: null,
+          approvalStatus: null,
+          sent: false,
+          note: null
+        }
+      };
+
+      qlOutput.value = JSON.stringify(obj, null, 2) + ',';
+      qlOutput.hidden = false;
+      qlCopyBtn.hidden = false;
+    });
+
+    qlCopyBtn.addEventListener('click', () => {
+      copyText(qlOutput.value).then(() => {
+        const original = qlCopyBtn.textContent;
+        qlCopyBtn.textContent = 'Copied!';
+        quickLogLive.textContent = 'Lead JSON copied to clipboard.';
+        setTimeout(() => { qlCopyBtn.textContent = original; }, 1800);
+      }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
+    });
+  }
+
   function loadDataFile(name) {
     return fetch('/sondrik/data/' + name + '.json').then(r => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1014,5 +1154,7 @@
     } else {
       copyPublicBtn.disabled = true;
     }
+
+    initQuickLogTool(channelsData || {}, downloadsData || {}, leadsData || {});
   });
 })();

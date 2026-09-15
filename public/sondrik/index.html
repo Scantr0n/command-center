@@ -94,6 +94,53 @@
     </div>
   </details>
 
+  <details class="schema-help" id="quickLogTool">
+    <summary>Quick log a download check or a lead (generates JSON to paste, saves nothing)</summary>
+    <div class="schema-help-body">
+      <p>Fills in the same fields as the table above, then builds the exact JSON object to paste into the right
+        file yourself. This never writes a file or sends anything, it only puts text on your clipboard.</p>
+
+      <div class="quick-log-grid">
+        <form class="quick-log-form" id="quickCheckForm">
+          <h3 class="quick-log-title font-mono">Download check &rarr; downloads.json</h3>
+          <label class="quick-log-label" for="qcDate">Date checked</label>
+          <input class="quick-log-input" type="date" id="qcDate" required>
+          <label class="quick-log-label" for="qcCount">Count</label>
+          <input class="quick-log-input" type="number" id="qcCount" min="0" step="1" required>
+          <label class="quick-log-label" for="qcNote">Note (optional)</label>
+          <input class="quick-log-input" type="text" id="qcNote" placeholder="e.g. confirmed via gh api">
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="qcWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="qcOutput" readonly rows="6" hidden aria-label="Generated download check JSON, ready to paste into metric.checks"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="qcCopyBtn" hidden>Copy JSON</button>
+        </form>
+
+        <form class="quick-log-form" id="quickLeadForm">
+          <h3 class="quick-log-title font-mono">Lead &rarr; leads.json</h3>
+          <label class="quick-log-label" for="qlId">Id (short, unique, kebab-case)</label>
+          <input class="quick-log-input" type="text" id="qlId" placeholder="e.g. hn-comment-tester-offer" required>
+          <label class="quick-log-label" for="qlChannel">Channel</label>
+          <select class="quick-log-input" id="qlChannel"></select>
+          <label class="quick-log-label" for="qlSourceDetail">Source detail</label>
+          <input class="quick-log-input" type="text" id="qlSourceDetail" placeholder="e.g. Commenter on r/SomeSub">
+          <label class="quick-log-label" for="qlType">Type</label>
+          <input class="quick-log-input" type="text" id="qlType" placeholder="e.g. beta-tester-offer">
+          <label class="quick-log-label" for="qlSummary">Summary</label>
+          <input class="quick-log-input" type="text" id="qlSummary" required>
+          <label class="quick-log-label" for="qlDate">Date logged</label>
+          <input class="quick-log-input" type="date" id="qlDate" required>
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="qlWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="qlOutput" readonly rows="10" hidden aria-label="Generated lead JSON, ready to paste into leads"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="qlCopyBtn" hidden>Copy JSON</button>
+          <p class="quick-log-hint">Outreach fields always come out unset (no draft, not sent). Draft an approval-gated message the same
+            way every other lead's outreach is drafted, never through this form.</p>
+        </form>
+      </div>
+      <div class="sr-only-live" role="status" aria-live="polite" id="quickLogLive"></div>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Timeline</h2>
     <div id="timelineSection"></div>
