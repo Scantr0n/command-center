@@ -99,6 +99,36 @@ header.page-head .sub {
 }
 .callout strong { color: var(--ink); }
 
+/* At-a-glance digest of what this board already knows needs a look, so a
+   real overdue nudge or a stalled deal doesn't require reading every section
+   below to notice. Purely a jump-link to the section that already computed
+   it, never a second source of truth. */
+.attention-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.attention-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  color: var(--sub);
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+.attention-pill:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.attention-pill strong { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--ink); }
+.attention-pill.attention-urgent { border-color: rgba(229,72,77,0.35); background: rgba(229,72,77,0.08); }
+.attention-pill.attention-urgent strong { color: #E5484D; }
+.attention-pill.attention-warn { border-color: rgba(224,160,48,0.3); background: rgba(224,160,48,0.06); }
+.attention-pill.attention-warn strong { color: #E0A030; }
+
 .schema-help {
   border: 1px solid var(--hairline);
   border-radius: 10px;

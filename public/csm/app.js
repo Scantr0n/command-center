@@ -21,6 +21,7 @@
   const funnelListEl = document.getElementById('funnelList');
   const channelEffListEl = document.getElementById('channelEffList');
   const categoryEffListEl = document.getElementById('categoryEffList');
+  const attentionBarEl = document.getElementById('attentionBar');
   const ACTIVITY_PREVIEW_COUNT = 8;
 
   printBtn.addEventListener('click', () => window.print());
@@ -189,17 +190,17 @@
       '</div>';
   }
 
-  function renderNudgeQueue(prospects) {
+  // Real gap this closes: nudgeSchedule.nudgePoint is the actual planned "nudge by
+  // this date" record (edited via the same guided forms as everything else on this
+  // board), but the queue keys off the separate nextNudgeDate field. A real
+  // nudgePoint can be logged, pass, and never appear anywhere on the board if
+  // nextNudgeDate was never also set to match it, silently falling off the radar
+  // with nothing here saying so. Surface those the same way an overdue nudge is.
+  function computeNudgeRows(prospects) {
     const withDates = prospects
       .filter(p => p.nextNudgeDate)
       .map(p => ({ p, days: daysUntil(p.nextNudgeDate), unqueued: false }));
 
-    // Real gap this closes: nudgeSchedule.nudgePoint is the actual planned "nudge by
-    // this date" record (edited via the same guided forms as everything else on this
-    // board), but the queue above only ever keys off the separate nextNudgeDate field.
-    // A real nudgePoint can be logged, pass, and never appear anywhere on the board if
-    // nextNudgeDate was never also set to match it, silently falling off the radar
-    // with nothing here saying so. Surface those the same way an overdue nudge is.
     const unqueued = prospects
       .filter(p => {
         const point = p.nudgeSchedule && p.nudgeSchedule.nudgePoint;
@@ -207,9 +208,12 @@
       })
       .map(p => ({ p, days: daysUntil(p.nudgeSchedule.nudgePoint), unqueued: true }));
 
-    const rows = withDates.concat(unqueued).sort((a, b) => a.days - b.days);
+    return withDates.concat(unqueued).sort((a, b) => a.days - b.days);
+  }
 
-    icsBtn.disabled = withDates.length === 0;
+  function renderNudgeQueue(prospects) {
+    const rows = computeNudgeRows(prospects);
+    icsBtn.disabled = rows.filter(r => !r.unqueued).length === 0;
 
     if (rows.length === 0) {
       nudgeEl.innerHTML = '<p class="nudge-empty">No nudge dates logged yet. Once a real send date and nudge ' +
@@ -255,6 +259,65 @@
     }).join('');
   }
 
+  // One-glance digest above everything else on the page: pulls counts the
+  // sections below already compute (nudge queue, stalled, data quality,
+  // duplicates) into a single row of jump links, so a real overdue nudge or
+  // a stalled deal doesn't require scrolling past several sections to
+  // notice. Never computes anything new, just points at where each count
+  // already lives, so it can never drift out of sync with those sections.
+  function renderAttentionBar(stages, prospects) {
+    const nudgeRows = computeNudgeRows(prospects);
+    const overdueCount = nudgeRows.filter(r => r.days <= 0).length;
+    const stalledCount = computeStalled(stages, prospects).length;
+    const backfillCount = computeDataQualityFlags(stages, prospects).length;
+    const duplicateCount = findDuplicateProspects(prospects).length;
+
+    const items = [];
+    if (overdueCount) {
+      items.push({
+        n: overdueCount, tone: 'urgent', target: 'nudgeQueue',
+        label: overdueCount === 1 ? 'nudge due or overdue' : 'nudges due or overdue'
+      });
+    }
+    if (stalledCount) {
+      items.push({
+        n: stalledCount, tone: 'warn', target: 'stalledList',
+        label: stalledCount === 1 ? 'prospect stalled in stage' : 'prospects stalled in stage'
+      });
+    }
+    if (backfillCount) {
+      items.push({
+        n: backfillCount, tone: 'warn', target: 'dataQualityList',
+        label: backfillCount === 1 ? 'prospect needs backfill' : 'prospects need backfill'
+      });
+    }
+    if (duplicateCount) {
+      items.push({
+        n: duplicateCount, tone: 'warn', target: 'duplicatesList',
+        label: duplicateCount === 1 ? 'possible duplicate' : 'possible duplicates'
+      });
+    }
+
+    if (items.length === 0) {
+      attentionBarEl.hidden = true;
+      attentionBarEl.innerHTML = '';
+      return;
+    }
+
+    attentionBarEl.hidden = false;
+    attentionBarEl.innerHTML = items.map(item =>
+      '<button type="button" class="attention-pill attention-' + item.tone + '" data-target="' +
+      escapeHtml(item.target) + '"><strong>' + item.n + '</strong> ' + escapeHtml(item.label) + '</button>'
+    ).join('');
+
+    attentionBarEl.querySelectorAll('[data-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const el = document.getElementById(btn.getAttribute('data-target'));
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+
   function byUrgency(a, b) {
     if (a.nextNudgeDate && b.nextNudgeDate) return a.nextNudgeDate < b.nextNudgeDate ? -1 : 1;
     if (a.nextNudgeDate) return -1;
@@ -265,12 +328,16 @@
   const stalledEl = document.getElementById('stalledList');
   const stalledSection = document.getElementById('stalledSection');
 
-  function renderStalled(stages, prospects) {
+  function computeStalled(stages, prospects) {
     const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
-    const stalled = prospects
+    return prospects
       .map(p => ({ p, info: stallInfo(p, stageById) }))
       .filter(x => x.info && x.info.isStale)
       .sort((a, b) => b.info.days - a.info.days);
+  }
+
+  function renderStalled(stages, prospects) {
+    const stalled = computeStalled(stages, prospects);
 
     if (stalled.length === 0) {
       stalledSection.hidden = true;
@@ -329,10 +396,8 @@
     wireRowsToModal(duplicatesEl);
   }
 
-  function renderDataQuality(stages, prospects) {
-    const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
-
-    const flagged = prospects
+  function computeDataQualityFlags(stages, prospects) {
+    return prospects
       .map(p => {
         const reasons = [];
         if (p.stage !== 'researched') {
@@ -346,6 +411,11 @@
         return { p, reasons };
       })
       .filter(x => x.reasons.length > 0);
+  }
+
+  function renderDataQuality(stages, prospects) {
+    const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
+    const flagged = computeDataQualityFlags(stages, prospects);
 
     if (flagged.length === 0) {
       dataQualitySection.hidden = true;
@@ -1996,6 +2066,7 @@
     if (prospectsResult.status === 'rejected') failures.push('prospects.json: ' + prospectsResult.reason.message);
 
     if (stagesData || prospectsData) {
+      renderAttentionBar(allStages, allProspects);
       renderNudgeQueue(allProspects);
       renderStats(allStages, allProspects);
       renderChannelFilterCounts(allProspects);
