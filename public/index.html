@@ -72,7 +72,7 @@
   .palette-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; }
   .palette-item[aria-selected="true"] { background: rgba(255,255,255,0.06); }
   .palette-item-name { color: var(--ink); font-weight: 500; font-size: 13px; flex-shrink: 0; }
-  .palette-item-cat { color: var(--faint); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3px; margin-left: auto; white-space: nowrap; }
+  .palette-item-cat { color: var(--sub); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3px; margin-left: auto; white-space: nowrap; }
   .palette-item-status { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; }
   #paletteResults::-webkit-scrollbar { width: 6px; }
   #paletteResults::-webkit-scrollbar-thumb { background: #23262b; border-radius: 3px; }
@@ -199,7 +199,7 @@
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">
           <span>Jump to</span>
-          <kbd class="kbd-chip text-[10px]" style="color: var(--faint)" aria-hidden="true">&#8984;K</kbd>
+          <kbd class="kbd-chip text-[10px]" style="color: var(--sub)" aria-hidden="true">&#8984;K</kbd>
         </button>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
         <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
@@ -315,7 +315,7 @@
         <input id="paletteInput" type="text" placeholder="Jump to a project..." aria-label="Jump to a project"
           class="flex-1 bg-transparent text-sm focus:outline-none" style="color: var(--ink)"
           role="combobox" aria-expanded="true" aria-controls="paletteResults" aria-autocomplete="list">
-        <kbd class="kbd-chip text-[10px]" style="color: var(--faint)">ESC</kbd>
+        <kbd class="kbd-chip text-[10px]" style="color: var(--sub)">ESC</kbd>
       </div>
       <div id="paletteResults" role="listbox" aria-label="Projects" class="flex-1 overflow-y-auto py-1.5"></div>
       <div id="paletteEmpty" class="hidden px-4 py-6 text-xs text-center" style="color: var(--faint)"></div>
