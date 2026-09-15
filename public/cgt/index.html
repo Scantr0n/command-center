@@ -115,6 +115,78 @@
     </div>
   </details>
 
+  <details class="schema-help" id="quickLogTool">
+    <summary>Quick log a new card (generates JSON to paste into cards.json, saves nothing)</summary>
+    <div class="schema-help-body">
+      <p>Fills in the same fields as the table above, runs the exact same checks as
+        <code>node public/cgt/data/validate.js</code> (duplicate id, a missing or unlabeled
+        <code>valuationBasis</code>, a <code>comp-estimate</code> with no <code>compNote</code>, a possible
+        duplicate of an existing card), then builds the JSON object to paste into the <code>cards</code> array
+        yourself. This never writes a file or sends anything, it only puts text on your clipboard. For more than
+        one card at a time, use <a href="/cgt/import.html">Import CSV</a> instead.</p>
+
+      <div class="quick-log-grid">
+        <form class="quick-log-form" id="quickCardForm">
+          <h3 class="quick-log-title font-mono">New card &rarr; cards.json</h3>
+          <label class="quick-log-label" for="ncId">Id (unique slug)</label>
+          <input class="quick-log-input" type="text" id="ncId" placeholder="e.g. 2021-topps-chrome-julio-rodriguez-psa10" required>
+          <label class="quick-log-label" for="ncCardName">Card name</label>
+          <input class="quick-log-input" type="text" id="ncCardName" placeholder="e.g. 2021 Topps Chrome Julio Rodriguez RC" required>
+          <label class="quick-log-label" for="ncYear">Year (optional)</label>
+          <input class="quick-log-input" type="number" id="ncYear" step="1" placeholder="e.g. 2021">
+          <label class="quick-log-label" for="ncSport">Sport</label>
+          <select class="quick-log-input" id="ncSport" required>
+            <option value="">Select one&hellip;</option>
+            <option value="hockey">Hockey</option>
+            <option value="baseball">Baseball</option>
+            <option value="football">Football</option>
+          </select>
+          <label class="quick-log-label" for="ncGradingCompany">Grading company (optional, blank if raw/ungraded)</label>
+          <select class="quick-log-input" id="ncGradingCompany">
+            <option value="">Not graded / raw</option>
+            <option value="PSA">PSA</option>
+            <option value="BGS">BGS</option>
+            <option value="SGC">SGC</option>
+            <option value="CGC">CGC</option>
+            <option value="HGA">HGA</option>
+            <option value="KSA">KSA</option>
+          </select>
+          <label class="quick-log-label" for="ncGrade">Grade (optional)</label>
+          <input class="quick-log-input" type="text" id="ncGrade" placeholder="e.g. 10 or 9.5">
+          <label class="quick-log-label" for="ncCertNumber">Cert number (optional)</label>
+          <input class="quick-log-input" type="text" id="ncCertNumber">
+          <label class="quick-log-label" for="ncStorageLocation">Storage location (optional)</label>
+          <input class="quick-log-input" type="text" id="ncStorageLocation" placeholder="e.g. Home safe">
+          <label class="quick-log-label" for="ncEstimatedValue">Estimated value, USD (optional)</label>
+          <input class="quick-log-input" type="number" id="ncEstimatedValue" min="0" step="0.01">
+          <label class="quick-log-label" for="ncValuationBasis">Valuation basis (required if a value is entered above)</label>
+          <select class="quick-log-input" id="ncValuationBasis">
+            <option value="">Select one&hellip;</option>
+            <option value="recent-sale">Recent sale (a real comp at this exact grade)</option>
+            <option value="comp-estimate">Comp estimate (inferred from other grades/cards)</option>
+          </select>
+          <label class="quick-log-label" for="ncCompNote">Comp note (required if basis is comp estimate)</label>
+          <input class="quick-log-input" type="text" id="ncCompNote" placeholder="e.g. No PSA10 sales found, based on 3 PSA9 sales + typical grade premium">
+          <label class="quick-log-label" for="ncSourceNote">Source note (optional)</label>
+          <input class="quick-log-input" type="text" id="ncSourceNote" placeholder="e.g. eBay sold listings, 3 comps, Aug 2026">
+          <label class="quick-log-label" for="ncCostBasis">Cost basis, USD (optional)</label>
+          <input class="quick-log-input" type="number" id="ncCostBasis" min="0" step="0.01">
+          <label class="quick-log-label" for="ncDatePriced">Date priced (leave blank if not priced yet)</label>
+          <input class="quick-log-input" type="date" id="ncDatePriced">
+          <label class="quick-log-label" for="ncBacklogBatch">Backlog batch (optional)</label>
+          <input class="quick-log-input" type="text" id="ncBacklogBatch" placeholder="e.g. 2026-08-08-full-backlog">
+          <label class="quick-log-label" for="ncNotes">Notes (optional)</label>
+          <input class="quick-log-input" type="text" id="ncNotes">
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="ncWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="ncOutput" readonly rows="14" hidden aria-label="Generated card JSON, ready to paste into the cards array"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="ncCopyBtn" hidden>Copy JSON</button>
+          <p class="quick-log-hint" id="quickLogLive" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </details>
+
   <details class="schema-help">
     <summary>How to log a grading submission (cards sent off, not back yet)</summary>
     <div class="schema-help-body">

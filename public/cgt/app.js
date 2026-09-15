@@ -1640,4 +1640,94 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// Quick-log tool: builds one candidate card from the form and runs it
+// through CGTValidateCore.validateCards, the exact same rules the CLI
+// validator and the CSV importer already use (see validate-core.js's own
+// header comment on why there is only one copy of these rules), instead of
+// hand-rolling a second set of checks here that could drift from them.
+// Never writes cards.json itself, Command Center's dashboards have no
+// backend to save to; this only builds paste-ready JSON for the clipboard.
+function initQuickLogTool() {
+  const form = document.getElementById('quickCardForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('ncWarnings');
+  const output = document.getElementById('ncOutput');
+  const copyBtn = document.getElementById('ncCopyBtn');
+  const live = document.getElementById('quickLogLive');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('ncId').value.trim();
+    const cardName = document.getElementById('ncCardName').value.trim();
+    const yearRaw = document.getElementById('ncYear').value.trim();
+    const estimatedValueRaw = document.getElementById('ncEstimatedValue').value.trim();
+    const costBasisRaw = document.getElementById('ncCostBasis').value.trim();
+
+    const candidate = {
+      id,
+      cardName: cardName || null,
+      year: yearRaw === '' ? null : Number(yearRaw),
+      sport: document.getElementById('ncSport').value || null,
+      gradingCompany: document.getElementById('ncGradingCompany').value || null,
+      grade: document.getElementById('ncGrade').value.trim() || null,
+      certNumber: document.getElementById('ncCertNumber').value.trim() || null,
+      storageLocation: document.getElementById('ncStorageLocation').value.trim() || null,
+      estimatedValue: estimatedValueRaw === '' ? null : Number(estimatedValueRaw),
+      valuationBasis: document.getElementById('ncValuationBasis').value || null,
+      compNote: document.getElementById('ncCompNote').value.trim() || null,
+      sourceNote: document.getElementById('ncSourceNote').value.trim() || null,
+      costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
+      datePriced: document.getElementById('ncDatePriced').value || null,
+      backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
+      priceHistory: [],
+      notes: document.getElementById('ncNotes').value.trim() || null
+    };
+
+    let blockers = [];
+    let advisory = [];
+    if (window.CGTValidateCore) {
+      const realCards = cards.filter(c => !isExample(c));
+      const merged = realCards.concat([candidate]);
+      // The candidate is always the last element, so this is its own,
+      // unambiguous "where" prefix, e.g. "cards[89]" or "cards[89] (my-id)".
+      // The trailing "]" rules out index 8 matching as a prefix of index 89.
+      const candidateWhere = 'cards[' + realCards.length + ']';
+      const strip = m => m.slice(m.indexOf(': ') + 2);
+      const { errors, warnings } = window.CGTValidateCore.validateCards(merged);
+      blockers = errors.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
+      advisory = warnings.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
+
+      const dupGroups = window.CGTValidateCore.findDuplicateGroups(merged);
+      const ownGroup = dupGroups.find(g => g.cards.includes(candidate));
+      if (ownGroup) {
+        const others = ownGroup.cards.filter(c => c !== candidate).map(c => c.id).join(', ');
+        advisory.push('Same card name, year, grading company, and grade as an existing card (' + others +
+          '). Could be a real second copy, or a duplicate entry, double check before pasting this in.');
+      }
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(candidate, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Card JSON copied to clipboard.';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+initQuickLogTool();
+
 loadCards();

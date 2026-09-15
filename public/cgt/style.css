@@ -863,6 +863,76 @@ code.inline-code {
 .insurance-summary-total td { font-weight: 700; border-bottom: none; border-top: 2px solid var(--hairlineHover); }
 .insurance-summary-empty { font-size: 0.85rem; color: var(--dim); }
 
+/* Quick-log tool: generates a paste-ready cards.json entry from a small
+   form, never writes a file or sends anything itself. Sits inside a
+   .schema-help details block, so it inherits that container's border/
+   spacing and only adds its own form layout on top. Same class names and
+   layout as Sondrik's own quick-log tool (public/sondrik/style.css). */
+.quick-log-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-top: 14px;
+}
+.quick-log-form {
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 14px 16px 16px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.quick-log-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+.quick-log-label {
+  font-size: 0.7rem;
+  color: var(--sub);
+  margin-top: 8px;
+}
+.quick-log-input {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 7px 9px;
+  width: 100%;
+}
+.quick-log-input:focus-visible { outline: 2px solid var(--hairlineHover); outline-offset: -1px; }
+.quick-log-generate { align-self: flex-start; margin-top: 12px; }
+.quick-log-warnings {
+  font-size: 0.72rem;
+  color: #E0A030;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.quick-log-warnings:empty { display: none; }
+.quick-log-output {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--ink);
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 9px 10px;
+  margin-top: 10px;
+  width: 100%;
+  resize: vertical;
+}
+.quick-log-copy { align-self: flex-start; margin-top: 8px; }
+.quick-log-hint {
+  font-size: 0.68rem;
+  color: var(--dim);
+  line-height: 1.5;
+  margin: 10px 0 0;
+}
+
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
   body { background: #fff; color: #111; }
