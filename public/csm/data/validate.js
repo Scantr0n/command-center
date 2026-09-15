@@ -205,6 +205,16 @@ function main() {
         warnings.push(where + ': outreachLog has an "initial-send" entry (' + initialSendEntry.date + ') but ' +
           'sendDate is not set. Backfill sendDate to match, it is read on its own elsewhere on the board.');
       }
+      // The other direction of the same drift: sendDate says this prospect
+      // was sent to, but outreachLog (what the "3+ touches, may need a new
+      // approach" flag actually counts from) has no record of it at all.
+      // Left unflagged, that flag would silently undercount this prospect's
+      // real touches by one, or never fire for them at all.
+      if (p.sendDate && !initialSendEntry) {
+        warnings.push(where + ': sendDate (' + p.sendDate + ') is set but outreachLog has no "initial-send" ' +
+          'entry. Backfill it, the touch-by-touch log (and the "3+ touches" flag it drives) undercounts real ' +
+          'outreach without it.');
+      }
     }
 
     if (!Array.isArray(p.stageHistory || [])) {
