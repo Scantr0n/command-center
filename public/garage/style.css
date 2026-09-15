@@ -900,6 +900,79 @@ footer.page-foot {
   margin: 10px 0 0;
 }
 
+/* Edit-this-listing form, inside the detail modal: same guided-form -> JSON
+   -> copy/paste convention as the quick-log tool above, pre-filled with the
+   listing's current values instead of blank. Same class names as CSM's and
+   CGT's own edit forms. */
+.np-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.form-row label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+.form-row-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.form-row-split > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+@media (max-width: 560px) {
+  .form-row-split { grid-template-columns: 1fr; }
+}
+.np-input {
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+}
+.np-input:focus { outline: none; border-color: var(--hairlineHover); }
+textarea.np-input { resize: vertical; }
+.np-generate-btn { color: var(--ink); border-color: var(--hairlineHover); background: rgba(255,255,255,0.04); }
+.np-result { border-top: 1px solid var(--hairline); padding-top: 16px; margin-top: 4px; }
+.np-warnings { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.np-warnings li {
+  font-size: 0.76rem;
+  color: #E0A030;
+  background: rgba(224,160,48,0.06);
+  border: 1px solid rgba(224,160,48,0.25);
+  border-radius: 6px;
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+.np-output-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.np-output {
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 300px;
+}
+
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
   body { background: #fff; color: #111; }

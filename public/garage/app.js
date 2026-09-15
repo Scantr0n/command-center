@@ -1534,6 +1534,174 @@ function ebaySoldSearchUrl(title) {
   return 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(title) + '&LH_Complete=1&LH_Sold=1';
 }
 
+function leInputInner(id, label, value, type) {
+  type = type || 'text';
+  const v = value == null ? '' : escapeHtml(String(value));
+  if (type === 'textarea') {
+    return '<div><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+      '<textarea id="' + id + '" class="np-input" rows="2">' + v + '</textarea></div>';
+  }
+  return '<div><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+    '<input type="' + type + '" id="' + id + '" class="np-input" value="' + v + '"' +
+    (type === 'number' ? ' min="0" step="0.01"' : '') + '></div>';
+}
+
+function leFieldRow(id, label, value, type) {
+  return '<div class="form-row">' + leInputInner(id, label, value, type) + '</div>';
+}
+
+function leSelectRow(id, label, value, options) {
+  const opts = options.map(([val, text]) =>
+    '<option value="' + escapeHtml(val) + '"' + (value === val ? ' selected' : '') + '>' + escapeHtml(text) + '</option>'
+  ).join('');
+  return '<div class="form-row"><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+    '<select id="' + id + '" class="np-input">' + opts + '</select></div>';
+}
+
+// Editing an existing listing's own fields previously had no guided path at
+// all: the quick-log tool above only builds a brand-new record. Reuses the
+// exact same guided-form -> JSON -> copy/paste convention, pre-filled with
+// the current values, and outputs the listing's *entire* record so the
+// result is a straight find-and-replace of one array entry in
+// listings.json, not a fragment to merge by hand. id, soldOn, and
+// listingUrls carry over unchanged: soldOn/listingUrls entries reference a
+// specific platform, and unchecking that platform from Platforms below
+// without also touching those would leave listings.json failing its own
+// validator, so this form blocks that combination instead of guessing what
+// to do with the orphaned entry.
+function listingEditFormHtml(l) {
+  return '<details class="schema-help">' +
+    '<summary>Edit this listing&rsquo;s details</summary>' +
+    '<div class="schema-help-body">' +
+    '<p>Generates this listing&rsquo;s full updated record with whatever fields below you change. ' +
+    '<code>id</code>, <code>soldOn</code>, and <code>listingUrls</code> carry over unchanged, edit those by hand ' +
+    'once a real sale or a live URL exists.</p>' +
+    '<div class="np-form">' +
+    leFieldRow('leTitle', 'Title', l.title) +
+    '<div class="form-row-split">' +
+    leInputInner('lePrice', 'Asking price, USD', l.price, 'number') +
+    leInputInner('leCostBasis', 'Cost basis, USD', l.costBasis, 'number') +
+    '</div>' +
+    '<div class="form-row"><label id="lePlatformsLabel">Platforms (at least one)</label>' +
+    '<div class="quick-log-checkbox-row" role="group" aria-labelledby="lePlatformsLabel">' +
+    ['ebay', 'vinted', 'poshmark', 'depop'].map(p =>
+      '<label class="quick-log-checkbox"><input type="checkbox" class="le-platform" value="' + p + '"' +
+      ((l.platforms || []).includes(p) ? ' checked' : '') + '> ' + escapeHtml(PLATFORM_LABELS[p]) + '</label>'
+    ).join('') +
+    '</div></div>' +
+    leSelectRow('leStatus', 'Status', l.status, [['draft', 'Draft'], ['ready-to-post', 'Ready to post'], ['live', 'Live'], ['sold', 'Sold']]) +
+    leFieldRow('leDatePublished', 'Date published', l.datePublished, 'date') +
+    leFieldRow('leLocation', 'Storage location', l.location) +
+    leFieldRow('leNotes', 'Notes', l.notes, 'textarea') +
+    '</div>' +
+    '<button type="button" id="leGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
+    '<div id="leResult" class="np-result" hidden>' +
+    '<ul id="leWarnings" class="np-warnings"></ul>' +
+    '<div class="np-output-head">' +
+    '<span class="field-label" style="margin:0">Replace this listing&rsquo;s whole entry with</span>' +
+    '<button type="button" id="leCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
+    '</div>' +
+    '<pre class="np-output font-mono" id="leOutput"></pre>' +
+    '</div>' +
+    '</div></details>';
+}
+
+function leVal(id) {
+  const v = document.getElementById(id).value.trim();
+  return v === '' ? null : v;
+}
+
+// Checks kept in sync with validate.js by hand, same as the quick-log tool
+// above (Garage has no shared browser-safe validator module the way CGT
+// does).
+function wireListingEditForm(l) {
+  const generateBtn = document.getElementById('leGenerateBtn');
+  if (!generateBtn) return;
+  const resultEl = document.getElementById('leResult');
+  const warningsEl = document.getElementById('leWarnings');
+  const outputEl = document.getElementById('leOutput');
+  const copyBtn = document.getElementById('leCopyBtn');
+
+  generateBtn.addEventListener('click', () => {
+    const title = leVal('leTitle');
+    const price = readOptionalNonNegativeInput(document.getElementById('lePrice'));
+    const costBasis = readOptionalNonNegativeInput(document.getElementById('leCostBasis'));
+    const platforms = Array.from(document.querySelectorAll('.le-platform:checked')).map(el => el.value);
+    const status = document.getElementById('leStatus').value;
+    const datePublished = leVal('leDatePublished');
+    const location = leVal('leLocation');
+    const notes = leVal('leNotes');
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!title) blockers.push('A title is required.');
+    if (!platforms.length) blockers.push('Select at least one platform.');
+    if (price === undefined) blockers.push('Enter a valid asking price of $0 or more, or leave it blank.');
+    if (costBasis === undefined) blockers.push('Enter a valid cost basis of $0 or more, or leave it blank.');
+
+    // soldOn/listingUrls each reference a specific platform; validate.js
+    // errors if either holds a platform no longer in this listing's own
+    // platforms array, so this blocks the same combination here instead of
+    // silently producing a record that fails the next validate.js run.
+    const orphanedSoldOn = (l.soldOn || []).filter(p => !platforms.includes(p));
+    if (orphanedSoldOn.length) {
+      blockers.push('This listing is marked sold on ' + orphanedSoldOn.map(p => PLATFORM_LABELS[p]).join(', ') +
+        ' but that platform was unchecked above. Keep it checked, or edit soldOn in listings.json by hand first.');
+    }
+    const orphanedUrls = Object.keys(l.listingUrls || {}).filter(p => !platforms.includes(p));
+    if (orphanedUrls.length) {
+      blockers.push('This listing has a logged URL for ' + orphanedUrls.map(p => PLATFORM_LABELS[p]).join(', ') +
+        ' but that platform was unchecked above. Keep it checked, or edit listingUrls in listings.json by hand first.');
+    }
+
+    if (title && platforms.length) {
+      platforms.forEach(p => {
+        const limit = TITLE_HARD_LIMITS[p];
+        if (limit && title.length > limit) {
+          advisory.push('Title is ' + title.length + ' chars, over ' + PLATFORM_LABELS[p] + '\'s ' + limit +
+            '-char cap, it will get rejected or truncated there.');
+        }
+      });
+    }
+
+    if (blockers.length) {
+      warningsEl.innerHTML = blockers.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+      outputEl.textContent = '';
+      resultEl.hidden = false;
+      resultEl.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+
+    const edited = Object.assign({}, l, {
+      title,
+      price: price === undefined ? null : price,
+      costBasis: costBasis === undefined ? null : costBasis,
+      platforms,
+      status,
+      datePublished,
+      location,
+      notes
+    });
+
+    warningsEl.innerHTML = advisory.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+    outputEl.textContent = JSON.stringify(edited, null, 2) + ',';
+    resultEl.hidden = false;
+    resultEl.scrollIntoView({ block: 'nearest' });
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(outputEl.textContent).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => {
+      copyBtn.textContent = "Couldn't copy, select the text manually";
+      setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 2400);
+    });
+  });
+}
+
 function openModal(id) {
   const l = listings.find(item => item.id === id);
   if (!l) return;
@@ -1543,6 +1711,7 @@ function openModal(id) {
   document.getElementById('modalSub').textContent = STAGE_LABELS[l.status] || l.status || 'Status not logged';
 
   const rows = [];
+  rows.push(listingEditFormHtml(l));
   rows.push(fieldRow('Asking price', l.price != null ? formatUsd(l.price) : 'Not set', l.price == null));
   rows.push(fieldRow('Cost basis', l.costBasis != null ? formatUsd(l.costBasis) : 'Not logged', l.costBasis == null));
   rows.push(fieldRow('Platforms', (l.platforms || []).length ? platformBadges(l.platforms, l.soldOn, l.listingUrls) : 'None logged', !(l.platforms || []).length));
@@ -1578,6 +1747,7 @@ function openModal(id) {
   rows.push(fieldRow('Notes', l.notes ? escapeHtml(l.notes) : 'None', !l.notes));
 
   document.getElementById('modalBody').innerHTML = rows.join('');
+  wireListingEditForm(l);
   modalOverlay.hidden = false;
   lockBodyScroll();
   modalClose.focus();
