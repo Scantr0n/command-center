@@ -147,6 +147,17 @@ const ORDER_STATUS_LOOKUP = {
 // before relying on this number," not that the price is wrong.
 const PRICE_STALE_AFTER_DAYS = 180;
 
+// Local calendar date as YYYY-MM-DD, same convention as daysSince above
+// (and CSM's/Sondrik's own todayIso): new Date().toISOString().slice(0, 10)
+// reads the UTC calendar date, which rolls over to tomorrow while it is
+// still today for anyone west of UTC, so a printed insurance document or a
+// CSV filename stamped that way can read one day ahead for the rest of the
+// evening, local time.
+function todayIso() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function daysSince(isoDate) {
   if (!isoDate) return null;
   // Local midnight, not UTC (no trailing Z), same convention as Sondrik's
@@ -900,7 +911,7 @@ function renderInsuranceSummary() {
     .slice()
     .sort((a, b) => b.estimatedValue - a.estimatedValue);
   const unpricedCount = real.length - priced.length;
-  const generatedOn = new Date().toISOString().slice(0, 10);
+  const generatedOn = todayIso();
 
   if (!priced.length) {
     el.innerHTML = `
@@ -1492,7 +1503,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'cgt-inventory-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.download = 'cgt-inventory-' + todayIso() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
