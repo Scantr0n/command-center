@@ -60,6 +60,20 @@
   .tag-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: 0.3px; }
   .cat-filter-chip { cursor: pointer; transition: opacity 0.15s ease; border: none; }
   .cat-filter-chip:hover { opacity: 0.8; }
+  .kbd-chip { font-family: 'JetBrains Mono', monospace; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--hairline); background: rgba(255,255,255,0.03); }
+  #paletteBtn:hover { border-color: var(--hairlineHover) !important; }
+
+  /* Quick-jump palette: same overlay chrome as the project modal, but a
+     single scrollable list of every project instead of a fixed layout, since
+     the whole point is jumping straight to one out of 20+ without hunting
+     through the graph or grid first. */
+  .palette-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; }
+  .palette-item[aria-selected="true"] { background: rgba(255,255,255,0.06); }
+  .palette-item-name { color: var(--ink); font-weight: 500; font-size: 13px; flex-shrink: 0; }
+  .palette-item-cat { color: var(--faint); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3px; margin-left: auto; white-space: nowrap; }
+  .palette-item-status { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; }
+  #paletteResults::-webkit-scrollbar { width: 6px; }
+  #paletteResults::-webkit-scrollbar-thumb { background: #23262b; border-radius: 3px; }
 
   /* On a narrow viewport, 9 wrapped category chips push the graph/grid
      several screens down before any project is visible. Below the point
@@ -179,6 +193,12 @@
             class="absolute inset-y-0 right-1.5 flex items-center text-[10px] font-mono leading-none pointer-events-none"
             style="color: var(--faint)">/</kbd>
         </div>
+        <button id="paletteBtn" type="button" aria-label="Jump to a project"
+          class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
+          style="color: var(--sub); background: var(--panelLight)">
+          <span>Jump to</span>
+          <kbd class="kbd-chip text-[10px]" style="color: var(--faint)" aria-hidden="true">&#8984;K</kbd>
+        </button>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
         <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5" aria-pressed="true">Graph</button>
@@ -282,6 +302,21 @@
           style="background: var(--panelLight); color: var(--ink)">
         <button id="sendChat" class="font-medium text-sm px-4 py-2 rounded-lg" style="background: var(--ink); color: var(--void)">Send</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Quick-jump palette (Ctrl/Cmd+K) -->
+  <div id="paletteOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-start justify-center z-50 p-6" style="padding-top: 12vh;">
+    <div class="corner-notch rounded-xl w-full max-w-lg max-h-[60vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)" role="dialog" aria-modal="true" aria-label="Jump to a project">
+      <div class="flex items-center gap-2.5 px-4 py-3 border-b hairline">
+        <span aria-hidden="true" style="color: var(--faint)">&#8981;</span>
+        <input id="paletteInput" type="text" placeholder="Jump to a project..." aria-label="Jump to a project"
+          class="flex-1 bg-transparent text-sm focus:outline-none" style="color: var(--ink)"
+          role="combobox" aria-expanded="true" aria-controls="paletteResults" aria-autocomplete="list">
+        <kbd class="kbd-chip text-[10px]" style="color: var(--faint)">ESC</kbd>
+      </div>
+      <div id="paletteResults" role="listbox" aria-label="Projects" class="flex-1 overflow-y-auto py-1.5"></div>
+      <div id="paletteEmpty" class="hidden px-4 py-6 text-xs text-center" style="color: var(--faint)"></div>
     </div>
   </div>
 
@@ -1066,6 +1101,117 @@ window.addEventListener('popstate', () => {
   }
 });
 
+// Quick-jump palette: a real project's name is often much faster to type
+// than hunting it down by eye in a 20+-node graph or scrolling a grid, same
+// reason Linear/Vercel/GitHub all ship a Cmd+K jump-to. Deliberately kept to
+// jumping into a project's own modal (identical destination to clicking its
+// card), not a general command runner, since that is the one real repeated
+// need here.
+let paletteOpen = false;
+let paletteSelectedIndex = 0;
+let paletteResultsCache = [];
+let paletteLastFocusedEl = null;
+
+// Plain substring scoring, not character-subsequence fuzzy matching: with
+// ~20 real projects a name/category/summary substring already finds the
+// right one reliably, and a looser fuzzy matcher risks more surprising
+// mismatches than it saves keystrokes at this list size.
+function paletteScore(c, term) {
+  const name = c.name.toLowerCase();
+  if (name.startsWith(term)) return 0;
+  if (name.includes(term)) return 1;
+  if ((c.category || '').toLowerCase().includes(term)) return 2;
+  if ((c.summary || '').toLowerCase().includes(term)) return 3;
+  return -1;
+}
+
+function paletteFilteredResults() {
+  const term = document.getElementById('paletteInput').value.trim().toLowerCase();
+  if (!term) return clusters.slice();
+  return clusters
+    .map(c => ({ c, score: paletteScore(c, term) }))
+    .filter(x => x.score >= 0)
+    .sort((a, b) => a.score - b.score || a.c.name.localeCompare(b.c.name))
+    .map(x => x.c);
+}
+
+function renderPaletteResults() {
+  paletteResultsCache = paletteFilteredResults();
+  const list = document.getElementById('paletteResults');
+  const empty = document.getElementById('paletteEmpty');
+
+  if (!paletteResultsCache.length) {
+    list.innerHTML = '';
+    empty.textContent = clusters.length ? 'No projects match.' : 'Projects still loading...';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  paletteSelectedIndex = Math.max(0, Math.min(paletteSelectedIndex, paletteResultsCache.length - 1));
+
+  list.innerHTML = paletteResultsCache.map((c, i) => `
+    <div class="palette-item" role="option" id="palette-opt-${i}" data-id="${escapeHtml(c.id)}" aria-selected="${i === paletteSelectedIndex}">
+      <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${categoryColor(c.category)}"></span>
+      <span class="palette-item-name">${escapeHtml(c.name)}</span>
+      <span class="palette-item-cat">${escapeHtml((c.category || 'Uncategorized').toUpperCase())}</span>
+      <span class="palette-item-status" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
+    </div>
+  `).join('');
+  document.getElementById('paletteInput').setAttribute('aria-activedescendant', `palette-opt-${paletteSelectedIndex}`);
+  list.querySelectorAll('.palette-item').forEach(el => {
+    el.addEventListener('click', () => activatePaletteItem(el.dataset.id));
+    el.addEventListener('mouseenter', () => {
+      paletteSelectedIndex = Number(el.id.replace('palette-opt-', ''));
+      renderPaletteResults();
+    });
+  });
+  const selectedEl = document.getElementById(`palette-opt-${paletteSelectedIndex}`);
+  if (selectedEl) selectedEl.scrollIntoView({ block: 'nearest' });
+}
+
+function paletteMove(delta) {
+  if (!paletteResultsCache.length) return;
+  paletteSelectedIndex = (paletteSelectedIndex + delta + paletteResultsCache.length) % paletteResultsCache.length;
+  renderPaletteResults();
+}
+
+function activatePaletteItem(id) {
+  closePalette();
+  openModal(id);
+}
+
+function openPalette() {
+  if (paletteOpen) return;
+  paletteOpen = true;
+  paletteSelectedIndex = 0;
+  paletteLastFocusedEl = document.activeElement;
+  document.getElementById('paletteInput').value = '';
+  document.getElementById('paletteOverlay').classList.remove('hidden');
+  document.getElementById('paletteOverlay').classList.add('flex');
+  lockBodyScroll();
+  renderPaletteResults();
+  document.getElementById('paletteInput').focus();
+}
+
+function closePalette() {
+  if (!paletteOpen) return;
+  paletteOpen = false;
+  document.getElementById('paletteOverlay').classList.add('hidden');
+  document.getElementById('paletteOverlay').classList.remove('flex');
+  unlockBodyScroll();
+  if (paletteLastFocusedEl && typeof paletteLastFocusedEl.focus === 'function') paletteLastFocusedEl.focus();
+  paletteLastFocusedEl = null;
+}
+
+document.getElementById('paletteInput').addEventListener('input', () => {
+  paletteSelectedIndex = 0;
+  renderPaletteResults();
+});
+document.getElementById('paletteOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('paletteOverlay')) closePalette();
+});
+document.getElementById('paletteBtn').addEventListener('click', openPalette);
+
 // Same "copy the shareable URL" affordance as the CSM/Garage/CGT hubs, here
 // copying a direct link to the open project's modal rather than a filtered
 // view.
@@ -1237,6 +1383,33 @@ document.getElementById('chatInput').addEventListener('keydown', (e) => {
 
 document.addEventListener('keydown', (e) => {
   const modalOpen = !document.getElementById('modalOverlay').classList.contains('hidden');
+
+  // Ctrl+K on Windows/Linux, Cmd+K on Mac, the same convention Linear/Vercel/
+  // GitHub all use for their own jump-to palettes. Toggles closed if already
+  // open; ignored while the project modal is open rather than stacking two
+  // overlays and their two separate focus traps on top of each other.
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    if (paletteOpen) closePalette();
+    else if (!modalOpen) openPalette();
+    return;
+  }
+
+  if (paletteOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closePalette(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); paletteMove(1); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); paletteMove(-1); return; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = paletteResultsCache[paletteSelectedIndex];
+      if (target) activatePaletteItem(target.id);
+      return;
+    }
+    // Anything else (typing a search term, including "/") reaches paletteInput
+    // normally instead of triggering the "/"-focuses-search shortcut below.
+    return;
+  }
+
   if (modalOpen && e.key === 'Escape') {
     closeModalAndReturnFocus();
     return;
