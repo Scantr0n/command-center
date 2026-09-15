@@ -528,6 +528,7 @@ header.page-head .sub {
 /* Positions table */
 .pl-good { color: #3DDC84; }
 .pl-bad { color: #E05050; }
+.pl-neutral { color: var(--dim); }
 .pos-table-wrap {
   border: 1px solid var(--hairline);
   border-radius: 12px;

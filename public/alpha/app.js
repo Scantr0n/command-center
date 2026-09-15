@@ -536,11 +536,17 @@ function renderAccount(data) {
     row.innerHTML = statTile('awaiting connection', 'Equity', null, true);
     return;
   }
-  const dayGood = acct.dayChangeDollar >= 0;
+  // dayChangeDollar is explicitly null (server.js) whenever the feed hasn't
+  // resolved both equity readings yet, same nullable shape fmtDollar already
+  // guards against. `null >= 0` is true in JS, so comparing the raw value
+  // before checking it's a real number colored an unresolved "-" green,
+  // falsely reading as "up today". Only color it once there's a real number.
+  const dayChangeIsNumber = typeof acct.dayChangeDollar === 'number' && Number.isFinite(acct.dayChangeDollar);
+  const dayGoodClass = dayChangeIsNumber ? (acct.dayChangeDollar >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
   row.innerHTML = [
     statTile(escapeHtml(fmtDollar(acct.equity) || '-'), 'Equity', null, false),
     statTile(
-      `<span class="${dayGood ? 'pl-good' : 'pl-bad'}">${escapeHtml((fmtDollar(acct.dayChangeDollar) || '-'))}</span>`,
+      `<span class="${dayGoodClass}">${escapeHtml((fmtDollar(acct.dayChangeDollar) || '-'))}</span>`,
       'Day change',
       fmtPct(acct.dayChangePct) || null,
       false
@@ -573,7 +579,12 @@ function renderPositions(data) {
   }
 
   const rows = positions.map(p => {
-    const good = p.unrealizedPl >= 0;
+    // Same nullable-number guard as renderAccount's dayChangeIsNumber above:
+    // qty/pl come through Number() in server.js, which turns a missing or
+    // malformed field into NaN, and `NaN >= 0` is false, so an unresolved
+    // value's dash would have been colored red, falsely reading as "losing".
+    const plIsNumber = typeof p.unrealizedPl === 'number' && Number.isFinite(p.unrealizedPl);
+    const goodClass = plIsNumber ? (p.unrealizedPl >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
     return `
       <tr>
         <td class="pos-symbol font-mono">${escapeHtml(p.symbol)}</td>
@@ -582,7 +593,7 @@ function renderPositions(data) {
         <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.avgEntryPrice) || '-')}</td>
         <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.currentPrice) || '-')}</td>
         <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.marketValue) || '-')}</td>
-        <td class="font-mono pos-num ${good ? 'pl-good' : 'pl-bad'}">${escapeHtml(fmtDollar(p.unrealizedPl) || '-')}
+        <td class="font-mono pos-num ${goodClass}">${escapeHtml(fmtDollar(p.unrealizedPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(p.unrealizedPlPct) || '')}</span>
         </td>
       </tr>
