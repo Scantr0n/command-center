@@ -747,6 +747,7 @@ function saveNotifyPref(enabled) {
 
 const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
 const notifyBtn = document.getElementById('notifyBtn');
+const testAlertBtn = document.getElementById('testAlertBtn');
 
 function renderNotifyBtn() {
   if (!notifyBtn || !notifySupported) return;
@@ -757,6 +758,7 @@ function renderNotifyBtn() {
     notifyBtn.classList.remove('notify-on');
     notifyBtn.textContent = 'Alerts blocked';
     notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+    if (testAlertBtn) testAlertBtn.hidden = true;
     return;
   }
   const enabled = permission === 'granted' && loadNotifyPref();
@@ -767,6 +769,30 @@ function renderNotifyBtn() {
   notifyBtn.title = enabled
     ? 'A native notification fires if the kill switch engages or this page errors while this tab is unfocused. Click to turn off.'
     : 'Get a native notification if the kill switch engages or this page errors while this tab is unfocused.';
+  // A granted browser permission doesn't guarantee the OS actually surfaces
+  // the notification (Do Not Disturb, a muted notification center entry for
+  // this browser, etc), so once armed, offer a way to check that end-to-end
+  // rather than leaving Jack to find out for certain only during a real kill
+  // switch event. Same real pairing every alerting tool with a "notify me"
+  // toggle ships (Slack, PagerDuty, UptimeRobot all offer a test alert next
+  // to the toggle that arms it).
+  if (testAlertBtn) testAlertBtn.hidden = !enabled;
+}
+
+if (testAlertBtn) {
+  testAlertBtn.addEventListener('click', () => {
+    if (!notifySupported || Notification.permission !== 'granted') return;
+    try {
+      new Notification('Alpha (test)', {
+        body: 'Test alert, no real state change. A real kill-switch or page-error alert looks just like this.',
+        icon: '/icon-192.png',
+        tag: 'alpha-test'
+      });
+      showToast('good', 'Test alert sent, check your notifications');
+    } catch (e) {
+      showToast('critical', "Couldn't send test alert: " + e.message);
+    }
+  });
 }
 
 if (notifyBtn && notifySupported) {
