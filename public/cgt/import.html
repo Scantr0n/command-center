@@ -17,7 +17,7 @@
   <header class="page-head">
     <div>
       <h1 class="font-display">IMPORT CSV</h1>
-      <p class="sub font-mono">Turn a CSV export from the real tracker file into a cards.json you can save over public/cgt/data/cards.json</p>
+      <p class="sub font-mono">Turn a CSV export from the real tracker file into cards.json, submissions.json, or candidates.json</p>
     </div>
     <div class="page-head-actions">
       <a href="/cgt/" class="back-link">&larr; Card Grading Tracker</a>
@@ -29,19 +29,32 @@
     <strong>This page does not save anything by itself.</strong> Command Center's dashboards are static files with
     no database, so there is nothing here for this tool to write to directly. It parses a CSV, lets you map its
     columns to the real schema, runs the exact same checks as
-    <code class="inline-code">node public/cgt/data/validate.js</code>, and then gives you a
-    <code class="inline-code">cards.json</code> file to download and use to replace
-    <code class="inline-code">public/cgt/data/cards.json</code> by hand. Nothing is invented: a blank
-    cell stays <code class="inline-code">null</code>, never a guess.
+    <code class="inline-code">node public/cgt/data/validate.js</code>, and then gives you a JSON file to download
+    and use to replace the matching file under <code class="inline-code">public/cgt/data/</code> by hand. Nothing
+    is invented: a blank cell stays <code class="inline-code">null</code>, never a guess.
   </div>
 
+  <section class="import-step">
+    <h2 class="section-title">1. What are you importing?</h2>
+    <p class="import-help">Cards (already graded, in <code class="inline-code">cards.json</code>), submissions
+      (batches currently at a grading company, in <code class="inline-code">submissions.json</code>), or
+      candidates (raw cards being weighed against the cost of grading them, in
+      <code class="inline-code">candidates.json</code>). Each has its own schema, so this changes the column
+      mapping options and which existing file gets combined with your import below.</p>
+    <div class="filter-row" id="datasetPicker" role="radiogroup" aria-label="Which dataset to import">
+      <button type="button" class="chip" data-dataset="cards" aria-pressed="true">Cards</button>
+      <button type="button" class="chip" data-dataset="submissions" aria-pressed="false">Submissions</button>
+      <button type="button" class="chip" data-dataset="candidates" aria-pressed="false">Candidates</button>
+    </div>
+  </section>
+
   <section class="import-step" id="stepLoadStatus">
-    <h2 class="section-title">Existing data</h2>
-    <p class="import-status-line font-mono" id="existingStatus">Checking public/cgt/data/cards.json&hellip;</p>
+    <h2 class="section-title">2. Existing data</h2>
+    <p class="import-status-line font-mono" id="existingStatus">Checking&hellip;</p>
   </section>
 
   <section class="import-step">
-    <h2 class="section-title">1. Paste or choose a CSV file</h2>
+    <h2 class="section-title">3. Paste or choose a CSV file</h2>
     <p class="import-help">The first row must be a header row. Column names don't need to match the schema exactly,
       the next step lets you map each one, and any column you don't map is ignored.</p>
     <div class="import-input-row">
@@ -50,20 +63,20 @@
       <button type="button" id="downloadTemplateBtn" class="print-btn font-mono">Download blank template CSV</button>
     </div>
     <label class="sr-only" for="csvPaste">Paste CSV text</label>
-    <textarea id="csvPaste" class="import-textarea font-mono" rows="6" placeholder="Or paste CSV text here, e.g.&#10;Card,Year,Sport,Grader,Grade,Cert #,Value,Basis,Comp note,Source,Date priced,Batch,Notes&#10;2021 Topps Chrome Julio Rodriguez RC,2021,baseball,PSA,10,12345678,450,recent-sale,,eBay sold Aug 2026 3 comps,2026-08-08,2026-08-08-full-backlog,"></textarea>
+    <textarea id="csvPaste" class="import-textarea font-mono" rows="6" placeholder="Or paste CSV text here"></textarea>
     <button type="button" id="parseBtn" class="print-btn font-mono import-primary-btn">Parse CSV</button>
     <p class="import-error" id="parseError" hidden role="alert"></p>
   </section>
 
   <section class="import-step" id="mappingStep" hidden>
-    <h2 class="section-title">2. Map columns</h2>
+    <h2 class="section-title">4. Map columns</h2>
     <p class="import-help">Guessed automatically from the header names where possible. Check each one, especially
       any left as "Ignore this column".</p>
     <div class="mapping-grid" id="mappingGrid"></div>
   </section>
 
   <section class="import-step" id="previewStep" hidden>
-    <h2 class="section-title">3. Preview</h2>
+    <h2 class="section-title">5. Preview</h2>
     <p class="import-help" id="previewSummary"></p>
     <div class="table-wrap">
       <table class="card-table" id="previewTable">
@@ -74,20 +87,18 @@
   </section>
 
   <section class="import-step" id="validateStep" hidden>
-    <h2 class="section-title">4. Validate</h2>
+    <h2 class="section-title">6. Validate</h2>
     <p class="import-help">Runs the same rules as <code class="inline-code">validate.js</code> against your
-      import combined with the existing real cards already on record (the example placeholder row is dropped
+      import combined with the existing real rows already on record (the example placeholder row is dropped
       automatically). Errors block the download below, warnings don't.</p>
     <div id="validationResults"></div>
   </section>
 
   <section class="import-step" id="downloadStep" hidden>
-    <h2 class="section-title">5. Download</h2>
+    <h2 class="section-title">7. Download</h2>
     <p class="import-help" id="downloadSummary"></p>
-    <button type="button" id="downloadJsonBtn" class="print-btn font-mono import-primary-btn">Download cards.json</button>
-    <p class="import-help">Save the downloaded file over <code class="inline-code">public/cgt/data/cards.json</code>,
-      then run <code class="inline-code">node public/cgt/data/validate.js</code> one more time from a real
-      checkout as a final check before committing it.</p>
+    <button type="button" id="downloadJsonBtn" class="print-btn font-mono import-primary-btn">Download JSON</button>
+    <p class="import-help" id="downloadHelp"></p>
   </section>
   </main>
 
