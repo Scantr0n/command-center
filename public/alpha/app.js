@@ -758,6 +758,7 @@ function renderNotifyBtn() {
     notifyBtn.classList.remove('notify-on');
     notifyBtn.textContent = 'Alerts blocked';
     notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+    notifyBtn.removeAttribute('aria-pressed');
     if (testAlertBtn) testAlertBtn.hidden = true;
     return;
   }
@@ -765,6 +766,10 @@ function renderNotifyBtn() {
   notifyBtn.hidden = false;
   notifyBtn.disabled = false;
   notifyBtn.classList.toggle('notify-on', enabled);
+  // Real toggle-button semantics (this button's own state persists across
+  // clicks, it isn't a one-shot action like Refresh), so screen readers get
+  // the same on/off state the border color already gives sighted users.
+  notifyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
   notifyBtn.textContent = enabled ? 'Critical alerts on' : 'Enable critical alerts';
   notifyBtn.title = enabled
     ? 'A native notification fires if the kill switch engages or this page errors while this tab is unfocused. Click to turn off.'
