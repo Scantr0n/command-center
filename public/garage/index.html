@@ -54,6 +54,7 @@
           <tr><th>status</th><td>One of: <code>draft</code>, <code>ready-to-post</code>, <code>live</code>, <code>sold</code></td></tr>
           <tr><th>datePublished</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet. Also drives the "Relist reminders" section below, log the real date an item first went live to get relist guidance for it.</td></tr>
           <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
+          <tr><th>location</th><td>Real physical storage spot for this item right now, e.g. <code>"Bin 3"</code> or <code>"Closet shelf B"</code>, a string or <code>null</code> until logged. Standard reseller inventory practice: pairs a bin/shelf label with each item so it can actually be found and shipped fast once it sells, rather than searched for. Purely descriptive, doesn't drive any calculation on this page.</td></tr>
           <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>.</td></tr>
           <tr><th>activity.json</th><td>One object per logged event in the <code>events</code> array: real bug fixes, photo audits, and other quality checks. Requires <code>id</code>, <code>title</code>, and <code>type</code> (<code>bug-fix</code>, <code>photo-audit</code>, or <code>other</code>).</td></tr>
           <tr><th>sales.json</th><td>One object per real completed sale in the <code>sales</code> array. Log a sale here <em>and</em> add that platform to the item's <code>soldOn</code> array in listings.json, both matter: this is the sale history, soldOn is what still needs delisting elsewhere.</td></tr>
@@ -85,7 +86,8 @@
   "listingUrls": {},
   "status": "draft",
   "datePublished": null,
-  "notes": null
+  "notes": null,
+  "location": null
 }</pre>
     </div>
   </details>
@@ -164,6 +166,7 @@
             <th class="sortable" data-sort="price" tabindex="0" aria-sort="none">Price</th>
             <th>Platforms</th>
             <th class="sortable" data-sort="datePublished" tabindex="0" aria-sort="none">Published</th>
+            <th>Location</th>
           </tr>
         </thead>
         <tbody id="listingTableBody"></tbody>

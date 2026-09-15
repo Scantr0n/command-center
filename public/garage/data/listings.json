@@ -10,7 +10,8 @@
       "listingUrls": { "ebay": null, "vinted": null, "poshmark": null, "depop": null },
       "status": "live",
       "datePublished": null,
-      "notes": null
+      "notes": null,
+      "location": null
     },
     {
       "id": "white-boots",
@@ -22,7 +23,8 @@
       "listingUrls": { "ebay": null, "vinted": null, "poshmark": null, "depop": null },
       "status": "live",
       "datePublished": null,
-      "notes": null
+      "notes": null,
+      "location": null
     },
     {
       "id": "softball-swing-analyzer",
@@ -34,7 +36,8 @@
       "listingUrls": { "ebay": null },
       "status": "live",
       "datePublished": null,
-      "notes": null
+      "notes": null,
+      "location": null
     }
   ]
 }

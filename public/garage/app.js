@@ -544,6 +544,7 @@ function buildDataQualityFlags(listings) {
       const reasons = [];
       if (!l.datePublished) reasons.push('NO DATE PUBLISHED LOGGED (BLOCKS RELIST GUIDANCE)');
       if (l.costBasis == null) reasons.push('NO COST BASIS LOGGED (BLOCKS PROFIT CALC)');
+      if (!l.location) reasons.push('NO STORAGE LOCATION LOGGED (SLOWS FULFILLMENT ON SALE)');
       const missingUrlPlatforms = (l.platforms || []).filter(p =>
         !(l.soldOn || []).includes(p) && !(l.listingUrls && l.listingUrls[p])
       );
@@ -777,6 +778,7 @@ function applyFiltersAndRender() {
       <td class="cell-value${l.price == null ? ' empty' : ''}">${l.price != null ? formatUsd(l.price) : 'not set'}</td>
       <td class="cell-platforms">${platformBadges(l.platforms, l.soldOn)}</td>
       <td class="cell-muted">${l.datePublished ? escapeHtml(l.datePublished) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-muted">${l.location ? escapeHtml(l.location) : '<span class="cell-value empty">not logged</span>'}</td>
     </tr>
   `).join('');
   tbody.querySelectorAll('[data-listing-id]').forEach(row => {
@@ -1277,6 +1279,7 @@ function openModal(id) {
     : 'Not applicable, not listed anywhere yet.';
   rows.push(fieldRow('Est. net payout by platform', payoutHtml, !(l.platforms || []).length));
 
+  rows.push(fieldRow('Storage location', l.location ? escapeHtml(l.location) : 'Not logged', !l.location));
   rows.push(fieldRow('Notes', l.notes ? escapeHtml(l.notes) : 'None', !l.notes));
 
   document.getElementById('modalBody').innerHTML = rows.join('');
@@ -1362,7 +1365,7 @@ function csvField(v) {
 const CSV_COLUMNS = [
   ['title', 'Item'], ['price', 'Price'], ['costBasis', 'Cost basis'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
   ['status', 'Status'], ['datePublished', 'Published'], ['daysListed', 'Days listed'],
-  ['relistGuidance', 'Relist guidance'], ['notes', 'Notes']
+  ['relistGuidance', 'Relist guidance'], ['location', 'Location'], ['notes', 'Notes']
 ];
 
 // Exports exactly what the table currently shows (same search, platform

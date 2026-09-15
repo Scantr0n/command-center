@@ -160,6 +160,10 @@ function main() {
       errors.push(where + ': "datePublished" is not a YYYY-MM-DD date or null: ' + JSON.stringify(l.datePublished));
     }
 
+    if (l.location !== null && l.location !== undefined && typeof l.location !== 'string') {
+      errors.push(where + ': "location" must be a string (real bin/shelf label) or null');
+    }
+
     if (l.title && Array.isArray(l.platforms)) {
       l.platforms.forEach(p => {
         const limit = TITLE_HARD_LIMITS[p];
