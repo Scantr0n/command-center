@@ -446,6 +446,16 @@ function fmtPct(n) {
   return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
 }
 
+// Same "never show a fabricated/misleading number" guard as fmtDollar/fmtPct
+// above, applied to share quantity: mapPositions in server.js always sends a
+// real number, but a missing/malformed qty from a future feed shape should
+// fall back to '-' like every other cell in this row, not Math.abs(undefined)'s
+// literal "NaN" text next to real dollar figures.
+function fmtQty(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
+  return String(Math.abs(n));
+}
+
 function renderAccount(data) {
   const row = document.getElementById('accountRow');
   const acct = data.live && data.live.account;
@@ -495,7 +505,7 @@ function renderPositions(data) {
       <tr>
         <td class="pos-symbol font-mono">${escapeHtml(p.symbol)}</td>
         <td class="font-mono pos-side-${escapeHtml(p.side)}">${escapeHtml(p.side)}</td>
-        <td class="font-mono pos-num">${escapeHtml(String(Math.abs(p.qty)))}</td>
+        <td class="font-mono pos-num">${escapeHtml(fmtQty(p.qty) || '-')}</td>
         <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.avgEntryPrice) || '-')}</td>
         <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.currentPrice) || '-')}</td>
         <td class="font-mono pos-num">${escapeHtml(fmtDollar(p.marketValue) || '-')}</td>
