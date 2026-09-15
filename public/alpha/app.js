@@ -629,6 +629,36 @@ function renderPositions(data) {
     `;
   }).join('');
 
+  // Totals row: a standard trading-table footer, the portfolio-level number
+  // a per-row scan doesn't give at a glance. Summed only from the same real
+  // per-row marketValue/unrealizedPl fields already rendered above, and only
+  // when every row has a real number to sum, never partially totaled against
+  // a row silently treated as zero. The aggregate P&L% is computed against
+  // total cost basis (mktValue - pl per row, the real amount actually paid),
+  // not averaged from the per-row percentages, since averaging percentages
+  // across differently-sized positions misrepresents overall performance.
+  const mvValues = positions.map(p => p.marketValue);
+  const plValues = positions.map(p => p.unrealizedPl);
+  const allNumeric = arr => arr.every(v => typeof v === 'number' && Number.isFinite(v));
+  const totalsKnown = allNumeric(mvValues) && allNumeric(plValues);
+  let totalsRow = '';
+  if (totalsKnown) {
+    const totalMv = mvValues.reduce((sum, v) => sum + v, 0);
+    const totalPl = plValues.reduce((sum, v) => sum + v, 0);
+    const totalCostBasis = totalMv - totalPl;
+    const totalPlPct = totalCostBasis > 0 ? (totalPl / totalCostBasis) * 100 : null;
+    const totalGoodClass = totalPl >= 0 ? 'pl-good' : 'pl-bad';
+    totalsRow = `
+      <tr class="pos-totals-row">
+        <td class="font-mono" colspan="5">Total (${positions.length} position${positions.length === 1 ? '' : 's'})</td>
+        <td class="font-mono pos-num">${escapeHtml(fmtDollar(totalMv) || '-')}</td>
+        <td class="font-mono pos-num ${totalGoodClass}">${escapeHtml(fmtDollar(totalPl) || '-')}
+          <span class="pos-plpct">${escapeHtml(fmtPct(totalPlPct) || '')}</span>
+        </td>
+      </tr>
+    `;
+  }
+
   panel.innerHTML = `
     <div class="pos-table-wrap">
       <table class="pos-table">
@@ -638,6 +668,7 @@ function renderPositions(data) {
           </tr>
         </thead>
         <tbody>${rows}</tbody>
+        ${totalsRow ? `<tfoot>${totalsRow}</tfoot>` : ''}
       </table>
     </div>
   `;

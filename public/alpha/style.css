@@ -566,6 +566,16 @@ header.page-head .sub {
 }
 .pos-table tbody tr:last-child td { border-bottom: none; }
 .pos-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+/* Totals footer row: set apart from the per-position rows above it (a
+   heavier top border in place of the row hover/divider styling) so it reads
+   as a portfolio-level sum, not one more position. */
+.pos-totals-row td {
+  border-top: 1px solid var(--hairlineHover);
+  border-bottom: none;
+  color: var(--sub);
+  font-weight: 600;
+}
+.pos-totals-row:hover { background: transparent; }
 .pos-symbol { font-weight: 600; }
 .pos-num { text-align: right; }
 .pos-side-long { color: #3DDC84; text-transform: uppercase; font-size: 0.72rem; }
