@@ -359,6 +359,13 @@ function renderStats() {
   const trendingDown = trended.filter(x => x.trend.abs < 0).length;
   const trendingFlat = trended.length - trendingUp - trendingDown;
 
+  // Real appraisal/insurance guidance (e.g. collectable.live's collectibles
+  // inventory guide) calls out per-item storage location as part of what a
+  // real claim needs, and the insurance print view already shows it per card
+  // when logged. Only measured against priced cards, since an unpriced card
+  // isn't part of the insurable total yet either.
+  const withStorageLocation = priced.filter(c => c.storageLocation).length;
+
   const tiles = [
     { value: real.length, label: 'Cards logged', sub: cards.length !== real.length ? '+ 1 example row' : null },
     { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
@@ -405,7 +412,15 @@ function renderStats() {
         : 'no cards re-priced yet',
       cls: trended.length ? (trendingUp > trendingDown ? 'positive' : (trendingDown > trendingUp ? 'negative' : null)) : null
     },
-    { value: bySportBreakdown || 'n/a', label: 'Cards by sport', sub: null }
+    { value: bySportBreakdown || 'n/a', label: 'Cards by sport', sub: null },
+    {
+      value: priced.length ? withStorageLocation + ' / ' + priced.length : 'n/a',
+      label: 'Storage location logged',
+      sub: priced.length
+        ? (withStorageLocation ? 'of priced cards, for the insurance summary' : 'none logged yet, worth backfilling for insurance')
+        : 'nothing priced yet',
+      cls: priced.length ? (withStorageLocation === priced.length ? 'positive' : (withStorageLocation === 0 ? 'negative' : null)) : null
+    }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
