@@ -11,7 +11,23 @@
   const copyStatusBtn = document.getElementById('copyStatusBtn');
   const copyStatusLive = document.getElementById('copyStatusLive');
   const attentionPill = document.getElementById('attentionPill');
+  const newSincePill = document.getElementById('newSincePill');
   const lastUpdatedSub = document.getElementById('lastUpdatedSub');
+
+  // "New since your last visit" is a per-browser convenience, not a second
+  // copy of any real fact: it only compares real logged dates already on the
+  // page (releases, download checks, leads, goals) against a plain date
+  // this same browser saw on a previous page load. localStorage can be
+  // unavailable (private browsing, blocked site data) or throw, so every
+  // access is wrapped and the feature just silently doesn't appear rather
+  // than breaking the page.
+  const LAST_VISIT_KEY = 'sondrik:lastVisitDate';
+  function safeStorageGet(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+  function safeStorageSet(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* ignore */ }
+  }
 
   // Shared read of "how old is a real logged date" used by the traction
   // freshness badge, the header's last-updated line, and the next-steps
@@ -94,13 +110,33 @@
       return;
     }
 
+    // Only compares against a real previous visit, never against "today" or
+    // an assumed date: on the very first-ever visit (nothing saved yet)
+    // nothing is marked new, since flagging every pre-existing item as new
+    // the first time someone opens the page would be noise, not signal.
+    const previousVisitDate = safeStorageGet(LAST_VISIT_KEY);
+    const newCount = previousVisitDate
+      ? dated.filter(e => e.date > previousVisitDate).length
+      : 0;
+    safeStorageSet(LAST_VISIT_KEY, todayIso());
+
+    if (newCount > 0) {
+      newSincePill.hidden = false;
+      newSincePill.textContent = newCount + (newCount === 1 ? ' update' : ' updates') +
+        ' since your last visit (' + fmtDate(previousVisitDate) + ')';
+    } else {
+      newSincePill.hidden = true;
+    }
+
     function itemHtml(e) {
+      const isNew = previousVisitDate && e.date && e.date > previousVisitDate;
       return '<li class="timeline-item timeline-kind-' + e.kind + '">' +
         '<div class="timeline-meta">' +
         '<span class="timeline-badge font-mono">' + KIND_LABEL[e.kind] + '</span>' +
         (e.date
           ? '<span class="timeline-date font-mono">' + fmtDate(e.date) + '</span>'
           : '<span class="timeline-date timeline-date-unknown font-mono">DATE NOT LOGGED</span>') +
+        (isNew ? '<span class="timeline-new-badge font-mono">NEW</span>' : '') +
         '</div>' +
         '<div class="timeline-title">' + escapeHtml(e.title) + '</div>' +
         (e.detail ? '<div class="timeline-detail">' + escapeHtml(e.detail) + '</div>' : '') +

@@ -112,6 +112,40 @@ header.page-head .sub {
   outline: none;
 }
 
+/* "New since your last visit" pill: purely a per-browser localStorage
+   comparison against real logged dates already on the page, never a second
+   copy of any fact. Uses the accent color (same family as the DOWNLOAD CHECK
+   timeline badge) rather than the attention pill's amber, since this is a
+   passive "here's what changed" cue, not something that needs action. */
+.new-since-pill {
+  font-size: 0.75rem;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid rgba(91,140,255,0.35);
+  background: rgba(91,140,255,0.1);
+  padding: 6px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.new-since-pill:hover, .new-since-pill:focus-visible {
+  border-color: rgba(91,140,255,0.6);
+  background: rgba(91,140,255,0.16);
+  outline: none;
+}
+
+.timeline-new-badge {
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(91,140,255,0.35);
+  background: rgba(91,140,255,0.12);
+  color: var(--accent);
+  margin-left: 6px;
+}
+
 .callout {
   border: 1px solid var(--hairline);
   background: rgba(255,255,255,0.02);
@@ -774,7 +808,7 @@ footer.page-foot {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .schema-help, .attention-pill, .next-steps-section {
+  .print-btn, .back-link, .schema-help, .attention-pill, .new-since-pill, .next-steps-section, .timeline-new-badge {
     display: none !important;
   }
 
