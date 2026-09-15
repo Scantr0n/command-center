@@ -8,6 +8,8 @@
   const snapshotStrip = document.getElementById('snapshotStrip');
   const nextStepsList = document.getElementById('nextStepsList');
   const csvBtn = document.getElementById('csvBtn');
+  const releasesCsvBtn = document.getElementById('releasesCsvBtn');
+  const leadsCsvBtn = document.getElementById('leadsCsvBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
   const copyPublicBtn = document.getElementById('copyPublicBtn');
   const copyStatusLive = document.getElementById('copyStatusLive');
@@ -880,6 +882,47 @@
     URL.revokeObjectURL(url);
   }
 
+  // Same "real logged history only, one row per record" rule as
+  // exportDownloadsCsv above, just for the other two record types that had
+  // no export at all: CGT, Garage, and CSM all already provide full-dataset
+  // CSV export for every entity type they track, this closes the same gap
+  // here. Goals is left out: goals.json is currently empty, an export
+  // button for zero real goals has nothing to export yet.
+  function exportReleasesCsv(releasesData) {
+    const releases = (releasesData.releases || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const header = ['Version', 'Date', 'Type', 'Summary', 'Notes'].map(csvField).join(',');
+    const lines = releases.map(r => [r.version, r.date, r.type, r.summary, r.notes].map(csvField).join(','));
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sondrik-releases-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportLeadsCsv(leadsData) {
+    const leads = (leadsData.leads || []).slice().sort((a, b) => (a.loggedDate || '').localeCompare(b.loggedDate || ''));
+    const header = ['Id', 'Source', 'Source detail', 'Type', 'Summary', 'Logged date', 'Draft status', 'Approval status', 'Sent'].map(csvField).join(',');
+    const lines = leads.map(l => {
+      const o = l.outreach || {};
+      return [l.id, l.source, l.sourceDetail, l.type, l.summary, l.loggedDate, o.draftStatus, o.approvalStatus, o.sent ? 'yes' : 'no'].map(csvField).join(',');
+    });
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sondrik-leads-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // Quick-log tool: turns a small form into the exact JSON object to paste
   // into downloads.json or leads.json by hand, same "generate paste-ready
   // JSON, save nothing" pattern CSM's quick-add uses for prospects. Never
@@ -1191,9 +1234,11 @@
 
     if (releasesData) {
       renderReleases(releasesData);
+      releasesCsvBtn.addEventListener('click', () => exportReleasesCsv(releasesData));
     } else {
       releaseSection.innerHTML = '<div class="empty-state" role="alert">Failed to load release data: ' +
         escapeHtml(releasesResult.reason.message) + '</div>';
+      releasesCsvBtn.disabled = true;
     }
 
     if (downloadsData) {
@@ -1222,9 +1267,11 @@
     if (leadsData) {
       renderLeads(leadsData);
       renderAttentionPill(leadsData);
+      leadsCsvBtn.addEventListener('click', () => exportLeadsCsv(leadsData));
     } else {
       leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
         escapeHtml(leadsResult.reason.message) + '</div>';
+      leadsCsvBtn.disabled = true;
     }
 
     if (releasesData || downloadsData || leadsData || goalsData || channelsData) {
