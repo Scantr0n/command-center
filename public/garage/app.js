@@ -1273,6 +1273,11 @@ const MESSAGE_TEMPLATES = [
     id: 'shipped',
     label: 'Item shipped notification',
     text: "Good news, {item} is on its way! Tracking is uploaded to the order, let me know once it arrives safely."
+  },
+  {
+    id: 'post-sale-review',
+    label: 'Post-sale thank-you / review request',
+    text: "Thanks so much for grabbing {item}! I hope it's exactly what you were looking for. If anything's off, message me first and I'll make it right, and if you're happy with it, a review goes a long way for a small seller like me."
   }
 ];
 
