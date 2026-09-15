@@ -294,6 +294,12 @@ function renderStats(listings, stages, sales, expenses) {
   const computedExpenses = expenses.map(e => computeExpenseAmount(e)).filter(a => a != null);
   const totalExpenses = computedExpenses.reduce((s, a) => s + a, 0);
   const uncomputedExpenseCount = expenses.length - computedExpenses.length;
+  // Bottom-line figure for Schedule C: only shown once at least one sale has a
+  // real profit computed (cost basis or shipping logged), since without that
+  // "net income" would just be revenue, not profit. Expenses default to the
+  // real $0 logged so far if none exist yet, never estimated.
+  const netIncomeTracked = salesWithCost.length > 0;
+  const netIncome = realizedProfit - totalExpenses;
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -309,7 +315,8 @@ function renderStats(listings, stages, sales, expenses) {
     { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },
     { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have at least one logged` : 'No sale has a cost basis or shipping cost logged yet' },
     { value: expenses.length, label: 'Business expenses logged', sub: expenses.length ? null : 'None yet' },
-    { value: formatUsd(totalExpenses), label: 'Real business expenses', sub: uncomputedExpenseCount ? `${uncomputedExpenseCount} of ${expenses.length} not counted yet, missing amount or a usable mileage rate` : (expenses.length ? 'For Schedule C, not tax advice' : 'No expenses logged yet') }
+    { value: formatUsd(totalExpenses), label: 'Real business expenses', sub: uncomputedExpenseCount ? `${uncomputedExpenseCount} of ${expenses.length} not counted yet, missing amount or a usable mileage rate` : (expenses.length ? 'For Schedule C, not tax advice' : 'No expenses logged yet') },
+    { value: netIncomeTracked ? formatUsd(netIncome) : 'not tracked yet', label: 'Net business income', sub: netIncomeTracked ? (expenses.length ? 'Realized profit minus real logged expenses' : 'Realized profit minus $0, no expenses logged yet') : 'Needs at least one sale with cost basis or shipping logged', warn: netIncomeTracked && netIncome < 0 }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
