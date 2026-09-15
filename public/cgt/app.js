@@ -1389,6 +1389,183 @@ function unlockBodyScroll() {
   document.body.style.paddingRight = '';
 }
 
+function ceInputInner(id, label, value, type) {
+  type = type || 'text';
+  const v = value == null ? '' : escapeHtml(String(value));
+  if (type === 'textarea') {
+    return '<div><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+      '<textarea id="' + id + '" class="np-input" rows="2">' + v + '</textarea></div>';
+  }
+  return '<div><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+    '<input type="' + type + '" id="' + id + '" class="np-input" value="' + v + '"' +
+    (type === 'number' ? ' min="0" step="0.01"' : '') + '></div>';
+}
+
+function ceFieldRow(id, label, value, type) {
+  return '<div class="form-row">' + ceInputInner(id, label, value, type) + '</div>';
+}
+
+function ceSelectRow(id, label, value, options) {
+  const opts = options.map(([val, text]) =>
+    '<option value="' + escapeHtml(val) + '"' + (value === val || (!value && val === '') ? ' selected' : '') + '>' + escapeHtml(text) + '</option>'
+  ).join('');
+  return '<div class="form-row"><label for="' + id + '">' + escapeHtml(label) + '</label>' +
+    '<select id="' + id + '" class="np-input">' + opts + '</select></div>';
+}
+
+// Editing an existing card's own fields previously had no guided path at
+// all: the quick-log tool above only builds a brand-new record. Reuses the
+// exact same guided-form -> JSON -> copy/paste convention, pre-filled with
+// the current values, and outputs the card's *entire* record (id and
+// priceHistory carried over untouched) so the result is a straight find-
+// and-replace of one array entry in cards.json, not a fragment to merge by
+// hand.
+function cardEditFormHtml(c) {
+  return '<details class="schema-help">' +
+    '<summary>Edit this card&rsquo;s details</summary>' +
+    '<div class="schema-help-body">' +
+    '<p>Generates this card&rsquo;s full updated record with whatever fields below you change. ' +
+    '<code>id</code> and <code>priceHistory</code> carry over unchanged. Re-pricing a card that already has an ' +
+    'estimatedValue? Push its current value/date/basis into <code>priceHistory</code> yourself first, this form ' +
+    'warns you if it looks like you forgot.</p>' +
+    '<div class="np-form">' +
+    ceFieldRow('ceCardName', 'Card name', c.cardName) +
+    '<div class="form-row-split">' +
+    ceInputInner('ceYear', 'Year', c.year, 'number') +
+    ceSelectRow('ceSport', 'Sport', c.sport, [['', 'Select one...'], ['hockey', 'Hockey'], ['baseball', 'Baseball'], ['football', 'Football']]) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceSelectRow('ceGradingCompany', 'Grading company', c.gradingCompany, [['', 'Not graded / raw'], ['PSA', 'PSA'], ['BGS', 'BGS'], ['SGC', 'SGC'], ['CGC', 'CGC'], ['HGA', 'HGA'], ['KSA', 'KSA']]) +
+    ceInputInner('ceGrade', 'Grade', c.grade) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('ceCertNumber', 'Cert number', c.certNumber) +
+    ceInputInner('ceStorageLocation', 'Storage location', c.storageLocation) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('ceEstimatedValue', 'Estimated value, USD', c.estimatedValue, 'number') +
+    ceSelectRow('ceValuationBasis', 'Valuation basis', c.valuationBasis, [['', 'Select one...'], ['recent-sale', 'Recent sale'], ['comp-estimate', 'Comp estimate']]) +
+    '</div>' +
+    ceFieldRow('ceCompNote', 'Comp note', c.compNote) +
+    ceFieldRow('ceSourceNote', 'Source note', c.sourceNote) +
+    '<div class="form-row-split">' +
+    ceInputInner('ceCostBasis', 'Cost basis, USD', c.costBasis, 'number') +
+    ceInputInner('ceDatePriced', 'Date priced', c.datePriced, 'date') +
+    '</div>' +
+    ceFieldRow('ceBacklogBatch', 'Backlog batch', c.backlogBatch) +
+    ceFieldRow('ceNotes', 'Notes', c.notes, 'textarea') +
+    '</div>' +
+    '<button type="button" id="ceGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
+    '<div id="ceResult" class="np-result" hidden>' +
+    '<ul id="ceWarnings" class="np-warnings"></ul>' +
+    '<div class="np-output-head">' +
+    '<span class="field-label" style="margin:0">Replace this card&rsquo;s whole entry with</span>' +
+    '<button type="button" id="ceCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
+    '</div>' +
+    '<pre class="np-output font-mono" id="ceOutput"></pre>' +
+    '</div>' +
+    '</div></details>';
+}
+
+function ceVal(id) {
+  const v = document.getElementById(id).value.trim();
+  return v === '' ? null : v;
+}
+
+// Reuses CGTValidateCore.validateCards, same as the quick-log tool, by
+// replacing this card in place within a copy of the real cards array so
+// the exact same rules the CLI validator enforces catch a structural
+// mistake here too, instead of only on the next `node validate.js` run.
+function wireCardEditForm(c) {
+  const generateBtn = document.getElementById('ceGenerateBtn');
+  if (!generateBtn) return;
+  const resultEl = document.getElementById('ceResult');
+  const warningsEl = document.getElementById('ceWarnings');
+  const outputEl = document.getElementById('ceOutput');
+  const copyBtn = document.getElementById('ceCopyBtn');
+
+  generateBtn.addEventListener('click', () => {
+    const yearRaw = document.getElementById('ceYear').value.trim();
+    const estimatedValueRaw = document.getElementById('ceEstimatedValue').value.trim();
+    const costBasisRaw = document.getElementById('ceCostBasis').value.trim();
+
+    const edited = Object.assign({}, c, {
+      cardName: ceVal('ceCardName') || c.cardName,
+      year: yearRaw === '' ? null : Number(yearRaw),
+      sport: document.getElementById('ceSport').value || null,
+      gradingCompany: document.getElementById('ceGradingCompany').value || null,
+      grade: ceVal('ceGrade'),
+      certNumber: ceVal('ceCertNumber'),
+      storageLocation: ceVal('ceStorageLocation'),
+      estimatedValue: estimatedValueRaw === '' ? null : Number(estimatedValueRaw),
+      valuationBasis: document.getElementById('ceValuationBasis').value || null,
+      compNote: ceVal('ceCompNote'),
+      sourceNote: ceVal('ceSourceNote'),
+      costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
+      datePriced: document.getElementById('ceDatePriced').value || null,
+      backlogBatch: ceVal('ceBacklogBatch'),
+      notes: ceVal('ceNotes')
+    });
+
+    let blockers = [];
+    let advisory = [];
+    if (window.CGTValidateCore) {
+      const realCards = cards.filter(x => !isExample(x));
+      const merged = realCards.slice();
+      const idx = merged.findIndex(x => x.id === c.id);
+      if (idx !== -1) merged[idx] = edited;
+      const where = 'cards[' + idx + ']';
+      const strip = m => m.slice(m.indexOf(': ') + 2);
+      const { errors, warnings } = window.CGTValidateCore.validateCards(merged);
+      blockers = errors.filter(m => m.indexOf(where) === 0).map(strip);
+      advisory = warnings.filter(m => m.indexOf(where) === 0).map(strip);
+
+      const dupGroups = window.CGTValidateCore.findDuplicateGroups(merged);
+      const ownGroup = dupGroups.find(g => g.cards.includes(edited));
+      if (ownGroup) {
+        const others = ownGroup.cards.filter(x => x !== edited).map(x => x.id).join(', ');
+        advisory.push('Same card name, year, grading company, and grade as an existing card (' + others +
+          '). Could be a real second copy, or a duplicate entry, double check before pasting this in.');
+      }
+    }
+
+    // Re-pricing without moving the old number into priceHistory first loses
+    // it silently, exactly the mistake the schema-help instructions above
+    // warn against.
+    if (c.estimatedValue != null && edited.estimatedValue !== c.estimatedValue &&
+        JSON.stringify(edited.priceHistory || null) === JSON.stringify(c.priceHistory || null)) {
+      advisory.push('Estimated value changed from ' + formatUsd(c.estimatedValue) + ' to ' +
+        (edited.estimatedValue != null ? formatUsd(edited.estimatedValue) : 'null') +
+        ' but priceHistory was not updated. Push the old value/date/basis into priceHistory yourself before ' +
+        'pasting this in, or that old price is lost.');
+    }
+
+    if (blockers.length) {
+      warningsEl.innerHTML = blockers.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+      outputEl.textContent = '';
+      resultEl.hidden = false;
+      resultEl.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+
+    warningsEl.innerHTML = advisory.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+    outputEl.textContent = JSON.stringify(edited, null, 2) + ',';
+    resultEl.hidden = false;
+    resultEl.scrollIntoView({ block: 'nearest' });
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(outputEl.textContent).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => {
+      copyBtn.textContent = "Couldn't copy, select the text manually";
+      setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 2400);
+    });
+  });
+}
+
 function openModal(id) {
   activeCard = cards.find(c => c.id === id);
   if (!activeCard) return;
@@ -1399,6 +1576,7 @@ function openModal(id) {
   document.getElementById('modalSub').textContent = subParts.length ? subParts.join(' · ') : 'No sport/grader/grade logged yet';
 
   let body = '';
+  body += cardEditFormHtml(activeCard);
   body += field('Cert number', activeCard.certNumber, !activeCard.certNumber);
   const lookup = certLookupLink(activeCard);
   if (lookup) {
@@ -1430,6 +1608,7 @@ function openModal(id) {
   body += field('Notes', activeCard.notes, !activeCard.notes);
 
   document.getElementById('modalBody').innerHTML = body;
+  wireCardEditForm(activeCard);
   document.getElementById('modalOverlay').hidden = false;
   lockBodyScroll();
   document.getElementById('modalClose').focus();
