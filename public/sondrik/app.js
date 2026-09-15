@@ -57,6 +57,15 @@
     return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
   }
 
+  // Local calendar date arithmetic to match daysBetween/todayIso above,
+  // used by the check-in cadence estimate to project a suggested next
+  // check date from a real logged one plus a real gap.
+  function addDays(iso, days) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   // Local calendar date as YYYY-MM-DD. daysBetween (like CSM's daysUntil)
   // parses logged dates as local midnight, so "today" has to match that or
   // every comparison drifts. new Date().toISOString().slice(0, 10) instead
@@ -258,6 +267,37 @@
       }
     }
 
+    // Check-in cadence: a forward-looking companion to the freshness badge
+    // below. Freshness only says how old the latest check is against a
+    // fixed 4/7-day threshold; this instead projects a suggested next check
+    // date from the real gap(s) between Jack's own past checks, so early on
+    // (when there's only ever been one real gap) it reads as "based on your
+    // only check-in gap so far" rather than implying an established rhythm
+    // it hasn't earned yet.
+    let cadenceHtml = '';
+    if (checks.length > 1) {
+      const gaps = [];
+      for (let i = 1; i < checks.length; i++) gaps.push(daysBetween(checks[i - 1].date, checks[i].date));
+      const avgGap = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+      if (avgGap > 0) {
+        const gapBasis = gaps.length === 1
+          ? 'your only check-in gap so far (' + avgGap + (avgGap === 1 ? ' day' : ' days') + ')'
+          : 'the average of your last ' + gaps.length + ' check-in gaps (~' + avgGap + (avgGap === 1 ? ' day' : ' days') + ')';
+        const nextDate = addDays(latest.date, avgGap);
+        const daysUntilNext = daysBetween(todayIso(), nextDate);
+        let dueLabel;
+        if (daysUntilNext > 0) {
+          dueLabel = 'next check suggested in ' + daysUntilNext + (daysUntilNext === 1 ? ' day' : ' days') + ' (' + fmtDate(nextDate) + ')';
+        } else if (daysUntilNext === 0) {
+          dueLabel = 'next check suggested today (' + fmtDate(nextDate) + ')';
+        } else {
+          const overdueDays = -daysUntilNext;
+          dueLabel = 'suggested check was ' + overdueDays + (overdueDays === 1 ? ' day' : ' days') + ' ago (' + fmtDate(nextDate) + ')';
+        }
+        cadenceHtml = '<div class="stat-cadence font-mono" title="Based on ' + escapeHtml(gapBasis) + '">' + escapeHtml(dueLabel) + '</div>';
+      }
+    }
+
     const ageDays = daysBetween(latest.date, todayIso());
     const isStale = ageDays > STALE_AFTER_DAYS;
     const isAging = !isStale && ageDays > AGING_AFTER_DAYS;
@@ -306,6 +346,7 @@
       deltaHtml +
       rateHtml +
       freshnessHtml +
+      cadenceHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +
       '</div>' +
       // role="group" is required for aria-label to take effect here: a plain

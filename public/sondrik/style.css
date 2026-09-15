@@ -371,6 +371,19 @@ section { margin-bottom: 36px; }
   line-height: 1.5;
 }
 
+/* Forward-looking companion to .freshness-badge: that one reports how old
+   the latest check already is, this one projects when the next one is
+   suggested from the real gap(s) between past checks. Uses --accent (the
+   same "informational, not urgent" color as .freshness-aging) rather than
+   the amber used for STALE/AGING, since it is guidance, not a warning. */
+.stat-cadence {
+  font-size: 0.68rem;
+  color: var(--accent);
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+  cursor: help;
+}
+
 .freshness-badge {
   font-size: 0.68rem;
   margin-top: 8px;
@@ -847,7 +860,7 @@ footer.page-foot {
   .snapshot-chip-label { color: #333; }
   .snapshot-chip-meta { color: #555; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
-  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .last-updated, .last-updated-stale, .channel-note,
+  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .last-updated, .last-updated-stale, .channel-note,
   .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-note { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
