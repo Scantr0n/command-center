@@ -241,6 +241,16 @@ header.page-head .sub {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--ink);
+  /* A path like public/alpha/data/status.json has no default break point
+     browsers will use; without this a long one could still force its own
+     cell wider than intended even in the stacked mobile layout below. */
+  overflow-wrap: anywhere;
+}
+/* Safety net, not the primary fix: if a future edit adds a schema key long
+   enough to widen the table beyond its container even in the stacked
+   layout below, this scrolls just the table instead of the whole page. */
+.schema-table-wrap {
+  overflow-x: auto;
 }
 .schema-table {
   width: 100%;
@@ -260,6 +270,36 @@ header.page-head .sub {
   white-space: nowrap;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem;
+}
+
+/* Below ~480px (phone width) this table's two real columns don't fit side
+   by side without either squeezing the description into a sliver or
+   forcing horizontal scroll on every single row, both bad for a table meant
+   to be read, not just glanced at. Real responsive-table practice for this
+   exact case is to stack each row into label-then-value blocks instead, so
+   this converts the whole table to block layout at that width: each <tr>
+   becomes its own record, its own top divider, with <th> and <td> each
+   taking the full line. Purely a layout change, same real schema content. */
+@media (max-width: 480px) {
+  .schema-table, .schema-table tbody, .schema-table tr, .schema-table th, .schema-table td {
+    display: block;
+    width: auto;
+  }
+  .schema-table tr {
+    border-top: 1px solid var(--hairline);
+    padding: 10px 0;
+  }
+  .schema-table tr:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+  .schema-table th, .schema-table td {
+    border-top: none;
+    padding: 0;
+  }
+  .schema-table th {
+    margin-bottom: 4px;
+  }
 }
 
 .section-title {
