@@ -24,6 +24,7 @@
       <button type="button" id="newProspectBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">+ Log new prospect</button>
       <button type="button" id="copyLinkBtn" class="print-btn font-mono" aria-live="polite">Copy link to this view</button>
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
+      <button type="button" id="backupBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">Download backup (.json)</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
@@ -59,6 +60,11 @@
         <code>stage</code> does not throw an error, it just makes the prospect silently vanish from the board.
         The validator catches that, plus duplicate ids, bad dates, an invalid <code>contactChannel.type</code>,
         and social numbers logged without an <code>asOfDate</code>.</p>
+      <p>Before a risky hand-edit, click <strong>Download backup (.json)</strong> in the header first. Unlike
+        <strong>Export CSV</strong>, which flattens each prospect to one row and drops <code>stageHistory</code>, the
+        backup file keeps the full <code>prospects.json</code> and <code>stages.json</code> structure exactly as
+        loaded, so a bad edit can be diffed against or restored from a known-good copy. This is a local download
+        only, nothing is uploaded anywhere.</p>
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"company-person-name"</code></td></tr>

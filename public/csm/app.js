@@ -16,6 +16,7 @@
   const modalCopyLinkBtn = document.getElementById('modalCopyLinkBtn');
   const printBtn = document.getElementById('printBtn');
   const csvBtn = document.getElementById('csvBtn');
+  const backupBtn = document.getElementById('backupBtn');
   const icsBtn = document.getElementById('icsBtn');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   const dataQualitySection = document.getElementById('dataQualitySection');
@@ -1096,6 +1097,8 @@
   let byId = {};
   let allStages = [];
   let allProspects = [];
+  let rawStagesData = null;
+  let rawProspectsData = null;
   let channelFilter = 'all';
   let categoryFilter = 'all';
   let lastFiltered = [];
@@ -1350,6 +1353,23 @@
     const lines = rows.map(r => CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
     const csv = [header, ...lines].join('\n');
     downloadFile(csv, 'csm-pipeline-' + todayIso() + '.csv', 'text/csv;charset=utf-8;');
+  });
+
+  // Full-fidelity backup: unlike the CSV export above, which flattens each
+  // prospect to one row and drops stageHistory entirely, this keeps
+  // prospects.json and stages.json exactly as loaded (including their
+  // schemaVersion/note wrappers) so a bad hand-edit can be diffed against or
+  // restored from a known-good copy. Local download only, nothing is sent
+  // anywhere.
+  backupBtn.addEventListener('click', () => {
+    if (!rawProspectsData && !rawStagesData) return;
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      source: 'Command Center CSM pipeline (/csm), local download only',
+      prospectsJson: rawProspectsData,
+      stagesJson: rawStagesData
+    };
+    downloadFile(JSON.stringify(backup, null, 2), 'csm-backup-' + todayIso() + '.json', 'application/json;charset=utf-8;');
   });
 
   // RFC 5545 (iCalendar) text escaping: backslash, comma, semicolon, and
@@ -2644,6 +2664,10 @@
     allStages = (stagesData && stagesData.stages) || [];
     allProspects = (prospectsData && prospectsData.prospects) || [];
     byId = Object.fromEntries(allProspects.map(p => [p.id, p]));
+    rawStagesData = stagesData;
+    rawProspectsData = prospectsData;
+    backupBtn.disabled = !stagesData && !prospectsData;
+    backupBtn.title = backupBtn.disabled ? "Can't back up, pipeline data failed to load (see below)" : '';
 
     renderDataFreshness([stagesResult, prospectsResult]
       .filter(r => r.status === 'fulfilled')
