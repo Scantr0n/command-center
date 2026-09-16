@@ -49,8 +49,14 @@
   </section>
 
   <section id="nextStepsSection" class="next-steps-section">
-    <h2 class="section-title">Next steps</h2>
+    <div class="section-toolbar">
+      <h2 class="section-title">Next steps</h2>
+      <button type="button" id="icsBtn" class="print-btn font-mono" disabled>Add reminders to calendar (.ics)</button>
+    </div>
     <div id="nextStepsList"></div>
+    <p class="section-note">Exports only real, already-computed future dates (an upcoming bugfix check-in, the
+      next suggested download check) as calendar events to import into Google Calendar, Apple Calendar, or
+      Outlook. Nothing here is sent anywhere, this only downloads a file to your own device.</p>
   </section>
 
   <details class="schema-help">

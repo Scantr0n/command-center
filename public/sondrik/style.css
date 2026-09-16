@@ -407,6 +407,13 @@ header.page-head .sub {
 }
 .section-toolbar .section-title { margin: 0; }
 
+.section-note {
+  font-size: 0.78rem;
+  color: var(--dim);
+  margin: -8px 0 14px;
+  max-width: 72ch;
+}
+
 section { margin-bottom: 36px; }
 
 /* Stat tile */

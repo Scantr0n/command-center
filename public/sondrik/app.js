@@ -18,6 +18,7 @@
   const lastUpdatedSub = document.getElementById('lastUpdatedSub');
   const printBtn = document.getElementById('printBtn');
   const backupBtn = document.getElementById('backupBtn');
+  const icsBtn = document.getElementById('icsBtn');
   const pageFavicon = document.getElementById('pageFavicon');
   const DEFAULT_FAVICON_HREF = pageFavicon ? pageFavicon.getAttribute('href') : null;
 
@@ -333,6 +334,23 @@
       '</div>';
   }
 
+  // Shared "how long between real check-ins on average, and when's the next
+  // one due" calculation, used both by the cadence line in the Traction
+  // section below and by the calendar reminders export, so the two can never
+  // state two different suggested next-check dates off the same real gaps.
+  // Needs at least two real checks (no gap exists off a single point).
+  function suggestedCheckCadence(downloadsData) {
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length < 2) return null;
+    const gaps = [];
+    for (let i = 1; i < checks.length; i++) gaps.push(daysBetween(checks[i - 1].date, checks[i].date));
+    const avgGap = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+    if (avgGap <= 0) return null;
+    const latest = checks[checks.length - 1];
+    return { avgGap, gapCount: gaps.length, latest, nextDate: addDays(latest.date, avgGap) };
+  }
+
   function renderTraction(data) {
     const metric = data.metric || {};
     const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -368,27 +386,22 @@
     // only check-in gap so far" rather than implying an established rhythm
     // it hasn't earned yet.
     let cadenceHtml = '';
-    if (checks.length > 1) {
-      const gaps = [];
-      for (let i = 1; i < checks.length; i++) gaps.push(daysBetween(checks[i - 1].date, checks[i].date));
-      const avgGap = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
-      if (avgGap > 0) {
-        const gapBasis = gaps.length === 1
-          ? 'your only check-in gap so far (' + avgGap + (avgGap === 1 ? ' day' : ' days') + ')'
-          : 'the average of your last ' + gaps.length + ' check-in gaps (~' + avgGap + (avgGap === 1 ? ' day' : ' days') + ')';
-        const nextDate = addDays(latest.date, avgGap);
-        const daysUntilNext = daysBetween(todayIso(), nextDate);
-        let dueLabel;
-        if (daysUntilNext > 0) {
-          dueLabel = 'next check suggested in ' + daysUntilNext + (daysUntilNext === 1 ? ' day' : ' days') + ' (' + fmtDate(nextDate) + ')';
-        } else if (daysUntilNext === 0) {
-          dueLabel = 'next check suggested today (' + fmtDate(nextDate) + ')';
-        } else {
-          const overdueDays = -daysUntilNext;
-          dueLabel = 'suggested check was ' + overdueDays + (overdueDays === 1 ? ' day' : ' days') + ' ago (' + fmtDate(nextDate) + ')';
-        }
-        cadenceHtml = '<div class="stat-cadence font-mono" title="Based on ' + escapeHtml(gapBasis) + '">' + escapeHtml(dueLabel) + '</div>';
+    const cadence = suggestedCheckCadence(data);
+    if (cadence) {
+      const gapBasis = cadence.gapCount === 1
+        ? 'your only check-in gap so far (' + cadence.avgGap + (cadence.avgGap === 1 ? ' day' : ' days') + ')'
+        : 'the average of your last ' + cadence.gapCount + ' check-in gaps (~' + cadence.avgGap + (cadence.avgGap === 1 ? ' day' : ' days') + ')';
+      const daysUntilNext = daysBetween(todayIso(), cadence.nextDate);
+      let dueLabel;
+      if (daysUntilNext > 0) {
+        dueLabel = 'next check suggested in ' + daysUntilNext + (daysUntilNext === 1 ? ' day' : ' days') + ' (' + fmtDate(cadence.nextDate) + ')';
+      } else if (daysUntilNext === 0) {
+        dueLabel = 'next check suggested today (' + fmtDate(cadence.nextDate) + ')';
+      } else {
+        const overdueDays = -daysUntilNext;
+        dueLabel = 'suggested check was ' + overdueDays + (overdueDays === 1 ? ' day' : ' days') + ' ago (' + fmtDate(cadence.nextDate) + ')';
       }
+      cadenceHtml = '<div class="stat-cadence font-mono" title="Based on ' + escapeHtml(gapBasis) + '">' + escapeHtml(dueLabel) + '</div>';
     }
 
     const ageDays = daysBetween(latest.date, todayIso());
@@ -995,6 +1008,112 @@
     return parts.join(' ');
   }
 
+  // Turns the same two forward-looking real dates already computed elsewhere
+  // on the page (the bugfix check-in schedule, the check-in cadence estimate)
+  // into calendar reminders, so they land somewhere Jack will actually see
+  // them instead of only on this page when he happens to visit it. Only ever
+  // a date that is today or still in the future: a reminder for one that has
+  // already passed isn't useful as a calendar event, Next Steps above already
+  // flags an overdue one as an action item instead. Adds no new fact, purely
+  // a re-expression of real data that already renders elsewhere.
+  function computeReminders(releasesData, downloadsData) {
+    const reminders = [];
+
+    const dated = ((releasesData && releasesData.releases) || []).filter(r => r.date)
+      .slice().sort((a, b) => b.date.localeCompare(a.date));
+    const latestRelease = dated[0];
+    if (latestRelease && latestRelease.type === 'bugfix') {
+      BUGFIX_CHECKPOINTS.forEach(checkpoint => {
+        const date = addDays(latestRelease.date, checkpoint);
+        if (date >= todayIso()) {
+          reminders.push({
+            date,
+            uid: 'sondrik-checkin-v' + latestRelease.version + '-' + checkpoint + '@command-center',
+            summary: 'Sondrik v' + latestRelease.version + ': ' + checkpoint + '-day check-in',
+            description: 'Confirm no new reports of the bug fixed in v' + latestRelease.version +
+              (latestRelease.summary ? ' (' + latestRelease.summary + ')' : '') + '.'
+          });
+        }
+      });
+    }
+
+    const cadence = suggestedCheckCadence(downloadsData);
+    if (cadence && cadence.nextDate >= todayIso()) {
+      const metric = (downloadsData && downloadsData.metric) || {};
+      reminders.push({
+        date: cadence.nextDate,
+        uid: 'sondrik-download-check-' + cadence.nextDate + '@command-center',
+        summary: 'Sondrik: pull a fresh ' + (metric.label || 'download') + ' count',
+        description: 'Based on ' + (cadence.gapCount === 1
+          ? 'your only check-in gap so far' : 'the average of your last ' + cadence.gapCount + ' check-in gaps') +
+          ' (~' + cadence.avgGap + (cadence.avgGap === 1 ? ' day' : ' days') + ').' +
+          (metric.source ? ' Source: ' + metric.source + '.' : '')
+      });
+    }
+
+    return reminders.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // RFC 5545 (iCalendar) text escaping and 75-octet line folding, same
+  // approach CSM's own nudge-queue calendar export already uses for exactly
+  // the same reason (long SUMMARY/DESCRIPTION values, and a UTF-8-safe fold
+  // so a multi-byte character never gets split across the line break).
+  function icsEscapeText(s) {
+    return String(s == null ? '' : s)
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\n/g, '\\n');
+  }
+
+  const icsEncoder = new TextEncoder();
+  function icsFoldLine(line) {
+    if (icsEncoder.encode(line).length <= 75) return line;
+    const segments = [];
+    let seg = '';
+    let segBytes = 0;
+    let budget = 75;
+    for (const ch of line) { // for...of walks by code point, never a lone surrogate half
+      const chBytes = icsEncoder.encode(ch).length;
+      if (segBytes + chBytes > budget) {
+        segments.push(seg);
+        seg = '';
+        segBytes = 0;
+        budget = 74; // continuation lines carry a leading space, counted separately below
+      }
+      seg += ch;
+      segBytes += chBytes;
+    }
+    if (seg) segments.push(seg);
+    return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
+  }
+
+  // One all-day VEVENT per real reminder, never anything that contacts
+  // anyone, this only builds a file for Jack's own calendar app to import.
+  function buildRemindersIcs(reminders) {
+    const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const events = reminders.map(r => {
+      const lines = [
+        'BEGIN:VEVENT',
+        'UID:' + icsEscapeText(r.uid),
+        'DTSTAMP:' + dtstamp,
+        'DTSTART;VALUE=DATE:' + r.date.replace(/-/g, ''),
+        'SUMMARY:' + icsEscapeText(r.summary),
+        'DESCRIPTION:' + icsEscapeText(r.description),
+        'END:VEVENT'
+      ];
+      return lines.map(icsFoldLine).join('\r\n');
+    });
+    return [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Command Center//Sondrik//EN',
+      'CALSCALE:GREGORIAN',
+      events.join('\r\n'),
+      'END:VCALENDAR'
+    ].join('\r\n') + '\r\n';
+  }
+
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       return navigator.clipboard.writeText(text);
@@ -1473,6 +1592,28 @@
       });
     } else {
       copyPublicBtn.disabled = true;
+    }
+
+    if (releasesData || downloadsData) {
+      const reminders = computeReminders(releasesData || {}, downloadsData || {});
+      icsBtn.disabled = reminders.length === 0;
+      if (reminders.length > 0) {
+        icsBtn.addEventListener('click', () => {
+          const blob = new Blob([buildRemindersIcs(reminders)], { type: 'text/calendar;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'sondrik-reminders-' + todayIso() + '.ics';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+      } else {
+        icsBtn.title = 'No upcoming real dates to remind on right now';
+      }
+    } else {
+      icsBtn.disabled = true;
     }
 
     initQuickLogTool(channelsData || {}, downloadsData || {}, leadsData || {}, releasesData || {}, goalsData || {});
