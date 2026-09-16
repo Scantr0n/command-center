@@ -47,10 +47,15 @@
   const STALE_AFTER_DAYS = 7;
   const AGING_AFTER_DAYS = 4;
 
+  // div.textContent/innerHTML round-trip only escapes &amp;/&lt;/&gt; in text
+  // content, not quotes, so a hand-typed value with a " or ' in it (a channel
+  // id, a lead field) could break out of an attribute like value="..." or
+  // data-foo="...". Same regex-based escape CGT and Garage already use for
+  // exactly that reason.
   function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = String(s);
-    return div.innerHTML;
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
   }
 
   function fmtDate(iso) {

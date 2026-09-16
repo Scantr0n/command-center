@@ -113,10 +113,15 @@
     return '<span class="badge badge-unknown">' + escapeHtml(channel.type).toUpperCase() + '</span>';
   }
 
+  // div.textContent/innerHTML round-trip only escapes &amp;/&lt;/&gt; in text
+  // content, not quotes, so a hand-typed value with a " or ' in it (a stage
+  // color, a category name, an id) could break out of an attribute like
+  // style="..." or data-foo="...". Same regex-based escape CGT and Garage
+  // already use for exactly that reason.
   function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = String(s);
-    return div.innerHTML;
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
   }
 
   // Lets the "Stalled in stage" and "Needs backfill" rows jump straight to the
@@ -2308,10 +2313,7 @@
 
   function npQuickRowHtml(rowId, values) {
     values = values || {};
-    // escapeHtml alone leaves a literal " in place (safe in text content, not
-    // inside an attribute), so a restored draft value containing a quote
-    // (e.g. a nicknamed name) could otherwise break out of value="..." here.
-    const v = f => escapeHtml(values[f] || '').replace(/"/g, '&quot;');
+    const v = f => escapeHtml(values[f] || '');
     return '<div class="np-quick-row" data-quick-row data-row-id="' + rowId + '">' +
       '<label class="sr-only" for="' + rowId + '-name">Name</label>' +
       '<input type="text" id="' + rowId + '-name" class="np-input" data-field="name" placeholder="Name *" value="' + v('name') + '">' +
