@@ -1105,6 +1105,139 @@ function wireCalc() {
   renderCalc();
 }
 
+// Break-even / target-profit price finder: the inverse of the calculator
+// above. That one goes price -> net payout -> profit; this one starts from
+// the net proceeds a seller actually needs (cost + shipping + target profit)
+// and solves each platform's fee formula backward for the minimum listing
+// price that clears it. Each platform's fee formula from estimateNetPayout()
+// is algebraically inverted here rather than reused, since none of it is a
+// simple lookup once fees are a function of the unknown price.
+let beCalcPlatforms = new Set(PAYOUT_PLATFORMS);
+let beIncludeDepopBoost = false;
+
+// eBay's per-order fee is a step function of price ($0.30 at/under $10, else
+// $0.40), so solve assuming the higher step first; if that price doesn't
+// actually clear $10 the assumption was wrong, so re-solve with the lower
+// step instead.
+function ebayMinPriceForNet(targetNet) {
+  const highStep = (targetNet + 0.40) / (1 - 0.136);
+  if (highStep > 10) return highStep;
+  return (targetNet + 0.30) / (1 - 0.136);
+}
+
+function depopMinPriceForNet(targetNet, applyBoost) {
+  const feeRate = 0.033 + (applyBoost ? DEPOP_BOOST_FEE_PCT : 0);
+  return (targetNet + 0.45) / (1 - feeRate);
+}
+
+// Poshmark's fee is flat $2.95 under $15, else a 20% commission, so the same
+// assume-then-check approach as eBay above: try the flat-fee branch first,
+// and fall back to the commission branch if that price wouldn't actually
+// land under $15.
+function poshmarkMinPriceForNet(targetNet) {
+  const flatStep = targetNet + 2.95;
+  if (flatStep < 15) return flatStep;
+  return targetNet / 0.80;
+}
+
+function minListingPriceForNet(platform, targetNet, applyBoost) {
+  switch (platform) {
+    case 'ebay': return ebayMinPriceForNet(targetNet);
+    case 'vinted': return targetNet;
+    case 'poshmark': return poshmarkMinPriceForNet(targetNet);
+    case 'depop': return depopMinPriceForNet(targetNet, applyBoost);
+    default: return null;
+  }
+}
+
+function renderBreakEven() {
+  const costInput = document.getElementById('beCostInput');
+  const costError = document.getElementById('beCostError');
+  const shippingInput = document.getElementById('beShippingInput');
+  const shippingError = document.getElementById('beShippingError');
+  const profitInput = document.getElementById('beProfitInput');
+  const profitError = document.getElementById('beProfitError');
+  const tbody = document.getElementById('beTableBody');
+  const empty = document.getElementById('beTableEmpty');
+  const table = document.getElementById('beTable');
+
+  const cost = readOptionalNonNegativeInput(costInput);
+  const shipping = readOptionalNonNegativeInput(shippingInput);
+  const profit = readOptionalNonNegativeInput(profitInput);
+
+  const costInvalid = cost === undefined;
+  costError.hidden = !costInvalid;
+  costError.textContent = costInvalid ? 'Enter a valid cost of $0 or more, ignoring it for now.' : '';
+  const shippingInvalid = shipping === undefined;
+  shippingError.hidden = !shippingInvalid;
+  shippingError.textContent = shippingInvalid ? 'Enter a valid shipping cost of $0 or more, ignoring it for now.' : '';
+  const profitInvalid = profit === undefined;
+  profitError.hidden = !profitInvalid;
+  profitError.textContent = profitInvalid ? 'Enter a valid target profit of $0 or more, ignoring it for now.' : '';
+
+  document.getElementById('beDepopBoostWrap').hidden = !beCalcPlatforms.has('depop');
+
+  const hasCost = cost != null && cost !== undefined && cost > 0;
+  const hasAnyInput = hasCost || (shipping != null && shipping !== undefined && shipping > 0) ||
+    (profit != null && profit !== undefined && profit > 0);
+
+  if (!hasAnyInput || beCalcPlatforms.size === 0) {
+    table.hidden = true;
+    empty.hidden = false;
+    empty.textContent = beCalcPlatforms.size === 0
+      ? 'No platforms selected above.'
+      : 'Enter a cost above to find the break-even price.';
+    return;
+  }
+  table.hidden = false;
+  empty.hidden = true;
+
+  const targetNet = (cost || 0) + (shipping || 0) + (profit || 0);
+  const applyBoost = beIncludeDepopBoost && beCalcPlatforms.has('depop');
+
+  const rows = PAYOUT_PLATFORMS.filter(p => beCalcPlatforms.has(p)).map(p => {
+    const minPrice = minListingPriceForNet(p, targetNet, applyBoost);
+    return { p, minPrice };
+  });
+  const lowest = rows.length > 1 ? Math.min(...rows.map(r => r.minPrice)) : null;
+  const tiedForLowest = lowest != null && rows.filter(r => r.minPrice === lowest).length > 1;
+
+  tbody.innerHTML = rows.map(r => {
+    const isBest = lowest != null && !tiedForLowest && r.minPrice === lowest;
+    const feeDescription = r.p === 'depop' && applyBoost
+      ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
+      : CALC_FEE_DESCRIPTIONS[r.p];
+    return `
+    <tr>
+      <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
+      <td class="cell-muted">${escapeHtml(feeDescription)}</td>
+      <td class="cell-value${isBest ? ' cell-value-best' : ''}">${formatUsd(r.minPrice)}${isBest ? ' <span class="best-tag" title="Lowest price that still clears the target across included platforms">lowest</span>' : ''}</td>
+    </tr>
+  `;
+  }).join('');
+}
+
+function wireBreakEven() {
+  document.getElementById('beCostInput').addEventListener('input', renderBreakEven);
+  document.getElementById('beShippingInput').addEventListener('input', renderBreakEven);
+  document.getElementById('beProfitInput').addEventListener('input', renderBreakEven);
+  document.getElementById('beDepopBoostInput').addEventListener('change', e => {
+    beIncludeDepopBoost = e.target.checked;
+    renderBreakEven();
+  });
+  const container = document.getElementById('bePlatformToggle');
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const platform = chip.getAttribute('data-platform');
+      const nowOn = chip.getAttribute('aria-pressed') !== 'true';
+      chip.setAttribute('aria-pressed', String(nowOn));
+      if (nowOn) beCalcPlatforms.add(platform); else beCalcPlatforms.delete(platform);
+      renderBreakEven();
+    });
+  });
+  renderBreakEven();
+}
+
 // Offer response guide: applies a real, documented counteroffer-ladder
 // framework (accept near-target, counter once on good-but-low, let a
 // borderline offer's answer depend on real listing age, decline a deep
@@ -2293,6 +2426,7 @@ function wireQuickLogTool() {
 }
 
 wireCalc();
+wireBreakEven();
 wireOfferGuide();
 wireMessageTemplates();
 wireChecklist();

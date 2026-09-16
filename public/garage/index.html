@@ -572,6 +572,86 @@
     </div>
   </section>
 
+  <section>
+    <h2 class="section-title">Break-even &amp; target-profit price finder</h2>
+    <div class="callout">
+      Reverse of the calculator above: enter what an item cost to acquire, what it costs to ship (only if the
+      seller pays it, see the note above), and a target profit, and this works backward through each platform's
+      real fee formula to the minimum listing price that actually clears that profit after fees. Leave target
+      profit at $0 to find the true break-even price. A scratch calculation, nothing here gets saved.
+    </div>
+    <div class="calc-row">
+      <div class="calc-cost-field">
+        <div class="calc-price-input-wrap">
+          <label for="beCostInput" class="calc-price-prefix font-mono">cost $</label>
+          <input
+            type="number"
+            id="beCostInput"
+            class="calc-price-input font-mono"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="0.00"
+            aria-label="What this item cost to acquire">
+        </div>
+        <p class="calc-cost-error" id="beCostError" hidden role="alert"></p>
+      </div>
+      <div class="calc-cost-field">
+        <div class="calc-price-input-wrap">
+          <label for="beShippingInput" class="calc-price-prefix font-mono">shipping $</label>
+          <input
+            type="number"
+            id="beShippingInput"
+            class="calc-price-input font-mono"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="optional"
+            aria-label="What shipping actually costs to send this item, optional, only if the seller pays it">
+        </div>
+        <p class="calc-cost-error" id="beShippingError" hidden role="alert"></p>
+      </div>
+      <div class="calc-cost-field">
+        <div class="calc-price-input-wrap">
+          <label for="beProfitInput" class="calc-price-prefix font-mono">target profit $</label>
+          <input
+            type="number"
+            id="beProfitInput"
+            class="calc-price-input font-mono"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="0.00"
+            aria-label="Target profit, leave at 0 for true break-even">
+        </div>
+        <p class="calc-cost-error" id="beProfitError" hidden role="alert"></p>
+      </div>
+      <div class="filter-row" id="bePlatformToggle" role="group" aria-label="Platforms to include in break-even calculator" style="margin-bottom:0">
+        <button type="button" class="chip" data-platform="ebay" aria-pressed="true">eBay</button>
+        <button type="button" class="chip" data-platform="vinted" aria-pressed="true">Vinted</button>
+        <button type="button" class="chip" data-platform="poshmark" aria-pressed="true">Poshmark</button>
+        <button type="button" class="chip" data-platform="depop" aria-pressed="true">Depop</button>
+      </div>
+    </div>
+    <label class="quick-log-checkbox calc-boost-toggle" id="beDepopBoostWrap" hidden>
+      <input type="checkbox" id="beDepopBoostInput">
+      Include Depop's optional 12% Boosted Listings fee (opt-in per item, eligible new listings since Mar 2026)
+    </label>
+    <div class="table-wrap" aria-live="polite" aria-atomic="true">
+      <table class="card-table" id="beTable">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Fees</th>
+            <th>Min. listing price</th>
+          </tr>
+        </thead>
+        <tbody id="beTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="beTableEmpty">Enter a cost above to find the break-even price.</div>
+    </div>
+  </section>
+
   <section id="offerGuideSection">
     <h2 class="section-title">Offer response guide</h2>
     <div class="callout">
