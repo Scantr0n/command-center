@@ -1194,7 +1194,11 @@ function matchesSearchTerm(c, term) {
     || String(c.year ?? '').includes(term);
 }
 function matchesSportValue(c, sport) { return sport === 'all' || c.sport === sport; }
-function matchesGraderValue(c, grader) { return grader === 'all' || c.gradingCompany === grader; }
+function matchesGraderValue(c, grader) {
+  if (grader === 'all') return true;
+  if (grader === 'raw') return !c.gradingCompany;
+  return c.gradingCompany === grader;
+}
 function matchesBatchValue(c, batch) { return batch === 'all' || c.backlogBatch === batch; }
 function matchesBasisValue(c, basis) {
   if (basis === 'all') return true;
@@ -1370,8 +1374,8 @@ function applyFiltersAndRender() {
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
       </td>
       <td class="cell-muted">${c.sport ? `<span class="badge badge-sport">${escapeHtml(c.sport)}</span>` : '<span class="cell-value empty">unknown</span>'}</td>
-      <td class="cell-muted">${c.gradingCompany ? escapeHtml(c.gradingCompany) : '<span class="cell-value empty">unknown</span>'}</td>
-      <td class="cell-muted">${c.grade != null ? escapeHtml(String(c.grade)) : '<span class="cell-value empty">unknown</span>'}</td>
+      <td class="cell-muted">${c.gradingCompany ? escapeHtml(c.gradingCompany) : '<span class="cell-value empty">raw / ungraded</span>'}</td>
+      <td class="cell-muted">${c.grade != null ? escapeHtml(String(c.grade)) : (c.gradingCompany ? '<span class="cell-value empty">unknown</span>' : '<span class="cell-value empty">n/a</span>')}</td>
       <td class="cell-value${c.estimatedValue == null ? ' empty' : ''}">${c.estimatedValue != null ? formatUsd(c.estimatedValue) : 'not priced'}${valueTrendBadge(c)}</td>
       <td>${basisBadge(c)}</td>
       <td class="cell-muted">${c.datePriced ? escapeHtml(c.datePriced) : '<span class="cell-value empty">n/a</span>'}${isStale(c) ? ' <span class="badge badge-stale" title="Priced more than 180 days ago, worth a re-check">stale</span>' : ''}</td>
