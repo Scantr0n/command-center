@@ -287,6 +287,28 @@ function main() {
     }
   });
 
+  // Same drift risk as category above, but for socialSnapshots[].platform: the
+  // per-prospect check earlier only catches the same platform logged twice on
+  // one prospect, not the same platform spelled differently across different
+  // prospects (e.g. "WeChat" vs "Wechat"), which silently fragments the
+  // search filter's platform matching (matchesSearchTerm in app.js) the same
+  // way an inconsistent category fragments the filter chips.
+  const byNormalizedPlatform = {};
+  prospects.forEach(p => {
+    (p.socialSnapshots || []).forEach(snap => {
+      if (!snap || !snap.platform) return;
+      const norm = snap.platform.trim().toLowerCase();
+      (byNormalizedPlatform[norm] = byNormalizedPlatform[norm] || new Set()).add(snap.platform);
+    });
+  });
+  Object.values(byNormalizedPlatform).forEach(variants => {
+    if (variants.size > 1) {
+      warnings.push('socialSnapshots platform has inconsistent casing/spacing across prospects: ' +
+        Array.from(variants).map(v => JSON.stringify(v)).join(' vs. ') +
+        '. Search filtering matches on this text, pick one spelling.');
+    }
+  });
+
   // Mirrors findDuplicateProspects in app.js: same person can end up logged
   // twice under different ids (e.g. a copy-pasted "Log new prospect" entry),
   // since the only uniqueness check that generator runs is on id itself.
