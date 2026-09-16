@@ -89,15 +89,29 @@
   // the "as of" date is the only thing keeping them honest. 90 days (a
   // typical social-audit refresh cadence) is the point past which those
   // numbers are old enough that showing them without a loud flag would be
-  // misleading, not just informative.
+  // misleading, not just informative. A prospect can have one snapshot per
+  // real platform (Douyin, Xiaohongshu, Weibo...), so this checks every
+  // entry, not just one.
   const SOCIAL_SNAPSHOT_STALE_DAYS = 90;
-  function socialSnapshotStaleInfo(p) {
-    const snap = p.socialSnapshot || {};
-    if (snap.followers == null && snap.engagementRate == null) return null;
+  function socialSnapshotStaleInfo(snap) {
+    if (!snap || (snap.followers == null && snap.engagementRate == null)) return null;
     if (!snap.asOfDate) return null;
     const days = daysSince(snap.asOfDate);
     if (days <= SOCIAL_SNAPSHOT_STALE_DAYS) return null;
     return { days };
+  }
+
+  // Worst (oldest) stale snapshot across every platform logged for this
+  // prospect, used by the "Needs backfill" flag, which only has room to
+  // surface one line per prospect.
+  function socialSnapshotsStaleInfo(p) {
+    const snaps = p.socialSnapshots || [];
+    let worst = null;
+    snaps.forEach(snap => {
+      const info = socialSnapshotStaleInfo(snap);
+      if (info && (!worst || info.days > worst.days)) worst = Object.assign({ platform: snap.platform }, info);
+    });
+    return worst;
   }
 
   function channelBadge(channel) {
@@ -493,8 +507,8 @@
           if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
           if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
         }
-        const snapStale = socialSnapshotStaleInfo(p);
-        if (snapStale) reasons.push(snapStale.days + 'D OLD SOCIAL SNAPSHOT, DUE FOR REFRESH');
+        const snapStale = socialSnapshotsStaleInfo(p);
+        if (snapStale) reasons.push(snapStale.days + 'D OLD ' + (snapStale.platform ? escapeHtml(snapStale.platform).toUpperCase() + ' ' : '') + 'SNAPSHOT, DUE FOR REFRESH');
         if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');
         if (hasOutOfOrderDates(p.outreachLog)) reasons.push('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING');
         if (p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate)) reasons.push('NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING');
@@ -1364,8 +1378,7 @@
     ['sendDate', 'Send Date'], ['nextNudgeDate', 'Next Nudge Date'], ['nextAction', 'Next Action'],
     ['doNotNudgeBefore', 'Do Not Nudge Before'], ['nudgePoint', 'Nudge Point'],
     ['replyStatus', 'Reply Status'],
-    ['socialPlatform', 'Social Platform'], ['socialFollowers', 'Social Followers'],
-    ['socialEngagementRate', 'Social Engagement Rate'], ['socialAsOfDate', 'Social Snapshot As Of'],
+    ['socialSnapshots', 'Social Snapshots'],
     ['outreachLog', 'Outreach Touches'], ['contentIdeas', 'Content Ideas'], ['notes', 'Notes']
   ];
 
@@ -1387,10 +1400,12 @@
       doNotNudgeBefore: p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore,
       nudgePoint: p.nudgeSchedule && p.nudgeSchedule.nudgePoint,
       replyStatus: p.replyStatus,
-      socialPlatform: p.socialSnapshot && p.socialSnapshot.platform,
-      socialFollowers: p.socialSnapshot && p.socialSnapshot.followers,
-      socialEngagementRate: p.socialSnapshot && p.socialSnapshot.engagementRate,
-      socialAsOfDate: p.socialSnapshot && p.socialSnapshot.asOfDate,
+      socialSnapshots: (p.socialSnapshots || [])
+        .map(snap => (snap.platform || 'Platform not logged') +
+          (snap.followers != null ? ': ' + snap.followers + ' followers' : '') +
+          (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '') +
+          (snap.asOfDate ? ' (as of ' + snap.asOfDate + ')' : ' (no as-of date)'))
+        .join('; '),
       outreachLog: (p.outreachLog || [])
         .map(entry => (entry.date ? entry.date + ': ' : '') + (OUTREACH_TYPE_LABEL[entry.type] || entry.type) +
           (entry.note ? ' (' + entry.note + ')' : ''))
@@ -1674,15 +1689,15 @@
   // generator below produces, so changing stage here would silently skip
   // the one audit trail this pipeline actually relies on.
   function prospectEditFormHtml(p) {
-    const snap = p.socialSnapshot || {};
     const ns = p.nudgeSchedule || {};
     const cc = p.contactChannel || {};
     return '<details class="schema-help">' +
       '<summary>Edit this prospect&rsquo;s details</summary>' +
       '<div class="schema-help-body">' +
       '<p>Generates this prospect&rsquo;s full updated record with whatever fields below you change. ' +
-      '<code>id</code>, <code>stage</code>, <code>stageHistory</code>, <code>outreachLog</code>, and ' +
-      '<code>contentIdeas</code> carry over unchanged, use the generators further down to touch those. To move ' +
+      '<code>id</code>, <code>stage</code>, <code>stageHistory</code>, <code>outreachLog</code>, ' +
+      '<code>contentIdeas</code>, and <code>socialSnapshots</code> carry over unchanged, use the generators ' +
+      'further down to touch those. To move ' +
       'this prospect to a different stage for real, use &ldquo;Log stage move&rdquo; below instead, not this ' +
       'form, that is the only place a stage change gets a dated record.</p>' +
       '<div class="np-form">' +
@@ -1710,12 +1725,6 @@
       peInputInner('peNudgePoint', 'Nudge point', ns.nudgePoint, 'date') +
       '</div>' +
       peFieldRow('peReplyStatus', 'Reply status', p.replyStatus, 'textarea') +
-      '<div class="form-row form-row-split3">' +
-      peInputInner('peSocialPlatform', 'Social platform', snap.platform) +
-      peInputInner('peSocialFollowers', 'Followers', snap.followers, 'number') +
-      peInputInner('peSocialEngagementRate', 'Engagement %', snap.engagementRate, 'number') +
-      '</div>' +
-      peFieldRow('peSocialAsOfDate', 'Social snapshot as-of date (when the numbers above were actually pulled)', snap.asOfDate, 'date') +
       peFieldRow('peNotes', 'Notes', p.notes, 'textarea') +
       '</div>' +
       '<button type="button" id="peGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
@@ -1760,11 +1769,6 @@
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
     }
-    const snap = edited.socialSnapshot || {};
-    if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
-      warnings.push('Social numbers are logged without an as-of date. Every social number on this board must be ' +
-        'labeled with when it was actually pulled, never shown as if live.');
-    }
     if (edited.category) {
       const norm = edited.category.trim().toLowerCase();
       const existing = allProspects.filter(x => x.id !== p.id).map(x => x.category).filter(Boolean);
@@ -1795,12 +1799,6 @@
         nextAction: peVal('peNextAction'),
         nudgeSchedule: { doNotNudgeBefore: peVal('peDoNotNudgeBefore'), nudgePoint: peVal('peNudgePoint') },
         replyStatus: peVal('peReplyStatus'),
-        socialSnapshot: {
-          platform: peVal('peSocialPlatform'),
-          followers: peVal('peSocialFollowers') != null ? Number(peVal('peSocialFollowers')) : null,
-          engagementRate: peVal('peSocialEngagementRate') != null ? Number(peVal('peSocialEngagementRate')) : null,
-          asOfDate: peVal('peSocialAsOfDate')
-        },
         notes: peVal('peNotes')
       });
       const warnings = peBuildWarnings(p, edited);
@@ -1848,21 +1846,20 @@
       : 'Not scheduled yet';
     rows.push(fieldRow('Nudge schedule', nudgeText, !(ns.doNotNudgeBefore || ns.nudgePoint)));
 
-    const snap = p.socialSnapshot || {};
-    const snapStale = socialSnapshotStaleInfo(p);
-    let snapHtml;
-    if (snap.platform || snap.followers != null) {
-      snapHtml = escapeHtml(snap.platform || 'Platform not logged') +
-        (snap.followers != null ? ', ' + Number(snap.followers).toLocaleString() + ' followers' : '') +
-        (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '') +
-        '<span class="snapshot-tag' + (snapStale ? ' snapshot-tag-stale' : '') + '">' +
-        (snap.asOfDate ? 'AS OF ' + fmtDate(snap.asOfDate).toUpperCase() + ', ONE-TIME MANUAL SNAPSHOT, NOT LIVE' : 'NO SNAPSHOT DATE LOGGED') +
-        (snapStale ? ' &middot; ' + snapStale.days + 'D OLD, DUE FOR REFRESH' : '') +
-        '</span>';
-    } else {
-      snapHtml = 'Not logged yet';
-    }
-    rows.push(fieldRow('Social snapshot', snapHtml, !(snap.platform || snap.followers != null)));
+    const snaps = (p.socialSnapshots || []).slice().sort((a, b) => (b.asOfDate || '').localeCompare(a.asOfDate || ''));
+    const snapsHtml = snaps.length
+      ? '<ul class="ideas-list">' + snaps.map(snap => {
+          const snapStale = socialSnapshotStaleInfo(snap);
+          return '<li>' + escapeHtml(snap.platform || 'Platform not logged') +
+            (snap.followers != null ? ', ' + Number(snap.followers).toLocaleString() + ' followers' : '') +
+            (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '') +
+            '<span class="snapshot-tag' + (snapStale ? ' snapshot-tag-stale' : '') + '">' +
+            (snap.asOfDate ? 'AS OF ' + fmtDate(snap.asOfDate).toUpperCase() + ', ONE-TIME MANUAL SNAPSHOT, NOT LIVE' : 'NO SNAPSHOT DATE LOGGED') +
+            (snapStale ? ' &middot; ' + snapStale.days + 'D OLD, DUE FOR REFRESH' : '') +
+            '</span></li>';
+        }).join('') + '</ul>'
+      : 'Not logged yet';
+    rows.push(fieldRow('Social snapshots', snapsHtml + socialSnapshotGeneratorHtml(), snaps.length === 0));
 
     const historyHtml = renderStageHistory(p, allStages);
     rows.push(fieldRow('Stage history', historyHtml.html + stageMoveGeneratorHtml(), historyHtml.empty));
@@ -1883,6 +1880,7 @@
     wireStageMoveGenerator(p);
     wireIdeaGenerator(p);
     wireOutreachLogGenerator(p);
+    wireSocialSnapshotGenerator(p);
     lockBodyScroll();
     modalClose.focus();
     openProspectId = p.id;
@@ -2089,6 +2087,80 @@
       resultEl.hidden = false;
     });
     wireCopyButton(document.getElementById('modalTouchCopy'), outputEl);
+  }
+
+  function socialSnapshotGeneratorHtml() {
+    return '<div class="inline-gen">' +
+      '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<label class="sr-only" for="modalSnapPlatform">Platform</label>' +
+      '<input type="text" id="modalSnapPlatform" class="np-input" placeholder="Platform, e.g. Douyin">' +
+      '<label class="sr-only" for="modalSnapFollowers">Followers</label>' +
+      '<input type="number" min="0" id="modalSnapFollowers" class="np-input inline-gen-date" placeholder="Followers">' +
+      '<label class="sr-only" for="modalSnapEngagement">Engagement %</label>' +
+      '<input type="number" min="0" step="0.1" id="modalSnapEngagement" class="np-input inline-gen-date" placeholder="Engagement %">' +
+      '</div>' +
+      '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<label class="sr-only" for="modalSnapDate">As-of date (when actually pulled)</label>' +
+      '<input type="date" id="modalSnapDate" class="np-input inline-gen-date">' +
+      '<button type="button" id="modalSnapGenerate" class="print-btn font-mono">+ Log social snapshot</button>' +
+      '</div>' +
+      '<div id="modalSnapResult" class="inline-gen-result" hidden>' +
+      '<div class="inline-gen-warn" id="modalSnapWarn" hidden></div>' +
+      '<div class="np-output-head">' +
+      '<span class="field-label" style="margin:0">Paste into <code>socialSnapshots</code></span>' +
+      '<button type="button" id="modalSnapCopy" class="print-btn font-mono" aria-live="polite">Copy</button>' +
+      '</div>' +
+      '<pre class="np-output font-mono" id="modalSnapOutput"></pre>' +
+      '</div></div>';
+  }
+
+  function wireSocialSnapshotGenerator(p) {
+    const platformInput = document.getElementById('modalSnapPlatform');
+    const followersInput = document.getElementById('modalSnapFollowers');
+    const engagementInput = document.getElementById('modalSnapEngagement');
+    const dateInput = document.getElementById('modalSnapDate');
+    dateInput.value = todayIso();
+    const resultEl = document.getElementById('modalSnapResult');
+    const warnEl = document.getElementById('modalSnapWarn');
+    const outputEl = document.getElementById('modalSnapOutput');
+    document.getElementById('modalSnapGenerate').addEventListener('click', () => {
+      const platform = platformInput.value.trim();
+      const followers = followersInput.value.trim();
+      const engagementRate = engagementInput.value.trim();
+      const asOfDate = dateInput.value;
+      if (!platform) {
+        warnEl.hidden = false;
+        warnEl.textContent = 'Name the real platform this snapshot is from (e.g. Douyin, Xiaohongshu, Weibo).';
+        outputEl.textContent = '';
+        resultEl.hidden = false;
+        return;
+      }
+      if ((followers || engagementRate) && !asOfDate) {
+        warnEl.hidden = false;
+        warnEl.textContent = 'Pick the real date these numbers were actually pulled, never shown as if live.';
+        outputEl.textContent = '';
+        resultEl.hidden = false;
+        return;
+      }
+      const existing = (p.socialSnapshots || []).find(s =>
+        (s.platform || '').trim().toLowerCase() === platform.toLowerCase());
+      const warn = existing
+        ? 'A snapshot for "' + existing.platform + '" is already logged for this prospect. This adds a second ' +
+          'entry for the same platform rather than replacing it, remove the stale one by hand if this is meant ' +
+          'to be a refresh, not a second platform.'
+        : '';
+      warnEl.hidden = !warn;
+      warnEl.textContent = warn;
+      const entry = {
+        platform,
+        followers: followers ? Number(followers) : null,
+        engagementRate: engagementRate ? Number(engagementRate) : null,
+        asOfDate: asOfDate || null
+      };
+      outputEl.textContent = JSON.stringify(entry, null, 2) + ',';
+      resultEl.hidden = false;
+    });
+    wireCopyButton(document.getElementById('modalSnapCopy'), outputEl);
   }
 
   function closeModal() {
@@ -2515,7 +2587,7 @@
         nextAction: null,
         nudgeSchedule: { doNotNudgeBefore: null, nudgePoint: null },
         replyStatus: null,
-        socialSnapshot: { platform: null, followers: null, engagementRate: null, asOfDate: null },
+        socialSnapshots: [],
         contentIdeas: [],
         stageHistory: researchedDate ? [{ date: researchedDate, stage: 'researched' }] : [],
         outreachLog: [],
@@ -2599,11 +2671,13 @@
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
     }
-    const snap = p.socialSnapshot || {};
-    if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
-      warnings.push('Social numbers are logged without an as-of date. Every social number on this board must be ' +
-        'labeled with when it was actually pulled, never shown as if live.');
-    }
+    (p.socialSnapshots || []).forEach(snap => {
+      if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
+        warnings.push('Social numbers for "' + (snap.platform || 'a platform') + '" are logged without an ' +
+          'as-of date. Every social number on this board must be labeled with when it was actually pulled, ' +
+          'never shown as if live.');
+      }
+    });
     if (p.category) {
       const norm = p.category.trim().toLowerCase();
       const existing = allProspects.map(x => x.category).filter(Boolean);
@@ -2649,12 +2723,12 @@
       nextAction: npVal('npNextAction'),
       nudgeSchedule: { doNotNudgeBefore: npVal('npDoNotNudgeBefore'), nudgePoint: npVal('npNudgePoint') },
       replyStatus: npVal('npReplyStatus'),
-      socialSnapshot: {
+      socialSnapshots: npVal('npSocialPlatform') ? [{
         platform: npVal('npSocialPlatform'),
         followers: npVal('npSocialFollowers') != null ? Number(npVal('npSocialFollowers')) : null,
         engagementRate: npVal('npSocialEngagementRate') != null ? Number(npVal('npSocialEngagementRate')) : null,
         asOfDate: npVal('npSocialAsOfDate')
-      },
+      }] : [],
       contentIdeas: [],
       stageHistory: stageEnteredDate ? [{ date: stageEnteredDate, stage }] : [],
       outreachLog: npVal('npSendDate') ? [{ date: npVal('npSendDate'), type: 'initial-send' }] : [],

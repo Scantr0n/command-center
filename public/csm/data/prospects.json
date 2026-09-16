@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "note": "Real pipeline data only. Fields left null are genuinely unlogged, not unknown-on-purpose placeholders. Fill them in as real records are found, do not invent values to make a row look complete.",
+  "schemaVersion": 2,
+  "note": "Real pipeline data only. Fields left null are genuinely unlogged, not unknown-on-purpose placeholders. Fill them in as real records are found, do not invent values to make a row look complete. schemaVersion 2: socialSnapshot (single object) became socialSnapshots (array), since a real China social media prospect is commonly active on more than one platform (Douyin, Xiaohongshu, Weibo, Bilibili, WeChat) and a single-platform snapshot was losing real research.",
   "prospects": [
     {
       "id": "city-bound-david-fraga",
@@ -22,12 +22,7 @@
         "nudgePoint": null
       },
       "replyStatus": "In active exploration, real ongoing conversation.",
-      "socialSnapshot": {
-        "platform": null,
-        "followers": null,
-        "engagementRate": null,
-        "asOfDate": null
-      },
+      "socialSnapshots": [],
       "contentIdeas": [],
       "stageHistory": [],
       "outreachLog": [],

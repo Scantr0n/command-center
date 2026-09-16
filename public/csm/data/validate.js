@@ -128,21 +128,44 @@ function main() {
       }
     }
 
-    const snap = p.socialSnapshot || {};
-    if (!isDateOrNull(snap.asOfDate)) {
-      errors.push(where + ': "socialSnapshot.asOfDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(snap.asOfDate));
-    }
-    if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
-      errors.push(where + ': socialSnapshot has follower/engagement numbers but no asOfDate. ' +
-        'Every social number on this board must be labeled with when it was pulled, never shown as if live.');
-    }
-    if ((snap.followers != null || snap.engagementRate != null) && snap.asOfDate && DATE_RE.test(snap.asOfDate)) {
-      const asOf = new Date(snap.asOfDate + 'T00:00:00');
-      const daysOld = Math.round((today - asOf) / 86400000);
-      if (daysOld > SOCIAL_SNAPSHOT_STALE_DAYS) {
-        warnings.push(where + ': socialSnapshot is ' + daysOld + ' days old, past the ' +
-          SOCIAL_SNAPSHOT_STALE_DAYS + '-day refresh threshold. Worth a real re-pull before relying on it.');
-      }
+    if (!Array.isArray(p.socialSnapshots || [])) {
+      errors.push(where + ': "socialSnapshots" must be an array (one entry per platform), not ' +
+        JSON.stringify(p.socialSnapshots));
+    } else {
+      const seenPlatforms = new Set();
+      (p.socialSnapshots || []).forEach((snap, snapIdx) => {
+        const snapWhere = where + '.socialSnapshots[' + snapIdx + ']';
+        if (typeof snap !== 'object' || snap === null || Array.isArray(snap)) {
+          errors.push(snapWhere + ': must be an object like { "platform": "...", "followers": 0, ' +
+            '"engagementRate": 0, "asOfDate": "YYYY-MM-DD" }, not ' + JSON.stringify(snap));
+          return;
+        }
+        if (!isDateOrNull(snap.asOfDate)) {
+          errors.push(snapWhere + ': "asOfDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(snap.asOfDate));
+        }
+        if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
+          errors.push(snapWhere + ': has follower/engagement numbers but no asOfDate. ' +
+            'Every social number on this board must be labeled with when it was pulled, never shown as if live.');
+        }
+        if ((snap.followers != null || snap.engagementRate != null) && snap.asOfDate && DATE_RE.test(snap.asOfDate)) {
+          const asOf = new Date(snap.asOfDate + 'T00:00:00');
+          const daysOld = Math.round((today - asOf) / 86400000);
+          if (daysOld > SOCIAL_SNAPSHOT_STALE_DAYS) {
+            warnings.push(snapWhere + ': ' + (snap.platform || 'platform not logged') + ' snapshot is ' + daysOld +
+              ' days old, past the ' + SOCIAL_SNAPSHOT_STALE_DAYS + '-day refresh threshold. Worth a real ' +
+              're-pull before relying on it.');
+          }
+        }
+        if (snap.platform) {
+          const norm = snap.platform.trim().toLowerCase();
+          if (seenPlatforms.has(norm)) {
+            warnings.push(snapWhere + ': another socialSnapshots entry already logs "' + snap.platform + '" for ' +
+              'this prospect. Add a new snapshot for a refresh instead of a second one for the same platform, or ' +
+              'remove the stale one.');
+          }
+          seenPlatforms.add(norm);
+        }
+      });
     }
 
     if (!Array.isArray(p.contentIdeas || [])) {
