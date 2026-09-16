@@ -241,6 +241,29 @@ function certLookupLink(c) {
   return null;
 }
 
+// Population report: a real, free-to-browse public tool each grading company
+// publishes showing how many copies of a card it has graded at each grade,
+// which is genuinely useful context for a grading decision (a low population
+// at a grade means real rarity, not just a good-looking number). Separate
+// concept from certLookupLink above, which verifies one specific slab rather
+// than showing the whole grade distribution for a card. PSA, SGC, and CGC all
+// publish a free public search; BGS's is real but sits behind a Beckett
+// account login, so its link text says that rather than pretending it opens
+// straight to results, same honesty rule as compSearchLink's eBay-login note
+// below. HGA and KSA publish no public population report as of this writing
+// (confirmed by search, same as HGA already having no cert lookup above), so
+// neither gets an entry here and no link is shown for them.
+const POP_REPORT_LOOKUP = {
+  PSA: { url: 'https://www.psacard.com/pop/search', text: 'Search PSA population report' },
+  BGS: { url: 'https://www.beckett.com/grading/pop-report', text: 'Open BGS population report (Beckett login required)' },
+  SGC: { url: 'https://www.gosgc.com/pop-report', text: 'Search SGC population report' },
+  CGC: { url: 'https://www.cgccards.com/population-report/', text: 'Browse CGC population report' }
+};
+
+function popReportLink(c) {
+  return (c.gradingCompany && POP_REPORT_LOOKUP[c.gradingCompany]) || null;
+}
+
 // A real, stable eBay search URL pattern (the _nkw keyword param has worked
 // this way for over a decade), built from the card's own real fields so it
 // never fabricates anything, just points at where the actual comps would be.
@@ -1682,6 +1705,13 @@ function openModal(id) {
   const lookup = certLookupLink(activeCard);
   if (lookup) {
     body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
+  }
+  const pop = popReportLink(activeCard);
+  if (pop) {
+    body += `<div class="field-row">
+      <a href="${escapeHtml(pop.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(pop.text)} &rarr;</a>
+      <div class="field-note">How many copies of this card ${escapeHtml(activeCard.gradingCompany)} has graded at each grade, real rarity context for a grading decision, separate from verifying this one cert above.</div>
+    </div>`;
   }
   body += field('Storage location', activeCard.storageLocation, !activeCard.storageLocation);
   const comp = compSearchLink(activeCard);
