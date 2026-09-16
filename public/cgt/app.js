@@ -1,6 +1,9 @@
 let cards = [];
 let submissions = [];
 let candidates = [];
+let rawCardsData = null;
+let rawSubmissionsData = null;
+let rawCandidatesData = null;
 let activeCard = null;
 let lastFocusedEl = null;
 let searchTerm = '';
@@ -269,8 +272,10 @@ async function loadSubmissions() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     submissions = data.submissions || [];
+    rawSubmissionsData = data;
   } catch (e) {
     submissions = [];
+    rawSubmissionsData = null;
     console.error("Couldn't load submissions.json: " + e.message);
   }
 }
@@ -285,8 +290,10 @@ async function loadCandidates() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     candidates = data.candidates || [];
+    rawCandidatesData = data;
   } catch (e) {
     candidates = [];
+    rawCandidatesData = null;
     console.error("Couldn't load candidates.json: " + e.message);
   }
 }
@@ -300,6 +307,10 @@ async function loadCards() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     cards = data.cards || [];
+    rawCardsData = data;
+    const backupBtn = document.getElementById('backupBtn');
+    backupBtn.disabled = false;
+    backupBtn.title = '';
     renderStats();
     renderCandidates();
     renderSubmissions();
@@ -317,10 +328,14 @@ async function loadCards() {
     initTableScrollShadows();
   } catch (e) {
     cards = [];
+    rawCardsData = null;
     document.getElementById('cardTableBody').innerHTML = '';
     errBox.hidden = false;
     errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load cards.json: " + e.message;
+    const backupBtn = document.getElementById('backupBtn');
+    backupBtn.disabled = true;
+    backupBtn.title = "Can't back up, cards.json failed to load (see below)";
   }
 }
 
@@ -1920,6 +1935,32 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'cgt-inventory-' + todayIso() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// Full-fidelity backup: unlike the CSV export above, which flattens each
+// card to one row and only covers whatever the current filters show, this
+// keeps cards.json/submissions.json/candidates.json exactly as loaded so a
+// bad hand-edit can be diffed against or restored from a known-good copy.
+// Local download only, nothing is sent anywhere. Same approach as CSM's
+// own backup button.
+document.getElementById('backupBtn').addEventListener('click', () => {
+  if (!rawCardsData) return;
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    source: 'Command Center CGT inventory (/cgt), local download only',
+    cardsJson: rawCardsData,
+    submissionsJson: rawSubmissionsData,
+    candidatesJson: rawCandidatesData
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cgt-backup-' + todayIso() + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

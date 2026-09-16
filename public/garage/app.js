@@ -6,6 +6,11 @@ let activePlatform = 'all';
 let sortKey = null;
 let sortDir = 'asc';
 let currentStages = [];
+let rawListingsData = null;
+let rawPipelineData = null;
+let rawActivityData = null;
+let rawSalesData = null;
+let rawExpensesData = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
@@ -163,6 +168,14 @@ async function loadData() {
   const activityData = activityResult.status === 'fulfilled' ? activityResult.value.data : null;
   const salesData = salesResult.status === 'fulfilled' ? salesResult.value.data : null;
   const expensesData = expensesResult.status === 'fulfilled' ? expensesResult.value.data : null;
+  rawListingsData = listingsData;
+  rawPipelineData = pipelineData;
+  rawActivityData = activityData;
+  rawSalesData = salesData;
+  rawExpensesData = expensesData;
+  const backupBtn = document.getElementById('backupBtn');
+  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData);
+  backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
   const expenses = (expensesData && expensesData.expenses) || [];
@@ -2143,6 +2156,34 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'garage-listings-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// Full-fidelity backup: unlike the CSV exports, which flatten one table at a
+// time to whatever's currently filtered, this keeps listings.json,
+// pipeline.json, activity.json, sales.json, and expenses.json exactly as
+// loaded, so a bad hand-edit to any of them can be diffed against or
+// restored from a known-good copy. Local download only, nothing is sent
+// anywhere. Same approach as CSM's own backup button.
+document.getElementById('backupBtn').addEventListener('click', () => {
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData) return;
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    source: 'Command Center Garage (/garage), local download only',
+    listingsJson: rawListingsData,
+    pipelineJson: rawPipelineData,
+    activityJson: rawActivityData,
+    salesJson: rawSalesData,
+    expensesJson: rawExpensesData
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-backup-' + new Date().toISOString().slice(0, 10) + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

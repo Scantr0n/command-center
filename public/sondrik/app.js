@@ -17,6 +17,7 @@
   const newSincePill = document.getElementById('newSincePill');
   const lastUpdatedSub = document.getElementById('lastUpdatedSub');
   const printBtn = document.getElementById('printBtn');
+  const backupBtn = document.getElementById('backupBtn');
 
   printBtn.addEventListener('click', () => window.print());
 
@@ -1451,5 +1452,38 @@
     }
 
     initQuickLogTool(channelsData || {}, downloadsData || {}, leadsData || {}, releasesData || {}, goalsData || {});
+
+    // Full-fidelity backup: unlike the per-section CSV exports, which
+    // flatten one table at a time, this keeps releases.json, downloads.json,
+    // leads.json, channels.json, and goals.json exactly as loaded, so a bad
+    // hand-edit to any of them can be diffed against or restored from a
+    // known-good copy. Local download only, nothing is sent anywhere. Same
+    // approach as CSM's own backup button.
+    if (releasesData || downloadsData || leadsData || channelsData || goalsData) {
+      backupBtn.disabled = false;
+      backupBtn.addEventListener('click', () => {
+        const backup = {
+          exportedAt: new Date().toISOString(),
+          source: 'Command Center Sondrik hub (/sondrik), local download only',
+          releasesJson: releasesData,
+          downloadsJson: downloadsData,
+          leadsJson: leadsData,
+          channelsJson: channelsData,
+          goalsJson: goalsData
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'sondrik-backup-' + todayIso() + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    } else {
+      backupBtn.disabled = true;
+      backupBtn.title = "Can't back up, all data files failed to load";
+    }
   });
 })();
