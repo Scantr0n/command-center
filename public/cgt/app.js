@@ -844,7 +844,7 @@ function renderCandidates() {
       math ? 'costs ' + formatUsd(math.totalCost) : null
     ].filter(Boolean);
     return `
-      <div class="submission-row candidate-row">
+      <div class="submission-row candidate-row" tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
         <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
@@ -854,6 +854,64 @@ function renderCandidates() {
   }).join('');
 
   el.innerHTML = rows;
+  el.querySelectorAll('.candidate-row').forEach(row => {
+    row.addEventListener('click', () => openCandidateModal(row.dataset.id));
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openCandidateModal(row.dataset.id);
+      }
+    });
+  });
+}
+
+// Full detail for a "should I grade this?" candidate: the compact feed row
+// above only has room for a few summary fields, which was hiding
+// rawValueNote/gradedValueNote whenever a value was a comp-estimate. Those
+// notes are required by validate.js precisely because a comp-estimate must
+// never be shown with no explanation of what it's based on, so leaving them
+// unreachable in the UI defeated the point of requiring them. Reuses the same
+// modal shell as the card detail view (openModal below) but is read-only:
+// a candidate has no edit form of its own yet, and does not touch
+// `activeCard`, which only the card modal uses.
+function openCandidateModal(id) {
+  const c = candidates.find(x => x.id === id);
+  if (!c) return;
+  lastFocusedEl = document.activeElement;
+
+  document.getElementById('modalName').textContent = c.cardName || 'Untitled candidate';
+  const subParts = [c.sport, c.targetGradingCompany, c.targetServiceLevel].filter(Boolean);
+  document.getElementById('modalSub').textContent = subParts.length ? subParts.join(' · ') : 'No sport/target grader logged yet';
+
+  const math = computeGradingMath(c);
+  const verdictKey = math ? math.verdict : 'needs-data';
+  const verdictMeta = CANDIDATE_VERDICT_META[verdictKey];
+
+  let body = '';
+  body += `<div class="field-row"><span class="badge ${verdictMeta.cls}">${escapeHtml(verdictMeta.label)}</span></div>`;
+  body += field('Year', c.year != null ? String(c.year) : null, c.year == null);
+  body += field('Raw value (ungraded)', c.rawValue != null ? formatUsd(c.rawValue) : null, c.rawValue == null);
+  body += field('Raw value basis', c.rawValueBasis === 'recent-sale' ? 'Recent sale' : c.rawValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.rawValueBasis);
+  body += field('Raw value note', c.rawValueNote, !c.rawValueNote);
+  body += field('Estimated grading cost', c.estimatedGradingCost != null ? formatUsd(c.estimatedGradingCost) : null, c.estimatedGradingCost == null);
+  body += field('Shipping cost', c.shippingCost != null ? formatUsd(c.shippingCost) : null, c.shippingCost == null);
+  body += field('Expected grade', c.expectedGrade, !c.expectedGrade);
+  body += field('Expected graded value', c.expectedGradedValue != null ? formatUsd(c.expectedGradedValue) : null, c.expectedGradedValue == null);
+  body += field('Graded value basis', c.gradedValueBasis === 'recent-sale' ? 'Recent sale' : c.gradedValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.gradedValueBasis);
+  body += field('Graded value note', c.gradedValueNote, !c.gradedValueNote);
+  if (math) {
+    body += field('Total cost (grading + shipping)', formatUsd(math.totalCost), false);
+    body += field('Expected gain', formatSignedUsd(math.expectedGain), false);
+  }
+  body += field('Date priced', c.datePriced, !c.datePriced);
+  body += field('Decision', c.decision, !c.decision);
+  body += field('Decision note', c.decisionNote, !c.decisionNote);
+  body += field('Notes', c.notes, !c.notes);
+
+  document.getElementById('modalBody').innerHTML = body;
+  document.getElementById('modalOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('modalClose').focus();
 }
 
 // Cards currently out for grading (status != "returned"), oldest submitted

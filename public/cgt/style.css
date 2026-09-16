@@ -594,6 +594,14 @@ table.card-table {
 .submissions-empty { font-size: 0.85rem; color: var(--dim); padding: 12px 0; }
 .submissions-returned-note { font-size: 0.72rem; color: var(--dim); padding: 0 0 10px; }
 
+/* Candidates are the one submission-row variant that opens a detail modal
+   (see openCandidateModal in app.js), so unlike a plain .submission-row it
+   needs its own clickable affordance, same hover/focus-visible treatment as
+   .movers-row and .data-quality-row elsewhere on this page. */
+.candidate-row { cursor: pointer; }
+.candidate-row:hover, .candidate-row:focus-visible { background: rgba(255,255,255,0.03); }
+.candidate-row:focus-visible { outline: 1px solid rgba(155,140,255,0.5); outline-offset: -2px; }
+
 /* "Needs backfill" data-quality list, same amber-flag pattern and markup as
    the CSM hub's own data-quality panel, restyled with CGT's own tokens. */
 .data-quality-list {
