@@ -144,7 +144,8 @@ function renderDataFreshness(lastModifiedDates) {
   const latest = new Date(Math.max(...known.map(d => d.getTime())));
   const daysAgo = Math.floor((Date.now() - latest.getTime()) / 86400000);
   const when = daysAgo <= 0 ? 'today' : daysAgo === 1 ? '1 day ago' : daysAgo + ' days ago';
-  el.textContent = ` Last hand-edited ${when} (${latest.toISOString().slice(0, 10)}).`;
+  const latestDateStr = latest.getFullYear() + '-' + String(latest.getMonth() + 1).padStart(2, '0') + '-' + String(latest.getDate()).padStart(2, '0');
+  el.textContent = ` Last hand-edited ${when} (${latestDateStr}).`;
   el.classList.toggle('data-freshness-stale', daysAgo > 14);
 }
 
@@ -411,9 +412,7 @@ function renderPacePlanner(stages) {
   }
 
   const days = Math.ceil(backlog / rate);
-  const finish = new Date();
-  finish.setDate(finish.getDate() + days);
-  const finishStr = finish.toISOString().slice(0, 10);
+  const finishStr = addDaysToDateStr(todayDateStr(), days);
   const dayWord = days === 1 ? 'day' : 'days';
 
   result.innerHTML = `
@@ -690,14 +689,22 @@ function renderRelist(listings) {
   }).join('');
 }
 
+// Local calendar date as YYYY-MM-DD, same convention as CGT's todayIso/
+// addDaysIso and Sondrik's todayIso: new Date().toISOString().slice(0, 10)
+// reads the UTC calendar date, which for anyone west of UTC still reads
+// yesterday until the local evening rollover, and for anyone east of UTC
+// rolls over to tomorrow before local midnight. That shifted an already-due
+// relist reminder in buildRelistReminders below by a real calendar day
+// instead of leaving it due today.
 function addDaysToDateStr(dateStr, days) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 function todayDateStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 // Same due-date math as relistGuidanceParts above, turned into actual dated
@@ -1778,7 +1785,7 @@ relistIcsBtn.addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'garage-relist-reminders-' + new Date().toISOString().slice(0, 10) + '.ics';
+  a.download = 'garage-relist-reminders-' + todayDateStr() + '.ics';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2155,7 +2162,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'garage-listings-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.download = 'garage-listings-' + todayDateStr() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2183,7 +2190,7 @@ document.getElementById('backupBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'garage-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.download = 'garage-backup-' + todayDateStr() + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2221,7 +2228,7 @@ document.getElementById('salesCsvBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'garage-sales-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.download = 'garage-sales-' + todayDateStr() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2251,7 +2258,7 @@ document.getElementById('expensesCsvBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'garage-expenses-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.download = 'garage-expenses-' + todayDateStr() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
