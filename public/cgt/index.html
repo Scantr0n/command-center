@@ -316,6 +316,25 @@
   </section>
 
   <section>
+    <h2 class="section-title">Insurance coverage check</h2>
+    <div class="callout">
+      Real collectibles-insurance guidance on scheduled personal articles floaters: a floater only pays out up to
+      the agreed value on file, so a growing collection needs its coverage limit reassessed and raised periodically,
+      not just appraised once. This does not know Jack's real policy limit, it only compares the real logged total
+      above against whatever number is typed in below, saved to this browser only, never sent anywhere or written to
+      a file.
+    </div>
+    <div class="coverage-check">
+      <label for="coverageLimitInput" class="quick-log-label">Your policy's scheduled coverage limit, USD (optional)</label>
+      <div class="coverage-limit-input-wrap">
+        <input type="number" id="coverageLimitInput" class="quick-log-input" min="0" step="1"
+          inputmode="decimal" placeholder="e.g. 5000" aria-label="Insurance policy scheduled coverage limit in USD">
+      </div>
+      <div id="coverageResult" class="coverage-result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section>
     <h2 class="section-title">Worth grading?</h2>
     <p class="section-subtitle">Raw cards being weighed against the real cost of grading them, before anything is
       shipped. Verdict uses the common "2x margin" rule (the expected gain over raw value should clear grading +

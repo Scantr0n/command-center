@@ -231,6 +231,25 @@ header.page-head .sub {
 .stat-tile-value.positive { color: #3DDC84; }
 .stat-tile-value.negative { color: #E0503C; }
 
+/* Insurance coverage check: a single number the user types in, compared
+   against the real logged total. Same green/red convention as the stat
+   tiles above. */
+.coverage-check { max-width: 360px; }
+.coverage-limit-input-wrap { margin-top: 6px; }
+.coverage-result {
+  margin-top: 14px;
+}
+.coverage-result-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--sub);
+  line-height: 1.5;
+}
+.coverage-result-note strong { color: var(--ink); }
+.coverage-result-note.positive strong { color: #3DDC84; }
+.coverage-result-note.negative strong { color: #E0503C; }
+.insurance-coverage-line { margin-top: 10px; }
+
 /* Value breakdown: horizontal bar lists grouping real priced cards' value by
    sport / grading company. Single accent hue since these bars encode
    magnitude only, categories are already identified by their text label. */
@@ -1066,6 +1085,7 @@ textarea.np-input { resize: vertical; }
     display: block !important;
   }
   .insurance-summary-meta, .insurance-summary-note { color: #333 !important; }
+  .insurance-summary-note strong { color: #111 !important; }
   .insurance-summary-table th { color: #333 !important; border-color: #ccc !important; }
   .insurance-summary-table td, .insurance-summary-table th { border-color: #ddd !important; }
   .insurance-summary-total td { color: #111 !important; border-top-color: #111 !important; }
@@ -1075,6 +1095,9 @@ textarea.np-input { resize: vertical; }
 
   .stat-tile { background: none; border: 1px solid #ccc; }
   .stat-tile-value, .stat-tile-label, .stat-tile-sub { color: #111 !important; }
+
+  .coverage-result-note { color: #333 !important; }
+  .coverage-result-note strong { color: #111 !important; }
 
   .breakdown-card { background: none; border: 1px solid #ccc; }
   .breakdown-title, .breakdown-empty { color: #333 !important; }

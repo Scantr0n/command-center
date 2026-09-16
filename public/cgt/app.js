@@ -385,6 +385,7 @@ async function loadCards() {
     renderGradeLadderFlags();
     renderBatchFilter();
     renderInsuranceSummary();
+    renderCoverageCheck();
     applyFiltersAndRender();
     initTableScrollShadows();
   } catch (e) {
@@ -1363,7 +1364,89 @@ function renderInsuranceSummary() {
         </tr>
       </tfoot>
     </table>
+    ${(() => {
+      const limit = loadCoverageLimit();
+      if (limit == null) return '';
+      const headroom = limit - total;
+      return `<p class="insurance-summary-note insurance-coverage-line">Logged policy coverage limit: <strong>${formatUsd(limit)}</strong> &middot; ${
+        headroom >= 0
+          ? formatUsd(headroom) + ' under limit'
+          : '<strong>' + formatUsd(Math.abs(headroom)) + ' over limit</strong>, worth checking with the insurer about raising it'
+      }. Self-reported, entered on the main dashboard, not pulled from a real policy document.</p>`;
+    })()}
   `;
+}
+
+// Real collectibles-insurance guidance (personal articles floaters /
+// scheduled property riders) is to reassess a collection's value
+// periodically and raise the policy's scheduled limit as it grows, since a
+// floater only pays out up to the agreed value on file, not whatever the
+// collection actually turns out to be worth. This never reads or guesses
+// Jack's real policy limit, it only compares the real logged total against
+// whatever number he types into coverageLimitInput himself, persisted to
+// this browser only (same pattern as Garage's pace-per-day input).
+const COVERAGE_LIMIT_STORAGE_KEY = 'cgt-insurance-coverage-limit';
+
+function loadCoverageLimit() {
+  try {
+    const raw = localStorage.getItem(COVERAGE_LIMIT_STORAGE_KEY);
+    const n = raw == null ? null : Number(raw);
+    return n && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+function saveCoverageLimit(limit) {
+  try {
+    localStorage.setItem(COVERAGE_LIMIT_STORAGE_KEY, String(limit));
+  } catch {
+    // Storage unavailable, the limit just won't persist across visits.
+  }
+}
+
+function renderCoverageCheck() {
+  const result = document.getElementById('coverageResult');
+  if (!result) return;
+  const real = cards.filter(c => !isExample(c) && !isSold(c));
+  const priced = real.filter(c => c.estimatedValue != null);
+  const total = priced.reduce((s, c) => s + c.estimatedValue, 0);
+
+  if (!priced.length) {
+    result.innerHTML = '<p class="coverage-result-note">No cards with a researched value on record yet, nothing to compare against a coverage limit.</p>';
+    return;
+  }
+
+  const input = document.getElementById('coverageLimitInput');
+  const raw = input ? input.value.trim() : '';
+  const limit = raw === '' ? null : Number(raw);
+
+  if (raw === '' || Number.isNaN(limit) || limit <= 0) {
+    result.innerHTML = `<p class="coverage-result-note">Current logged total: <strong>${formatUsd(total)}</strong> across ${priced.length} priced card(s). Enter your real policy limit above to see how it compares.</p>`;
+    return;
+  }
+
+  const headroom = limit - total;
+  if (headroom >= 0) {
+    result.innerHTML = `<p class="coverage-result-note positive"><strong>${formatUsd(total)}</strong> logged, <strong>${formatUsd(headroom)}</strong> under your ${formatUsd(limit)} coverage limit.</p>`;
+  } else {
+    result.innerHTML = `<p class="coverage-result-note negative"><strong>${formatUsd(total)}</strong> logged, <strong>${formatUsd(Math.abs(headroom))} over</strong> your ${formatUsd(limit)} coverage limit. Worth checking with the insurer about raising it, a floater only pays out up to the scheduled amount on file.</p>`;
+  }
+}
+
+function wireCoverageCheck() {
+  const input = document.getElementById('coverageLimitInput');
+  if (!input) return;
+  const saved = loadCoverageLimit();
+  if (saved) input.value = String(saved);
+  input.addEventListener('input', () => {
+    const raw = input.value.trim();
+    const limit = raw === '' ? null : Number(raw);
+    if (limit && limit > 0) saveCoverageLimit(limit);
+    renderCoverageCheck();
+    // Keep the printable appraisal doc's coverage line in sync too, it reads
+    // the same saved limit but only re-renders when told to.
+    renderInsuranceSummary();
+  });
 }
 
 // Compact up/down/flat indicator next to a card's value in the table, so a
@@ -2247,6 +2330,7 @@ wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
 wireChipGroup('graderFilter', 'data-grader', (v) => { activeGrader = v; });
 wireChipGroup('ownershipFilter', 'data-owned', (v) => { activeOwnership = v; });
+wireCoverageCheck();
 
 // Resets search, all four chip groups (batch included, even though its own
 // chips are rebuilt per-load rather than static markup like the others), and
