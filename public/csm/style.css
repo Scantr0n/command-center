@@ -183,6 +183,17 @@ header.page-head .sub {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem;
 }
+.table-wrap {
+  overflow-x: auto;
+}
+#platformOutreachSection .schema-table th {
+  white-space: normal;
+}
+#platformOutreachSection .schema-table td:first-child {
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--ink);
+}
 .schema-example {
   background: var(--panelLight);
   border: 1px solid var(--hairline);
