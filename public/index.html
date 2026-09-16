@@ -790,11 +790,15 @@ function toggleCategoryFilter(el) {
 // filter by category at all.
 function renderCategoryFilter() {
   const row = document.getElementById('categoryFilterRow');
-  const categories = groupByCategory(clusters).map(g => g.category);
-  row.innerHTML = categories.map(cat => {
+  const groups = groupByCategory(clusters);
+  // Same "(count)" convention CSM's own channel/category filter chips already
+  // use, so a filter row here says up front how many projects a click would
+  // actually surface instead of making that a guess until after clicking.
+  row.innerHTML = groups.map(g => {
+    const cat = g.category;
     const color = categoryColor(cat);
     const active = activeCategory === cat;
-    return `<button type="button" class="tag-chip cat-filter-chip" data-category="${escapeHtml(cat)}" aria-pressed="${active}" style="background:${color}1F; color:${color}; ${active ? `outline: 1.5px solid ${color};` : ''}">${escapeHtml(cat.toUpperCase())}</button>`;
+    return `<button type="button" class="tag-chip cat-filter-chip" data-category="${escapeHtml(cat)}" aria-pressed="${active}" style="background:${color}1F; color:${color}; ${active ? `outline: 1.5px solid ${color};` : ''}">${escapeHtml(cat.toUpperCase())} (${g.items.length})</button>`;
   }).join('');
   row.querySelectorAll('.cat-filter-chip').forEach(el => {
     el.addEventListener('click', () => toggleCategoryFilter(el));
