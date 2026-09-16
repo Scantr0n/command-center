@@ -502,6 +502,12 @@ async function loadClusters() {
     }
   } catch (e) {
     if (requestId !== latestClustersRequestId) return;
+    // A failed *first* load left the "LOADING" skeleton pulsing forever
+    // behind this same error banner, since it was only ever hidden on the
+    // success path above. Hiding it here too is a no-op once a prior load
+    // already succeeded, but is what actually clears it when the very first
+    // fetch is the one that fails.
+    document.getElementById('graphSkeleton').classList.add('hidden');
     errBox.textContent = `Couldn't load project data: ${e.message}. Retrying in 30s.`;
     errBox.classList.remove('hidden');
   }
