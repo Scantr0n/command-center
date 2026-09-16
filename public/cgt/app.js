@@ -171,6 +171,44 @@ const ORDER_STATUS_LOOKUP = {
   PSA: { url: 'https://www.psacard.com/orderstatus', text: 'Check status on psacard.com' }
 };
 
+// Each grader's own published per-tier turnaround, business days, midpoint
+// of the range shown in the "Grading service tiers reference" section
+// (index.html), reviewed September 2026 -- see that section for sources and
+// caveats (PSA's Value tiers paused, Beckett's Base/Standard closed, SGC's
+// own published windows disagreeing across sources). This is only ever used
+// as a fallback estimate in renderSubmissions below, for a grader/company
+// with fewer than 2 real returned submissions logged to average from; once
+// real history exists, buildTurnaroundByGrader's own real average always
+// wins over this. "default" is used when serviceLevel doesn't match a known
+// tier name (including no serviceLevel logged at all).
+const PUBLISHED_TURNAROUND_DAYS = {
+  PSA: { default: 35, tiers: { 'walk-through': 6, walkthrough: 6, 'super express': 9, express: 25, regular: 35, 'value max': 45, 'value plus': 70, 'value bulk': 150, value: 110 } },
+  BGS: { default: 45, tiers: { base: 75, standard: 45, express: 15, priority: 5 } },
+  CGC: { default: 20, tiers: { bulk: 40, economy: 20, standard: 10, express: 5, walkthrough: 2, 'walk-through': 2 } },
+  SGC: { default: 45, tiers: { entry: 45, standard: 45, expedited: 3 } }
+};
+
+// Business days -> calendar days, weekends only (no holiday calendar here),
+// same rough conversion used nowhere else in this file since every other
+// date math here already works in real calendar days from a real logged
+// date. Good enough for a "published estimate, not a guarantee" figure, not
+// meant to be exact to the day.
+function businessDaysToCalendarDays(businessDays) {
+  return Math.round(businessDays * 1.4);
+}
+
+function publishedTurnaroundDays(gradingCompany, serviceLevel) {
+  const entry = gradingCompany && PUBLISHED_TURNAROUND_DAYS[gradingCompany];
+  if (!entry) return null;
+  if (serviceLevel) {
+    const norm = serviceLevel.toLowerCase().trim();
+    for (const [tierName, days] of Object.entries(entry.tiers)) {
+      if (norm.includes(tierName) || tierName.includes(norm)) return days;
+    }
+  }
+  return entry.default;
+}
+
 // Card market prices drift over months, not days, so this is a much longer
 // window than the 7-day staleness check used elsewhere in Command Center
 // (e.g. the Sondrik download tracker). It just means "worth a re-check
@@ -1002,9 +1040,21 @@ function renderSubmissions() {
     // grader's own average window; once it's running long the "past avg"
     // badge below already says so, and a projected date already in the past
     // would just read as a broken estimate rather than a useful one.
-    const estReturnDate = (!runningLong && s.submittedDate && graderStats && graderStats.count >= 2)
+    const hasRealHistory = graderStats && graderStats.count >= 2;
+    // Real returned-submission history for this grader beats the published
+    // schedule whenever there's enough of it (2+ returns); until then, fall
+    // back to the grader's own published estimate (PUBLISHED_TURNAROUND_DAYS,
+    // see the Grading service tiers reference section) rather than showing
+    // nothing at all. Same "recent-sale beats comp-estimate, but a labeled
+    // estimate beats a blank" rule the card pricing side of this hub already
+    // uses, applied to turnaround instead of price.
+    const publishedDays = !hasRealHistory && s.gradingCompany ? publishedTurnaroundDays(s.gradingCompany, s.serviceLevel) : null;
+    const estReturnDate = (!runningLong && s.submittedDate && hasRealHistory)
       ? addDaysIso(s.submittedDate, graderStats.value)
-      : null;
+      : (!runningLong && s.submittedDate && publishedDays != null)
+        ? addDaysIso(s.submittedDate, businessDaysToCalendarDays(publishedDays))
+        : null;
+    const estReturnIsPublished = estReturnDate != null && !hasRealHistory;
     const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
     const metaParts = [
       s.gradingCompany,
@@ -1028,7 +1078,10 @@ function renderSubmissions() {
           <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
           <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
           ${runningLong ? `<span class="badge badge-late" title="${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} is ${graderStats.value} days">past ${escapeHtml(s.gradingCompany)} avg (${graderStats.value}d)</span>` : ''}
-          ${estReturnDate ? `<span class="submission-meta font-mono" title="Based on ${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee from the grader">est. back ~${escapeHtml(estReturnDate)}</span>` : ''}
+          ${estReturnDate ? (estReturnIsPublished
+            ? `<span class="submission-meta font-mono" title="${escapeHtml(s.gradingCompany)}'s own published estimate is about ${publishedDays} business days for this service level, not a guarantee and not this dataset's own return history yet -- see Grading service tiers reference below">est. back ~${escapeHtml(estReturnDate)} (published est.)</span>`
+            : `<span class="submission-meta font-mono" title="Based on ${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee from the grader">est. back ~${escapeHtml(estReturnDate)}</span>`
+          ) : ''}
         </div>
         ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
       </div>

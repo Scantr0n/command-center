@@ -316,13 +316,70 @@
     <p class="section-subtitle">Raw cards being weighed against the real cost of grading them, before anything is
       shipped. Verdict uses the common "2x margin" rule (the expected gain over raw value should clear grading +
       shipping costs by at least 2x, to leave room for coming back at a lower grade than expected), applied only to
-      real researched numbers, never a guess.</p>
+      real researched numbers, never a guess. See "Grading service tiers reference" below for current published
+      per-tier pricing and turnaround to fill in <code class="inline-code">estimatedGradingCost</code> with a real
+      number instead of a guess.</p>
     <div class="candidates-feed" id="candidatesFeed"></div>
   </section>
 
   <section>
     <h2 class="section-title">Grading submissions</h2>
     <div class="submissions-feed" id="submissionsFeed"></div>
+  </section>
+
+  <section id="gradingReferenceSection">
+    <h2 class="section-title">Grading service tiers reference</h2>
+    <div class="callout">
+      Real published per-tier pricing and turnaround estimates for the six graders this hub tracks, reviewed
+      September 2026 from each company's own published page where reachable and from grading-industry tracking
+      sites otherwise (sources linked below). These are the graders' own advertised estimates, not Jack's real
+      submission history (see "Avg. grading turnaround" under Value breakdown for that once real returned
+      submissions are logged) -- they drift, and posted turnaround is never a guarantee. PSA paused its four
+      Value tiers to new submissions on 2026-06-02. Beckett closed its two cheapest tiers (Base, Standard) to new
+      online submissions on 2026-08-08, with a stated reopening around 2026-09-15. SGC's own published tier
+      names and turnaround windows disagreed across the sources checked here, so its row below is a wide range,
+      not a single confirmed figure. Confirm the live schedule on the grader's own site before paying for or
+      timing a submission around any number below.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table">
+        <thead>
+          <tr><th>Company</th><th>Tier</th><th>Price</th><th>Est. turnaround</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>PSA</td><td>Walk-Through</td><td>Priced by declared value, see psacard.com</td><td>5-7 business days</td><td>Limited-access tier</td></tr>
+          <tr><td>PSA</td><td>Super Express</td><td>Priced by declared value, see psacard.com</td><td>7-10 business days</td><td></td></tr>
+          <tr><td>PSA</td><td>Express</td><td>Priced by declared value, see psacard.com</td><td>20-30 business days</td><td></td></tr>
+          <tr><td>PSA</td><td>Regular</td><td>Priced by declared value, see psacard.com</td><td>30-40 business days</td><td></td></tr>
+          <tr><td>PSA</td><td>Value Max</td><td>Priced by declared value, see psacard.com</td><td>40-50 business days</td><td>Paused to new submissions since 2026-06-02</td></tr>
+          <tr><td>PSA</td><td>Value Plus</td><td>Priced by declared value, see psacard.com</td><td>60-80 business days</td><td>Paused to new submissions since 2026-06-02</td></tr>
+          <tr><td>PSA</td><td>Value</td><td>Priced by declared value, see psacard.com</td><td>100-120 business days</td><td>Paused to new submissions since 2026-06-02</td></tr>
+          <tr><td>PSA</td><td>Value Bulk</td><td>Priced by declared value, see psacard.com</td><td>140-160 business days</td><td>Paused to new submissions since 2026-06-02</td></tr>
+          <tr><td>BGS</td><td>Base</td><td>$14.95/card ($17.95 with all 4 subgrades)</td><td>75+ business days</td><td>Closed to new online submissions since 2026-08-08, reopening expected ~2026-09-15</td></tr>
+          <tr><td>BGS</td><td>Standard</td><td>$34.95/card, subgrades included</td><td>45 business days</td><td>Closed to new online submissions since 2026-08-08, reopening expected ~2026-09-15</td></tr>
+          <tr><td>BGS</td><td>Express</td><td>$79.95/card</td><td>15 business days</td><td></td></tr>
+          <tr><td>BGS</td><td>Priority</td><td>$124.95/card</td><td>5 business days</td><td></td></tr>
+          <tr><td>SGC</td><td>Standard (entry)</td><td>$15/card up to $1,500 declared value</td><td>40-75+ business days</td><td>Sources disagreed on this window, treat as a rough range only</td></tr>
+          <tr><td>SGC</td><td>Expedited</td><td>$150-$3,750/card by declared value</td><td>2-3 business days</td><td></td></tr>
+          <tr><td>CGC</td><td>Bulk</td><td>$17/card, 25-card minimum</td><td>40 business days</td><td></td></tr>
+          <tr><td>CGC</td><td>Economy</td><td>$20/card</td><td>20 business days</td><td></td></tr>
+          <tr><td>CGC</td><td>Standard</td><td>$55/card</td><td>10 business days</td><td></td></tr>
+          <tr><td>CGC</td><td>Express</td><td>$100/card</td><td>5 business days</td><td></td></tr>
+          <tr><td>CGC</td><td>WalkThrough</td><td>$300/card</td><td>2 business days</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="schema-help-body" style="margin-top:.75rem">
+      Sources: <a href="https://www.psacard.com/info/submission-updates" target="_blank" rel="noopener noreferrer">PSA submission updates</a>,
+      <a href="https://www.psacard.com/articles/articleview/15210/service-level-update-may-2026" target="_blank" rel="noopener noreferrer">PSA Value tier pause announcement</a>,
+      <a href="https://cardgrade.io/blog/bgs-grading-cost-breakdown" target="_blank" rel="noopener noreferrer">Beckett (BGS) cost/turnaround breakdown</a>,
+      <a href="https://www.ripster.gg/blog/bgs-grading-turnaround-time" target="_blank" rel="noopener noreferrer">Beckett (BGS) turnaround by tier</a>,
+      <a href="https://cardgrade.io/sgc-grading" target="_blank" rel="noopener noreferrer">SGC cost/turnaround</a>,
+      <a href="https://www.si.com/collectibles/sgc-latest-company-raise-grading-prices" target="_blank" rel="noopener noreferrer">SGC pricing changes</a>,
+      <a href="https://www.cgccards.com/submit/services-fees/cgc-grading/" target="_blank" rel="noopener noreferrer">CGC services and fees</a>.
+      HGA and KSA had no published turnaround/fee schedule found in this review, so they are left out of this table
+      rather than guessed at.
+    </p>
   </section>
 
   <section>
