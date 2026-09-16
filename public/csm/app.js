@@ -1048,6 +1048,7 @@
           listSortKey = key;
           listSortDir = (key === 'stalled' || key === 'lastTouch') ? 'desc' : 'asc';
         }
+        syncUrl();
         renderBoardList(stages, prospects, allProspects, displayQuery, filtering);
       };
       th.addEventListener('click', activate);
@@ -1200,6 +1201,8 @@
   // pipeline (e.g. "named decision-makers in the outreach-sent stage") can be
   // bookmarked or shared as a link, same convention as the CGT hub.
   const VALID_CHANNELS = ['named-decision-maker', 'generic-inbox', 'unlogged'];
+  // Must match the header `key`s in renderBoardList's `headers` array.
+  const VALID_SORT_KEYS = ['name', 'stage', 'category', 'channel', 'nextNudge', 'stalled', 'lastTouch'];
 
   function restoreStateFromUrl() {
     const params = new URLSearchParams(location.search);
@@ -1208,11 +1211,19 @@
     const category = params.get('category');
     const view = params.get('view');
     const prospect = params.get('prospect');
+    const sort = params.get('sort');
+    const dir = params.get('dir');
     if (q) searchInput.value = q;
     if (channel && VALID_CHANNELS.includes(channel)) channelFilter = channel;
     if (category) categoryFilter = category;
     if (view === 'list') viewMode = 'list';
     if (prospect) initialProspectId = prospect;
+    // List view's column sort was previously local-only state: switching to
+    // List, sorting by a column, then using "Copy link to this view" (which
+    // every other filter/view choice here already survives) silently lost
+    // the sort the moment someone else opened that link.
+    if (sort && VALID_SORT_KEYS.includes(sort)) listSortKey = sort;
+    if (dir === 'asc' || dir === 'desc') listSortDir = dir;
   }
 
   function syncUrl() {
@@ -1223,6 +1234,10 @@
     if (categoryFilter !== 'all') params.set('category', categoryFilter);
     if (viewMode === 'list') params.set('view', 'list');
     if (openProspectId) params.set('prospect', openProspectId);
+    if (viewMode === 'list' && (listSortKey !== 'nextNudge' || listSortDir !== 'asc')) {
+      params.set('sort', listSortKey);
+      params.set('dir', listSortDir);
+    }
     const qs = params.toString();
     const url = location.pathname + (qs ? '?' + qs : '');
     history.replaceState(null, '', url);
