@@ -18,6 +18,8 @@
   const lastUpdatedSub = document.getElementById('lastUpdatedSub');
   const printBtn = document.getElementById('printBtn');
   const backupBtn = document.getElementById('backupBtn');
+  const pageFavicon = document.getElementById('pageFavicon');
+  const DEFAULT_FAVICON_HREF = pageFavicon ? pageFavicon.getAttribute('href') : null;
 
   printBtn.addEventListener('click', () => window.print());
 
@@ -705,7 +707,13 @@
 
   // Surfaces the single most actionable fact on the page, real drafted
   // outreach sitting on a human approval, as a header pill rather than
-  // making a visitor read the whole engagement queue to find it.
+  // making a visitor read the whole engagement queue to find it. Also
+  // swaps the tab's own favicon to the same amber dot the attention pill
+  // uses, the same "glance indicator" convention Alpha's app.js already
+  // established for its own tab (favicon + title both carry the state a
+  // background tab can't otherwise show), so Jack can tell a draft is
+  // waiting on him without this tab being focused. Reverts to the shared
+  // favicon.svg, never edits it, once nothing is pending.
   function renderAttentionPill(data) {
     const leads = data.leads || [];
     const pending = leads.filter(l => {
@@ -715,11 +723,17 @@
     if (pending.length === 0) {
       attentionPill.hidden = true;
       document.title = 'Sondrik / Command Center';
+      if (pageFavicon && DEFAULT_FAVICON_HREF) pageFavicon.setAttribute('href', DEFAULT_FAVICON_HREF);
       return;
     }
     attentionPill.hidden = false;
     attentionPill.textContent = pending.length + (pending.length === 1 ? ' draft awaiting your approval' : ' drafts awaiting your approval');
     document.title = '(' + pending.length + ') Sondrik / Command Center';
+    if (pageFavicon) {
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
+        '<circle cx="16" cy="16" r="13" fill="#E0A030"/></svg>';
+      pageFavicon.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(svg));
+    }
   }
 
   function renderLeads(data) {
