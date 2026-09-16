@@ -707,6 +707,8 @@ header.page-head .sub {
 .badge-category { background: rgba(255,255,255,0.04); color: var(--sub); border-color: var(--hairline); }
 .badge-stale { background: rgba(229,72,77,0.1); color: #E5484D; border-color: rgba(229,72,77,0.35); }
 .badge-touch { background: rgba(94,200,216,0.08); color: #5EC8D8; border-color: rgba(94,200,216,0.3); }
+.badge-nudge-overdue { background: rgba(229,72,77,0.15); color: #E5484D; border-color: rgba(229,72,77,0.4); font-weight: 600; }
+.badge-nudge-today { background: rgba(224,160,48,0.15); color: #E0A030; border-color: rgba(224,160,48,0.4); font-weight: 600; }
 
 .card-stale { border-color: rgba(229,72,77,0.35); }
 .card-stale:hover, .card-stale:focus-visible { border-color: rgba(229,72,77,0.6); }
@@ -1128,7 +1130,8 @@ footer.page-foot {
   .card-company { color: #444; }
 
   .badge { border-color: #999; background: none !important; }
-  .badge-dm, .badge-generic, .badge-unknown, .badge-age, .badge-stale, .badge-touch { color: #111 !important; }
+  .badge-dm, .badge-generic, .badge-unknown, .badge-age, .badge-stale, .badge-touch,
+  .badge-nudge-overdue, .badge-nudge-today { color: #111 !important; }
 
   .column-empty { border-color: #ccc; color: #555; }
   .card-stale { border-color: #ccc; }

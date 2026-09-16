@@ -212,6 +212,16 @@
   // nudgePoint can be logged, pass, and never appear anywhere on the board if
   // nextNudgeDate was never also set to match it, silently falling off the radar
   // with nothing here saying so. Surface those the same way an overdue nudge is.
+  // Same urgency tiering renderNudgeQueue already used inline, pulled out so
+  // renderCard below can flag an overdue/due-today nudge on the board itself
+  // without duplicating the bad-date/unqueued/days branching.
+  function nudgeUrgencyLevel(days, unqueued, badDate) {
+    if (badDate || unqueued || days < 0) return 'overdue';
+    if (days === 0) return 'today';
+    if (days <= 2) return 'soon';
+    return 'later';
+  }
+
   function computeNudgeRows(prospects) {
     const withDates = prospects
       .filter(p => p.nextNudgeDate && isValidDateStr(p.nextNudgeDate))
@@ -247,13 +257,13 @@
     }
 
     nudgeEl.innerHTML = rows.map(({ p, days, unqueued, badDate }) => {
-      let when, urgency;
-      if (badDate) { when = 'bad date'; urgency = 'overdue'; }
-      else if (unqueued) { when = Math.abs(days) + 'd past planned nudge point'; urgency = 'overdue'; }
-      else if (days < 0) { when = Math.abs(days) + 'd overdue'; urgency = 'overdue'; }
-      else if (days === 0) { when = 'today'; urgency = 'today'; }
-      else if (days <= 2) { when = 'in ' + days + 'd'; urgency = 'soon'; }
-      else { when = 'in ' + days + 'd'; urgency = 'later'; }
+      const urgency = nudgeUrgencyLevel(days, unqueued, badDate);
+      let when;
+      if (badDate) when = 'bad date';
+      else if (unqueued) when = Math.abs(days) + 'd past planned nudge point';
+      else if (days < 0) when = Math.abs(days) + 'd overdue';
+      else if (days === 0) when = 'today';
+      else when = 'in ' + days + 'd';
       const notBefore = p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore
         ? ' &middot; do not nudge before ' + fmtDate(p.nudgeSchedule.doNotNudgeBefore)
         : '';
@@ -808,12 +818,18 @@
 
   function renderBoard(stages, prospects, allProspects, displayQuery, filtering) {
     const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    // Built once per render from the same computeNudgeRows the Nudge Queue
+    // section already uses, so a card's badge can never disagree with that
+    // section's own overdue/today reasoning.
+    const nudgeUrgencyById = Object.fromEntries(
+      computeNudgeRows(allProspects).map(r => [r.p.id, nudgeUrgencyLevel(r.days, r.unqueued, r.badDate)])
+    );
     boardEl.innerHTML = stages.map(stage => {
       const inStage = prospects.filter(p => p.stage === stage.id).sort(byUrgency);
       const totalInStage = allProspects.filter(p => p.stage === stage.id).length;
       let cards;
       if (inStage.length) {
-        cards = inStage.map(p => renderCard(p, stageById)).join('');
+        cards = inStage.map(p => renderCard(p, stageById, nudgeUrgencyById)).join('');
       } else if (filtering && totalInStage > 0) {
         cards = '<div class="column-empty" role="status">No matches' +
           (displayQuery ? ' for "' + escapeHtml(displayQuery) + '"' : '') + ' in this stage.</div>';
@@ -1075,7 +1091,19 @@
     return daysSince(lastDate);
   }
 
-  function renderCard(p, stageById) {
+  // Only the two tiers a person would actually act on today ('overdue' and
+  // 'today') get a card badge, 'soon'/'later' stay in the Nudge Queue section
+  // only, same reasoning as the research this session's improvement was
+  // based on: a scanned board should surface the one thing to act on now,
+  // not repeat every date the dedicated queue below already shows.
+  function nudgeCardBadge(p, nudgeUrgencyById) {
+    const urgency = nudgeUrgencyById[p.id];
+    if (urgency === 'overdue') return '<span class="badge badge-nudge-overdue">NUDGE OVERDUE</span>';
+    if (urgency === 'today') return '<span class="badge badge-nudge-today">NUDGE DUE TODAY</span>';
+    return '';
+  }
+
+  function renderCard(p, stageById, nudgeUrgencyById) {
     const info = stallInfo(p, stageById);
     const stallBadge = info
       ? '<span class="badge ' + (info.isStale ? 'badge-stale' : 'badge-age') + '">' +
@@ -1091,7 +1119,7 @@
     return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" draggable="true" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
-      '<div class="card-meta">' + categoryBadge + channelBadge(p.contactChannel) + stallBadge + touchBadge + '</div>' +
+      '<div class="card-meta">' + nudgeCardBadge(p, nudgeUrgencyById) + categoryBadge + channelBadge(p.contactChannel) + stallBadge + touchBadge + '</div>' +
       '</button>';
   }
 
