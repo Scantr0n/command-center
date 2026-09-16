@@ -916,6 +916,42 @@ function openCandidateModal(id) {
   document.getElementById('modalClose').focus();
 }
 
+// Full detail for a grading submission: the feed row only has room for
+// status/days-in-queue/a few summary fields. Previously the only way to move
+// a batch from "in-queue" to "returned", log a tracking number, or record
+// the real invoiced cost was to hand-edit submissions.json; this reuses the
+// same guided-form -> JSON -> copy/paste convention as the card and
+// candidate edit forms.
+function openSubmissionModal(id) {
+  const s = submissions.find(x => x.id === id);
+  if (!s) return;
+  lastFocusedEl = document.activeElement;
+
+  document.getElementById('modalName').textContent = s.description || 'Untitled submission';
+  const meta = SUBMISSION_STATUS_META[s.status] || { label: s.status || 'Unknown status' };
+  const subParts = [s.gradingCompany, s.serviceLevel, meta.label].filter(Boolean);
+  document.getElementById('modalSub').textContent = subParts.length ? subParts.join(' · ') : 'No grader/status logged yet';
+
+  let body = '';
+  body += submissionEditFormHtml(s);
+  body += field('Card count', s.cardCount != null ? String(s.cardCount) : null, s.cardCount == null);
+  body += field('Submitted date', s.submittedDate, !s.submittedDate);
+  body += field('Tracking number', s.trackingNumber, !s.trackingNumber);
+  body += field('Returned date', s.returnedDate, !s.returnedDate);
+  body += field('Cost (grading fee)', s.cost != null ? formatUsd(s.cost) : null, s.cost == null);
+  const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
+  if (lookup) {
+    body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
+  }
+  body += field('Notes', s.notes, !s.notes);
+
+  document.getElementById('modalBody').innerHTML = body;
+  wireSubmissionEditForm(s);
+  document.getElementById('modalOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('modalClose').focus();
+}
+
 // Cards currently out for grading (status != "returned"), oldest submitted
 // first, since the longest-outstanding batch is the one most worth checking
 // on. A submission with no submittedDate sorts last rather than first, same
@@ -977,14 +1013,14 @@ function renderSubmissions() {
       s.cost != null ? formatUsd(s.cost) + ' fee' : null
     ].filter(Boolean);
     return `
-      <div class="submission-row">
+      <div class="submission-row candidate-row" tabindex="0" role="button" data-id="${escapeHtml(s.id)}">
         <span class="submission-days font-mono${runningLong ? ' submission-days-late' : ''}">${escapeHtml(daysText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
         ${runningLong ? `<span class="badge badge-late" title="${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} is ${graderStats.value} days">past ${escapeHtml(s.gradingCompany)} avg (${graderStats.value}d)</span>` : ''}
         ${estReturnDate ? `<span class="submission-meta font-mono" title="Based on ${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee from the grader">est. back ~${escapeHtml(estReturnDate)}</span>` : ''}
-        ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
+        ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono" onclick="event.stopPropagation()">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
       </div>
     `;
   }).join('');
@@ -992,6 +1028,15 @@ function renderSubmissions() {
   el.innerHTML = rows + (returnedCount
     ? `<div class="submissions-returned-note">+ ${returnedCount} past submission${returnedCount === 1 ? '' : 's'} logged as returned</div>`
     : '');
+  el.querySelectorAll('.submission-row[data-id]').forEach(row => {
+    row.addEventListener('click', () => openSubmissionModal(row.dataset.id));
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openSubmissionModal(row.dataset.id);
+      }
+    });
+  });
 }
 
 // Batches aren't a fixed vocabulary like sport/basis/grader, they're one per
@@ -1788,6 +1833,115 @@ function wireCandidateEditForm(c) {
 function ceVal(id) {
   const v = document.getElementById(id).value.trim();
   return v === '' ? null : v;
+}
+
+// Same guided-form -> JSON -> copy/paste convention as the card and
+// candidate edit forms above, for submissions.json. This is the only way to
+// move a batch from "in-queue" to "returned" (or log its real tracking
+// number / invoiced cost) that isn't hand-editing the file directly.
+function submissionEditFormHtml(s) {
+  return '<details class="schema-help">' +
+    '<summary>Edit this submission&rsquo;s details</summary>' +
+    '<div class="schema-help-body">' +
+    '<p>Generates this submission&rsquo;s full updated record with whatever fields below you change. ' +
+    '<code>id</code> carries over unchanged. Once a batch actually comes back, add the real graded cards to ' +
+    '<code>cards.json</code> with their real cert numbers, then set status to &ldquo;returned&rdquo; here with a ' +
+    'real returned date rather than deleting this row.</p>' +
+    '<div class="np-form">' +
+    ceFieldRow('sceDescription', 'Description', s.description) +
+    '<div class="form-row-split">' +
+    ceSelectRow('sceGradingCompany', 'Grading company', s.gradingCompany, [['', 'Select one...'], ['PSA', 'PSA'], ['BGS', 'BGS'], ['SGC', 'SGC'], ['CGC', 'CGC'], ['HGA', 'HGA'], ['KSA', 'KSA']]) +
+    ceInputInner('sceServiceLevel', 'Service level', s.serviceLevel) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('sceCardCount', 'Card count', s.cardCount, 'number') +
+    ceInputInner('sceCost', 'Cost (grading fee), USD', s.cost, 'number') +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('sceSubmittedDate', 'Submitted date', s.submittedDate, 'date') +
+    ceInputInner('sceTrackingNumber', 'Tracking number', s.trackingNumber) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceSelectRow('sceStatus', 'Status', s.status, [['submitted', 'Submitted'], ['in-queue', 'In queue'], ['grading', 'Grading'], ['shipped-back', 'Shipped back'], ['returned', 'Returned']]) +
+    ceInputInner('sceReturnedDate', 'Returned date (required once status is Returned)', s.returnedDate, 'date') +
+    '</div>' +
+    ceFieldRow('sceNotes', 'Notes', s.notes, 'textarea') +
+    '</div>' +
+    '<button type="button" id="sceGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
+    '<div id="sceResult" class="np-result" hidden>' +
+    '<ul id="sceWarnings" class="np-warnings"></ul>' +
+    '<div class="np-output-head">' +
+    '<span class="field-label" style="margin:0">Replace this submission&rsquo;s whole entry with</span>' +
+    '<button type="button" id="sceCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
+    '</div>' +
+    '<pre class="np-output font-mono" id="sceOutput"></pre>' +
+    '</div>' +
+    '</div></details>';
+}
+
+function wireSubmissionEditForm(s) {
+  const generateBtn = document.getElementById('sceGenerateBtn');
+  if (!generateBtn) return;
+  const resultEl = document.getElementById('sceResult');
+  const warningsEl = document.getElementById('sceWarnings');
+  const outputEl = document.getElementById('sceOutput');
+  const copyBtn = document.getElementById('sceCopyBtn');
+
+  generateBtn.addEventListener('click', () => {
+    const cardCountRaw = document.getElementById('sceCardCount').value.trim();
+    const costRaw = document.getElementById('sceCost').value.trim();
+
+    const edited = Object.assign({}, s, {
+      description: ceVal('sceDescription') || s.description,
+      gradingCompany: document.getElementById('sceGradingCompany').value || null,
+      serviceLevel: ceVal('sceServiceLevel'),
+      cardCount: cardCountRaw === '' ? null : Number(cardCountRaw),
+      submittedDate: document.getElementById('sceSubmittedDate').value || null,
+      trackingNumber: ceVal('sceTrackingNumber'),
+      status: document.getElementById('sceStatus').value || null,
+      returnedDate: document.getElementById('sceReturnedDate').value || null,
+      cost: costRaw === '' ? null : Number(costRaw),
+      notes: ceVal('sceNotes')
+    });
+
+    let blockers = [];
+    let advisory = [];
+    if (window.CGTValidateCore) {
+      const realSubmissions = submissions.filter(x => !isExampleSubmission(x));
+      const merged = realSubmissions.slice();
+      const idx = merged.findIndex(x => x.id === s.id);
+      if (idx !== -1) merged[idx] = edited;
+      const where = 'submissions[' + idx + ']';
+      const strip = m => m.slice(m.indexOf(': ') + 2);
+      const { errors, warnings } = window.CGTValidateCore.validateSubmissions(merged);
+      blockers = errors.filter(m => m.indexOf(where) === 0).map(strip);
+      advisory = warnings.filter(m => m.indexOf(where) === 0).map(strip);
+    }
+
+    if (blockers.length) {
+      warningsEl.innerHTML = blockers.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+      outputEl.textContent = '';
+      resultEl.hidden = false;
+      resultEl.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+
+    warningsEl.innerHTML = advisory.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+    outputEl.textContent = JSON.stringify(edited, null, 2) + ',';
+    resultEl.hidden = false;
+    resultEl.scrollIntoView({ block: 'nearest' });
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(outputEl.textContent).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => {
+      copyBtn.textContent = "Couldn't copy, select the text manually";
+      setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 2400);
+    });
+  });
 }
 
 // Reuses CGTValidateCore.validateCards, same as the quick-log tool, by
