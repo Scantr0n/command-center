@@ -539,10 +539,16 @@ function fmtQty(n) {
 // and totalInvested is safe to report as exactly $0 rather than "-".
 function computeExposure(acct, positions) {
   if (!acct) return { totalInvested: null, pctDeployed: null };
-  const marketValues = positions
-    .map(p => p.marketValue)
-    .filter(v => typeof v === 'number' && Number.isFinite(v));
-  if (positions.length && !marketValues.length) return { totalInvested: null, pctDeployed: null };
+  const marketValues = positions.map(p => p.marketValue);
+  // Same all-or-nothing rule renderPositions' own totals row uses just below
+  // (see its comment): filtering out the bad values and summing the rest
+  // used to silently treat one position's missing marketValue as $0 instead
+  // of admitting the total itself is unknown, so this panel and the
+  // positions table right beneath it could report two different totals for
+  // the same data.
+  if (positions.length && !marketValues.every(v => typeof v === 'number' && Number.isFinite(v))) {
+    return { totalInvested: null, pctDeployed: null };
+  }
   const totalInvested = marketValues.reduce((sum, v) => sum + v, 0);
   const pctDeployed = (typeof acct.equity === 'number' && Number.isFinite(acct.equity) && acct.equity > 0)
     ? (totalInvested / acct.equity) * 100
