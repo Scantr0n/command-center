@@ -760,20 +760,65 @@ function renderArchitecture(data) {
   `).join('');
 }
 
+// One card per lineage, the literal "wall" the architecture note promises,
+// once a real feed knows per-lineage detail rather than only the three
+// aggregate counts renderGenealogy already showed. Genealogy/lineage
+// visualization research (evolutionary-algorithm lineage trees, genealogical
+// graphs) converges on a grouped card/grid layout over a literal branching
+// tree the moment per-node attribute count grows past a couple of fields,
+// exactly this shape: one card per lineage, generation and status at a
+// glance, detail on the card itself rather than requiring a hover or click.
+function lineageCard(l) {
+  const status = l.status === 'retired' ? 'retired' : (l.status === 'active' ? 'active' : null);
+  const badgeClass = status === 'retired' ? 'badge-retired' : (status === 'active' ? 'badge-active' : 'badge-pending');
+  const badgeText = status || 'unknown';
+  const agentText = (typeof l.agentCount === 'number' && Number.isFinite(l.agentCount))
+    ? l.agentCount + ' agent' + (l.agentCount === 1 ? '' : 's')
+    : 'awaiting connection';
+  const genText = (typeof l.generation === 'number' && Number.isFinite(l.generation)) ? 'GEN ' + l.generation : 'GEN -';
+  const eventText = l.lastEventAt
+    ? (l.lastEventNote ? escapeHtml(l.lastEventNote) : 'Last event ' + escapeHtml(timeAgo(l.lastEventAt) || formatAbsolute(l.lastEventAt)))
+    : null;
+  return `
+    <div class="lineage-card">
+      <div class="lineage-card-head">
+        <span class="lineage-gen font-mono">${escapeHtml(genText)}</span>
+        <span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span>
+      </div>
+      <div class="lineage-label">${escapeHtml(l.label || l.id || 'Unnamed lineage')}</div>
+      <div class="lineage-meta font-mono">${escapeHtml(agentText)}</div>
+      ${eventText ? `<div class="lineage-event">${eventText}</div>` : ''}
+    </div>
+  `;
+}
+
 function renderGenealogy(data) {
   const g = data.live.genealogy;
   const panel = document.getElementById('genealogyPanel');
-  const hasAny = g && (g.generation != null || g.activeLineages != null || g.lastBreedingEventAt != null);
-  if (!hasAny) return; // keep the built-in "awaiting live connection" empty state
+  const lineages = (g && Array.isArray(g.lineages)) ? g.lineages : [];
+  const hasAggregate = g && (g.generation != null || g.activeLineages != null || g.lastBreedingEventAt != null);
+  if (!hasAggregate && !lineages.length) return; // keep the built-in "awaiting live connection" empty state
 
   panel.classList.remove('empty-panel');
-  panel.innerHTML = `
+
+  const summaryHtml = hasAggregate ? `
     <div class="stat-row">
       ${statTile(g.generation != null ? escapeHtml(String(g.generation)) : 'awaiting connection', 'Generation', null, g.generation == null)}
       ${statTile(g.activeLineages != null ? escapeHtml(String(g.activeLineages)) : 'awaiting connection', 'Active lineages', null, g.activeLineages == null)}
       ${statTile(g.lastBreedingEventAt ? escapeHtml(timeAgo(g.lastBreedingEventAt) || g.lastBreedingEventAt) : 'awaiting connection', 'Last breeding event', g.lastBreedingEventNote || null, !g.lastBreedingEventAt)}
     </div>
-  `;
+  ` : '';
+
+  // The wall itself only appears once a feed sends real per-lineage entries;
+  // an empty lineages[] with aggregate counts set (today's real server.js
+  // mapping, see its own genealogy comment) just keeps the summary row above,
+  // same as before this feature existed, rather than showing an empty grid.
+  const wallHtml = lineages.length ? `
+    <div class="lineage-wall-label font-mono">LINEAGES</div>
+    <div class="lineage-wall">${lineages.map(lineageCard).join('')}</div>
+  ` : '';
+
+  panel.innerHTML = summaryHtml + wallHtml;
 }
 
 // A status-only page loses the "what changed and when" that makes a status

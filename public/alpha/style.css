@@ -677,6 +677,58 @@ header.page-head .sub {
 }
 .badge-pending { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
 .badge-active { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
+/* A retired lineage isn't pending (nothing is blocking it) or actively
+   trading (the green .badge-active), just done; the same neutral gray the
+   rest of the page reserves for an unremarkable, non-actionable state. */
+.badge-retired { background: rgba(123,129,136,0.1); color: var(--sub); border-color: var(--hairlineHover); }
+
+/* Genealogy wall: one card per lineage, see lineageCard() in app.js. */
+.lineage-wall-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+  margin: 18px 0 10px;
+}
+.lineage-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.lineage-card {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.lineage-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lineage-gen {
+  font-size: 0.65rem;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+}
+.lineage-label {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+  margin-top: 8px;
+}
+.lineage-meta {
+  font-size: 0.72rem;
+  color: var(--sub);
+  margin-top: 4px;
+}
+.lineage-event {
+  font-size: 0.72rem;
+  color: var(--dim);
+  margin-top: 6px;
+  line-height: 1.5;
+}
 
 /* Genealogy / empty state */
 .empty-panel {

@@ -42,7 +42,8 @@
       "generation": null,
       "activeLineages": null,
       "lastBreedingEventAt": null,
-      "lastBreedingEventNote": null
+      "lastBreedingEventNote": null,
+      "lineages": []
     }
   },
   "events": []

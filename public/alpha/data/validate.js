@@ -70,7 +70,8 @@ function main() {
     live.regime != null ||
     (live.killSwitch && live.killSwitch.engaged != null) ||
     (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null || live.positionSizing.maxDrawdownPct != null)) ||
-    (live.genealogy && (live.genealogy.generation != null || live.genealogy.activeLineages != null || live.genealogy.lastBreedingEventAt != null));
+    (live.genealogy && (live.genealogy.generation != null || live.genealogy.activeLineages != null || live.genealogy.lastBreedingEventAt != null ||
+      (Array.isArray(live.genealogy.lineages) && live.genealogy.lineages.length > 0)));
 
   if (anyLiveValueSet && !live.asOf) {
     errors.push('live: one or more live fields are set but "live.asOf" is missing. Every live reading must carry ' +
@@ -85,6 +86,44 @@ function main() {
   }
   if (live.genealogy && !isIsoDatetimeOrNull(live.genealogy.lastBreedingEventAt)) {
     errors.push('live.genealogy.lastBreedingEventAt: not a valid ISO datetime or null');
+  }
+
+  // The genealogy wall itself: one card per lineage once a real feed knows
+  // per-lineage detail, rather than only the aggregate counts above. Same
+  // "starts empty, honestly" rule as connection.history/events; each entry
+  // needs a real id to key off of, everything else is nullable exactly like
+  // the aggregate fields it sits alongside.
+  const lineages = live.genealogy && live.genealogy.lineages;
+  if (lineages != null) {
+    if (!Array.isArray(lineages)) {
+      errors.push('live.genealogy.lineages: must be an array if present (empty is fine, it starts that way honestly)');
+    } else {
+      lineages.forEach((l, i) => {
+        const where = `live.genealogy.lineages[${i}]`;
+        if (!l || typeof l !== 'object') { errors.push(where + ': must be an object'); return; }
+        if (typeof l.id !== 'string' || !l.id) {
+          errors.push(where + '.id: required, must be a non-empty string');
+        }
+        if (l.label != null && typeof l.label !== 'string') {
+          errors.push(where + '.label: must be a string if set');
+        }
+        if (l.generation != null && !(typeof l.generation === 'number' && Number.isFinite(l.generation))) {
+          errors.push(where + '.generation: must be null or a finite number');
+        }
+        if (l.agentCount != null && !(typeof l.agentCount === 'number' && Number.isFinite(l.agentCount) && l.agentCount >= 0)) {
+          errors.push(where + '.agentCount: must be null or a non-negative finite number');
+        }
+        if (l.status != null && !['active', 'retired'].includes(l.status)) {
+          errors.push(where + '.status: must be "active" or "retired" if set');
+        }
+        if (!isIsoDatetimeOrNull(l.lastEventAt)) {
+          errors.push(where + '.lastEventAt: not a valid ISO datetime or null');
+        }
+        if (l.lastEventNote != null && typeof l.lastEventNote !== 'string') {
+          errors.push(where + '.lastEventNote: must be a string if set');
+        }
+      });
+    }
   }
 
   const drawdownPct = live.positionSizing && live.positionSizing.currentDrawdownPct;
