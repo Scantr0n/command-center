@@ -417,6 +417,64 @@
     </div>
   </section>
 
+  <section id="packagingRulesSection">
+    <h2 class="section-title">Packaging &amp; shipping rules by platform</h2>
+    <div class="callout">
+      Real per-platform packaging requirements, sourced from each platform's own shipping/seller documentation as
+      of September 2026. The Poshmark rule below is the same class of silent-failure risk as the eBay
+      return-policy bug logged above: the free USPS Priority Mail boxes eBay orders and the post office hands out
+      (including the free Priority Mail Shoe Box, sized for shoes up to about size 12, useful for the boots listed
+      here) are against Poshmark's own rules, and a package sent that way can be a real policy violation there
+      even though nothing stops you from grabbing one at the counter.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Label</th>
+            <th>Allowed packaging</th>
+            <th>Watch for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>eBay</td>
+            <td>Buy a discounted USPS/UPS label through eBay, or use your own</td>
+            <td>Free USPS Priority Mail boxes (Post Office or ebay.com/ship) for Priority Mail service, including
+              the free Priority Mail Shoe Box; a plain box for Ground Advantage service</td>
+            <td>For an item as light as shoes, a plain box priced by weight on Ground Advantage is usually cheaper
+              than a flat-rate box, per eBay's own seller community shipping guidance; flat-rate boxes also can't
+              be cut down or modified</td>
+          </tr>
+          <tr>
+            <td>Vinted</td>
+            <td>Vinted-generated prepaid label only</td>
+            <td>A sturdy outer box or padded/waterproof envelope sized snugly to the item, with void space filled
+              (bubble wrap, paper); no bin bags or unpadded bags</td>
+            <td>Packing outside Vinted's own instructions on the label can void damage compensation if the parcel
+              is damaged in transit</td>
+          </tr>
+          <tr>
+            <td>Poshmark</td>
+            <td>Poshmark-generated prepaid USPS label only</td>
+            <td>A plain, unbranded box or mailer, USPS Ground Advantage service only</td>
+            <td><strong>USPS Priority Mail, Flat Rate, and Regional Rate packaging are not allowed on Poshmark</strong>,
+              even though they're free and easy to grab at the counter</td>
+          </tr>
+          <tr>
+            <td>Depop</td>
+            <td>Depop's discounted USPS label, or a self-purchased label</td>
+            <td>Ground Advantage (typically under 1 lb): plain box or poly mailer only, free Priority boxes are not
+              allowed. Priority Mail (over 1 lb, when that service is actually chosen): free Post Office Priority
+              boxes are fine</td>
+            <td>It's the chosen service level, not just weight, that decides which boxes are allowed</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Relist reminders</h2>
@@ -915,6 +973,13 @@
         <label>
           <input type="checkbox" data-check-id="price-set">
           Asking price is set and matches what's live on each platform
+        </label>
+      </li>
+      <li>
+        <label>
+          <input type="checkbox" data-check-id="packaging-rules">
+          Packaging on hand actually matches this platform's rules, not just whatever's free at the counter
+          (Poshmark bans free USPS Priority/flat-rate boxes, Ground Advantage only)
         </label>
       </li>
     </ul>
