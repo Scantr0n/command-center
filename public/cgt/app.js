@@ -871,9 +871,9 @@ function renderCandidates() {
 // notes are required by validate.js precisely because a comp-estimate must
 // never be shown with no explanation of what it's based on, so leaving them
 // unreachable in the UI defeated the point of requiring them. Reuses the same
-// modal shell as the card detail view (openModal below) but is read-only:
-// a candidate has no edit form of its own yet, and does not touch
-// `activeCard`, which only the card modal uses.
+// modal shell as the card detail view (openModal below), including its own
+// guided edit form (candidateEditFormHtml/wireCandidateEditForm below), and
+// does not touch `activeCard`, which only the card modal uses.
 function openCandidateModal(id) {
   const c = candidates.find(x => x.id === id);
   if (!c) return;
@@ -888,6 +888,7 @@ function openCandidateModal(id) {
   const verdictMeta = CANDIDATE_VERDICT_META[verdictKey];
 
   let body = '';
+  body += candidateEditFormHtml(c);
   body += `<div class="field-row"><span class="badge ${verdictMeta.cls}">${escapeHtml(verdictMeta.label)}</span></div>`;
   body += field('Year', c.year != null ? String(c.year) : null, c.year == null);
   body += field('Raw value (ungraded)', c.rawValue != null ? formatUsd(c.rawValue) : null, c.rawValue == null);
@@ -909,6 +910,7 @@ function openCandidateModal(id) {
   body += field('Notes', c.notes, !c.notes);
 
   document.getElementById('modalBody').innerHTML = body;
+  wireCandidateEditForm(c);
   document.getElementById('modalOverlay').hidden = false;
   lockBodyScroll();
   document.getElementById('modalClose').focus();
@@ -1644,6 +1646,143 @@ function cardEditFormHtml(c) {
     '<pre class="np-output font-mono" id="ceOutput"></pre>' +
     '</div>' +
     '</div></details>';
+}
+
+// Same guided-form -> JSON -> copy/paste convention as cardEditFormHtml
+// above, for candidates.json instead. Candidates previously had a read-only
+// detail modal only: updating a decision or a re-researched raw/graded value
+// meant hand-editing the JSON file directly, the exact gap the card edit
+// form already closed for cards.json.
+function candidateEditFormHtml(c) {
+  return '<details class="schema-help">' +
+    '<summary>Edit this candidate&rsquo;s details</summary>' +
+    '<div class="schema-help-body">' +
+    '<p>Generates this candidate&rsquo;s full updated record with whatever fields below you change. ' +
+    '<code>id</code> carries over unchanged. Once this candidate is actually shipped for grading, set ' +
+    '<code>decision</code> to &ldquo;submit&rdquo;, add the real batch to <code>submissions.json</code>, and note its id below rather than deleting this row.</p>' +
+    '<div class="np-form">' +
+    ceFieldRow('cceCardName', 'Card name', c.cardName) +
+    '<div class="form-row-split">' +
+    ceInputInner('cceYear', 'Year', c.year, 'number') +
+    ceSelectRow('cceSport', 'Sport', c.sport, [['', 'Select one...'], ['hockey', 'Hockey'], ['baseball', 'Baseball'], ['football', 'Football']]) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('cceRawValue', 'Raw value (ungraded), USD', c.rawValue, 'number') +
+    ceSelectRow('cceRawValueBasis', 'Raw value basis', c.rawValueBasis, [['', 'Select one...'], ['recent-sale', 'Recent sale'], ['comp-estimate', 'Comp estimate']]) +
+    '</div>' +
+    ceFieldRow('cceRawValueNote', 'Raw value note', c.rawValueNote) +
+    '<div class="form-row-split">' +
+    ceSelectRow('cceTargetGradingCompany', 'Target grading company', c.targetGradingCompany, [['', 'Not decided'], ['PSA', 'PSA'], ['BGS', 'BGS'], ['SGC', 'SGC'], ['CGC', 'CGC'], ['HGA', 'HGA'], ['KSA', 'KSA']]) +
+    ceInputInner('cceTargetServiceLevel', 'Target service level', c.targetServiceLevel) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('cceEstimatedGradingCost', 'Estimated grading cost, USD', c.estimatedGradingCost, 'number') +
+    ceInputInner('cceShippingCost', 'Shipping cost, USD', c.shippingCost, 'number') +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('cceExpectedGrade', 'Expected grade', c.expectedGrade) +
+    ceInputInner('cceExpectedGradedValue', 'Expected graded value, USD', c.expectedGradedValue, 'number') +
+    '</div>' +
+    ceSelectRow('cceGradedValueBasis', 'Graded value basis', c.gradedValueBasis, [['', 'Select one...'], ['recent-sale', 'Recent sale'], ['comp-estimate', 'Comp estimate']]) +
+    ceFieldRow('cceGradedValueNote', 'Graded value note', c.gradedValueNote) +
+    '<div class="form-row-split">' +
+    ceInputInner('cceDatePriced', 'Date priced', c.datePriced, 'date') +
+    ceSelectRow('cceDecision', 'Decision', c.decision, [['', 'Still weighing it'], ['submit', 'Submit'], ['hold', 'Hold'], ['sell-raw', 'Sell raw'], ['pass', 'Pass']]) +
+    '</div>' +
+    ceFieldRow('cceDecisionNote', 'Decision note', c.decisionNote) +
+    ceFieldRow('cceNotes', 'Notes', c.notes, 'textarea') +
+    '</div>' +
+    '<button type="button" id="cceGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
+    '<div id="cceResult" class="np-result" hidden>' +
+    '<ul id="cceWarnings" class="np-warnings"></ul>' +
+    '<div class="np-output-head">' +
+    '<span class="field-label" style="margin:0">Replace this candidate&rsquo;s whole entry with</span>' +
+    '<button type="button" id="cceCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
+    '</div>' +
+    '<pre class="np-output font-mono" id="cceOutput"></pre>' +
+    '</div>' +
+    '</div></details>';
+}
+
+function wireCandidateEditForm(c) {
+  const generateBtn = document.getElementById('cceGenerateBtn');
+  if (!generateBtn) return;
+  const resultEl = document.getElementById('cceResult');
+  const warningsEl = document.getElementById('cceWarnings');
+  const outputEl = document.getElementById('cceOutput');
+  const copyBtn = document.getElementById('cceCopyBtn');
+
+  generateBtn.addEventListener('click', () => {
+    const yearRaw = document.getElementById('cceYear').value.trim();
+    const rawValueRaw = document.getElementById('cceRawValue').value.trim();
+    const gradingCostRaw = document.getElementById('cceEstimatedGradingCost').value.trim();
+    const shippingCostRaw = document.getElementById('cceShippingCost').value.trim();
+    const gradedValueRaw = document.getElementById('cceExpectedGradedValue').value.trim();
+
+    const edited = Object.assign({}, c, {
+      cardName: ceVal('cceCardName') || c.cardName,
+      year: yearRaw === '' ? null : Number(yearRaw),
+      sport: document.getElementById('cceSport').value || null,
+      rawValue: rawValueRaw === '' ? null : Number(rawValueRaw),
+      rawValueBasis: document.getElementById('cceRawValueBasis').value || null,
+      rawValueNote: ceVal('cceRawValueNote'),
+      targetGradingCompany: document.getElementById('cceTargetGradingCompany').value || null,
+      targetServiceLevel: ceVal('cceTargetServiceLevel'),
+      estimatedGradingCost: gradingCostRaw === '' ? null : Number(gradingCostRaw),
+      shippingCost: shippingCostRaw === '' ? null : Number(shippingCostRaw),
+      expectedGrade: ceVal('cceExpectedGrade'),
+      expectedGradedValue: gradedValueRaw === '' ? null : Number(gradedValueRaw),
+      gradedValueBasis: document.getElementById('cceGradedValueBasis').value || null,
+      gradedValueNote: ceVal('cceGradedValueNote'),
+      datePriced: document.getElementById('cceDatePriced').value || null,
+      decision: document.getElementById('cceDecision').value || null,
+      decisionNote: ceVal('cceDecisionNote'),
+      notes: ceVal('cceNotes')
+    });
+
+    let blockers = [];
+    let advisory = [];
+    if (window.CGTValidateCore) {
+      const realCandidates = candidates.filter(x => !isExampleCandidate(x));
+      const merged = realCandidates.slice();
+      const idx = merged.findIndex(x => x.id === c.id);
+      if (idx !== -1) merged[idx] = edited;
+      const where = 'candidates[' + idx + ']';
+      const strip = m => m.slice(m.indexOf(': ') + 2);
+      const { errors, warnings } = window.CGTValidateCore.validateCandidates(merged);
+      blockers = errors.filter(m => m.indexOf(where) === 0).map(strip);
+      advisory = warnings.filter(m => m.indexOf(where) === 0).map(strip);
+    }
+
+    if (edited.decision === 'submit' && !edited.decisionNote) {
+      advisory.push('Decision is "submit" but no decision note logging the real submissions.json id this turns ' +
+        'into once shipped. Not required, just makes it easier to trace later.');
+    }
+
+    if (blockers.length) {
+      warningsEl.innerHTML = blockers.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+      outputEl.textContent = '';
+      resultEl.hidden = false;
+      resultEl.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+
+    warningsEl.innerHTML = advisory.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
+    outputEl.textContent = JSON.stringify(edited, null, 2) + ',';
+    resultEl.hidden = false;
+    resultEl.scrollIntoView({ block: 'nearest' });
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(outputEl.textContent).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => {
+      copyBtn.textContent = "Couldn't copy, select the text manually";
+      setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 2400);
+    });
+  });
 }
 
 function ceVal(id) {
