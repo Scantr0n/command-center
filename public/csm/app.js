@@ -972,6 +972,11 @@
     const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
     const stageOrderIndex = Object.fromEntries(stages.map((s, i) => [s.id, i]));
     const sorted = prospects.slice().sort(listComparator(listSortKey, listSortDir, stageById, stageOrderIndex));
+    // Same overdue/today tiering the board's card badge uses, so the two
+    // views never disagree on what counts as due now.
+    const nudgeUrgencyById = Object.fromEntries(
+      computeNudgeRows(allProspects).map(r => [r.p.id, nudgeUrgencyLevel(r.days, r.unqueued, r.badDate)])
+    );
 
     const headers = [
       { key: 'name', label: 'Prospect' },
@@ -1003,7 +1008,10 @@
           : '<span class="board-list-unlogged">Unknown stage</span>') + '</td>' +
         '<td>' + (p.category ? escapeHtml(p.category) : '<span class="board-list-unlogged">Not logged</span>') + '</td>' +
         '<td>' + channelBadge(p.contactChannel) + '</td>' +
-        '<td>' + (p.nextNudgeDate ? escapeHtml(fmtDate(p.nextNudgeDate)) : '<span class="board-list-unlogged">Not queued</span>') + '</td>' +
+        '<td>' + (p.nextNudgeDate
+          ? '<span class="' + (nudgeUrgencyById[p.id] === 'overdue' || nudgeUrgencyById[p.id] === 'today' ? 'board-list-nudge-due' : '') +
+            '">' + escapeHtml(fmtDate(p.nextNudgeDate)) + '</span>'
+          : '<span class="board-list-unlogged">Not queued</span>') + '</td>' +
         '<td>' + (info ? info.days + 'd' + (info.isStale ? ' (stalled)' : '') : '<span class="board-list-unlogged">Unlogged</span>') + '</td>' +
         '<td>' + (lastTouchDays != null ? lastTouchDays + 'd ago' : '<span class="board-list-unlogged">No touches logged</span>') + '</td>' +
         '</tr>';

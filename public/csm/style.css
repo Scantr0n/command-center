@@ -618,6 +618,7 @@ header.page-head .sub {
 .board-list-name { font-weight: 500; }
 .board-list-company { color: var(--sub); font-size: 0.76rem; margin-top: 2px; }
 .board-list-unlogged { color: var(--dim); font-style: italic; }
+.board-list-nudge-due { color: #E5484D; font-weight: 600; }
 .board-list-empty { padding: 20px; color: var(--dim); font-size: 0.85rem; margin: 0; }
 
 .column {
