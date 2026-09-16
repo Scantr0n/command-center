@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Command Center</title>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" id="pageFavicon">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -544,10 +544,34 @@ function renderStats() {
   `;
 }
 
+// Same glance-indicator convention Alpha's and Sondrik's own app.js already
+// use: this is a hub Jack leaves open in a background tab, so the tab itself
+// (favicon dot + title) should carry whether anything needs attention, not
+// just the on-page pill. 'broken' outranks 'stalled' the same way it already
+// does in STATUS_SEVERITY, so one broken project among several stalled ones
+// still shows red, not a falsely-calmer amber.
+const DEFAULT_TITLE = document.title;
+function updateGlanceIndicator(flagged) {
+  const favicon = document.getElementById('pageFavicon');
+  if (!flagged.length) {
+    document.title = DEFAULT_TITLE;
+    if (favicon) favicon.href = '/favicon.svg';
+    return;
+  }
+  const worstStatus = flagged.some(c => c.status === 'broken') ? 'broken' : 'stalled';
+  document.title = `(${flagged.length}) ${DEFAULT_TITLE}`;
+  if (favicon) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +
+      `<circle cx="16" cy="16" r="13" fill="${statusColor(worstStatus)}"/></svg>`;
+    favicon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+}
+
 function renderAttention() {
   const flagged = clusters.filter(c => c.status === 'stalled' || c.status === 'broken');
   const compact = document.getElementById('attnCompact');
   const cards = document.getElementById('attnCards');
+  updateGlanceIndicator(flagged);
 
   if (!flagged.length) {
     compact.classList.add('hidden'); compact.classList.remove('flex'); compact.innerHTML = '';
