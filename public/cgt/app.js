@@ -1892,7 +1892,15 @@ const CSV_COLUMNS = [
   [c => computeValueTrend(c)?.prevValue ?? null, 'Previous value'],
   [c => computeValueTrend(c)?.abs ?? null, 'Change since last check'],
   [c => c.valuationBasis, 'Valuation basis'], [c => c.compNote, 'Comp note'], [c => c.sourceNote, 'Source'],
-  [c => c.costBasis, 'Cost basis'], [c => computeGainLoss(c)?.abs ?? null, 'Gain/loss'],
+  [c => c.costBasis, 'Cost basis'],
+  [c => isSold(c) ? c.soldDate : null, 'Sold date'],
+  [c => isSold(c) ? c.soldPrice : null, 'Sold price'],
+  // Realized once a card is sold (soldPrice vs costBasis), unrealized otherwise
+  // (estimatedValue vs costBasis), same branch the detail modal already uses;
+  // the label column says which one a given row is so the two never get
+  // read as the same kind of number.
+  [c => isSold(c) ? (computeRealizedGainLoss(c)?.abs ?? null) : (computeGainLoss(c)?.abs ?? null), 'Gain/loss'],
+  [c => isSold(c) ? 'Realized' : 'Unrealized', 'Gain/loss type'],
   [c => c.datePriced, 'Date priced'], [c => c.backlogBatch, 'Backlog batch'], [c => c.notes, 'Notes']
 ];
 
