@@ -1854,7 +1854,16 @@ function openModal(id) {
         const net = estimateNetPayout(p, l.price);
         const isBest = p === modalBest;
         const profit = net != null && hasCostBasis ? net - l.costBasis : null;
-        return `<tr><td>${label}</td><td class="cell-value${net == null ? ' empty' : ''}${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>${hasCostBasis ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)} profit</td>` : ''}</tr>`;
+        // net is null whenever the asking price itself isn't set yet (see
+        // estimateNetPayout above), which used to still render "$0 profit"
+        // here: formatUsd(null) coerces to 0 instead of throwing, so a cost
+        // basis logged before a price falsely read as break-even instead of
+        // "not applicable", the same wording the sold-here row above already
+        // uses for its own not-applicable case.
+        const profitCell = !hasCostBasis ? '' : profit != null
+          ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)} profit</td>`
+          : '<td class="cell-value empty">not applicable</td>';
+        return `<tr><td>${label}</td><td class="cell-value${net == null ? ' empty' : ''}${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>${profitCell}</tr>`;
       }).join('') + '</table>'
     : 'Not applicable, not listed anywhere yet.';
   rows.push(fieldRow('Est. net payout by platform', payoutHtml, !(l.platforms || []).length));
