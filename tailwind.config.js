@@ -17,10 +17,5 @@ module.exports = {
         faint: '#565B64',
       }
     }
-  },
-  safelist: [
-    { pattern: /bg-\[#.{6}\]/ },
-    { pattern: /border-\[#.{6}\]/ },
-    { pattern: /text-\[#.{6}\]/ },
-  ]
+  }
 }
