@@ -948,6 +948,74 @@ function renderEventLog(data) {
   log.innerHTML = sorted.map(eventItem).join('');
 }
 
+// This page depends on a few browser features to work fully (localStorage
+// for the connectivity/regime/last-known caches, the Notification API for
+// critical alerts, a service worker for offline caching), and any one of
+// them can be silently unavailable (private browsing, a locked-down
+// profile, a revoked permission) without the page itself erroring, which
+// just as silently mutes whatever depended on it. A real, live check of
+// this browser, right now, so that silence never gets mistaken for
+// "everything is fine". Never touches Alpha or any network path to it,
+// purely introspection of this tab's own environment.
+function checkLocalStorageAvailable() {
+  try {
+    const key = 'alpha:storageCheck';
+    localStorage.setItem(key, '1');
+    localStorage.removeItem(key);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Service worker registration state resolves asynchronously and doesn't
+// change once known, so it's checked once here rather than on every
+// loadStatus() tick, and cached in this module-level variable for
+// renderBrowserDiagnostics to read whenever it next runs.
+let serviceWorkerDiagnostic = ('serviceWorker' in navigator) ? 'Checking...' : 'Not supported in this browser';
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistration().then(reg => {
+    serviceWorkerDiagnostic = reg ? 'Registered' : 'Not yet registered';
+  }).catch(() => {
+    serviceWorkerDiagnostic = 'Registration check failed';
+  });
+}
+
+// status: 'ok' (green), 'blocked' (amber, same treatment arch-card's
+// .badge-pending already gives an unfinished-but-not-broken feature), or
+// 'info' (neutral gray, same as a retired lineage's badge) for a state
+// that is simply informational rather than good or bad on its own.
+function diagnosticRow(label, status, badgeText, detail) {
+  const badgeClass = status === 'ok' ? 'badge-active' : status === 'blocked' ? 'badge-pending' : 'badge-retired';
+  return `<tr><th>${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
+}
+
+function renderBrowserDiagnostics(connCheckCount, regimeObservationCount) {
+  const body = document.getElementById('browserDiagnosticsBody');
+  if (!body) return;
+
+  const storageOk = checkLocalStorageAvailable();
+  const notifyStatus = !notifySupported ? 'info' : (Notification.permission === 'granted' ? 'ok' : Notification.permission === 'denied' ? 'blocked' : 'info');
+  const notifyBadge = !notifySupported ? 'N/A' : (Notification.permission === 'granted' ? 'GRANTED' : Notification.permission === 'denied' ? 'DENIED' : 'NOT SET');
+  const swStatus = serviceWorkerDiagnostic === 'Registered' ? 'ok' : (serviceWorkerDiagnostic === 'Registration check failed' ? 'blocked' : 'info');
+
+  const rows = [
+    diagnosticRow('Local storage', storageOk ? 'ok' : 'blocked', storageOk ? 'AVAILABLE' : 'BLOCKED',
+      storageOk
+        ? 'Connectivity checks, regime history, and the last-known-state cache all persist here.'
+        : 'Private browsing or a locked profile. Connectivity/regime history and the last-known-state cache will not persist across reloads.'),
+    diagnosticRow('Notifications', notifyStatus, notifyBadge,
+      !notifySupported ? 'Not supported in this browser.' : (Notification.permission === 'granted' ? 'Critical alerts can fire natively when this tab is backgrounded.' : Notification.permission === 'denied' ? 'Critical alerts are muted; re-enable from this browser’s own site settings.' : 'Permission not yet requested (use "Enable critical alerts" above).')),
+    diagnosticRow('Service worker', swStatus, serviceWorkerDiagnostic.toUpperCase(),
+      swStatus === 'ok' ? 'Offline app-shell caching is active.' : 'Offline app-shell caching may be unavailable.'),
+    diagnosticRow('Connectivity checks recorded', storageOk ? 'ok' : 'blocked', String(connCheckCount),
+      'Real connectivity results recorded by this browser (see Connection above).'),
+    diagnosticRow('Regime observations recorded', storageOk ? 'ok' : 'blocked', String(regimeObservationCount),
+      'Real regime transitions this browser has actually observed (see Regime history above).')
+  ];
+  body.innerHTML = rows.join('');
+}
+
 // A passive color change on the headline pill is easy to miss if this tab
 // sits open in the background while the 30s auto-refresh keeps polling.
 // Real trading-bot monitoring UIs surface a transient alert on state
@@ -1215,6 +1283,7 @@ async function loadStatus() {
     renderArchitecture(data);
     renderGenealogy(effectiveData);
     renderEventLog(data);
+    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length);
   } catch (e) {
     if (requestId !== latestStatusRequestId) return;
     // Distinct from "down" (Alpha has no live feed yet, an expected,
@@ -1337,4 +1406,8 @@ document.addEventListener('visibilitychange', () => {
 // service worker can still serve the cached app shell), so the banner
 // doesn't wait for a later 'offline' event that will never fire.
 updateOfflineBanner();
+// Renders once immediately, independent of the /api/alpha/live fetch below,
+// so this table is accurate even if that fetch itself fails; loadStatus()
+// re-renders it with fresh counts on every successful tick after this.
+renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length);
 loadStatus();

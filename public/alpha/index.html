@@ -111,6 +111,23 @@
     </div>
   </details>
 
+  <details class="schema-help">
+    <summary>This browser's status</summary>
+    <div class="schema-help-body">
+      <p>This page leans on a few browser features to work fully: <code>localStorage</code> for the connectivity,
+        regime-history, and last-known-state caches described above, the Notification API for critical alerts, and
+        a service worker for offline app-shell caching. Any one of these can be silently blocked (private
+        browsing, a locked-down profile, revoked permissions) without the rest of the page failing, which just as
+        silently mutes the feature that depended on it. This table is a real, live check of this browser, right
+        now, on this device, so that silence is never mistaken for "nothing to report".</p>
+      <div class="schema-table-wrap">
+        <table class="schema-table" id="browserDiagnosticsTable">
+          <tbody id="browserDiagnosticsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Connection</h2>
     <div class="conn-strip" id="connStrip" role="status" aria-atomic="true">
