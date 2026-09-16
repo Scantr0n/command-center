@@ -420,6 +420,24 @@
     return null;
   }
 
+  // The real per-day rate between the first and latest logged download check,
+  // the same two checks the traction section's own rateHtml already divides.
+  // Needs at least two real checks (no rate exists off a single point) and a
+  // positive span (guards the same same-day-typo case daysBetween elsewhere
+  // has to guard). Downloads-only: a goal against "leads" has no comparable
+  // trend to divide, just one real Reddit comment logged so far, not a
+  // history of checks.
+  function downloadsPerDayRate(downloadsData) {
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length < 2) return null;
+    const first = checks[0];
+    const latest = checks[checks.length - 1];
+    const span = daysBetween(first.date, latest.date);
+    if (span <= 0) return null;
+    return { perDay: (latest.count - first.count) / span, first, latest };
+  }
+
   // Renders the real target-vs-actual goal Jack has logged, if any. This is
   // the standard "target vs actual" pattern from traction dashboards: a
   // benchmark, how the current real number compares to it, and a trend cue
@@ -473,6 +491,30 @@
         }
       }
 
+      // A second, independent forward-look from paceStatusHtml above: that one
+      // compares progress to elapsed time against a targetDate, this instead
+      // projects an ETA straight from the real download trend, so it still
+      // has something to say for an open-ended goal with no targetDate at
+      // all. Only shown once the goal is not already met (pct reaching 100%
+      // above already says that) and only for a positive real rate, since
+      // dividing by a flat or negative one would produce a meaningless or
+      // negative "days needed".
+      let projectionHtml = '';
+      if (g.metric === 'downloads' && currentCount < g.target) {
+        const rate = downloadsPerDayRate(downloadsData);
+        if (rate && rate.perDay > 0) {
+          const daysNeeded = Math.ceil((g.target - currentCount) / rate.perDay);
+          const projectedDate = addDays(rate.latest.date, daysNeeded);
+          projectionHtml = '<div class="goal-projection font-mono" title="Based on ~' + rate.perDay.toFixed(1) +
+            '/day between ' + fmtDate(rate.first.date) + ' and ' + fmtDate(rate.latest.date) + '">' +
+            'AT CURRENT PACE (~' + rate.perDay.toFixed(1) + '/DAY), TARGET AROUND ' + fmtDate(projectedDate).toUpperCase() +
+            ' (~' + daysNeeded + (daysNeeded === 1 ? ' DAY' : ' DAYS') + ')</div>';
+        } else if (rate) {
+          projectionHtml = '<div class="goal-projection goal-projection-flat font-mono">' +
+            'FLAT OR DECLINING PACE SINCE ' + fmtDate(rate.first.date).toUpperCase() + ', NO PROJECTED DATE AT THIS RATE</div>';
+        }
+      }
+
       const setLabel = g.setDate ? 'Goal set ' + fmtDate(g.setDate) : 'No set date logged';
       const currentNote = current
         ? 'Current: ' + currentCount + (current.asOf ? ' as of ' + fmtDate(current.asOf) : ', no date logged on the latest one')
@@ -493,6 +535,7 @@
         '<div class="goal-current font-mono">' + escapeHtml(currentNote) + ', target ' + g.target + '</div>' +
         paceHtml +
         paceStatusHtml +
+        projectionHtml +
         (g.note ? '<div class="goal-note">' + escapeHtml(g.note) + '</div>' : '') +
         '</div>';
     }).join('');

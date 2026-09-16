@@ -839,6 +839,13 @@ section { margin-bottom: 36px; }
 .goal-pace-status-on { color: var(--dim); }
 .goal-pace-status-ahead { color: #3DDC84; }
 .goal-pace-status-behind { color: #E0A030; }
+.goal-projection {
+  font-size: 0.68rem;
+  color: var(--dim);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.goal-projection-flat { color: #E0A030; }
 .goal-note {
   font-size: 0.75rem;
   color: var(--sub);
@@ -942,7 +949,7 @@ footer.page-foot {
   .snapshot-chip-meta { color: #555; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
   .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .last-updated, .last-updated-stale, .channel-note,
-  .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-note { color: #555; }
+  .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-projection, .goal-note { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
   .release-badge, .timeline-badge,
