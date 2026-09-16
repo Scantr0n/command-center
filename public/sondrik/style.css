@@ -699,6 +699,44 @@ section { margin-bottom: 36px; }
   color: var(--sub);
   line-height: 1.5;
 }
+.launch-window {
+  width: 100%;
+  margin-top: 8px;
+}
+.launch-window-label {
+  font-size: 0.68rem;
+  color: var(--dim);
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+.launch-window-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+.launch-window-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.launch-window-tick {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: var(--hairline);
+}
+.launch-window-marks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  color: var(--dim);
+  margin-top: 4px;
+}
 
 /* Empty state */
 .empty-state {
@@ -965,6 +1003,9 @@ footer.page-foot {
   .timeline-item { border-color: #ddd; }
   .goal-progress-track { border-color: #999; background: none; }
   .goal-progress-fill { background: #888; }
+  .launch-window-track { border-color: #999; background: none; }
+  .launch-window-fill { background: #888; }
+  .launch-window-label, .launch-window-marks { color: #555; }
   .goal-progress-pct { color: #111; }
 
   .empty-state { border-color: #ccc; color: #555; }

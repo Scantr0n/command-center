@@ -236,14 +236,47 @@
     }
     releaseSection.innerHTML = releases.map((r, idx) => {
       const rel = idx === 0 ? relativeDaysLabel(r.date) : null;
+      const windowHtml = idx === 0 ? launchWindowHtml(r.date) : '';
       return '<div class="release-card">' +
       '<span class="release-version font-display">v' + escapeHtml(r.version) + '</span>' +
       (r.date ? '<span class="release-date">' + fmtDate(r.date) +
         (rel ? ' <span class="release-relative font-mono">(' + rel + ')</span>' : '') + '</span>' : '') +
       (r.type ? '<span class="release-badge">' + escapeHtml(r.type).toUpperCase() + '</span>' : '') +
       '<div class="release-summary">' + escapeHtml(r.summary || 'No summary logged yet.') + '</div>' +
+      windowHtml +
       '</div>';
     }).join('');
+  }
+
+  // Where the latest real release sits against the 30/60/90-day post-launch
+  // windows early-stage products are commonly evaluated against (see the
+  // "first 30/60/90 days" framing traction dashboards use). Purely a
+  // time-since-ship calculation off the real logged ship date, it states no
+  // benchmark or judgment about whether the real numbers elsewhere on the
+  // page are good or bad for that window, only which window today falls in.
+  // Skipped for an undated release (no real ship date to measure from) or a
+  // future-dated one (a typo, not a real elapsed span).
+  function launchWindowHtml(shipDateIso) {
+    if (!shipDateIso) return '';
+    const days = daysBetween(shipDateIso, todayIso());
+    if (days < 0) return '';
+    const cappedDays = Math.min(days, 90);
+    const pct = Math.round((cappedDays / 90) * 100);
+    const windowLabel = days <= 30 ? '0-30 day window since ship'
+      : days <= 60 ? '30-60 day window since ship'
+      : days <= 90 ? '60-90 day window since ship'
+      : 'past the 90-day window since ship';
+    const dayLabel = 'Day ' + days;
+    return '<div class="launch-window">' +
+      '<div class="launch-window-label font-mono">' + escapeHtml((dayLabel + ', ' + windowLabel).toUpperCase()) + '</div>' +
+      '<div class="launch-window-track" role="img" aria-label="' +
+      escapeHtml(dayLabel + ' since ship, in the ' + windowLabel) + '">' +
+      '<div class="launch-window-fill" style="width:' + pct + '%"></div>' +
+      '<span class="launch-window-tick" style="left:33.33%"></span>' +
+      '<span class="launch-window-tick" style="left:66.66%"></span>' +
+      '</div>' +
+      '<div class="launch-window-marks font-mono" aria-hidden="true"><span>0</span><span>30</span><span>60</span><span>90+</span></div>' +
+      '</div>';
   }
 
   function renderTraction(data) {
