@@ -709,7 +709,7 @@ function renderGraph() {
     const sColor = statusColor(c.status);
     const dx = nx + (r + 3) * 0.7;
     const dy = ny - (r + 3) * 0.7;
-    const stale = c.lastUpdate && (Date.now() - new Date(c.lastUpdate + 'T00:00:00')) / 86400000 > 30;
+    const stale = isStale(c);
     // A JS-added role="button" on a grouped SVG element can't reliably rely
     // on a nested <title> for its accessible name across every browser and
     // screen reader pairing, so this is stated explicitly rather than only
@@ -910,6 +910,15 @@ function relativeTime(dateStr) {
   return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
+// Same 30-day threshold the graph's own dashed-ring treatment already uses
+// (renderGraph), pulled out here so Grid can flag the same thing instead of
+// silently dropping it: staleness was previously only visible as a dashed
+// stroke on a node, so anyone using Grid (a persisted, one-click-away default)
+// had no way to see a quietly stalled project without opening its modal.
+function isStale(c) {
+  return !!(c.lastUpdate && (Date.now() - new Date(c.lastUpdate + 'T00:00:00')) / 86400000 > 30);
+}
+
 let gridSortBy = 'priority';
 try { gridSortBy = localStorage.getItem('ccGridSort') || 'priority'; } catch {}
 document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
@@ -952,6 +961,7 @@ function renderGrid() {
   const grid = document.getElementById('clusterGrid');
   grid.innerHTML = sortForGrid(clusters).map(c => {
     const color = categoryColor(c.category);
+    const stale = isStale(c);
     return `
     <div class="cluster-card cursor-pointer rounded-xl p-5 border hairline" style="background: var(--panel)" data-id="${escapeHtml(c.id)}">
       <div class="flex items-center justify-between mb-3">
@@ -960,9 +970,10 @@ function renderGrid() {
       </div>
       <h2 class="font-display font-700 text-base mb-1" style="color: var(--ink)">${escapeHtml(c.name)}${c.priority === 'top' ? ' <span style=\'font-size:9px;color:var(--faint);font-family:monospace;letter-spacing:0.5px;vertical-align:middle\'>&nbsp;TOP</span>' : ''}</h2>
       <p class="text-xs leading-snug line-clamp-3" style="color: var(--sub)">${escapeHtml(c.summary)}</p>
-      <div class="mt-3 flex items-center justify-between">
-        <span class="tag-chip" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
-        ${c.toggleable ? `<span class="text-[10px] font-mono" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
+      <div class="mt-3 flex items-center justify-between gap-2">
+        <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
+        <span class="text-[10px] font-mono truncate" style="color: ${stale ? statusColor('stalled') : 'var(--faint)'}; font-weight: ${stale ? '600' : '400'}">${stale ? 'stale, ' : ''}${escapeHtml(relativeTime(c.lastUpdate))}</span>
+        ${c.toggleable ? `<span class="text-[10px] font-mono flex-shrink-0" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
       </div>
     </div>
   `;
