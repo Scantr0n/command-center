@@ -19,6 +19,7 @@
   const backupBtn = document.getElementById('backupBtn');
   const icsBtn = document.getElementById('icsBtn');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
+  const snapshotBtn = document.getElementById('snapshotBtn');
   const dataQualitySection = document.getElementById('dataQualitySection');
   const dataQualityList = document.getElementById('dataQualityList');
   const activityFeedEl = document.getElementById('activityFeed');
@@ -1355,6 +1356,84 @@
     downloadFile(csv, 'csm-pipeline-' + todayIso() + '.csv', 'text/csv;charset=utf-8;');
   });
 
+  // Plain-text digest for pasting into a notes app, journal, or a message to
+  // yourself, not the tool itself: there is no backend to check the pipeline
+  // from anywhere but this page, so this is the fastest way to carry today's
+  // real state (stage counts, what needs attention, what's actually due)
+  // somewhere else for a moment. Builds only from data already computed for
+  // the sections above, never a separate read of the raw JSON, so it can't
+  // drift out of sync with what the page itself shows.
+  function buildSnapshotText(stages, prospects) {
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    const lines = [];
+    lines.push('CSM PIPELINE SNAPSHOT - ' + todayIso());
+    lines.push(prospects.length + ' prospect' + (prospects.length === 1 ? '' : 's') + ' total');
+    lines.push('');
+    lines.push('STAGE COUNTS');
+    stages.forEach(s => {
+      const count = prospects.filter(p => p.stage === s.id).length;
+      lines.push('  ' + s.label + ': ' + count);
+    });
+
+    const nudgeRows = computeNudgeRows(prospects);
+    const overdue = nudgeRows.filter(r => !r.badDate && r.days <= 0);
+    const stalled = computeStalled(stages, prospects);
+    const coldSignal = computeColdSignal(prospects);
+    const backfill = computeDataQualityFlags(stages, prospects);
+    const duplicates = findDuplicateProspects(prospects);
+
+    lines.push('');
+    lines.push('NEEDS ATTENTION');
+    const attentionLines = [];
+    if (overdue.length) attentionLines.push('  ' + overdue.length + ' nudge' + (overdue.length === 1 ? '' : 's') + ' due or overdue');
+    if (stalled.length) attentionLines.push('  ' + stalled.length + ' prospect' + (stalled.length === 1 ? '' : 's') + ' stalled in stage');
+    if (coldSignal.length) attentionLines.push('  ' + coldSignal.length + ' prospect' + (coldSignal.length === 1 ? '' : 's') + ' may need a new approach');
+    if (backfill.length) attentionLines.push('  ' + backfill.length + ' prospect' + (backfill.length === 1 ? '' : 's') + ' needs backfill');
+    if (duplicates.length) attentionLines.push('  ' + duplicates.length + ' possible duplicate group' + (duplicates.length === 1 ? '' : 's'));
+    lines.push(...(attentionLines.length ? attentionLines : ['  Nothing needs attention right now.']));
+
+    lines.push('');
+    lines.push('NUDGE QUEUE');
+    if (nudgeRows.length) {
+      nudgeRows.forEach(({ p, days, unqueued, badDate }) => {
+        let when;
+        if (badDate) when = 'bad date logged';
+        else if (unqueued) when = Math.abs(days) + 'd past planned nudge point, not queued';
+        else if (days < 0) when = Math.abs(days) + 'd overdue';
+        else if (days === 0) when = 'today';
+        else when = 'in ' + days + 'd';
+        const action = p.nextAction ? ' - ' + p.nextAction : '';
+        lines.push('  ' + p.name + (p.company ? ' (' + p.company + ')' : '') + ': ' + when + action);
+      });
+    } else {
+      lines.push('  Nothing on the nudge queue.');
+    }
+
+    lines.push('');
+    lines.push('IN EXPLORATION / CLIENT');
+    const active = prospects.filter(p => p.stage === 'in-exploration' || p.stage === 'client');
+    if (active.length) {
+      active.forEach(p => {
+        lines.push('  ' + p.name + (p.company ? ' (' + p.company + ')' : '') + ' - ' +
+          ((stageById[p.stage] && stageById[p.stage].label) || p.stage));
+      });
+    } else {
+      lines.push('  None yet.');
+    }
+
+    lines.push('');
+    lines.push('Exported from Command Center CSM pipeline (/csm), local copy only, nothing sent anywhere.');
+    return lines.join('\n');
+  }
+
+  snapshotBtn.addEventListener('click', () => {
+    const original = snapshotBtn.textContent;
+    copyText(buildSnapshotText(allStages, allProspects))
+      .then(() => { snapshotBtn.textContent = 'Snapshot copied'; })
+      .catch(() => { snapshotBtn.textContent = "Couldn't copy"; })
+      .finally(() => { setTimeout(() => { snapshotBtn.textContent = original; }, 1800); });
+  });
+
   // Full-fidelity backup: unlike the CSV export above, which flattens each
   // prospect to one row and drops stageHistory entirely, this keeps
   // prospects.json and stages.json exactly as loaded (including their
@@ -2668,6 +2747,8 @@
     rawProspectsData = prospectsData;
     backupBtn.disabled = !stagesData && !prospectsData;
     backupBtn.title = backupBtn.disabled ? "Can't back up, pipeline data failed to load (see below)" : '';
+    snapshotBtn.disabled = !stagesData && !prospectsData;
+    snapshotBtn.title = snapshotBtn.disabled ? "Can't build a snapshot, pipeline data failed to load (see below)" : '';
 
     renderDataFreshness([stagesResult, prospectsResult]
       .filter(r => r.status === 'fulfilled')
