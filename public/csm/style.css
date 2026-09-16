@@ -725,6 +725,20 @@ header.page-head .sub {
 .card-stale { border-color: rgba(229,72,77,0.35); }
 .card-stale:hover, .card-stale:focus-visible { border-color: rgba(229,72,77,0.6); }
 
+.card-next-action {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--hairline);
+  color: var(--sub);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  text-align: left;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .card[draggable="true"] { cursor: grab; }
 .card.card-dragging { opacity: 0.45; cursor: grabbing; }
 .column.column-dragover {
@@ -1147,6 +1161,7 @@ footer.page-foot {
 
   .column-empty { border-color: #ccc; color: #555; }
   .card-stale { border-color: #ccc; }
+  .card-next-action { color: #444; border-color: #ccc; -webkit-line-clamp: unset; }
   .column.column-dragover { outline: none; background: none; }
 
   .nudge-queue { background: none; border-color: #ccc; }

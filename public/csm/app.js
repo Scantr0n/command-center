@@ -1147,10 +1147,18 @@
     const touchBadge = lastTouchDays != null
       ? '<span class="badge badge-touch">' + lastTouchDays + 'D SINCE LAST TOUCH</span>'
       : '';
+    // Surfaced directly on the card face, not just in the modal/nudge queue:
+    // a due nudge date with no visible concrete next step is exactly the
+    // silent-stall pattern validate.js and the nudge queue already warn
+    // about, so at-a-glance board triage should show it without a click.
+    const nextActionLine = p.nextAction
+      ? '<div class="card-next-action">' + escapeHtml(p.nextAction) + '</div>'
+      : '';
     return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" draggable="true" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
       '<div class="card-meta">' + nudgeCardBadge(p, nudgeUrgencyById) + categoryBadge + channelBadge(p.contactChannel) + stallBadge + touchBadge + '</div>' +
+      nextActionLine +
       '</button>';
   }
 
