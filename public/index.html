@@ -174,6 +174,44 @@
       pointer-events: none;
     }
   }
+
+  /* Printed status report: same "flip the shared --ink/--sub/--panel/--hairline
+     custom properties to a light print theme" trick as the rest of this file
+     relies on for dark-mode styling, which is enough to re-color almost every
+     inline style="color: var(--ink)"-type rule in the page for free. Only the
+     per-category/per-status hex colors computed at render time (tag-chip,
+     status-dot, activity-feed dots) sit outside that variable system and need
+     their own override below. The graph has no meaningful printed form (a
+     circular node layout means nothing on paper), so printing always forces
+     the grid + needs-attention list + activity feed regardless of whichever
+     view is on screen, same "ignore the current view, print the list" rule
+     CSM/Garage/CGT/Sondrik already use. */
+  @media print {
+    :root {
+      --void: #ffffff; --panel: #ffffff; --panelLight: #ffffff;
+      --hairline: #cccccc; --hairlineHover: #999999;
+      --ink: #111111; --sub: #444444; --faint: #666666;
+    }
+    body { background: #fff; }
+    .max-w-7xl { max-width: none; padding: 0.3in 0.4in; }
+
+    #searchWrap, #paletteBtn, #printBtn, #viewToggleGroup, #errorBanner,
+    #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
+    #noResultsMsg, #graphView, #gridToolbar, #modalOverlay, #paletteOverlay {
+      display: none !important;
+    }
+
+    #clusterGrid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; }
+    .cluster-card { break-inside: avoid; box-shadow: none !important; transform: none !important; }
+
+    #attnCards { display: flex !important; }
+    .attn-card { break-inside: avoid; }
+
+    .tag-chip { background: none !important; color: #111 !important; border: 1px solid #999 !important; }
+    .status-dot, .activity-row > span.rounded-full { display: none !important; }
+    #statsRow, #statsRow * { color: #111 !important; }
+    .cluster-card span[style*="3DDC84"] { color: #111 !important; }
+  }
 </style>
 </head>
 <body class="min-h-screen font-sans" style="color: var(--ink)">
@@ -184,7 +222,7 @@
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
       <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
-        <div class="relative">
+        <div id="searchWrap" class="relative">
           <input id="searchInput" type="text" placeholder="Search projects..." aria-label="Search projects"
             class="search-input text-xs font-mono rounded-lg pl-3 pr-6 py-1.5 border hairline focus:outline-none w-[175px] sm:w-[190px]"
             style="background: var(--panelLight); color: var(--ink)">
@@ -202,10 +240,13 @@
           <kbd class="kbd-chip text-[10px]" style="color: var(--sub)" aria-hidden="true">&#8984;K</kbd>
         </button>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
-        <div class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
+        <div id="viewToggleGroup" class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5" aria-pressed="true">Graph</button>
           <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5" aria-pressed="false">Grid</button>
         </div>
+        <button id="printBtn" type="button" aria-label="Print a project status report"
+          class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
+          style="color: var(--sub); background: var(--panelLight)">Print</button>
       </div>
     </header>
 
@@ -216,7 +257,7 @@
     <div id="attnCompact" class="hidden flex-wrap items-center gap-2 mb-4"></div>
     <div id="attnCards" class="hidden flex-col gap-2 mb-6"></div>
 
-    <div class="flex items-center gap-4 text-[10px] font-mono mb-2 flex-wrap" style="color: var(--faint)">
+    <div id="statusLegend" class="flex items-center gap-4 text-[10px] font-mono mb-2 flex-wrap" style="color: var(--faint)">
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#3DDC84"></span>Active</span>
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#4A9EDB"></span>Done</span>
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#E0A030"></span>Stalled</span>
@@ -948,6 +989,14 @@ function setView(view, persist = true) {
 }
 document.getElementById('viewGraphBtn').addEventListener('click', () => setView('graph'));
 document.getElementById('viewGridBtn').addEventListener('click', () => setView('grid'));
+
+// Prints a project status report regardless of which view (Graph or Grid) is
+// currently active: the graph's circular node layout has no meaningful
+// printed form, so the print stylesheet below always renders the grid's
+// cards plus the needs-attention list and activity feed instead, same
+// "force the printable layout, ignore the current on-screen view" pattern
+// as CSM/Garage/CGT/Sondrik's own print buttons.
+document.getElementById('printBtn').addEventListener('click', () => window.print());
 
 // Remember Graph vs Grid across reloads, same as a browser remembering a
 // list/gallery toggle, so switching to Grid does not silently reset itself
