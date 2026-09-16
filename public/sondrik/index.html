@@ -102,7 +102,7 @@
   </details>
 
   <details class="schema-help" id="quickLogTool">
-    <summary>Quick log a download check, lead, release, or goal (generates JSON to paste, saves nothing)</summary>
+    <summary>Quick log a download check, channel, lead, release, or goal (generates JSON to paste, saves nothing)</summary>
     <div class="schema-help-body">
       <p>Fills in the same fields as the table above, then builds the exact JSON object to paste into the right
         file yourself. This never writes a file or sends anything, it only puts text on your clipboard.</p>
@@ -120,6 +120,32 @@
           <div class="quick-log-warnings" id="qcWarnings" role="alert"></div>
           <textarea class="quick-log-output" id="qcOutput" readonly rows="6" hidden aria-label="Generated download check JSON, ready to paste into metric.checks"></textarea>
           <button type="button" class="print-btn quick-log-copy" id="qcCopyBtn" hidden>Copy JSON</button>
+        </form>
+
+        <form class="quick-log-form" id="quickChannelForm">
+          <h3 class="quick-log-title font-mono">Channel &rarr; channels.json</h3>
+          <label class="quick-log-label" for="qchId">Id (short, unique, kebab-case)</label>
+          <input class="quick-log-input" type="text" id="qchId" placeholder="e.g. hacker-news" required>
+          <label class="quick-log-label" for="qchName">Name</label>
+          <input class="quick-log-input" type="text" id="qchName" placeholder="e.g. Hacker News" required>
+          <label class="quick-log-label" for="qchLinkedMetric">Linked metric</label>
+          <select class="quick-log-input" id="qchLinkedMetric">
+            <option value="">None yet</option>
+            <option value="downloads">downloads</option>
+            <option value="leads">leads</option>
+          </select>
+          <label class="quick-log-label" for="qchStatus">Status</label>
+          <select class="quick-log-input" id="qchStatus">
+            <option value="tracked">tracked</option>
+            <option value="manual-log">manual-log</option>
+            <option value="not-tracked">not-tracked</option>
+          </select>
+          <label class="quick-log-label" for="qchNote">Note (optional)</label>
+          <input class="quick-log-input" type="text" id="qchNote" placeholder="e.g. why this isn't tracked yet">
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="qchWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="qchOutput" readonly rows="7" hidden aria-label="Generated channel JSON, ready to paste into channels"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="qchCopyBtn" hidden>Copy JSON</button>
         </form>
 
         <form class="quick-log-form" id="quickLeadForm">

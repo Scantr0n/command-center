@@ -1319,6 +1319,68 @@
       }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
     });
 
+    // The one record type on this page that previously had no quick-log
+    // form, unlike releases/goals/downloads/leads, meaning adding a channel
+    // was the only edit still requiring a hand-typed JSON blob. Warnings
+    // mirror validate.js's own channel checks (duplicate id, a "tracked"
+    // channel with no linkedMetric, a "not-tracked" channel with no note)
+    // so the same gaps surface here instead of only on the next
+    // `node validate.js` run.
+    const qchForm = document.getElementById('quickChannelForm');
+    const qchId = document.getElementById('qchId');
+    const qchName = document.getElementById('qchName');
+    const qchLinkedMetric = document.getElementById('qchLinkedMetric');
+    const qchStatus = document.getElementById('qchStatus');
+    const qchNote = document.getElementById('qchNote');
+    const qchWarnings = document.getElementById('qchWarnings');
+    const qchOutput = document.getElementById('qchOutput');
+    const qchCopyBtn = document.getElementById('qchCopyBtn');
+
+    qchForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const id = qchId.value.trim();
+      const name = qchName.value.trim();
+      const linkedMetric = qchLinkedMetric.value || null;
+      const status = qchStatus.value;
+      const note = qchNote.value.trim();
+      const blockers = [];
+      const advisory = [];
+
+      if (!id) blockers.push('An id is required.');
+      const existingIds = new Set(((channelsData && channelsData.channels) || []).map(c => c.id));
+      if (id && existingIds.has(id)) blockers.push('"' + id + '" is already used by another channel, ids must be unique.');
+      if (!name) blockers.push('A name is required.');
+
+      if (status === 'tracked' && !linkedMetric) {
+        advisory.push('Status is "tracked" but no linked metric is set, nothing real will display for it.');
+      }
+      if (status === 'not-tracked' && !note) {
+        advisory.push('Status is "not-tracked" with no note, add one explaining why so this reads as an honest gap, not an unexplained one.');
+      }
+
+      if (blockers.length) {
+        qchWarnings.textContent = blockers.join(' ');
+        qchOutput.hidden = true;
+        qchCopyBtn.hidden = true;
+        return;
+      }
+      qchWarnings.textContent = advisory.join(' ');
+
+      const obj = { id, name, linkedMetric, status, note: note || null };
+      qchOutput.value = JSON.stringify(obj, null, 2) + ',';
+      qchOutput.hidden = false;
+      qchCopyBtn.hidden = false;
+    });
+
+    qchCopyBtn.addEventListener('click', () => {
+      copyText(qchOutput.value).then(() => {
+        const original = qchCopyBtn.textContent;
+        qchCopyBtn.textContent = 'Copied!';
+        quickLogLive.textContent = 'Channel JSON copied to clipboard.';
+        setTimeout(() => { qchCopyBtn.textContent = original; }, 1800);
+      }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
+    });
+
     const qlForm = document.getElementById('quickLeadForm');
     const qlId = document.getElementById('qlId');
     const qlChannel = document.getElementById('qlChannel');
