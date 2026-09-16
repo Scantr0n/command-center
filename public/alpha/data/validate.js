@@ -69,7 +69,7 @@ function main() {
   const anyLiveValueSet =
     live.regime != null ||
     (live.killSwitch && live.killSwitch.engaged != null) ||
-    (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null || live.positionSizing.maxDrawdownPct != null)) ||
+    (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null || live.positionSizing.maxDrawdownPct != null || live.positionSizing.robustnessScore != null)) ||
     (live.genealogy && (live.genealogy.generation != null || live.genealogy.activeLineages != null || live.genealogy.lastBreedingEventAt != null ||
       (Array.isArray(live.genealogy.lineages) && live.genealogy.lineages.length > 0)));
 
@@ -142,6 +142,18 @@ function main() {
   if (drawdownPct != null && maxDrawdownPct != null && drawdownPct > maxDrawdownPct) {
     errors.push('live.positionSizing: currentDrawdownPct (' + drawdownPct + ') exceeds maxDrawdownPct (' + maxDrawdownPct +
       '), max is defined as the deepest drawdown observed so it can never be smaller than the current reading');
+  }
+
+  // Robustness-based sizing is named as its own real architecture feature
+  // (system.features, id "robustness-sizing") alongside drawdown-based
+  // sizing, but until now nothing in the live schema actually represented
+  // it, only the drawdown axis. Same 0-100 range and honest-null rule as
+  // the drawdown fields above.
+  const robustnessScore = live.positionSizing && live.positionSizing.robustnessScore;
+  if (robustnessScore != null && !(typeof robustnessScore === 'number' && Number.isFinite(robustnessScore) && robustnessScore >= 0 && robustnessScore <= 100)) {
+    errors.push('live.positionSizing.robustnessScore: must be null or a finite number from 0 to 100 ' +
+      '(it drives a percentage meter on the page, same as currentDrawdownPct/maxDrawdownPct): ' +
+      JSON.stringify(robustnessScore));
   }
 
   if (data.connection && data.connection.connected === true && !data.connection.checkedAt) {

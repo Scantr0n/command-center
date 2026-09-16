@@ -616,14 +616,14 @@ function renderStats(data) {
 // meter treatment as current drawdown, same honest empty state, and its own
 // schema field (positionSizing.maxDrawdownPct) rather than derived here,
 // since only a real feed from Alpha knows the true historical peak.
-function drawdownMeter(label, pct) {
+function rangeMeter(label, pct, ariaSuffix) {
   const validPct = typeof pct === 'number' && Number.isFinite(pct) && pct >= 0 && pct <= 100;
   if (!validPct) {
     return `
       <div class="ps-meter">
         <div class="ps-field-label font-mono">${escapeHtml(label)}</div>
         <div class="meter-track meter-track-empty" role="meter" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
-          aria-valuetext="awaiting connection" aria-label="${escapeHtml(label)}, percent of range used"></div>
+          aria-valuetext="awaiting connection" aria-label="${escapeHtml(label)}, ${escapeHtml(ariaSuffix)}"></div>
         <div class="meter-value awaiting font-mono">awaiting connection</div>
       </div>
     `;
@@ -632,12 +632,27 @@ function drawdownMeter(label, pct) {
     <div class="ps-meter">
       <div class="ps-field-label font-mono">${escapeHtml(label)}</div>
       <div class="meter-track" role="meter" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
-        aria-label="${escapeHtml(label)}, percent of range used">
+        aria-label="${escapeHtml(label)}, ${escapeHtml(ariaSuffix)}">
         <div class="meter-fill" style="width:${pct}%"></div>
       </div>
       <div class="meter-value font-mono">${escapeHtml(String(pct))}%</div>
     </div>
   `;
+}
+
+function drawdownMeter(label, pct) {
+  return rangeMeter(label, pct, 'percent of range used');
+}
+
+// Robustness-based sizing is named as its own real architecture feature
+// (system.features, id "robustness-sizing"), alongside drawdown-based
+// sizing, but until now nothing under Position sizing actually represented
+// it, only the two drawdown meters below. Same 0-100 meter treatment and
+// honest empty state as those, its own schema field
+// (positionSizing.robustnessScore) rather than derived, since only a real
+// feed from Alpha knows the true reading.
+function robustnessMeter(pct) {
+  return rangeMeter('ROBUSTNESS SCORE', pct, 'score out of 100');
 }
 
 function renderPositionSizing(data) {
@@ -655,7 +670,8 @@ function renderPositionSizing(data) {
 
   panel.innerHTML = modeHtml +
     drawdownMeter('CURRENT DRAWDOWN', ps.currentDrawdownPct) +
-    drawdownMeter('MAX DRAWDOWN (PEAK TO TROUGH)', ps.maxDrawdownPct);
+    drawdownMeter('MAX DRAWDOWN (PEAK TO TROUGH)', ps.maxDrawdownPct) +
+    robustnessMeter(ps.robustnessScore);
 }
 
 function fmtDollar(n) {
@@ -1357,6 +1373,7 @@ function buildStatusSummary(data) {
     '- Position sizing mode: ' + (ps.activeMode || awaiting),
     '- Current drawdown: ' + (typeof ps.currentDrawdownPct === 'number' ? ps.currentDrawdownPct + '%' : awaiting),
     '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),
+    '- Robustness score: ' + (typeof ps.robustnessScore === 'number' ? ps.robustnessScore + '/100' : awaiting),
     '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active) ? 'Active' : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
   ];
   return lines.join('\n');

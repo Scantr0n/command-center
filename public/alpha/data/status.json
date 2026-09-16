@@ -30,7 +30,8 @@
     "positionSizing": {
       "activeMode": null,
       "currentDrawdownPct": null,
-      "maxDrawdownPct": null
+      "maxDrawdownPct": null,
+      "robustnessScore": null
     },
     "debatePanel": {
       "active": false,
