@@ -74,6 +74,25 @@ function irsMileageRateForDate(dateStr) {
   return hit ? hit.rate : null;
 }
 
+// A mileage expense with real miles and a real date but no computed amount
+// has two very different causes that otherwise render identically as "not
+// logged": a genuine backfill gap (no miles/date logged yet), or this table
+// itself being out of date (dated after MILEAGE_RATES_2026's last known
+// range, e.g. once 2027 starts and the IRS hasn't published or this table
+// hasn't been updated with next year's rate yet). Only the second one is
+// "the app's own fault, not a logging mistake", so it gets a distinct,
+// specific message instead of leaving the two indistinguishable.
+function mileageRateGapReason(e) {
+  if (e.amount != null || e.category !== 'mileage' || e.miles == null || !e.date) return null;
+  if (irsMileageRateForDate(e.date) != null) return null;
+  const lastKnown = MILEAGE_RATES_2026[MILEAGE_RATES_2026.length - 1].to;
+  if (e.date > lastKnown) {
+    return `No IRS rate known past ${lastKnown}, this tool's rate table only has 2026 rates in it. Log a real ` +
+      `manual amount, or add the newly published rate to MILEAGE_RATES_2026 once the IRS announces it.`;
+  }
+  return `No IRS rate known for ${e.date}, this tool's rate table only has 2026 rates in it. Log a real manual amount instead.`;
+}
+
 // A logged "amount" always wins (it's a real number someone entered), a
 // mileage entry with no amount falls back to computing one from real miles
 // at the real rate for its real date, everything else with no amount stays
@@ -1721,12 +1740,19 @@ function renderExpenses(expenses) {
     const amount = computeExpenseAmount(e);
     const isComputedMileage = e.amount == null && e.category === 'mileage' && amount != null;
     const rate = isComputedMileage ? irsMileageRateForDate(e.date) : null;
+    const gapReason = amount == null ? mileageRateGapReason(e) : null;
+    const amountTitle = isComputedMileage
+      ? `Computed at the real IRS rate of ${(rate * 100).toFixed(1)}&cent;/mile for this date`
+      : (gapReason ? escapeHtml(gapReason) : '');
+    const amountText = amount != null
+      ? formatUsd(amount) + (isComputedMileage ? ' <span class="cell-muted">(mileage)</span>' : '')
+      : (gapReason ? 'no rate for this date' : 'not logged');
     return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(e.description || 'Untitled expense')}</div></td>
       <td>${e.category ? `<span class="badge">${escapeHtml(EXPENSE_CATEGORY_LABELS[e.category] || e.category)}</span>` : ''}</td>
       <td class="cell-value${e.miles == null ? ' empty' : ''}">${e.miles != null ? e.miles : ''}</td>
-      <td class="cell-value${amount == null ? ' empty' : ''}" title="${isComputedMileage ? `Computed at the real IRS rate of ${(rate * 100).toFixed(1)}&cent;/mile for this date` : ''}">${amount != null ? formatUsd(amount) + (isComputedMileage ? ' <span class="cell-muted">(mileage)</span>' : '') : 'not logged'}</td>
+      <td class="cell-value${amount == null ? ' empty' : ''}" title="${amountTitle}">${amountText}</td>
       <td class="cell-muted">${e.date ? escapeHtml(e.date) : '<span class="cell-value empty">not logged</span>'}</td>
     </tr>
   `;
@@ -1734,6 +1760,7 @@ function renderExpenses(expenses) {
 
   const computed = expenses.map(e => ({ e, amount: computeExpenseAmount(e) }));
   const uncounted = computed.filter(c => c.amount == null).length;
+  const rateTableGaps = computed.filter(c => c.amount == null && mileageRateGapReason(c.e)).length;
   const byCategory = {};
   computed.forEach(({ e, amount }) => {
     if (amount == null) return;
@@ -1748,7 +1775,7 @@ function renderExpenses(expenses) {
   totalsEl.innerHTML = `
     <p class="pace-result-note">
       <span class="pace-result-figure">${formatUsd(total)}</span> total real expenses logged${categoryParts ? ' (' + escapeHtml(categoryParts) + ')' : ''}.
-      ${uncounted ? `${uncounted} expense(s) not counted yet, missing a real amount or a usable mileage rate.` : ''}
+      ${uncounted ? `${uncounted} expense(s) not counted yet, missing a real amount or a usable mileage rate${rateTableGaps ? ` (${rateTableGaps} of them because this tool's mileage rate table itself needs a newer year added, not a logging gap)` : ''}.` : ''}
     </p>`;
 }
 
