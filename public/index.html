@@ -119,6 +119,11 @@
   }
   #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
   .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed { opacity: 0.16; }
+  /* A dimmed node's own spoke line back to the hub was previously left out of
+     this rule entirely (it's a sibling <line>, not a child of .graph-node),
+     so filtering to one category still left every other category's spokes
+     lit at full brightness, defeating the point of filtering the graph down. */
+  .spoke-line.dimmed { opacity: 0.16; }
   .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
   .cat-label { cursor: pointer; }
   .corner-notch { position: relative; }
@@ -719,7 +724,7 @@ function renderGraph() {
     const hx = cx + hubR * ((nx - cx) / Math.hypot(nx - cx, ny - cy) || 0);
     const hy = cy + hubR * ((ny - cy) / Math.hypot(nx - cx, ny - cy) || 0);
     const color = categoryColor(c.category);
-    spokesHtml += `<line class="spoke-line" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
+    spokesHtml += `<line class="spoke-line" data-id="${escapeHtml(c.id)}" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
 
     // Real cross-project relationships only (e.g. Lifting Tracker relays into
     // Macro Tracker), not decorative, only drawn when a cluster's own data
@@ -844,6 +849,18 @@ function applyFilters() {
   // classes below, so the announced count reflects distinct projects, not
   // triple the real total.
   const countedIds = new Set();
+  // Purely decorative, so kept out of the interactive-elements loop below:
+  // it only ever needs the dimmed class, never aria-hidden/tabindex, which
+  // would otherwise make every one of these lines its own (nameless, useless)
+  // stop in the tab order.
+  document.querySelectorAll('.spoke-line').forEach(el => {
+    const c = clusters.find(x => x.id === el.dataset.id);
+    if (!c) return;
+    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
+    const matchesCategory = !activeCategory || c.category === activeCategory;
+    el.classList.toggle('dimmed', anyFilterActive && !(matchesSearch && matchesCategory));
+  });
+
   document.querySelectorAll('.graph-node, .cluster-card, .activity-row').forEach(el => {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
