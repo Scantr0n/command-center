@@ -990,7 +990,16 @@ const CALC_FEE_DESCRIPTIONS = {
   poshmark: 'Flat $2.95 under $15, otherwise 20% commission',
   depop: '3.3% + $0.45 payment processing, no commission'
 };
+// Real, optional Depop add-on fee, separate from estimateNetPayout() above:
+// a seller opts a specific listing into Boosted Listings (eligible new
+// listings only, live since 2026-03-23) and only pays 12% if it then sells
+// through that boost. It's not part of Depop's baseline fee, so it stays out
+// of the payout table (which reflects already-published, un-boosted
+// listings) and only applies here, where a seller is deciding whether
+// boosting a new item is worth it.
+const DEPOP_BOOST_FEE_PCT = 0.12;
 let calcPlatforms = new Set(PAYOUT_PLATFORMS);
+let includeDepopBoost = false;
 
 // Reads a positive-or-zero numeric input, treating blank as "not provided"
 // (null) rather than 0, since a real $0 cost and "haven't entered one yet"
@@ -1033,6 +1042,7 @@ function renderCalc() {
   const hasCost = cost != null && cost !== undefined;
   const hasShipping = shipping != null && shipping !== undefined;
   const showProfit = hasCost || hasShipping;
+  document.getElementById('calcDepopBoostWrap').hidden = !calcPlatforms.has('depop');
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;
@@ -1046,19 +1056,27 @@ function renderCalc() {
   empty.hidden = true;
   profitHead.hidden = !showProfit;
 
-  const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => ({
-    p, net: estimateNetPayout(p, price)
-  }));
+  const applyBoost = includeDepopBoost && calcPlatforms.has('depop');
+
+  const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => {
+    const net = p === 'depop' && applyBoost
+      ? estimateNetPayout(p, price) - price * DEPOP_BOOST_FEE_PCT
+      : estimateNetPayout(p, price);
+    return { p, net };
+  });
   const bestNet = rows.length > 1 ? Math.max(...rows.map(r => r.net)) : null;
   const tiedForBest = bestNet != null && rows.filter(r => r.net === bestNet).length > 1;
 
   tbody.innerHTML = rows.map(r => {
     const isBest = bestNet != null && !tiedForBest && r.net === bestNet;
     const profit = showProfit ? r.net - (hasCost ? cost : 0) - (hasShipping ? shipping : 0) : null;
+    const feeDescription = r.p === 'depop' && applyBoost
+      ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
+      : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
       <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
-      <td class="cell-muted">${escapeHtml(CALC_FEE_DESCRIPTIONS[r.p])}</td>
+      <td class="cell-muted">${escapeHtml(feeDescription)}</td>
       <td class="cell-value${isBest ? ' cell-value-best' : ''}">${formatUsd(r.net)}${isBest ? ' <span class="best-tag" title="Highest net payout at this price">best</span>' : ''}</td>
       ${showProfit ? `<td class="cell-value${profit < 0 ? ' cell-value-loss' : ''}">${formatUsd(profit)}</td>` : ''}
     </tr>
@@ -1070,6 +1088,10 @@ function wireCalc() {
   document.getElementById('calcPriceInput').addEventListener('input', renderCalc);
   document.getElementById('calcCostInput').addEventListener('input', renderCalc);
   document.getElementById('calcShippingInput').addEventListener('input', renderCalc);
+  document.getElementById('calcDepopBoostInput').addEventListener('change', e => {
+    includeDepopBoost = e.target.checked;
+    renderCalc();
+  });
   const container = document.getElementById('calcPlatformToggle');
   container.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {

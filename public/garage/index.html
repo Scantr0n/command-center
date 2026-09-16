@@ -466,7 +466,7 @@
             <tr><th>eBay</th><td>13.6% final value fee (standard rate, most categories) + $0.30 per-order fee, $0.40 on orders over $10</td></tr>
             <tr><th>Vinted</th><td>No seller fees, buyer pays a separate buyer protection fee</td></tr>
             <tr><th>Poshmark</th><td>Flat $2.95 on sales under $15, otherwise 20% commission</td></tr>
-            <tr><th>Depop</th><td>3.3% + $0.45 Depop Payments processing fee, no seller commission (US/UK)</td></tr>
+            <tr><th>Depop</th><td>3.3% + $0.45 Depop Payments processing fee, no seller commission (US/UK). An optional 12% Boosted Listings fee applies only if you choose to boost that specific listing and it sells through the boost (eligible new listings, since Mar 23, 2026), not included in this table, see the calculator below to model it.</td></tr>
           </tbody>
         </table>
       </div>
@@ -552,6 +552,10 @@
         <button type="button" class="chip" data-platform="depop" aria-pressed="true">Depop</button>
       </div>
     </div>
+    <label class="quick-log-checkbox calc-boost-toggle" id="calcDepopBoostWrap" hidden>
+      <input type="checkbox" id="calcDepopBoostInput">
+      Include Depop's optional 12% Boosted Listings fee (opt-in per item, eligible new listings since Mar 2026)
+    </label>
     <div class="table-wrap" aria-live="polite" aria-atomic="true">
       <table class="card-table" id="calcTable">
         <thead>
