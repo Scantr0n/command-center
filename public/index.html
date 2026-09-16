@@ -118,7 +118,7 @@
     background: rgba(255,255,255,0.03);
   }
   #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .graph-node.dimmed, .cluster-card.dimmed { opacity: 0.16; }
+  .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed { opacity: 0.16; }
   .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
   .cat-label { cursor: pointer; }
   .corner-notch { position: relative; }
@@ -809,11 +809,12 @@ function applyFilters() {
   const term = searchTerm.trim().toLowerCase();
   const anyFilterActive = !!term || !!activeCategory;
   let matchCount = 0;
-  // Only count against one element type (graph-node) even though both graph
-  // and grid nodes get the dimmed/matched classes below, so the announced
-  // count reflects distinct projects, not double the real total.
+  // Only count distinct projects even though graph nodes, grid cards, and
+  // now activity-feed rows for the same project all get the dimmed/matched
+  // classes below, so the announced count reflects distinct projects, not
+  // triple the real total.
   const countedIds = new Set();
-  document.querySelectorAll('.graph-node, .cluster-card').forEach(el => {
+  document.querySelectorAll('.graph-node, .cluster-card, .activity-row').forEach(el => {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
     if (!c) return;
