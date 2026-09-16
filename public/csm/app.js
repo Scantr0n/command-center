@@ -2749,6 +2749,15 @@
     backupBtn.title = backupBtn.disabled ? "Can't back up, pipeline data failed to load (see below)" : '';
     snapshotBtn.disabled = !stagesData && !prospectsData;
     snapshotBtn.title = snapshotBtn.disabled ? "Can't build a snapshot, pipeline data failed to load (see below)" : '';
+    // Both read from data that is empty until this load settles (lastFiltered
+    // for csvBtn, the rendered board itself for printBtn), so a click before
+    // this point would silently export/print a blank pipeline instead of
+    // erroring, same failure shape the backupBtn/snapshotBtn disabled state
+    // above already guards against.
+    csvBtn.disabled = !stagesData && !prospectsData;
+    csvBtn.title = csvBtn.disabled ? "Can't export, pipeline data failed to load (see below)" : '';
+    printBtn.disabled = !stagesData && !prospectsData;
+    printBtn.title = printBtn.disabled ? "Can't print, pipeline data failed to load (see below)" : '';
 
     renderDataFreshness([stagesResult, prospectsResult]
       .filter(r => r.status === 'fulfilled')
