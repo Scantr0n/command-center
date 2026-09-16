@@ -437,6 +437,62 @@ header.page-head .sub {
   margin-top: 6px;
 }
 
+/* Recent incidents: a readable list built from the same connection.history
+   entries as the tick strip above, grouped into start/end/duration windows
+   (see computeIncidents in app.js). The tick strip answers "what's the
+   shape of recent checks", this answers "when was it actually down and for
+   how long", the two questions real status-page uptime sections both
+   answer side by side. */
+.incident-list-wrap {
+  margin-bottom: 28px;
+}
+.incident-list-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.incident-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.incident-item {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+}
+.incident-duration {
+  color: var(--sub);
+  flex-shrink: 0;
+}
+/* Still down as of the most recent recorded check: the one incident state
+   worth calling out in the same red the rest of the page reserves for a
+   real, current problem (see .conn-dot.error / .headline-status.critical),
+   distinct from a resolved incident's neutral gray. */
+.incident-ongoing .incident-duration {
+  color: #E8A0A0;
+  font-weight: 600;
+}
+.incident-range {
+  color: var(--dim);
+}
+.incident-empty {
+  font-size: 0.72rem;
+  color: var(--dim);
+  font-style: italic;
+  list-style: none;
+}
+
 /* Stat tiles */
 .stat-row {
   display: grid;

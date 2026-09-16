@@ -402,6 +402,73 @@ function renderConnectionHistory(data, clientHistory) {
     : `Single check, at ${formatAbsolute(oldest)}`;
 }
 
+// Statuspage-style "past incidents" list: the tick strip above shows the
+// shape of recent checks but not a readable answer to "when was it actually
+// down, and for how long", which real status-page UX research consistently
+// flags as what builds trust in a status page over time (alongside the
+// uptime percentage the strip already computes). Built by walking the same
+// real connection.history entries the strip already renders and grouping
+// consecutive "not connected" runs into incidents; nothing here is a
+// separate or estimated reading. history is assumed oldest-first, same
+// assumption mostRecentConnectedAt/currentStateStartedAt already make.
+function computeIncidents(history) {
+  if (!Array.isArray(history) || !history.length) return [];
+  const incidents = [];
+  let open = null;
+  for (const entry of history) {
+    if (!entry) continue;
+    if (!entry.connected) {
+      if (!open) open = { start: entry.at, end: null, ongoing: true };
+    } else if (open) {
+      open.end = entry.at;
+      open.ongoing = false;
+      incidents.push(open);
+      open = null;
+    }
+  }
+  // A run still open when the loop ends means the most recent check in this
+  // history was still "not connected", i.e. a real outage still in progress
+  // as of the last recorded check, not one this page is guessing has ended.
+  if (open) incidents.push(open);
+  return incidents;
+}
+
+const INCIDENT_LIST_LIMIT = 8;
+
+function incidentItem(incident) {
+  const startAbs = formatAbsolute(incident.start);
+  const endMs = incident.ongoing ? Date.now() : new Date(incident.end).getTime();
+  const durationText = formatDuration(endMs - new Date(incident.start).getTime()) || 'under 1m';
+  const rangeText = incident.ongoing
+    ? 'Started ' + startAbs + ', still down'
+    : startAbs + ' to ' + formatAbsolute(incident.end);
+  return `
+    <li class="incident-item${incident.ongoing ? ' incident-ongoing' : ''}">
+      <span class="incident-duration font-mono">${incident.ongoing ? 'Ongoing' : 'Down for ' + escapeHtml(durationText)}</span>
+      <span class="incident-range">${escapeHtml(rangeText)}</span>
+    </li>
+  `;
+}
+
+function renderIncidents(data, clientHistory) {
+  const list = document.getElementById('incidentList');
+  if (!list) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  if (!history.length) {
+    list.innerHTML = `<li class="incident-empty font-mono">No connectivity checks recorded yet.</li>`;
+    return;
+  }
+  const incidents = computeIncidents(history);
+  if (!incidents.length) {
+    list.innerHTML = `<li class="incident-empty font-mono">No downtime recorded in the covered history.</li>`;
+    return;
+  }
+  // Newest first, same convention as the activity log below it, capped to a
+  // glance-sized list rather than every incident this browser has ever seen.
+  const recent = [...incidents].reverse().slice(0, INCIDENT_LIST_LIMIT);
+  list.innerHTML = recent.map(incidentItem).join('');
+}
+
 function statTile(value, label, sub, awaiting) {
   return `
     <div class="stat-tile">
@@ -1005,6 +1072,7 @@ async function loadStatus() {
     updateLastKnownTags(lastKnown);
     const connCls = renderConnection(data, clientConnHistory);
     renderConnectionHistory(data, clientConnHistory);
+    renderIncidents(data, clientConnHistory);
     // Kill switch engaged outranks plain connection freshness for the one
     // glance a background tab gives Jack, same priority it gets everywhere
     // else on this page.
