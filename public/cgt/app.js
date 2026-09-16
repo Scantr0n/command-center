@@ -1012,15 +1012,25 @@ function renderSubmissions() {
       s.cardCount != null ? s.cardCount + ' card' + (s.cardCount === 1 ? '' : 's') : null,
       s.cost != null ? formatUsd(s.cost) + ' fee' : null
     ].filter(Boolean);
+    // The tracking link below used to sit *inside* this same tabindex/
+    // role="button" row, an interactive <a> nested inside another
+    // interactive element, invalid ARIA (axe's nested-interactive check
+    // flags it: screen readers can fail to announce or reach a control
+    // nested this way). Split into two flex children of a plain, non-
+    // interactive outer div instead: .submission-row-main keeps the exact
+    // same flex/wrap/gap layout for the row's own click/keydown handling,
+    // and the link is a sibling next to it, not a descendant.
     return `
-      <div class="submission-row candidate-row" tabindex="0" role="button" data-id="${escapeHtml(s.id)}">
-        <span class="submission-days font-mono${runningLong ? ' submission-days-late' : ''}">${escapeHtml(daysText)}</span>
-        <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
-        <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
-        <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
-        ${runningLong ? `<span class="badge badge-late" title="${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} is ${graderStats.value} days">past ${escapeHtml(s.gradingCompany)} avg (${graderStats.value}d)</span>` : ''}
-        ${estReturnDate ? `<span class="submission-meta font-mono" title="Based on ${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee from the grader">est. back ~${escapeHtml(estReturnDate)}</span>` : ''}
-        ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono" onclick="event.stopPropagation()">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
+      <div class="submission-row">
+        <div class="candidate-row submission-row-main" tabindex="0" role="button" data-id="${escapeHtml(s.id)}">
+          <span class="submission-days font-mono${runningLong ? ' submission-days-late' : ''}">${escapeHtml(daysText)}</span>
+          <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
+          <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
+          <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
+          ${runningLong ? `<span class="badge badge-late" title="${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} is ${graderStats.value} days">past ${escapeHtml(s.gradingCompany)} avg (${graderStats.value}d)</span>` : ''}
+          ${estReturnDate ? `<span class="submission-meta font-mono" title="Based on ${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee from the grader">est. back ~${escapeHtml(estReturnDate)}</span>` : ''}
+        </div>
+        ${lookup ? `<a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="submission-link font-mono">${escapeHtml(lookup.text)} &rarr;</a>` : ''}
       </div>
     `;
   }).join('');
@@ -1028,7 +1038,7 @@ function renderSubmissions() {
   el.innerHTML = rows + (returnedCount
     ? `<div class="submissions-returned-note">+ ${returnedCount} past submission${returnedCount === 1 ? '' : 's'} logged as returned</div>`
     : '');
-  el.querySelectorAll('.submission-row[data-id]').forEach(row => {
+  el.querySelectorAll('.submission-row-main[data-id]').forEach(row => {
     row.addEventListener('click', () => openSubmissionModal(row.dataset.id));
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {

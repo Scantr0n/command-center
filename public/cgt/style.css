@@ -586,6 +586,12 @@ table.card-table {
 .submissions-feed, .candidates-feed { border: 1px solid var(--hairline); border-radius: 12px; padding: 6px 20px; margin-bottom: 32px; background: var(--panel); }
 .submission-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 0.82rem; }
 .submission-row:first-child { border-top: none; }
+/* The clickable part of a submission row (days/status/description/meta) and
+   its optional tracking link are now separate flex children of the plain
+   .submission-row above, not the link nested inside the clickable part, so
+   this repeats the same flex/wrap/gap the fields were already laid out
+   with, just one level in. See renderSubmissions in app.js. */
+.submission-row-main { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; min-width: 0; }
 .submission-days { color: var(--dim); font-size: 0.7rem; flex-shrink: 0; width: 92px; }
 .submission-who { flex-shrink: 0; color: var(--ink); }
 .submission-meta { color: var(--sub); }
