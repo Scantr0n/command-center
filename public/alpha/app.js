@@ -846,7 +846,28 @@ function renderPositions(data) {
   `;
 }
 
+// system.* has no daemon behind it to report its own freshness the way
+// live.asOf does for everything under `live`, so a reader has no way to
+// tell whether "33 agents" is confirmed current or a description that
+// quietly drifted out of date months ago. lastVerifiedAt is that missing
+// trust signal: when this description was last actually checked against
+// Alpha's real code, shown the same way every other timestamp on this
+// page is (relative text, exact time on hover).
+function renderArchitectureVerifiedMeta(data) {
+  const meta = document.getElementById('archVerifiedMeta');
+  if (!meta) return;
+  const verifiedAt = data.system && data.system.lastVerifiedAt;
+  if (!verifiedAt) {
+    meta.textContent = '';
+    meta.title = '';
+    return;
+  }
+  meta.textContent = 'Verified ' + (timeAgo(verifiedAt) || 'earlier');
+  meta.title = 'Description last confirmed against Alpha\'s real code at ' + formatAbsolute(verifiedAt);
+}
+
 function renderArchitecture(data) {
+  renderArchitectureVerifiedMeta(data);
   const grid = document.getElementById('archGrid');
   grid.innerHTML = data.system.features.map(f => `
     <div class="arch-card">

@@ -197,6 +197,16 @@ function main() {
     errors.push('system.features: missing or not an array');
   }
 
+  // system.* is hand-maintained architectural fact (agent count, feature
+  // list), not a live reading, so it has no natural freshness signal of its
+  // own the way every live.* field gets from live.asOf. lastVerifiedAt is
+  // that signal: when this description was last actually confirmed to still
+  // match Alpha's real architecture, so a reader can judge how much to trust
+  // "33 agents" the same way they'd judge a live reading's age.
+  if (data.system && !isIsoDatetimeOrNull(data.system.lastVerifiedAt)) {
+    errors.push('system.lastVerifiedAt: not a valid ISO datetime or null: ' + JSON.stringify(data.system.lastVerifiedAt));
+  }
+
   if ('events' in data) {
     if (!Array.isArray(data.events)) {
       errors.push('events: must be an array (empty is fine, it starts that way honestly)');

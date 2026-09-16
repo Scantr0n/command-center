@@ -312,6 +312,15 @@ header.page-head .sub {
   color: var(--sub);
   margin: 0 0 14px;
 }
+.section-title-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--dim);
+  margin-left: 8px;
+}
 
 /* Connection strip */
 .conn-strip {

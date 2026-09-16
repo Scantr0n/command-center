@@ -92,6 +92,7 @@
       <table class="schema-table">
         <tbody>
           <tr><th>system.*</th><td>Static architectural facts (agent count, feature list). Real, does not change with market conditions, safe to hand-edit only when the architecture itself changes.</td></tr>
+          <tr><th>system.lastVerifiedAt</th><td>ISO datetime this architectural description was last actually confirmed to match Alpha's real code, or <code>null</code>. Unlike everything under <code>live</code>, these facts have no daemon to report their own freshness, so this is a hand-set trust signal instead: update it whenever the feature list or agent count is re-checked against reality, not on every unrelated edit to this file.</td></tr>
           <tr><th>connection.connected</th><td><code>true</code> once a real feed exists and is currently reachable, otherwise <code>false</code>.</td></tr>
           <tr><th>connection.checkedAt</th><td>ISO datetime of the last time connectivity was actually checked, or <code>null</code>.</td></tr>
           <tr><th>connection.history[]</th><td>Append-only log of past connectivity checks, oldest first, each a real result of an actual check, never backfilled or estimated. Each entry needs <code>at</code> (ISO datetime) and <code>connected</code> (<code>true</code>/<code>false</code>, never <code>null</code>, since a check that never resolved is not a result). Drives the strip of ticks under the connection status and the recent-incidents list beneath it (each incident there is just a run of consecutive "not connected" entries from this same array, grouped into a start time, end time, and duration; nothing estimated). Starts empty, honestly. The live route in <code>server.js</code> does not populate this yet (it always sends an empty array), so until a future session wires that up, this page instead keeps its own honest record of the checks it makes in this browser's <code>localStorage</code> and uses that instead, labeled "recorded by this browser only" so it's never mistaken for a server-side record shared across devices.</td></tr>
@@ -184,7 +185,7 @@
   </section>
 
   <section>
-    <h2 class="section-title">Architecture</h2>
+    <h2 class="section-title">Architecture <span class="section-title-meta" id="archVerifiedMeta"></span></h2>
     <div class="arch-grid" id="archGrid"></div>
   </section>
 
