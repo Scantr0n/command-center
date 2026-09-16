@@ -1896,7 +1896,12 @@ copyLinkBtn.addEventListener('click', () => {
 });
 
 function csvField(v) {
-  const s = v == null ? '' : String(v);
+  let s = v == null ? '' : String(v);
+  // CSV/formula injection (OWASP): a hand-typed note starting with
+  // =, +, -, @, tab, or a carriage return is read as a live formula by
+  // Excel/Sheets when this export is opened there, not as plain text.
+  // A leading single quote is the standard mitigation both recommend.
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
