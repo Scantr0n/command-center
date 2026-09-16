@@ -738,6 +738,22 @@ section { margin-bottom: 36px; }
   margin-top: 4px;
 }
 
+/* Post-ship bugfix check-in: "upcoming" and "passed" are informational
+   (same --dim/--accent tiers as .freshness-fresh/.freshness-aging), "due"
+   is the actionable window and gets the same amber .freshness-stale uses. */
+.bugfix-checkin {
+  width: 100%;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  margin-top: 4px;
+}
+.bugfix-checkin-upcoming { color: var(--accent); }
+.bugfix-checkin-passed { color: var(--dim); }
+.bugfix-checkin-due {
+  color: #E0A030;
+  font-weight: 500;
+}
+
 /* Empty state */
 .empty-state {
   border: 1px dashed var(--hairline);

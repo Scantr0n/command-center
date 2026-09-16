@@ -237,6 +237,7 @@
     releaseSection.innerHTML = releases.map((r, idx) => {
       const rel = idx === 0 ? relativeDaysLabel(r.date) : null;
       const windowHtml = idx === 0 ? launchWindowHtml(r.date) : '';
+      const checkinHtml = idx === 0 ? bugfixCheckinHtml(r) : '';
       return '<div class="release-card">' +
       '<span class="release-version font-display">v' + escapeHtml(r.version) + '</span>' +
       (r.date ? '<span class="release-date">' + fmtDate(r.date) +
@@ -244,8 +245,53 @@
       (r.type ? '<span class="release-badge">' + escapeHtml(r.type).toUpperCase() + '</span>' : '') +
       '<div class="release-summary">' + escapeHtml(r.summary || 'No summary logged yet.') + '</div>' +
       windowHtml +
+      checkinHtml +
       '</div>';
     }).join('');
+  }
+
+  // A shipped bugfix is only confirmed fixed once nothing regresses after it;
+  // the common post-release practice is to tag the fix and re-check at 7 and
+  // 14 days out to confirm it held (see the "revisit the affected metric 7
+  // and 14 days later" pattern from post-release monitoring write-ups).
+  // Purely a days-since-ship calculation off the real logged date, same
+  // future/undated guards as launchWindowHtml, restricted to type "bugfix"
+  // since a feature release has no "did the bug stay fixed" question to
+  // answer at those checkpoints. Shared by the release card and the next
+  // steps checklist below so both agree on the same tier at the same time.
+  const BUGFIX_CHECKPOINTS = [7, 14];
+  const BUGFIX_CHECKPOINT_GRACE_DAYS = 3;
+  function bugfixCheckinStatus(release) {
+    if (!release || release.type !== 'bugfix' || !release.date) return null;
+    const days = daysBetween(release.date, todayIso());
+    if (days < 0) return null;
+
+    for (const checkpoint of BUGFIX_CHECKPOINTS) {
+      if (days < checkpoint) {
+        return {
+          tier: 'upcoming',
+          text: checkpoint + '-day check-in in ' + (checkpoint - days) + (checkpoint - days === 1 ? ' day' : ' days') +
+            ' (' + fmtDate(addDays(release.date, checkpoint)) + ')'
+        };
+      }
+      if (days < checkpoint + BUGFIX_CHECKPOINT_GRACE_DAYS) {
+        return {
+          tier: 'due',
+          text: 'Past the ' + checkpoint + '-day check-in (day ' + days + '), confirm no new reports of the fixed bug'
+        };
+      }
+    }
+    return {
+      tier: 'passed',
+      text: 'Both the 7- and 14-day check-ins have passed (day ' + days + ')'
+    };
+  }
+
+  function bugfixCheckinHtml(release) {
+    const status = bugfixCheckinStatus(release);
+    if (!status) return '';
+    return '<div class="bugfix-checkin bugfix-checkin-' + status.tier + ' font-mono">' +
+      escapeHtml(status.text.toUpperCase()) + '</div>';
   }
 
   // Where the latest real release sits against the 30/60/90-day post-launch
@@ -720,6 +766,18 @@
           ', no date is on record.',
         href: '#releaseSection'
       });
+    }
+
+    const datedReleases = releases.filter(r => r.date).slice().sort((a, b) => b.date.localeCompare(a.date));
+    if (datedReleases.length > 0) {
+      const checkinStatus = bugfixCheckinStatus(datedReleases[0]);
+      if (checkinStatus && checkinStatus.tier === 'due') {
+        steps.push({
+          urgent: true,
+          text: 'v' + datedReleases[0].version + ': ' + checkinStatus.text.charAt(0).toLowerCase() + checkinStatus.text.slice(1) + '.',
+          href: '#releaseSection'
+        });
+      }
     }
 
     const leads = (leadsData && leadsData.leads) || [];
