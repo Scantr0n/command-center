@@ -175,6 +175,26 @@ function main() {
     }
   });
 
+  // Mirrors findDuplicateListings in app.js: the same physical item can end
+  // up logged twice (a re-add after a platform sync, or copy-pasting an
+  // existing listing as a starting point and forgetting to change the id),
+  // and nothing else here catches it since each id is otherwise valid on its
+  // own. Scoped to live listings only, a sold item legitimately gets
+  // relisted under a new id with the same title/price.
+  const byDupKey = new Map();
+  listings.forEach(l => {
+    if (l.status !== 'live' || !l.title || l.price == null) return;
+    const key = l.title.trim().toLowerCase() + '|' + l.price;
+    if (!byDupKey.has(key)) byDupKey.set(key, []);
+    byDupKey.get(key).push(l);
+  });
+  [...byDupKey.values()].filter(group => group.length > 1).forEach(group => {
+    const ids = group.map(l => l.id || '(missing id)');
+    warnings.push('possible duplicate listing: "' + group[0].title + '" at $' + group[0].price +
+      ' appears on ' + ids.length + ' live listings (' + ids.join(', ') + '). Confirm these are really ' +
+      'separate items, not the same one logged twice.');
+  });
+
   const stages = pipelineData.stages || [];
   const seenStages = new Set();
   stages.forEach((s, idx) => {

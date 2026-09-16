@@ -190,6 +190,7 @@ async function loadData() {
     renderStats(listings, stages, sales, expenses);
     renderDelistList(listings);
     renderDataQuality(listings);
+    renderDuplicates(listings);
     applyFiltersAndRender();
     renderCoverage(listings);
     renderTitleFit(listings);
@@ -202,6 +203,7 @@ async function loadData() {
     document.getElementById('statRow').innerHTML = '';
     document.getElementById('delistSection').hidden = true;
     document.getElementById('dataQualitySection').hidden = true;
+    document.getElementById('duplicatesSection').hidden = true;
     document.getElementById('listingTableBody').innerHTML = '';
     document.getElementById('coverageTableBody').innerHTML = '';
     document.getElementById('titleFitTableBody').innerHTML = '';
@@ -605,6 +607,48 @@ function renderDataQuality(listings) {
       <span class="dq-why">${escapeHtml(reasons.join(' · '))}</span>
     </button>
   `).join('');
+  list.querySelectorAll('[data-listing-id]').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.listingId));
+  });
+}
+
+// Same duplicate-detection convention CGT (findDuplicateGroups) and CSM
+// (findDuplicateProspects) already use: group live listings by a normalized
+// key of the fields that actually identify the same physical item, title +
+// price, and flag any group with more than one member. The real risk this
+// catches: re-adding an item after a platform sync, or copy-pasting an
+// existing listing as a starting point for a new one and forgetting to
+// change the id, would otherwise silently double-count in "Total live
+// asking value" and every other stat tile with no flag ever surfacing.
+// Scoped to live listings only, since a sold item legitimately gets
+// relisted (new id, same title/price) without that being a mistake.
+function findDuplicateListings(listings) {
+  const byKey = new Map();
+  (listings || []).forEach(l => {
+    if (l.status !== 'live' || !l.title || l.price == null) return;
+    const key = l.title.trim().toLowerCase() + '|' + l.price;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(l);
+  });
+  return [...byKey.values()].filter(group => group.length > 1);
+}
+
+function renderDuplicates(listings) {
+  const section = document.getElementById('duplicatesSection');
+  const list = document.getElementById('duplicatesList');
+  const groups = findDuplicateListings(listings);
+
+  if (!groups.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = groups.map(group => group.map(l => `
+    <button type="button" class="data-quality-row" data-listing-id="${escapeHtml(l.id)}">
+      <span class="dq-name">${escapeHtml(l.title || 'Untitled item')}</span>
+      <span class="dq-why">${group.length} LIVE LISTINGS MATCH ON TITLE + PRICE</span>
+    </button>
+  `).join('')).join('');
   list.querySelectorAll('[data-listing-id]').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.listingId));
   });
