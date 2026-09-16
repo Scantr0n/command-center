@@ -202,7 +202,7 @@
 
     #searchWrap, #paletteBtn, #printBtn, #viewToggleGroup, #errorBanner,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
-    #noResultsMsg, #graphView, #gridToolbar, #modalOverlay, #paletteOverlay {
+    #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay {
       display: none !important;
     }
 
@@ -302,6 +302,7 @@
     </div>
 
     <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="gridSkeleton" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-hidden="true"></div>
 
     <div class="mt-10 pt-6 border-t hairline">
       <h2 class="text-xs font-mono tracking-wide mb-3" style="color: var(--faint)">RECENT ACTIVITY, ACROSS ALL PROJECTS</h2>
@@ -432,6 +433,15 @@ let lastClustersRaw = null;
 let lastFullRenderAt = 0;
 let deepLinkChecked = false;
 
+// Grid has the same "blank until the first fetch resolves" gap the graph
+// used to have, except the graph's own #graphSkeleton only ever covers the
+// graph, so a visitor with Grid persisted from localStorage (setView runs
+// before loadClusters has anything to render) saw nothing at all here, not
+// even the graph's loading indicator, since it's on the hidden view.
+// Tracked separately from the request-id/skip logic above because it only
+// needs to flip once, the first time any load settles, success or error.
+let firstLoadDone = false;
+
 // True whenever the currently open modal added its own history entry (a
 // normal card click), so closing it can hand control back to history.back()
 // and let the URL/back-button stay in sync. False for a modal opened by
@@ -455,6 +465,8 @@ async function loadClusters() {
     const data = await res.json();
     if (requestId !== latestClustersRequestId) return;
     document.getElementById('graphSkeleton').classList.add('hidden');
+    firstLoadDone = true;
+    document.getElementById('gridSkeleton').classList.add('hidden');
 
     // A cluster file that fails to parse (a hand-edit typo) is skipped
     // server-side rather than taking the whole dashboard down with it, but
@@ -513,6 +525,8 @@ async function loadClusters() {
     // already succeeded, but is what actually clears it when the very first
     // fetch is the one that fails.
     document.getElementById('graphSkeleton').classList.add('hidden');
+    firstLoadDone = true;
+    document.getElementById('gridSkeleton').classList.add('hidden');
     errBox.textContent = `Couldn't load project data: ${e.message}. Retrying in 30s.`;
     errBox.classList.remove('hidden');
   }
@@ -1004,6 +1018,31 @@ document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
   btn.addEventListener('click', () => setGridSort(btn.dataset.sort));
 });
 
+// Placeholder cards shaped like a real cluster-card (same padding, same
+// category-chip/title/summary/footer rows), mirroring #graphSkeleton's job
+// for the grid: something on screen during the gap between "Grid is the
+// active view" and "clusters actually arrived", instead of empty space.
+// Built once since it never depends on real data, then just shown/hidden.
+function renderGridSkeleton() {
+  const bar = (w, h, o = 0.06) => `<span style="display:block; width:${w}; height:${h}px; border-radius:4px; background: rgba(255,255,255,${o})"></span>`;
+  const card = `
+    <div class="rounded-xl p-5 border hairline skeleton-pulse" style="background: var(--panel)">
+      <div class="flex items-center justify-between mb-3">
+        ${bar('64px', 16)}
+        <span style="width:10px; height:10px; border-radius:999px; background: rgba(255,255,255,0.06)"></span>
+      </div>
+      <div class="mb-3">${bar('70%', 15)}</div>
+      <div class="flex flex-col gap-1.5 mb-4">${bar('100%', 10, 0.045)}${bar('88%', 10, 0.045)}${bar('55%', 10, 0.045)}</div>
+      <div class="flex items-center justify-between">
+        ${bar('46px', 16)}
+        ${bar('58px', 10, 0.045)}
+      </div>
+    </div>
+  `;
+  document.getElementById('gridSkeleton').innerHTML = card.repeat(6);
+}
+renderGridSkeleton();
+
 function renderGrid() {
   const grid = document.getElementById('clusterGrid');
   grid.innerHTML = sortForGrid(clusters).map(c => {
@@ -1039,6 +1078,7 @@ function setView(view, persist = true) {
   currentView = view;
   document.getElementById('graphView').classList.toggle('hidden', view !== 'graph');
   document.getElementById('clusterGrid').classList.toggle('hidden', view !== 'grid');
+  document.getElementById('gridSkeleton').classList.toggle('hidden', view !== 'grid' || firstLoadDone);
   document.getElementById('gridToolbar').classList.toggle('hidden', view !== 'grid');
   document.getElementById('gridToolbar').classList.toggle('flex', view === 'grid');
   document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
