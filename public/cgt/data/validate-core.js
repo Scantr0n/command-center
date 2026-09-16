@@ -114,6 +114,16 @@
         }
       }
 
+      // storageLocation feeds the insurance/appraisal print view (see
+      // public/cgt/app.js's "field" calls into that document) as free text.
+      // Every other field that document renders is type-checked before it
+      // gets there; a wrong type here (an accidentally pasted number or
+      // object) would pass validation clean and only ever surface as a
+      // garbled line on the printed document itself.
+      if (c.storageLocation !== null && c.storageLocation !== undefined && typeof c.storageLocation !== 'string') {
+        errors.push(where + ': "storageLocation" must be a string or null');
+      }
+
       // A real sale is one event with two halves (when, for how much), so
       // each half requires the other, same "never half-log a real number"
       // rule valuationBasis/estimatedValue already enforce on the price
