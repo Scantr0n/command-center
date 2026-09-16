@@ -538,6 +538,30 @@
     return { perDay: (latest.count - first.count) / span, first, latest };
   }
 
+  // The real date a now-met goal actually crossed its target, derived only
+  // from dates already logged elsewhere, never estimated. For downloads,
+  // that's the first real check whose count reached the target. For leads,
+  // it's the loggedDate of the Nth lead once leads are ordered by that same
+  // real date, and only if every lead up to that point actually has one, an
+  // undated lead earlier in the queue could put the real crossing point
+  // anywhere, so this returns null (an honest "reached, exact date unknown")
+  // rather than guess an ordering that isn't backed by real logged dates.
+  function goalReachedDate(g, downloadsData, leadsData) {
+    if (g.metric === 'downloads') {
+      const checks = (((downloadsData && downloadsData.metric) || {}).checks || [])
+        .slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      const hit = checks.find(c => c.count >= g.target && c.date);
+      return hit ? hit.date : null;
+    }
+    if (g.metric === 'leads') {
+      const leads = (leadsData && leadsData.leads) || [];
+      if (leads.length < g.target || leads.some(l => !l.loggedDate)) return null;
+      const sorted = leads.slice().sort((a, b) => a.loggedDate.localeCompare(b.loggedDate));
+      return sorted[g.target - 1].loggedDate;
+    }
+    return null;
+  }
+
   // Renders the real target-vs-actual goal Jack has logged, if any. This is
   // the standard "target vs actual" pattern from traction dashboards: a
   // benchmark, how the current real number compares to it, and a trend cue
@@ -558,9 +582,34 @@
       // NaN/Infinity here, which Math.max/min don't clamp away, so guard it
       // explicitly rather than rendering "NaN%".
       const pct = g.target > 0 ? Math.max(0, Math.min(100, Math.round((currentCount / g.target) * 100))) : 0;
+      const achieved = g.target > 0 && currentCount >= g.target;
+
+      // Once the real number has actually reached the target, "3 days left"
+      // or "ahead of pace" reads as if the goal were still in progress. Show
+      // a plain "goal met" fact instead, dated from real history where that's
+      // derivable (see goalReachedDate above), and skip the still-in-progress
+      // pace/projection lines below entirely rather than let them keep
+      // narrating a race that's already over.
+      let achievedHtml = '';
+      if (achieved) {
+        const reachedDate = goalReachedDate(g, downloadsData, leadsData);
+        let text = 'GOAL MET';
+        if (reachedDate) {
+          text += ', REACHED ' + fmtDate(reachedDate).toUpperCase();
+          if (g.targetDate) {
+            const diffDays = daysBetween(reachedDate, g.targetDate);
+            if (diffDays > 0) text += ' (' + diffDays + (diffDays === 1 ? ' DAY' : ' DAYS') + ' AHEAD OF THE ' + fmtDate(g.targetDate).toUpperCase() + ' TARGET DATE)';
+            else if (diffDays < 0) text += ' (' + (-diffDays) + (diffDays === -1 ? ' DAY' : ' DAYS') + ' AFTER THE ' + fmtDate(g.targetDate).toUpperCase() + ' TARGET DATE)';
+            else text += ' (ON THE TARGET DATE)';
+          }
+        } else {
+          text += ', EXACT DATE NOT DERIVABLE FROM LOGGED DATA';
+        }
+        achievedHtml = '<div class="goal-achieved font-mono">' + text + '</div>';
+      }
 
       let paceHtml = '';
-      if (g.targetDate) {
+      if (!achieved && g.targetDate) {
         const daysLeft = daysBetween(todayIso(), g.targetDate);
         if (daysLeft < 0) {
           paceHtml = '<div class="goal-pace goal-pace-overdue font-mono">TARGET DATE PASSED, ' + fmtDate(g.targetDate).toUpperCase() + '</div>';
@@ -577,7 +626,7 @@
       // (current, not just currentCount defaulting to 0) so an unlogged
       // metric never reads as "behind pace" when it might just be untracked.
       let paceStatusHtml = '';
-      if (current && g.setDate && g.targetDate) {
+      if (!achieved && current && g.setDate && g.targetDate) {
         const totalDays = daysBetween(g.setDate, g.targetDate);
         const elapsedDays = daysBetween(g.setDate, todayIso());
         if (totalDays > 0 && elapsedDays > 0) {
@@ -633,6 +682,7 @@
         '<span class="goal-progress-pct font-mono">' + pct + '%</span>' +
         '</div>' +
         '<div class="goal-current font-mono">' + escapeHtml(currentNote) + ', target ' + g.target + '</div>' +
+        achievedHtml +
         paceHtml +
         paceStatusHtml +
         projectionHtml +
