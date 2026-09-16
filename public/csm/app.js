@@ -1070,7 +1070,11 @@
     const latest = new Date(Math.max(...known.map(d => d.getTime())));
     const daysAgo = Math.floor((Date.now() - latest.getTime()) / 86400000);
     const when = daysAgo <= 0 ? 'today' : daysAgo === 1 ? '1 day ago' : daysAgo + ' days ago';
-    el.textContent = ' Last hand-edited ' + when + ' (' + latest.toISOString().slice(0, 10) + ').';
+    // Local calendar date, not latest.toISOString()'s UTC one: the same fix
+    // applied to the Garage hub's identical footer, which read a day off
+    // depending on timezone and time of day.
+    const latestDateStr = latest.getFullYear() + '-' + String(latest.getMonth() + 1).padStart(2, '0') + '-' + String(latest.getDate()).padStart(2, '0');
+    el.textContent = ' Last hand-edited ' + when + ' (' + latestDateStr + ').';
     el.classList.toggle('data-freshness-stale', daysAgo > 14);
   }
 
