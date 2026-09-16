@@ -1239,7 +1239,8 @@
       (p.category || '').toLowerCase().includes(query) ||
       (p.verifiedHook || '').toLowerCase().includes(query) ||
       (p.notes || '').toLowerCase().includes(query) ||
-      (p.contactChannel && (p.contactChannel.detail || '').toLowerCase().includes(query));
+      (p.contactChannel && (p.contactChannel.detail || '').toLowerCase().includes(query)) ||
+      (p.socialSnapshots || []).some(snap => (snap.platform || '').toLowerCase().includes(query));
   }
 
   // Counts how many prospects would match if this one chip group (channel or
