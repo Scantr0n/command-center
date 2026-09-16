@@ -96,7 +96,7 @@
           <tr><th>connection.checkedAt</th><td>ISO datetime of the last time connectivity was actually checked, or <code>null</code>.</td></tr>
           <tr><th>connection.history[]</th><td>Append-only log of past connectivity checks, oldest first, each a real result of an actual check, never backfilled or estimated. Each entry needs <code>at</code> (ISO datetime) and <code>connected</code> (<code>true</code>/<code>false</code>, never <code>null</code>, since a check that never resolved is not a result). Drives the strip of ticks under the connection status and the recent-incidents list beneath it (each incident there is just a run of consecutive "not connected" entries from this same array, grouped into a start time, end time, and duration; nothing estimated). Starts empty, honestly. The live route in <code>server.js</code> does not populate this yet (it always sends an empty array), so until a future session wires that up, this page instead keeps its own honest record of the checks it makes in this browser's <code>localStorage</code> and uses that instead, labeled "recorded by this browser only" so it's never mistaken for a server-side record shared across devices.</td></tr>
           <tr><th>live.asOf</th><td><strong>Required whenever any field below it is set.</strong> ISO datetime the live reading was actually taken at.</td></tr>
-          <tr><th>live.regime</th><td>Current detected market regime label, or <code>null</code>.</td></tr>
+          <tr><th>live.regime</th><td>Current detected market regime label, or <code>null</code>. The server sends only this single current value, never a history; the "Regime history" section below builds its own log of real transitions this browser has actually observed (a new value that differs from the last one it saw), timestamped and kept in this browser's own <code>localStorage</code>, labeled "recorded by this browser only" for the same reason as the connectivity-check history above. Nothing estimated or backfilled, only real observed changes.</td></tr>
           <tr><th>live.killSwitch.engaged</th><td><code>true</code> / <code>false</code> / <code>null</code> if unknown.</td></tr>
           <tr><th>live.positionSizing.activeMode</th><td>Which sizing rule is currently driving position size (e.g. <code>"drawdown-based"</code>), or <code>null</code>.</td></tr>
           <tr><th>live.positionSizing.currentDrawdownPct</th><td>Current drawdown as a number from 0 to 100, or <code>null</code>. Drives the drawdown meter, never a dollar figure.</td></tr>
@@ -137,6 +137,17 @@
   <section>
     <h2 class="section-title">Summary <span class="lastknown-tag" id="summaryLastKnownTag" hidden></span></h2>
     <div class="stat-row" id="statRow"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Regime history</h2>
+    <div class="regime-history-wrap">
+      <div class="regime-history-label font-mono">
+        RECENT REGIME CHANGES
+        <span class="regime-history-source">(recorded by this browser only, real transitions it has actually observed)</span>
+      </div>
+      <ol class="regime-history-list" id="regimeHistoryList"></ol>
+    </div>
   </section>
 
   <section>

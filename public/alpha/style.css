@@ -493,6 +493,63 @@ header.page-head .sub {
   list-style: none;
 }
 
+/* Regime history: same real-log-over-time treatment as the incident list
+   above, applied to live.regime instead of connection state (see the
+   recordClientRegimeObservation comment in app.js for why this is built
+   client-side rather than from the server). */
+.regime-history-wrap {
+  margin-bottom: 28px;
+}
+.regime-history-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.regime-history-source {
+  text-transform: none;
+  letter-spacing: normal;
+  font-style: italic;
+  margin-left: 6px;
+}
+.regime-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.regime-history-item {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+}
+.regime-history-label-value {
+  color: var(--ink);
+  font-weight: 600;
+}
+.regime-history-current .regime-history-label-value { color: #3DDC84; }
+.regime-history-duration {
+  color: var(--sub);
+  flex-shrink: 0;
+}
+.regime-history-range {
+  color: var(--dim);
+}
+.regime-history-empty {
+  font-size: 0.72rem;
+  color: var(--dim);
+  font-style: italic;
+  list-style: none;
+}
+
 /* Stat tiles */
 .stat-row {
   display: grid;

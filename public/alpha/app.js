@@ -283,6 +283,89 @@ function effectiveConnHistory(data, clientHistory) {
   return serverHistory.length ? serverHistory : clientHistory;
 }
 
+// live.regime is sent as a single current value, never a history (see the
+// schema-help row for live.regime), so this page has no way to show how
+// Alpha's regime detection has actually behaved over time, only its reading
+// right now, even though regime detection is one of Alpha's real, named
+// architecture features. Same gap connection history had before
+// CLIENT_CONN_HISTORY_KEY above, and the same fix: this browser keeps its
+// own honest, append-only log of real transitions it has actually observed
+// (a value that differs from the last one recorded), timestamped for real,
+// in localStorage, never backfilled or guessed. Only records while genuinely
+// connected, since a null/awaiting reading is not an observed regime.
+const CLIENT_REGIME_HISTORY_KEY = 'alpha:clientRegimeHistory';
+const CLIENT_REGIME_HISTORY_CAP = 200;
+
+function loadClientRegimeHistory() {
+  try {
+    const raw = localStorage.getItem(CLIENT_REGIME_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function recordClientRegimeObservation(connected, regime) {
+  const history = loadClientRegimeHistory();
+  if (!connected || !regime) return history;
+  const last = history[history.length - 1];
+  if (last && last.regime === regime) return history;
+  const next = [...history, { at: new Date().toISOString(), regime }].slice(-CLIENT_REGIME_HISTORY_CAP);
+  try {
+    localStorage.setItem(CLIENT_REGIME_HISTORY_KEY, JSON.stringify(next));
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // other client-side histories above, the section just stays empty.
+  }
+  return next;
+}
+
+// Turns the flat transition log above into readable segments: each entry
+// marks when a regime started, so the segment it started runs until the
+// next entry's timestamp (or now, for the most recent one, which is still
+// current). history is oldest-first, same assumption the connection-history
+// helpers above make.
+function computeRegimeSegments(history) {
+  if (!Array.isArray(history) || !history.length) return [];
+  return history.map((entry, i) => ({
+    regime: entry.regime,
+    start: entry.at,
+    end: i + 1 < history.length ? history[i + 1].at : null,
+    current: i === history.length - 1
+  }));
+}
+
+const REGIME_HISTORY_LIMIT = 10;
+
+function regimeSegmentItem(seg) {
+  const startAbs = formatAbsolute(seg.start);
+  const endMs = seg.current ? Date.now() : new Date(seg.end).getTime();
+  const durationText = formatDuration(endMs - new Date(seg.start).getTime()) || 'under 1m';
+  const rangeText = seg.current
+    ? 'Since ' + startAbs
+    : startAbs + ' to ' + formatAbsolute(seg.end);
+  return `
+    <li class="regime-history-item${seg.current ? ' regime-history-current' : ''}">
+      <span class="regime-history-label-value font-mono">${escapeHtml(seg.regime)}</span>
+      <span class="regime-history-duration font-mono">${seg.current ? 'Current · ' : ''}${escapeHtml(durationText)}</span>
+      <span class="regime-history-range">${escapeHtml(rangeText)}</span>
+    </li>
+  `;
+}
+
+function renderRegimeHistory(clientRegimeHistory) {
+  const list = document.getElementById('regimeHistoryList');
+  if (!list) return;
+  const segments = computeRegimeSegments(clientRegimeHistory);
+  if (!segments.length) {
+    list.innerHTML = `<li class="regime-history-empty font-mono">No regime changes observed by this browser yet.</li>`;
+    return;
+  }
+  const recent = [...segments].reverse().slice(0, REGIME_HISTORY_LIMIT);
+  list.innerHTML = recent.map(regimeSegmentItem).join('');
+}
+
 // Returns the connection-freshness class ('down'/'live'/'stale') so the
 // caller can decide the tab's glance indicator alongside the separate,
 // higher-priority kill-switch check (see the GLANCE_COLORS comment above);
@@ -1095,6 +1178,8 @@ async function loadStatus() {
     // of outcome, so the uptime strip has genuine data to show even while
     // Alpha's own daemon is unreachable, see effectiveConnHistory above.
     const clientConnHistory = recordClientConnCheck(data.connection && data.connection.connected);
+    const connectedNow = !!(data.connection && data.connection.connected);
+    const clientRegimeHistory = recordClientRegimeObservation(connectedNow, data.live && data.live.regime);
     // Only the three sections built from the cached fields (stats,
     // position sizing, genealogy) read effectiveData; connection, account
     // and positions always read the real `data` so those never show a
@@ -1118,6 +1203,7 @@ async function loadStatus() {
     const connCls = renderConnection(data, clientConnHistory);
     renderConnectionHistory(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
+    renderRegimeHistory(clientRegimeHistory);
     // Kill switch engaged outranks plain connection freshness for the one
     // glance a background tab gives Jack, same priority it gets everywhere
     // else on this page.
