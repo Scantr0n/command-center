@@ -89,6 +89,8 @@
           <tr><th>sourceNote</th><td>Where the price came from, e.g. <code>"eBay sold listings, 3 comps, Aug 2026"</code></td></tr>
           <tr><th>costBasis</th><td>USD number, what was actually paid for the card. Optional and independent of <code>estimatedValue</code>: log it when known, leave <code>null</code> when not. Powers the "Unrealized gain / loss" summary tile and the detail view, only computed for cards where both this and <code>estimatedValue</code> are on record.</td></tr>
           <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
+          <tr><th>soldDate</th><td>ISO date this card was actually sold. Leave <code>null</code> while still owned. Once set, the card counts as sold: it drops out of the portfolio value, breakdowns, and insurance summary (nothing left to insure), but stays in the file as a permanent record. <strong>Required together with <code>soldPrice</code></strong>, one without the other is a validation error.</td></tr>
+          <tr><th>soldPrice</th><td>USD number, what the card actually sold for. <strong>Required together with <code>soldDate</code>.</strong> Independent of <code>estimatedValue</code> (the last researched estimate before the sale) and <code>costBasis</code> (what was paid); logging both <code>costBasis</code> and <code>soldPrice</code> is what powers the "Realized gain / loss" summary tile and the detail view.</td></tr>
           <tr><th>backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
           <tr><th>priceHistory</th><td>Optional array of <code>{ "value": number, "date": "YYYY-MM-DD", "basis": "recent-sale" | "comp-estimate" }</code> objects, one per prior real price this card has had, each dated before the current <code>datePriced</code>. Leave off or empty until the card has actually been re-priced once; see the note above on how to fill it in when that happens. Powers the up/down indicator next to the value in the table, the price-history list in the detail view, and the "Price trend since last check" summary tile.</td></tr>
         </tbody>
@@ -108,6 +110,8 @@
   "sourceNote": null,
   "costBasis": null,
   "datePriced": null,
+  "soldDate": null,
+  "soldPrice": null,
   "backlogBatch": null,
   "priceHistory": [],
   "notes": null
@@ -417,6 +421,12 @@
       <button type="button" class="chip" data-grader="KSA" aria-pressed="false">KSA<span class="chip-count"></span></button>
     </div>
     <div class="filter-row" id="batchFilter" role="group" aria-label="Filter by pricing batch" hidden></div>
+    <div class="filter-row" id="ownershipFilter" role="group" aria-label="Filter by ownership">
+      <span class="filter-row-label font-mono">OWNERSHIP</span>
+      <button type="button" class="chip" data-owned="all" aria-pressed="true">All<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-owned="owned" aria-pressed="false">In collection<span class="chip-count"></span></button>
+      <button type="button" class="chip chip-sold" data-owned="sold" aria-pressed="false">Sold<span class="chip-count"></span></button>
+    </div>
     <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
     <div class="table-wrap">
       <table class="card-table" id="cardTable">

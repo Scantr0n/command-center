@@ -114,6 +114,29 @@
         }
       }
 
+      // A real sale is one event with two halves (when, for how much), so
+      // each half requires the other, same "never half-log a real number"
+      // rule valuationBasis/estimatedValue already enforce on the price
+      // itself. Once a card has both, it reads as sold (see isSold in
+      // public/cgt/app.js) and drops out of the current-portfolio totals.
+      if (c.soldPrice !== null && c.soldPrice !== undefined) {
+        if (typeof c.soldPrice !== 'number' || Number.isNaN(c.soldPrice) || c.soldPrice < 0) {
+          errors.push(where + ': "soldPrice" must be a non-negative number or null');
+        }
+        if (!c.soldDate) {
+          errors.push(where + ': has a "soldPrice" but no "soldDate". A real sale needs both, not just the amount.');
+        }
+      } else if (c.soldDate) {
+        errors.push(where + ': has a "soldDate" but no "soldPrice". A real sale needs both, not just the date.');
+      }
+      if (!isDateOrNull(c.soldDate)) {
+        errors.push(where + ': "soldDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.soldDate));
+      }
+      if (c.soldDate && c.datePriced && c.soldDate < c.datePriced) {
+        warnings.push(where + ': "soldDate" (' + c.soldDate + ') is before "datePriced" (' + c.datePriced +
+          '). Possible (sold before ever being individually priced), but double-check the two dates were not swapped.');
+      }
+
       if (!isDateOrNull(c.datePriced)) {
         errors.push(where + ': "datePriced" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.datePriced));
       }

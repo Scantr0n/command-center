@@ -8,6 +8,7 @@ let activeSport = 'all';
 let activeBasis = 'all';
 let activeGrader = 'all';
 let activeBatch = 'all';
+let activeOwnership = 'all';
 let sortKey = null;
 let sortDir = 'asc';
 
@@ -19,6 +20,7 @@ let sortDir = 'asc';
 const VALID_BASES = ['recent-sale', 'comp-estimate', 'unpriced'];
 const VALID_GRADERS = ['PSA', 'BGS', 'SGC', 'CGC', 'HGA', 'KSA'];
 const VALID_SPORTS = ['hockey', 'baseball', 'football'];
+const VALID_OWNERSHIP = ['owned', 'sold'];
 
 function restoreStateFromUrl() {
   const params = new URLSearchParams(location.search);
@@ -27,6 +29,7 @@ function restoreStateFromUrl() {
   const basis = params.get('basis');
   const grader = params.get('grader');
   const batch = params.get('batch');
+  const ownership = params.get('owned');
   const sort = params.get('sort');
   const dir = params.get('dir');
   if (q) searchTerm = q;
@@ -37,6 +40,7 @@ function restoreStateFromUrl() {
   // labels are open-ended (one per real pricing session). An unknown batch
   // in the URL just matches nothing once applied, same as a stale bookmark.
   if (batch) activeBatch = batch;
+  if (ownership && VALID_OWNERSHIP.includes(ownership)) activeOwnership = ownership;
   if (sort) sortKey = sort;
   if (dir === 'desc') sortDir = 'desc';
 }
@@ -55,6 +59,7 @@ function syncUrl() {
   if (activeBasis !== 'all') params.set('basis', activeBasis);
   if (activeGrader !== 'all') params.set('grader', activeGrader);
   if (activeBatch !== 'all') params.set('batch', activeBatch);
+  if (activeOwnership !== 'all') params.set('owned', activeOwnership);
   if (sortKey) {
     params.set('sort', sortKey);
     if (sortDir === 'desc') params.set('dir', 'desc');
@@ -92,6 +97,28 @@ function computeGainLoss(c) {
 
 function isExample(c) {
   return c.id === 'example-row-not-real';
+}
+
+// A card is sold once it has a real soldDate (validate-core.js requires
+// soldPrice and soldDate together, so either field alone is enough to check
+// here). Sold cards stay in cards.json as a permanent record of what was
+// owned, but drop out of every "what do I currently hold" total (portfolio
+// value, breakdowns, unrealized gain/loss, the insurance summary) the same
+// way an unpriced card drops out of the priced total instead of counting as
+// $0: no longer owning it isn't a $0 value, it's a different question.
+function isSold(c) {
+  return c.soldDate != null;
+}
+
+// Only counts when both a real purchase price and a real sale price are on
+// record, same "never guess at a missing side" rule as computeGainLoss's
+// unrealized version. A card sold with no logged costBasis has a real sale
+// price but no real realized gain/loss to compute against.
+function computeRealizedGainLoss(c) {
+  if (!isSold(c) || c.costBasis == null) return null;
+  const abs = c.soldPrice - c.costBasis;
+  const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
+  return { abs, pct };
 }
 
 // priceHistory holds prior researched prices for a card, oldest first, logged
@@ -299,18 +326,25 @@ async function loadCards() {
 
 function renderStats() {
   const real = cards.filter(c => !isExample(c));
-  const priced = real.filter(c => c.estimatedValue != null);
+  // A sold card stays in cards.json as a permanent record but no longer
+  // belongs to any "what do I currently hold" total below (portfolio value,
+  // basis/sport/cost-basis breakdowns, staleness): it's not part of the
+  // collection anymore, so it should not count toward its value either.
+  const owned = real.filter(c => !isSold(c));
+  const sold = real.filter(isSold);
+  const priced = owned.filter(c => c.estimatedValue != null);
   const totalValue = priced.reduce((s, c) => s + c.estimatedValue, 0);
   const saleCards = priced.filter(c => c.valuationBasis === 'recent-sale');
   const compCards = priced.filter(c => c.valuationBasis === 'comp-estimate');
   const saleValue = saleCards.reduce((s, c) => s + c.estimatedValue, 0);
   const compValue = compCards.reduce((s, c) => s + c.estimatedValue, 0);
   const stale = priced.filter(isStale).length;
-  // Built from whatever sport values actually appear on real cards, not a
-  // hardcoded hockey/baseball/football list, so a card logged under any other
-  // sport still shows up here instead of being silently uncounted.
+  // Built from whatever sport values actually appear on currently-owned
+  // cards, not a hardcoded hockey/baseball/football list, so a card logged
+  // under any other sport still shows up here instead of being silently
+  // uncounted.
   const bySportCounts = new Map();
-  real.forEach(c => { if (c.sport) bySportCounts.set(c.sport, (bySportCounts.get(c.sport) || 0) + 1); });
+  owned.forEach(c => { if (c.sport) bySportCounts.set(c.sport, (bySportCounts.get(c.sport) || 0) + 1); });
   const bySportBreakdown = [...bySportCounts.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([sport, count]) => sport.charAt(0).toUpperCase() + sport.slice(1) + ' ' + count)
@@ -320,11 +354,21 @@ function renderStats() {
   // value are on record, same rule as computeGainLoss. A card with only one
   // of the two contributes to neither side, rather than being treated as a
   // break-even or a total-loss by assuming the missing field is zero.
-  const withCostBasis = real.filter(c => c.costBasis != null && c.estimatedValue != null);
+  const withCostBasis = owned.filter(c => c.costBasis != null && c.estimatedValue != null);
   const totalCostBasis = withCostBasis.reduce((s, c) => s + c.costBasis, 0);
   const totalCurrentValue = withCostBasis.reduce((s, c) => s + c.estimatedValue, 0);
   const netGainLoss = totalCurrentValue - totalCostBasis;
   const netGainLossPct = totalCostBasis > 0 ? (netGainLoss / totalCostBasis) * 100 : null;
+
+  // Realized gain/loss is the sold-card counterpart to the unrealized tile
+  // above: only counts a sale where a real costBasis is also on record, same
+  // "never guess at a missing side" rule. A card sold with no logged
+  // costBasis has a real sale price but nothing to compare it against yet.
+  const soldWithGainLoss = sold.map(c => ({ c, gl: computeRealizedGainLoss(c) })).filter(x => x.gl);
+  const totalRealizedGainLoss = soldWithGainLoss.reduce((s, x) => s + x.gl.abs, 0);
+  const totalRealizedCostBasis = soldWithGainLoss.reduce((s, x) => s + x.c.costBasis, 0);
+  const realizedGainLossPct = totalRealizedCostBasis > 0 ? (totalRealizedGainLoss / totalRealizedCostBasis) * 100 : null;
+  const totalSoldProceeds = sold.reduce((s, c) => s + (c.soldPrice || 0), 0);
 
   // Only counts cardCount on active (non-returned, non-example) submissions,
   // same "real data only" rule as every other tile here: a submission with
@@ -354,7 +398,7 @@ function renderStats() {
   // to compare the current number against), the same real-data-only rule as
   // every other tile: a card priced exactly once has no trend yet, it isn't
   // counted as "flat".
-  const trended = real.map(c => ({ c, trend: computeValueTrend(c) })).filter(x => x.trend);
+  const trended = owned.map(c => ({ c, trend: computeValueTrend(c) })).filter(x => x.trend);
   const trendingUp = trended.filter(x => x.trend.abs > 0).length;
   const trendingDown = trended.filter(x => x.trend.abs < 0).length;
   const trendingFlat = trended.length - trendingUp - trendingDown;
@@ -367,8 +411,13 @@ function renderStats() {
   const withStorageLocation = priced.filter(c => c.storageLocation).length;
 
   const tiles = [
-    { value: real.length, label: 'Cards logged', sub: cards.length !== real.length ? '+ 1 example row' : null },
-    { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced' : 'nothing priced yet' },
+    {
+      value: real.length,
+      label: 'Cards logged',
+      sub: [cards.length !== real.length ? '+ 1 example row' : null, sold.length ? sold.length + ' sold' : null]
+        .filter(Boolean).join(' · ') || null
+    },
+    { value: priced.length ? formatUsd(totalValue) : '$0', label: 'Total estimated value', sub: priced.length ? priced.length + ' priced, currently held' : 'nothing priced yet' },
     {
       value: activeSubmissions.length ? cardsOutForGrading : 0,
       label: 'Cards out for grading',
@@ -402,6 +451,19 @@ function renderStats() {
         ? withCostBasis.length + ' card(s) with cost basis logged' + (netGainLossPct != null ? ' · ' + (netGainLossPct >= 0 ? '+' : '') + netGainLossPct.toFixed(1) + '%' : '')
         : 'no purchase prices logged yet',
       cls: withCostBasis.length ? (netGainLoss >= 0 ? 'positive' : 'negative') : null
+    },
+    {
+      value: sold.length ? formatUsd(totalSoldProceeds) : '$0',
+      label: 'Cards sold',
+      sub: sold.length ? sold.length + ' card(s), total sale proceeds' : 'nothing sold yet'
+    },
+    {
+      value: soldWithGainLoss.length ? formatSignedUsd(totalRealizedGainLoss) : 'n/a',
+      label: 'Realized gain / loss',
+      sub: soldWithGainLoss.length
+        ? soldWithGainLoss.length + ' sale(s) with cost basis logged' + (realizedGainLossPct != null ? ' · ' + (realizedGainLossPct >= 0 ? '+' : '') + realizedGainLossPct.toFixed(1) + '%' : '')
+        : (sold.length ? 'no cost basis logged for sold cards yet' : 'nothing sold yet'),
+      cls: soldWithGainLoss.length ? (totalRealizedGainLoss >= 0 ? 'positive' : 'negative') : null
     },
     { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
     {
@@ -439,7 +501,7 @@ function renderStats() {
 // empty or single-example dataset just renders the honest empty state below
 // rather than a chart with nothing in it.
 function buildValueGroups(field) {
-  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c[field]);
+  const priced = cards.filter(c => !isExample(c) && !isSold(c) && c.estimatedValue != null && c[field]);
   const totals = new Map();
   priced.forEach(c => totals.set(c[field], (totals.get(c[field]) || 0) + c.estimatedValue));
   return [...totals.entries()]
@@ -456,7 +518,7 @@ function buildValueGroups(field) {
 // merged with a real collection. Grade alone is skipped here since "10" from
 // PSA and "10" from SGC track very different markets.
 function buildValueGroupsByGrade() {
-  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c.gradingCompany && c.grade != null);
+  const priced = cards.filter(c => !isExample(c) && !isSold(c) && c.estimatedValue != null && c.gradingCompany && c.grade != null);
   const totals = new Map();
   priced.forEach(c => {
     const label = c.gradingCompany + ' ' + c.grade;
@@ -474,7 +536,7 @@ function buildValueGroupsByGrade() {
 // year first rather than by value like the other breakdown cards, since a
 // year list reads as a timeline and a value-sorted year list would not.
 function buildValueGroupsByYear() {
-  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c.year != null);
+  const priced = cards.filter(c => !isExample(c) && !isSold(c) && c.estimatedValue != null && c.year != null);
   const totals = new Map();
   priced.forEach(c => totals.set(c.year, (totals.get(c.year) || 0) + c.estimatedValue));
   return [...totals.entries()]
@@ -491,7 +553,7 @@ function buildValueGroupsByYear() {
 // into its component batches. Cards with no backlogBatch logged are skipped,
 // same as buildValueGroups skips a falsy field on any other breakdown.
 function buildValueGroupsByBatch() {
-  const priced = cards.filter(c => !isExample(c) && c.estimatedValue != null && c.backlogBatch);
+  const priced = cards.filter(c => !isExample(c) && !isSold(c) && c.estimatedValue != null && c.backlogBatch);
   const totals = new Map();
   priced.forEach(c => totals.set(c.backlogBatch, (totals.get(c.backlogBatch) || 0) + c.estimatedValue));
   return [...totals.entries()]
@@ -596,7 +658,7 @@ const MOVERS_LIST_LIMIT = 5;
 
 function buildBiggestMovers() {
   const trended = cards
-    .filter(c => !isExample(c))
+    .filter(c => !isExample(c) && !isSold(c))
     .map(c => ({ c, trend: computeValueTrend(c) }))
     .filter(x => x.trend && x.trend.abs !== 0);
   const gainers = trended.filter(x => x.trend.abs > 0).sort((a, b) => b.trend.abs - a.trend.abs).slice(0, MOVERS_LIST_LIMIT);
@@ -870,7 +932,7 @@ function renderBatchFilter() {
 // metadata gap, these have no price at all yet and would otherwise be
 // invisible outside the raw inventory table's "not priced" cell.
 function buildUnpricedFlags() {
-  return cards.filter(c => !isExample(c) && c.estimatedValue == null);
+  return cards.filter(c => !isExample(c) && !isSold(c) && c.estimatedValue == null);
 }
 
 function renderUnpriced() {
@@ -937,7 +999,7 @@ function renderDataQuality() {
 // most out of date and the most worth re-checking first.
 function buildStalePricingFlags() {
   return cards
-    .filter(c => !isExample(c) && isStale(c))
+    .filter(c => !isExample(c) && !isSold(c) && isStale(c))
     .sort((a, b) => daysSince(b.datePriced) - daysSince(a.datePriced));
 }
 
@@ -1035,7 +1097,11 @@ function renderGradeLadderFlags() {
 // total on the page never gets mistaken for a complete collection value.
 function renderInsuranceSummary() {
   const el = document.getElementById('insuranceSummary');
-  const real = cards.filter(c => !isExample(c));
+  // A sold card is no longer owned, so it has nothing to insure and does not
+  // belong on an appraisal document, same reasoning as every other
+  // currently-held-only total in renderStats/buildValueGroups above.
+  const real = cards.filter(c => !isExample(c) && !isSold(c));
+  const soldCount = cards.filter(c => !isExample(c) && isSold(c)).length;
   const priced = real
     .filter(c => c.estimatedValue != null)
     .slice()
@@ -1070,9 +1136,10 @@ function renderInsuranceSummary() {
   el.innerHTML = `
     <h1 class="insurance-summary-title">Card Grading Tracker, Insurance / Appraisal Summary</h1>
     <p class="insurance-summary-meta">Generated ${escapeHtml(generatedOn)} &middot; ${priced.length} priced card${priced.length === 1 ? '' : 's'}</p>
-    <p class="insurance-summary-note">${unpricedCount
-      ? unpricedCount + ' additional card' + (unpricedCount === 1 ? '' : 's') + ' logged with no researched value yet, excluded from this list and from the total below.'
-      : 'Every logged card has a researched value on record; none excluded.'
+    <p class="insurance-summary-note">${[
+      unpricedCount ? unpricedCount + ' additional card' + (unpricedCount === 1 ? '' : 's') + ' logged with no researched value yet, excluded from this list and from the total below.' : null,
+      soldCount ? soldCount + ' sold card' + (soldCount === 1 ? '' : 's') + ' excluded, no longer owned and nothing to insure.' : null
+    ].filter(Boolean).join(' ') || 'Every logged card has a researched value on record; none excluded.'
     } A value marked "Comp-based estimate" has no directly comparable sale on record and is inferred from related sales, not a confirmed sale of this exact card and grade. A blank "Location" means no storage location has been logged for that card yet.</p>
     <table class="insurance-summary-table">
       <thead>
@@ -1134,13 +1201,18 @@ function matchesBasisValue(c, basis) {
   if (basis === 'unpriced') return c.estimatedValue == null;
   return c.valuationBasis === basis;
 }
+function matchesOwnershipValue(c, ownership) {
+  if (ownership === 'all') return true;
+  return ownership === 'sold' ? isSold(c) : !isSold(c);
+}
 
 function matchesFilters(c) {
   return matchesSearchTerm(c, searchTerm)
     && matchesSportValue(c, activeSport)
     && matchesGraderValue(c, activeGrader)
     && matchesBatchValue(c, activeBatch)
-    && matchesBasisValue(c, activeBasis);
+    && matchesBasisValue(c, activeBasis)
+    && matchesOwnershipValue(c, activeOwnership);
 }
 
 // Counts how many cards would match if this one dimension's chip were set to
@@ -1155,10 +1227,12 @@ function facetCount(dimension, value) {
     if (dimension !== 'grader' && !matchesGraderValue(c, activeGrader)) return false;
     if (dimension !== 'batch' && !matchesBatchValue(c, activeBatch)) return false;
     if (dimension !== 'basis' && !matchesBasisValue(c, activeBasis)) return false;
+    if (dimension !== 'ownership' && !matchesOwnershipValue(c, activeOwnership)) return false;
     if (dimension === 'sport') return matchesSportValue(c, value);
     if (dimension === 'grader') return matchesGraderValue(c, value);
     if (dimension === 'batch') return matchesBatchValue(c, value);
     if (dimension === 'basis') return matchesBasisValue(c, value);
+    if (dimension === 'ownership') return matchesOwnershipValue(c, value);
     return true;
   }).length;
 }
@@ -1167,7 +1241,8 @@ const FACET_DIMENSIONS = [
   ['sportFilter', 'data-sport', 'sport'],
   ['basisFilter', 'data-basis', 'basis'],
   ['graderFilter', 'data-grader', 'grader'],
-  ['batchFilter', 'data-batch', 'batch']
+  ['batchFilter', 'data-batch', 'batch'],
+  ['ownershipFilter', 'data-owned', 'ownership']
 ];
 
 function updateChipCounts() {
@@ -1226,7 +1301,7 @@ function updateSortHeaders() {
 // own search/category filter.
 function anyFilterActive() {
   return !!searchTerm.trim() || activeSport !== 'all' || activeGrader !== 'all' ||
-    activeBatch !== 'all' || activeBasis !== 'all';
+    activeBatch !== 'all' || activeBasis !== 'all' || activeOwnership !== 'all';
 }
 
 function announceFilterStatus(matchCount) {
@@ -1291,7 +1366,7 @@ function applyFiltersAndRender() {
   tbody.innerHTML = filtered.map(c => `
     <tr tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
       <td>
-        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}</div>
+        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}</div>
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
       </td>
       <td class="cell-muted">${c.sport ? `<span class="badge badge-sport">${escapeHtml(c.sport)}</span>` : '<span class="cell-value empty">unknown</span>'}</td>
@@ -1452,6 +1527,10 @@ function cardEditFormHtml(c) {
     ceInputInner('ceCostBasis', 'Cost basis, USD', c.costBasis, 'number') +
     ceInputInner('ceDatePriced', 'Date priced', c.datePriced, 'date') +
     '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('ceSoldDate', 'Sold date (leave blank if still owned)', c.soldDate, 'date') +
+    ceInputInner('ceSoldPrice', 'Sold price, USD', c.soldPrice, 'number') +
+    '</div>' +
     ceFieldRow('ceBacklogBatch', 'Backlog batch', c.backlogBatch) +
     ceFieldRow('ceNotes', 'Notes', c.notes, 'textarea') +
     '</div>' +
@@ -1488,6 +1567,7 @@ function wireCardEditForm(c) {
     const yearRaw = document.getElementById('ceYear').value.trim();
     const estimatedValueRaw = document.getElementById('ceEstimatedValue').value.trim();
     const costBasisRaw = document.getElementById('ceCostBasis').value.trim();
+    const soldPriceRaw = document.getElementById('ceSoldPrice').value.trim();
 
     const edited = Object.assign({}, c, {
       cardName: ceVal('ceCardName') || c.cardName,
@@ -1503,6 +1583,8 @@ function wireCardEditForm(c) {
       sourceNote: ceVal('ceSourceNote'),
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
       datePriced: document.getElementById('ceDatePriced').value || null,
+      soldDate: document.getElementById('ceSoldDate').value || null,
+      soldPrice: soldPriceRaw === '' ? null : Number(soldPriceRaw),
       backlogBatch: ceVal('ceBacklogBatch'),
       notes: ceVal('ceNotes')
     });
@@ -1594,9 +1676,18 @@ function openModal(id) {
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
   body += renderPriceHistoryField(activeCard);
   body += field('Cost basis (what was paid)', activeCard.costBasis != null ? formatUsd(activeCard.costBasis) : null, activeCard.costBasis == null);
-  const gl = computeGainLoss(activeCard);
-  if (gl) {
-    body += field('Gain / loss', formatSignedUsd(gl.abs) + (gl.pct != null ? ' (' + (gl.pct >= 0 ? '+' : '') + gl.pct.toFixed(1) + '%)' : ''), false);
+  if (isSold(activeCard)) {
+    body += field('Sold date', activeCard.soldDate, !activeCard.soldDate);
+    body += field('Sold price', activeCard.soldPrice != null ? formatUsd(activeCard.soldPrice) : null, activeCard.soldPrice == null);
+    const rgl = computeRealizedGainLoss(activeCard);
+    if (rgl) {
+      body += field('Realized gain / loss', formatSignedUsd(rgl.abs) + (rgl.pct != null ? ' (' + (rgl.pct >= 0 ? '+' : '') + rgl.pct.toFixed(1) + '%)' : ''), false);
+    }
+  } else {
+    const gl = computeGainLoss(activeCard);
+    if (gl) {
+      body += field('Unrealized gain / loss', formatSignedUsd(gl.abs) + (gl.pct != null ? ' (' + (gl.pct >= 0 ? '+' : '') + gl.pct.toFixed(1) + '%)' : ''), false);
+    }
   }
   body += field('Comp note', activeCard.compNote, !activeCard.compNote);
   body += field('Source', activeCard.sourceNote, !activeCard.sourceNote);
@@ -1687,10 +1778,12 @@ document.getElementById('searchInput').value = searchTerm;
 setInitialChipState('sportFilter', 'data-sport', activeSport);
 setInitialChipState('basisFilter', 'data-basis', activeBasis);
 setInitialChipState('graderFilter', 'data-grader', activeGrader);
+setInitialChipState('ownershipFilter', 'data-owned', activeOwnership);
 
 wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
 wireChipGroup('graderFilter', 'data-grader', (v) => { activeGrader = v; });
+wireChipGroup('ownershipFilter', 'data-owned', (v) => { activeOwnership = v; });
 
 // Resets search, all four chip groups (batch included, even though its own
 // chips are rebuilt per-load rather than static markup like the others), and
@@ -1703,11 +1796,13 @@ document.getElementById('clearFiltersBtn').addEventListener('click', () => {
   activeBasis = 'all';
   activeGrader = 'all';
   activeBatch = 'all';
+  activeOwnership = 'all';
   document.getElementById('searchInput').value = '';
   setInitialChipState('sportFilter', 'data-sport', activeSport);
   setInitialChipState('basisFilter', 'data-basis', activeBasis);
   setInitialChipState('graderFilter', 'data-grader', activeGrader);
   setInitialChipState('batchFilter', 'data-batch', activeBatch);
+  setInitialChipState('ownershipFilter', 'data-owned', activeOwnership);
   applyFiltersAndRender();
   document.getElementById('searchInput').focus();
 });

@@ -97,6 +97,8 @@ const DATASETS = {
       { key: 'sourceNote', label: 'Source', aliases: ['sourcenote', 'source'] },
       { key: 'costBasis', label: 'Cost basis (what was paid)', aliases: ['costbasis', 'paid', 'pricepaid', 'cost'], type: 'number' },
       { key: 'datePriced', label: 'Date priced', aliases: ['datepriced', 'date'] },
+      { key: 'soldDate', label: 'Sold date (blank if still owned)', aliases: ['solddate', 'datesold'] },
+      { key: 'soldPrice', label: 'Sold price', aliases: ['soldprice', 'saleprice'], type: 'number' },
       { key: 'backlogBatch', label: 'Backlog batch', aliases: ['backlogbatch', 'batch'] },
       { key: 'notes', label: 'Notes', aliases: ['notes', 'note'] }
     ]
