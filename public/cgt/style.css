@@ -86,6 +86,24 @@ header.page-head .sub {
 }
 .print-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
 
+/* This device has no network path at all (navigator.onLine / online / offline,
+   never inferred from a failed fetch), a different question from whether the
+   fetch itself succeeded: the service worker can serve a cached /data/*.json
+   response successfully while genuinely offline, so "the fetch resolved" is
+   not proof the page is current. Same banner Alpha already uses for the
+   same reason. */
+.offline-banner {
+  border: 1px solid rgba(224,160,48,0.35);
+  background: rgba(224,160,48,0.06);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 0.8rem;
+  color: #E8C088;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.offline-banner strong { color: #F2D9B0; }
+
 .callout {
   border: 1px solid var(--hairline);
   background: rgba(255,255,255,0.02);

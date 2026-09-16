@@ -1763,4 +1763,18 @@
       backupBtn.title = "Can't back up, all data files failed to load";
     }
   });
+
+  // This device's own network path (navigator.onLine plus the real
+  // online/offline events), a different question from whether the last fetch
+  // succeeded: the service worker can serve a cached /data/*.json response
+  // successfully while genuinely offline, so "the fetch resolved" is not
+  // proof this page is current. Same banner Alpha already shows for the
+  // same reason.
+  function updateOfflineBanner() {
+    const banner = document.getElementById('offlineBanner');
+    if (banner) banner.hidden = navigator.onLine;
+  }
+  window.addEventListener('offline', updateOfflineBanner);
+  window.addEventListener('online', updateOfflineBanner);
+  updateOfflineBanner();
 })();
