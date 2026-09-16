@@ -968,18 +968,25 @@ function checkLocalStorageAvailable() {
   }
 }
 
-// Service worker registration state resolves asynchronously and doesn't
-// change once known, so it's checked once here rather than on every
-// loadStatus() tick, and cached in this module-level variable for
-// renderBrowserDiagnostics to read whenever it next runs.
+// Service worker registration resolves asynchronously, and on a first-ever
+// visit it was still unregistered at the instant this script ran (the page's
+// own navigator.serviceWorker.register('/sw.js') call does not even fire
+// until the window's load event, after this runs), so a single check here
+// permanently cached "Not yet registered" even once registration actually
+// completed a moment later. Re-queried on every renderBrowserDiagnostics
+// call instead (each loadStatus() poll, same 30s cadence everything else on
+// this panel already refreshes on) and cached in this module-level variable
+// only so rendering itself can stay synchronous between checks.
 let serviceWorkerDiagnostic = ('serviceWorker' in navigator) ? 'Checking...' : 'Not supported in this browser';
-if ('serviceWorker' in navigator) {
+function refreshServiceWorkerDiagnostic() {
+  if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.getRegistration().then(reg => {
-    serviceWorkerDiagnostic = reg ? 'Registered' : 'Not yet registered';
+    serviceWorkerDiagnostic = reg ? (reg.active ? 'Registered' : 'Registering') : 'Not yet registered';
   }).catch(() => {
     serviceWorkerDiagnostic = 'Registration check failed';
   });
 }
+refreshServiceWorkerDiagnostic();
 
 // status: 'ok' (green), 'blocked' (amber, same treatment arch-card's
 // .badge-pending already gives an unfinished-but-not-broken feature), or
@@ -993,6 +1000,10 @@ function diagnosticRow(label, status, badgeText, detail) {
 function renderBrowserDiagnostics(connCheckCount, regimeObservationCount) {
   const body = document.getElementById('browserDiagnosticsBody');
   if (!body) return;
+
+  // Fire-and-forget: updates serviceWorkerDiagnostic in time for the next
+  // call (30s away), same lag the rest of this panel already tolerates.
+  refreshServiceWorkerDiagnostic();
 
   const storageOk = checkLocalStorageAvailable();
   const notifyStatus = !notifySupported ? 'info' : (Notification.permission === 'granted' ? 'ok' : Notification.permission === 'denied' ? 'blocked' : 'info');
