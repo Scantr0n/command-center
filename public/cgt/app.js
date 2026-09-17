@@ -288,20 +288,33 @@ const CERT_LOOKUP = {
   // cert numbers are shared with PSA/DNA's autograph-only database, so a
   // bare /cert/<number> can land on the wrong item type for a colliding id.
   PSA: { deepLink: cert => 'https://www.psacard.com/cert/' + encodeURIComponent(cert) + '/psa' },
-  BGS: { deepLink: cert => 'https://www.beckett.com/grading/card-lookup?item_id=' + encodeURIComponent(cert) + '&item_type=BGS' },
+  // Beckett's own site, not just this one lookup tool, has had real
+  // multi-day outages in 2026 (see the Grading service tiers reference
+  // section's Beckett notes) -- BECKETT_SITE_STATUS_NOTE below surfaces
+  // that here too, since a dead cert/pop-report link with no explanation
+  // reads as this tool being broken rather than the grader's own site.
+  BGS: { deepLink: cert => 'https://www.beckett.com/grading/card-lookup?item_id=' + encodeURIComponent(cert) + '&item_type=BGS', note: true },
   SGC: { landing: 'https://www.gosgc.com/auth-code' },
   CGC: { landing: 'https://www.cgccards.com/verify' },
   KSA: { landing: 'https://www.ksagrading.com/pages/card-serial-number-verification' }
 };
 
+// Deliberately not dated (contrast the Grading service tiers reference
+// section, which does date its Beckett outage note): that section gets
+// reviewed and refreshed as part of the real research pass on grading
+// tiers, but this link note has no such refresh cycle, so a hardcoded date
+// would just go stale in place. "has had" stays true regardless of whether
+// beckett.com happens to be up the moment this link is clicked.
+const BECKETT_SITE_STATUS_NOTE = "Beckett's own site (beckett.com) has had real multi-day outages in 2026. If this link won't load, it's likely the site, not this card -- check the Grading service tiers reference section above for its current status.";
+
 function certLookupLink(c) {
   const entry = c.gradingCompany && CERT_LOOKUP[c.gradingCompany];
   if (!entry) return null;
   if (entry.deepLink && c.certNumber) {
-    return { url: entry.deepLink(c.certNumber), text: 'Verify cert on ' + c.gradingCompany + '.com' };
+    return { url: entry.deepLink(c.certNumber), text: 'Verify cert on ' + c.gradingCompany + '.com', note: entry.note ? BECKETT_SITE_STATUS_NOTE : null };
   }
   if (entry.landing) {
-    return { url: entry.landing, text: 'Open ' + c.gradingCompany + ' cert lookup (enter cert by hand)' };
+    return { url: entry.landing, text: 'Open ' + c.gradingCompany + ' cert lookup (enter cert by hand)', note: entry.note ? BECKETT_SITE_STATUS_NOTE : null };
   }
   return null;
 }
@@ -320,13 +333,15 @@ function certLookupLink(c) {
 // neither gets an entry here and no link is shown for them.
 const POP_REPORT_LOOKUP = {
   PSA: { url: 'https://www.psacard.com/pop/search', text: 'Search PSA population report' },
-  BGS: { url: 'https://www.beckett.com/grading/pop-report', text: 'Open BGS population report (Beckett login required)' },
+  BGS: { url: 'https://www.beckett.com/grading/pop-report', text: 'Open BGS population report (Beckett login required)', note: true },
   SGC: { url: 'https://www.gosgc.com/pop-report', text: 'Search SGC population report' },
   CGC: { url: 'https://www.cgccards.com/population-report/', text: 'Browse CGC population report' }
 };
 
 function popReportLink(c) {
-  return (c.gradingCompany && POP_REPORT_LOOKUP[c.gradingCompany]) || null;
+  const entry = c.gradingCompany && POP_REPORT_LOOKUP[c.gradingCompany];
+  if (!entry) return null;
+  return { url: entry.url, text: entry.text, note: entry.note ? BECKETT_SITE_STATUS_NOTE : null };
 }
 
 // A real, stable eBay search URL pattern (the _nkw keyword param has worked
@@ -2257,13 +2272,17 @@ function openModal(id) {
   body += field('Cert number', activeCard.certNumber, !activeCard.certNumber);
   const lookup = certLookupLink(activeCard);
   if (lookup) {
-    body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
+    body += `<div class="field-row">
+      <a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a>
+      ${lookup.note ? `<div class="field-note">${escapeHtml(lookup.note)}</div>` : ''}
+    </div>`;
   }
   const pop = popReportLink(activeCard);
   if (pop) {
     body += `<div class="field-row">
       <a href="${escapeHtml(pop.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(pop.text)} &rarr;</a>
       <div class="field-note">How many copies of this card ${escapeHtml(activeCard.gradingCompany)} has graded at each grade, real rarity context for a grading decision, separate from verifying this one cert above.</div>
+      ${pop.note ? `<div class="field-note">${escapeHtml(pop.note)}</div>` : ''}
     </div>`;
   }
   body += field('Storage location', activeCard.storageLocation, !activeCard.storageLocation);
