@@ -10,6 +10,7 @@
   const csvBtn = document.getElementById('csvBtn');
   const releasesCsvBtn = document.getElementById('releasesCsvBtn');
   const leadsCsvBtn = document.getElementById('leadsCsvBtn');
+  const channelsCsvBtn = document.getElementById('channelsCsvBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
   const copyPublicBtn = document.getElementById('copyPublicBtn');
   const copyStatusLive = document.getElementById('copyStatusLive');
@@ -1303,6 +1304,43 @@
     URL.revokeObjectURL(url);
   }
 
+  // Same export pattern as releases/downloads/leads above, closing the same
+  // gap for the one remaining real-data record type that had no export:
+  // channels.json already carries 3 real, hand-logged channels, unlike
+  // goals.json (still empty, see the note above exportReleasesCsv for why
+  // that one is skipped for now). linkedValue mirrors renderChannels' own
+  // lookup so the exported number matches what the card on screen shows,
+  // never a second, possibly-stale copy of it.
+  function exportChannelsCsv(channelsData, downloadsData, leadsData) {
+    const channels = channelsData.channels || [];
+    function linkedValue(c) {
+      if (c.linkedMetric === 'downloads') {
+        const metric = (downloadsData && downloadsData.metric) || {};
+        const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        if (checks.length === 0) return '';
+        return checks[checks.length - 1].count;
+      }
+      if (c.linkedMetric === 'leads') {
+        const leads = ((leadsData && leadsData.leads) || []).filter(l => l.channelId === c.id);
+        return leads.length || '';
+      }
+      return '';
+    }
+    const header = ['Id', 'Name', 'Status', 'Linked metric', 'Current value', 'Note'].map(csvField).join(',');
+    const lines = channels.map(c =>
+      [c.id, c.name, c.status, c.linkedMetric, linkedValue(c), c.note].map(csvField).join(','));
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sondrik-channels-' + todayIso() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // Quick-log tool: turns a small form into the exact JSON object to paste
   // into downloads.json or leads.json by hand, same "generate paste-ready
   // JSON, save nothing" pattern CSM's quick-add uses for prospects. Never
@@ -1701,9 +1739,11 @@
 
     if (channelsData) {
       renderChannels(channelsData, downloadsData, leadsData);
+      channelsCsvBtn.addEventListener('click', () => exportChannelsCsv(channelsData, downloadsData, leadsData));
     } else {
       channelsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load channels data: ' +
         escapeHtml(channelsResult.reason.message) + '</div>';
+      channelsCsvBtn.disabled = true;
     }
 
     if (leadsData) {
