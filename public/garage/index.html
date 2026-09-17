@@ -595,6 +595,62 @@
     </div>
   </section>
 
+  <section id="electronicsRulesSection">
+    <h2 class="section-title">Electronics &amp; battery-item rules by platform</h2>
+    <div class="callout">
+      Relevant to the softball swing analyzer, the one battery-powered item actually live right now, sourced from
+      each platform's own current electronics/dangerous-goods policy and USPS's lithium battery mailing rules as of
+      September 2026. This is a separate concern from the packaging table above: that one governs the box, this one
+      governs whether the item can be listed at all, and how it has to ship once it can.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Can a battery-powered device be listed</th>
+            <th>Real gotcha</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>eBay</td>
+            <td>Yes</td>
+            <td>USPS requires the "installed in equipment" battery, like the one in the swing analyzer, to ship
+              differently from a loose spare: installed is mailable via air or ground in limited quantity, a loose
+              spare battery not packed with its device is Ground-only. A pre-owned electronic containing a lithium
+              battery is restricted to Ground Advantage, Retail Ground, or Parcel Select, no air/Priority service,
+              and needs the current lithium battery mark on the label; the older mark without a phone number retires
+              December 31, 2026</td>
+          </tr>
+          <tr>
+            <td>Vinted</td>
+            <td>Yes, with limits</td>
+            <td>Battery capacity is capped at 100 Wh, and a package can carry at most 2 batteries, with at most 2
+              battery-powered devices in one bundle; a battery that's damaged, swollen, corroding, or leaking can't
+              be shipped at all, check it before packing, not just before listing</td>
+          </tr>
+          <tr>
+            <td>Poshmark</td>
+            <td>Yes, with a data-wipe step</td>
+            <td>A pre-owned electronic has to be logged out of and disconnected from any linked account or app, and
+              factory-reset where that's possible, before it ships; for the swing analyzer specifically, unpair it
+              from Jack's own phone and any swing-tracking app account first, the same class of "looks done, isn't"
+              risk as the eBay return-policy bug logged above</td>
+          </tr>
+          <tr>
+            <td>Depop</td>
+            <td><strong>No</strong>, not allowed at all</td>
+            <td>Depop bans any item that runs on electrical power, including batteries, with a narrow exception for
+              cameras/camcorders; the swing analyzer doesn't qualify for that exception. It's correctly logged as
+              <code>ebay</code>-only in listings.json right now, keep it that way rather than adding it to a Depop
+              cross-post later</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="shippingCostSection">
     <h2 class="section-title">Shipping cost reference: flat rate vs weight-based</h2>
     <div class="callout">
