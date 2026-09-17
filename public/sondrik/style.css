@@ -795,6 +795,10 @@ section { margin-bottom: 36px; }
   border-color: rgba(224,160,48,0.35);
   color: #E0A030;
 }
+.empty-state-cta {
+  display: block;
+  margin: 14px auto 0;
+}
 
 /* Channels */
 .channel-grid {

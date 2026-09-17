@@ -69,6 +69,31 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  // An empty state that just says "add one to whatever.json" is a dead end,
+  // the quick-log tool that builds that exact JSON already exists further
+  // up the page but stays collapsed and easy to miss. This turns each empty
+  // state into a real CTA surface: it opens the <details>, scrolls the
+  // matching form into view, and focuses its first field. Delegated on
+  // document since the empty-state buttons are re-created on every render.
+  function openQuickLogForm(formId) {
+    const details = document.getElementById('quickLogTool');
+    const form = document.getElementById(formId);
+    if (!details || !form) return;
+    details.open = true;
+    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const firstField = form.querySelector('input, select, textarea');
+    if (firstField) firstField.focus();
+  }
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-open-quick-log]');
+    if (btn) openQuickLogForm(btn.getAttribute('data-open-quick-log'));
+  });
+
+  function emptyStateCta(formId, label) {
+    return '<button type="button" class="print-btn empty-state-cta" data-open-quick-log="' +
+      escapeHtml(formId) + '">' + escapeHtml(label) + '</button>';
+  }
+
   function daysBetween(a, b) {
     return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
   }
@@ -241,7 +266,8 @@
   function renderReleases(data) {
     const releases = (data.releases || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     if (releases.length === 0) {
-      releaseSection.innerHTML = '<div class="empty-state">No releases logged yet.</div>';
+      releaseSection.innerHTML = '<div class="empty-state">No releases logged yet.' +
+        emptyStateCta('quickReleaseForm', 'Log one now') + '</div>';
       return;
     }
     releaseSection.innerHTML = releases.map((r, idx) => {
@@ -356,7 +382,8 @@
     const metric = data.metric || {};
     const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     if (checks.length === 0) {
-      tractionSection.innerHTML = '<div class="empty-state">No download checks logged yet.</div>';
+      tractionSection.innerHTML = '<div class="empty-state">No download checks logged yet.' +
+        emptyStateCta('quickCheckForm', 'Log one now') + '</div>';
       return;
     }
 
@@ -573,7 +600,8 @@
     const goals = (goalsData && goalsData.goals) || [];
     if (goals.length === 0) {
       goalsSection.innerHTML = '<div class="empty-state">No goal set yet. Add one to ' +
-        '<code>public/sondrik/data/goals.json</code> once there is a real target to track against.</div>';
+        '<code>public/sondrik/data/goals.json</code> once there is a real target to track against.' +
+        emptyStateCta('quickGoalForm', 'Log one now') + '</div>';
       return;
     }
     goalsSection.innerHTML = goals.map(g => {
@@ -701,7 +729,8 @@
   function renderChannels(channelsData, downloadsData, leadsData) {
     const channels = channelsData.channels || [];
     if (channels.length === 0) {
-      channelsSection.innerHTML = '<div class="empty-state">No channels logged yet.</div>';
+      channelsSection.innerHTML = '<div class="empty-state">No channels logged yet.' +
+        emptyStateCta('quickChannelForm', 'Log one now') + '</div>';
       return;
     }
 
@@ -826,7 +855,8 @@
   function renderLeads(data) {
     const leads = data.leads || [];
     if (leads.length === 0) {
-      leadsSection.innerHTML = '<div class="empty-state">No leads logged yet.</div>';
+      leadsSection.innerHTML = '<div class="empty-state">No leads logged yet.' +
+        emptyStateCta('quickLeadForm', 'Log one now') + '</div>';
       return;
     }
     const duplicateIds = new Set();
