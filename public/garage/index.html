@@ -937,6 +937,65 @@
     </div>
   </section>
 
+  <section id="bundleSection">
+    <h2 class="section-title">Multi-item bundle discount</h2>
+    <div class="callout">
+      Real per-platform bundle mechanics, sourced from each platform's own current seller documentation as of
+      September 2026. <strong>Poshmark</strong>: a seller-set Bundle Discount, a percentage plus a minimum item
+      count set once under Account &gt; My Seller Discount, applies automatically whenever a buyer checks out
+      2+ items from the same closet together; buyers also pay one flat $7.97 shipping charge per order either
+      way as of 2026, so bundling turns that fixed shipping cost into a per-item win for the buyer even before
+      any seller discount. <strong>Vinted</strong>: a Standard seller can set a closet-wide bundle discount that
+      applies automatically on a 2+ item order, and the items ship on one combined postage label instead of
+      separate ones, but Vinted charges the seller no fee at all, so a Vinted bundle discount is pure shipping
+      convenience for the buyer, not a seller fee saving. <strong>eBay</strong>: nothing applies by itself, a
+      seller sets Combined Shipping Discount rules under Shipping preferences that cut shipping cost on a
+      multi-item order from one buyer; the same 13.6% final value fee documented above still applies per item,
+      only the one $0.30/$0.40 per-order fee is shared once instead of paid per listing. <strong>Depop</strong>
+      has no native checkout bundle at all, a bundle there is the manual "Bundle / combined shipping request"
+      message template above, priced and closed out by hand. This calculator models the one real lever that's
+      actually about seller net, not shipping: paying the fixed per-order fee once on a combined sale instead of
+      once per separate listing, against whatever discount is actually offered.
+    </div>
+    <div class="calc-row" id="bundleItemRows"></div>
+    <div class="calc-row">
+      <button type="button" class="print-btn font-mono" id="bundleAddItemBtn">+ Add item</button>
+      <div class="calc-price-input-wrap">
+        <label for="bundleDiscountInput" class="calc-price-prefix font-mono">discount %</label>
+        <input
+          type="number"
+          id="bundleDiscountInput"
+          class="calc-price-input font-mono"
+          min="0"
+          max="100"
+          step="1"
+          inputmode="numeric"
+          placeholder="0"
+          aria-label="Bundle discount percent off the combined price">
+      </div>
+      <div class="filter-row" id="bundlePlatformToggle" role="group" aria-label="Platforms to include in bundle calculator" style="margin-bottom:0">
+        <button type="button" class="chip" data-platform="ebay" aria-pressed="true">eBay</button>
+        <button type="button" class="chip" data-platform="vinted" aria-pressed="true">Vinted</button>
+        <button type="button" class="chip" data-platform="poshmark" aria-pressed="true">Poshmark</button>
+        <button type="button" class="chip" data-platform="depop" aria-pressed="true">Depop</button>
+      </div>
+    </div>
+    <div class="table-wrap" aria-live="polite" aria-atomic="true">
+      <table class="card-table" id="bundleTable">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Sold separately, net</th>
+            <th>Bundled at this discount, net</th>
+            <th>Swing</th>
+          </tr>
+        </thead>
+        <tbody id="bundleTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="bundleTableEmpty">Enter at least two item prices above to compare.</div>
+    </div>
+  </section>
+
   <section id="offerGuideSection">
     <h2 class="section-title">Offer response guide</h2>
     <div class="callout">

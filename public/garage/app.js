@@ -1321,6 +1321,118 @@ function wireBreakEven() {
   renderBreakEven();
 }
 
+// Multi-item bundle discount calculator: the one real seller-net lever in a
+// bundle sale, separate from the shipping-convenience angle covered in the
+// callout text. eBay/Poshmark/Depop each charge their fixed per-order fee
+// once per transaction, so combining N items into one sale pays that fee
+// once instead of N times; Vinted charges the seller no fee at all, so it
+// always shows the full discount as a loss with no offsetting saving, which
+// is the real, correct answer for that platform, not a bug in this table.
+let bundleItemValues = ['', ''];
+let bundlePlatforms = new Set(PAYOUT_PLATFORMS);
+
+function bundleItemRowHtml(i, value) {
+  return `
+    <div class="bundle-item-row" data-bundle-row="${i}">
+      <div class="calc-price-input-wrap">
+        <label class="calc-price-prefix font-mono" for="bundleItem${i}">item ${i + 1} $</label>
+        <input
+          type="number"
+          id="bundleItem${i}"
+          class="calc-price-input font-mono bundle-item-input"
+          data-row-index="${i}"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0.00"
+          value="${escapeHtml(value)}"
+          aria-label="Item ${i + 1} asking price">
+      </div>
+      <button type="button" class="bundle-remove-btn" data-remove-row="${i}" aria-label="Remove item ${i + 1}"${bundleItemValues.length <= 2 ? ' disabled' : ''}>&times;</button>
+    </div>`;
+}
+
+function renderBundleItemRows() {
+  const container = document.getElementById('bundleItemRows');
+  container.innerHTML = bundleItemValues.map((v, i) => bundleItemRowHtml(i, v)).join('');
+  container.querySelectorAll('.bundle-item-input').forEach(input => {
+    input.addEventListener('input', e => {
+      bundleItemValues[Number(e.target.getAttribute('data-row-index'))] = e.target.value;
+      renderBundle();
+    });
+  });
+  container.querySelectorAll('[data-remove-row]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (bundleItemValues.length <= 2) return;
+      bundleItemValues.splice(Number(btn.getAttribute('data-remove-row')), 1);
+      renderBundleItemRows();
+      renderBundle();
+    });
+  });
+}
+
+function renderBundle() {
+  const discountInput = document.getElementById('bundleDiscountInput');
+  const tbody = document.getElementById('bundleTableBody');
+  const empty = document.getElementById('bundleTableEmpty');
+  const table = document.getElementById('bundleTable');
+
+  const prices = bundleItemValues
+    .map(v => v.trim() === '' ? null : Number(v))
+    .filter(n => n != null && !Number.isNaN(n) && n >= 0);
+
+  if (prices.length < 2 || bundlePlatforms.size === 0) {
+    table.hidden = true;
+    empty.hidden = false;
+    empty.textContent = bundlePlatforms.size === 0
+      ? 'No platforms selected above.'
+      : 'Enter at least two item prices above to compare.';
+    return;
+  }
+  table.hidden = false;
+  empty.hidden = true;
+
+  const discountRaw = Number(discountInput.value);
+  const discountPct = Number.isNaN(discountRaw) ? 0 : Math.min(100, Math.max(0, discountRaw));
+  const bundleTotal = prices.reduce((s, p) => s + p, 0) * (1 - discountPct / 100);
+
+  const rows = PAYOUT_PLATFORMS.filter(p => bundlePlatforms.has(p)).map(p => {
+    const separateNet = prices.reduce((s, price) => s + estimateNetPayout(p, price), 0);
+    const bundledNet = estimateNetPayout(p, bundleTotal);
+    return { p, separateNet, bundledNet, swing: bundledNet - separateNet };
+  });
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
+      <td class="cell-muted">${formatUsd(r.separateNet)}</td>
+      <td class="cell-value">${formatUsd(r.bundledNet)}</td>
+      <td class="cell-value${r.swing < 0 ? ' cell-value-loss' : ''}">${r.swing >= 0 ? '+' : ''}${formatUsd(r.swing)}</td>
+    </tr>
+  `).join('');
+}
+
+function wireBundle() {
+  renderBundleItemRows();
+  document.getElementById('bundleAddItemBtn').addEventListener('click', () => {
+    bundleItemValues.push('');
+    renderBundleItemRows();
+    renderBundle();
+  });
+  document.getElementById('bundleDiscountInput').addEventListener('input', renderBundle);
+  const container = document.getElementById('bundlePlatformToggle');
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const platform = chip.getAttribute('data-platform');
+      const nowOn = chip.getAttribute('aria-pressed') !== 'true';
+      chip.setAttribute('aria-pressed', String(nowOn));
+      if (nowOn) bundlePlatforms.add(platform); else bundlePlatforms.delete(platform);
+      renderBundle();
+    });
+  });
+  renderBundle();
+}
+
 // Offer response guide: applies a real, documented counteroffer-ladder
 // framework (accept near-target, counter once on good-but-low, let a
 // borderline offer's answer depend on real listing age, decline a deep
@@ -2747,6 +2859,7 @@ function wireQuickLogExpenseTool() {
 
 wireCalc();
 wireBreakEven();
+wireBundle();
 wireOfferGuide();
 wireMessageTemplates();
 wireChecklist();

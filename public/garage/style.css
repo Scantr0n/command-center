@@ -370,6 +370,22 @@ section { margin-bottom: 36px; }
 .calc-cost-field { display: flex; flex-direction: column; gap: 4px; }
 .calc-cost-error { color: #E56464; font-size: 0.72rem; margin: 0; }
 
+.bundle-item-row { display: flex; align-items: center; gap: 6px; }
+.bundle-remove-btn {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  color: var(--dim);
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.bundle-remove-btn:hover:not(:disabled) { border-color: var(--hairlineHover); color: var(--ink); }
+.bundle-remove-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
 .pace-result-note {
   font-size: 0.85rem;
   color: var(--sub);
