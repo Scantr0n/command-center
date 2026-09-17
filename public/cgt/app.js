@@ -222,6 +222,13 @@ function publishedTurnaroundDays(gradingCompany, serviceLevel) {
   if (!entry) return null;
   if (serviceLevel) {
     const norm = serviceLevel.toLowerCase().trim();
+    // Exact tier name first: PSA's "super express" and "value max"/"value
+    // plus"/"value bulk" each contain a shorter real tier name ("express",
+    // "value"), so a plain bidirectional substring match on those returns
+    // the wrong tier's turnaround for the shorter, more common one. Only
+    // fall back to substring matching for a serviceLevel that doesn't
+    // exactly match any known tier (e.g. minor wording variations).
+    if (Object.prototype.hasOwnProperty.call(entry.tiers, norm)) return entry.tiers[norm];
     for (const [tierName, days] of Object.entries(entry.tiers)) {
       if (norm.includes(tierName) || tierName.includes(norm)) return days;
     }
