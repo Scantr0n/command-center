@@ -401,6 +401,26 @@ header.page-head .sub {
   color: var(--dim);
 }
 
+/* Sparkline paired with the fetch-latency reading above: a compact trend
+   line, no axes or labels by design (see renderLatencySparkline's own
+   comment in app.js), same real recorded samples the text reading already
+   uses. Sits flush against .conn-latency rather than wrapping onto its own
+   row, since it is a companion to that reading, not a separate stat. */
+.conn-latency-spark {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.latency-spark-line {
+  stroke: var(--sub);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.latency-spark-dot {
+  fill: #3DDC84;
+}
+
 .refresh-btn {
   font-size: 0.72rem;
   color: var(--sub);

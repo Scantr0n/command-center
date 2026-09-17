@@ -445,6 +445,49 @@ function averageLatency(history) {
   return Math.round(sum / recent.length);
 }
 
+// The "Fetch Xms (avg Yms)" text next to the connection strip gives the
+// latest and average reading but not the shape between them, exactly what a
+// sparkline is for (a compact trend line paired with a KPI, no axes or
+// labels, real-status-dashboard convention: UptimeRobot/Statuspage-style
+// response-time widgets all pair the current number with one of these).
+// Built only from the same real, already-recorded CLIENT_LATENCY_HISTORY_KEY
+// samples the text reading already uses, same LATENCY_AVG_WINDOW so the
+// line and the "avg" figure describe the same window; never a separate or
+// estimated series. Returns '' (nothing rendered) with fewer than 2 points,
+// since a single point has no trend to show, same honest-empty-state rule as
+// every other section on this page.
+const SPARK_W = 56;
+const SPARK_H = 18;
+const SPARK_PAD = 2;
+
+function renderLatencySparkline(history) {
+  const recent = (history || []).slice(-LATENCY_AVG_WINDOW).filter(e => typeof e.ms === 'number' && Number.isFinite(e.ms));
+  if (recent.length < 2) return '';
+  const values = recent.map(e => e.ms);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  const innerW = SPARK_W - SPARK_PAD * 2;
+  const innerH = SPARK_H - SPARK_PAD * 2;
+  const points = values.map((v, i) => {
+    const x = SPARK_PAD + (values.length === 1 ? 0 : (i / (values.length - 1)) * innerW);
+    // range === 0 means every recent sample was identical: draw a flat line
+    // through the middle rather than dividing by zero.
+    const y = SPARK_PAD + (range === 0 ? innerH / 2 : innerH - ((v - min) / range) * innerH);
+    return [x, y];
+  });
+  const path = points.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const last = points[points.length - 1];
+  const title = 'Last ' + recent.length + ' fetches: ' + min + 'ms to ' + max + 'ms';
+  return `
+    <svg class="latency-spark" width="${SPARK_W}" height="${SPARK_H}" viewBox="0 0 ${SPARK_W} ${SPARK_H}" role="img" aria-label="${escapeHtml(title)}">
+      <title>${escapeHtml(title)}</title>
+      <polyline points="${path}" class="latency-spark-line" fill="none" />
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="1.6" class="latency-spark-dot" />
+    </svg>
+  `;
+}
+
 // live.regime is sent as a single current value, never a history (see the
 // schema-help row for live.regime), so this page has no way to show how
 // Alpha's regime detection has actually behaved over time, only its reading
@@ -544,6 +587,8 @@ function renderConnection(data, clientHistory, latencyHistory) {
       ? 'Fetch ' + latest + 'ms' + (avg != null ? ' (avg ' + avg + 'ms)' : '')
       : '';
   }
+  const latencySparkEl = document.getElementById('connLatencySpark');
+  if (latencySparkEl) latencySparkEl.innerHTML = renderLatencySparkline(latencyHistory || []);
   const asOf = data.live && data.live.asOf;
   // connection.checkedAt is a distinct real field from live.asOf: it is when
   // connectivity itself was last probed, which can exist even with no live
