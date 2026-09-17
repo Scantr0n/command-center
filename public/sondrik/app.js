@@ -1856,6 +1856,106 @@
     }
   });
 
+  // "?" keyboard shortcuts overlay, same markup, CSS classes, and focus-trap
+  // behavior as the CGT, Garage, Alpha, and CSM hubs, closing the one gap
+  // that left Sondrik as the only hub without it. Wired independently of the
+  // Promise.allSettled data load above (it works even if every data file
+  // fails to load), since none of its real shortcuts depend on the fetched
+  // data, only on buttons and DOM structure that exist unconditionally.
+  let shortcutsOpen = false;
+  let shortcutsLastFocusedEl = null;
+
+  // Only the shortcuts this page actually wires up, never an invented or
+  // aspirational one. This page has no search box or custom list navigation
+  // like CGT/Garage/CSM, so "C" opens the one real single-key action already
+  // on the page (copy status update), the same pattern Alpha uses for its
+  // own single-key actions.
+  const SHORTCUTS = [
+    { keys: ['C'], label: 'Copy status update' },
+    { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
+    { keys: ['Esc'], label: 'Close the open dialog' },
+    { keys: ['?'], label: 'Show this help' }
+  ];
+
+  function renderShortcutsList() {
+    document.getElementById('shortcutsList').innerHTML = SHORTCUTS.map(s =>
+      '<div class="shortcut-row">' +
+      '<span class="shortcut-label">' + escapeHtml(s.label) + '</span>' +
+      '<span class="shortcut-keys">' +
+      s.keys.map(k => '<kbd class="shortcut-key">' + escapeHtml(k) + '</kbd>').join('<span class="shortcut-label">or</span>') +
+      '</span></div>'
+    ).join('');
+  }
+
+  function getShortcutsFocusable() {
+    return Array.from(document.getElementById('shortcutsModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openShortcuts() {
+    if (shortcutsOpen) return;
+    shortcutsOpen = true;
+    shortcutsLastFocusedEl = document.activeElement;
+    renderShortcutsList();
+    document.getElementById('shortcutsOverlay').hidden = false;
+    document.getElementById('shortcutsClose').focus();
+  }
+
+  function closeShortcuts() {
+    if (!shortcutsOpen) return;
+    shortcutsOpen = false;
+    document.getElementById('shortcutsOverlay').hidden = true;
+    if (shortcutsLastFocusedEl && typeof shortcutsLastFocusedEl.focus === 'function') shortcutsLastFocusedEl.focus();
+    shortcutsLastFocusedEl = null;
+  }
+
+  document.getElementById('shortcutsBtn').addEventListener('click', openShortcuts);
+  document.getElementById('shortcutsClose').addEventListener('click', closeShortcuts);
+  document.getElementById('shortcutsOverlay').addEventListener('click', e => {
+    if (e.target.id === 'shortcutsOverlay') closeShortcuts();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!shortcutsOpen) return;
+    if (e.key === 'Escape') { closeShortcuts(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getShortcutsFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
+  // "?" opens the overlay and "C" copies the status update, but never while
+  // the shortcuts overlay is already open (Tab/Esc above own that case) or
+  // while focus sits in a real text field (the quick-log forms all take
+  // free text, including one with a literal "?" placeholder character).
+  document.addEventListener('keydown', e => {
+    if (shortcutsOpen) return;
+    const active = document.activeElement;
+    const tag = active && active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
+
+    if (e.key === '?') {
+      e.preventDefault();
+      openShortcuts();
+      return;
+    }
+    if (e.key === 'c' || e.key === 'C') {
+      if (copyStatusBtn.disabled) return;
+      e.preventDefault();
+      copyStatusBtn.click();
+    }
+  });
+
   // This device's own network path (navigator.onLine plus the real
   // online/offline events), a different question from whether the last fetch
   // succeeded: the service worker can serve a cached /data/*.json response

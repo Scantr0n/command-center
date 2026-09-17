@@ -29,6 +29,7 @@
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="backupBtn" class="print-btn font-mono" disabled title="Loading Sondrik data...">Download backup (.json)</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
+      <button type="button" id="shortcutsBtn" class="print-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
@@ -263,6 +264,14 @@
     <code>/sondrik/data/goals.json</code>, edited by hand until a real backend is wired in. Run
     <code>node public/sondrik/data/validate.js</code> after any edit.
   </footer>
+</div>
+
+<div class="modal-overlay" id="shortcutsOverlay" hidden>
+  <div class="modal" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+    <button class="modal-close" id="shortcutsClose" aria-label="Close">&times;</button>
+    <h3 id="shortcutsTitle" class="font-display">Keyboard shortcuts</h3>
+    <div class="shortcuts-list" id="shortcutsList"></div>
+  </div>
 </div>
 
 <script src="/sondrik/app.js"></script>
