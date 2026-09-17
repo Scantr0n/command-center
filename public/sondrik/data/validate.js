@@ -95,6 +95,7 @@ function main() {
   const checks = metric.checks || [];
   const seenDates = new Set();
   let prevDate = null;
+  let prevCount = null;
   checks.forEach((c, idx) => {
     const where = 'metric.checks[' + idx + ']';
     if (!isDateOrNull(c.date)) errors.push(where + ': "date" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.date));
@@ -109,6 +110,16 @@ function main() {
     }
     if (typeof c.count !== 'number' || c.count < 0) {
       errors.push(where + ': "count" must be a non-negative number, got ' + JSON.stringify(c.count));
+    } else {
+      // A GitHub release download count is cumulative and can only go up.
+      // A later check reading lower than an earlier one almost always means
+      // a transposed digit or the wrong check pasted in, not a real drop, so
+      // this is worth flagging even though it can't tell which entry is wrong.
+      if (prevCount !== null && c.count < prevCount) {
+        warnings.push(where + ': count (' + c.count + ') is lower than the previous check (' + prevCount +
+          '), a real cumulative download count should not go down, check for a typo');
+      }
+      prevCount = c.count;
     }
   });
 
