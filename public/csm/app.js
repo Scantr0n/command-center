@@ -27,6 +27,7 @@
   const funnelListEl = document.getElementById('funnelList');
   const channelEffListEl = document.getElementById('channelEffList');
   const categoryEffListEl = document.getElementById('categoryEffList');
+  const socialReachListEl = document.getElementById('socialReachList');
   const attentionBarEl = document.getElementById('attentionBar');
   const ACTIVITY_PREVIEW_COUNT = 8;
 
@@ -889,6 +890,83 @@
     }).join('');
   }
 
+  // Aggregates real socialSnapshots across every prospect into per-platform
+  // reach totals. Only the most recent asOfDate entry per prospect per
+  // platform counts, so logging a refresh snapshot never double-counts that
+  // same account's followers under the same platform. This is a rollup of
+  // one-time manual research pulls, never a live number, same honesty rule
+  // socialSnapshotStaleInfo already enforces per snapshot in the modal.
+  function computeSocialReach(prospects) {
+    const byPlatform = {};
+    const order = [];
+    function bucketFor(platform) {
+      if (!byPlatform[platform]) {
+        byPlatform[platform] = {
+          platform, prospectCount: 0, totalFollowers: 0, hasFollowers: false,
+          engagementSum: 0, engagementCount: 0, mostRecentAsOf: null, staleCount: 0
+        };
+        order.push(platform);
+      }
+      return byPlatform[platform];
+    }
+    prospects.forEach(p => {
+      const latestByPlatform = {};
+      (p.socialSnapshots || []).forEach(snap => {
+        if (!snap || !snap.platform) return;
+        const existing = latestByPlatform[snap.platform];
+        if (!existing || (snap.asOfDate || '') > (existing.asOfDate || '')) {
+          latestByPlatform[snap.platform] = snap;
+        }
+      });
+      Object.values(latestByPlatform).forEach(snap => {
+        const bucket = bucketFor(snap.platform);
+        bucket.prospectCount += 1;
+        if (snap.followers != null) {
+          bucket.totalFollowers += Number(snap.followers);
+          bucket.hasFollowers = true;
+        }
+        if (snap.engagementRate != null) {
+          bucket.engagementSum += Number(snap.engagementRate);
+          bucket.engagementCount += 1;
+        }
+        if (snap.asOfDate && (!bucket.mostRecentAsOf || snap.asOfDate > bucket.mostRecentAsOf)) {
+          bucket.mostRecentAsOf = snap.asOfDate;
+        }
+        if (socialSnapshotStaleInfo(snap)) bucket.staleCount += 1;
+      });
+    });
+    return order.map(key => byPlatform[key])
+      .sort((a, b) => b.totalFollowers - a.totalFollowers || b.prospectCount - a.prospectCount ||
+        a.platform.localeCompare(b.platform));
+  }
+
+  function renderSocialReach(prospects) {
+    const results = computeSocialReach(prospects);
+    if (results.length === 0) {
+      socialReachListEl.innerHTML = '<p class="channel-eff-empty">No social snapshots logged for any prospect ' +
+        'yet. Once a real socialSnapshots entry is logged, reach aggregates here by platform, one-time research ' +
+        'pulls only, never a live number.</p>';
+      return;
+    }
+    socialReachListEl.innerHTML = results.map(r => {
+      const followersText = r.hasFollowers ? r.totalFollowers.toLocaleString() + ' followers' : 'no follower counts logged';
+      const engagementText = r.engagementCount ? (r.engagementSum / r.engagementCount).toFixed(1) + '% avg engagement' : null;
+      const asOfText = r.mostRecentAsOf ? 'most recent pull ' + fmtDate(r.mostRecentAsOf) : 'no as-of date logged';
+      const staleText = r.staleCount
+        ? '<span class="snapshot-tag-stale"> &middot; ' + r.staleCount + ' of ' + r.prospectCount + ' due for refresh</span>'
+        : '';
+      return '<div class="channel-eff-row">' +
+        '<div class="channel-eff-row-head">' +
+        '<span class="channel-eff-label">' + escapeHtml(r.platform) + '</span>' +
+        '<span class="channel-eff-count font-mono">' + r.prospectCount + ' prospect' + (r.prospectCount === 1 ? '' : 's') + ' tracked</span>' +
+        '</div>' +
+        '<span class="channel-eff-rate font-mono">' + escapeHtml(followersText) +
+        (engagementText ? ' &middot; ' + escapeHtml(engagementText) : '') +
+        ' &middot; ' + escapeHtml(asOfText) + staleText + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
   function renderBoard(stages, prospects, allProspects, displayQuery, filtering) {
     const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
     // Built once per render from the same computeNudgeRows the Nudge Queue
@@ -1566,6 +1644,19 @@
       });
     } else {
       lines.push('  None yet.');
+    }
+
+    lines.push('');
+    lines.push('SOCIAL REACH BY PLATFORM');
+    const reach = computeSocialReach(prospects);
+    if (reach.length) {
+      reach.forEach(r => {
+        const followers = r.hasFollowers ? r.totalFollowers.toLocaleString() + ' followers' : 'no follower counts logged';
+        lines.push('  ' + r.platform + ': ' + r.prospectCount + ' prospect' + (r.prospectCount === 1 ? '' : 's') +
+          ' tracked, ' + followers);
+      });
+    } else {
+      lines.push('  No social snapshots logged yet.');
     }
 
     lines.push('');
@@ -3060,6 +3151,7 @@
       renderStageVelocity(allStages, allProspects);
       renderChannelEffectiveness(allProspects);
       renderCategoryEffectiveness(allProspects);
+      renderSocialReach(allProspects);
       applyFilter();
       if (initialProspectId && byId[initialProspectId]) openModal(initialProspectId);
       if (failures.length) {
@@ -3081,6 +3173,7 @@
       velocityListEl.innerHTML = '<p class="velocity-empty" role="alert">Failed to load.</p>';
       channelEffListEl.innerHTML = '<p class="channel-eff-empty" role="alert">Failed to load.</p>';
       categoryEffListEl.innerHTML = '<p class="channel-eff-empty" role="alert">Failed to load.</p>';
+      socialReachListEl.innerHTML = '<p class="channel-eff-empty" role="alert">Failed to load.</p>';
     }
   });
 
