@@ -1172,6 +1172,12 @@ function buildDataQualityFlags() {
       if (c.estimatedValue != null && !c.sourceNote) reasons.push('PRICED BUT NO SOURCE LOGGED');
       if (c.estimatedValue != null && !c.datePriced) reasons.push('PRICED BUT NO DATE LOGGED');
       if (c.gradingCompany && !c.certNumber) reasons.push('NO CERT NUMBER LOGGED');
+      // Same condition validate.js already warns on (CGTValidateCore), surfaced
+      // here too since a swapped soldDate/datePriced silently corrupts the
+      // realized gain/loss math (computeRealizedGainLoss trusts these fields
+      // as given) and previously only showed up by running the CLI validator
+      // by hand.
+      if (c.soldDate && c.datePriced && c.soldDate < c.datePriced) reasons.push('SOLD DATE BEFORE PRICED DATE');
       return { c, reasons };
     })
     .filter(x => x.reasons.length > 0);
