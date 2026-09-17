@@ -839,10 +839,17 @@
       // text next to it, same reasoning as the CHANNEL_EFF_MIN_N_FOR_RATE
       // comment above: a filled-looking bar next to "sample too small for a
       // rate" would still visually claim the rate it says it can't show.
+      // ratePct (the real, unfloored rounded rate) is kept separate from
+      // widthPct (the same rate floored to 2% so a genuinely nonzero result
+      // still renders as a visible sliver of bar), same split renderFunnel
+      // already keeps between its own widthPct and conversionFromPrev: the
+      // floor is a bar-visibility fix, not something that belongs in the
+      // printed number, or a true 1% would display as a fabricated 2%.
+      const ratePct = Math.round((r.advanced / r.contacted) * 100);
       const widthPct = r.contacted < CHANNEL_EFF_MIN_N_FOR_RATE ? 0
-        : r.advanced > 0 ? Math.max(2, Math.round((r.advanced / r.contacted) * 100)) : 0;
+        : r.advanced > 0 ? Math.max(2, ratePct) : 0;
       const rateHtml = r.contacted >= CHANNEL_EFF_MIN_N_FOR_RATE
-        ? '<span class="channel-eff-rate font-mono">' + widthPct + '% reached active exploration</span>'
+        ? '<span class="channel-eff-rate font-mono">' + ratePct + '% reached active exploration</span>'
         : '<span class="channel-eff-rate font-mono">Sample too small for a rate (n=' + r.contacted + ')</span>';
       return '<div class="channel-eff-row">' +
         '<div class="channel-eff-row-head">' +
@@ -874,10 +881,13 @@
       // Same empty-bar-below-threshold rule as computeCategoryEffectiveness's
       // render function above, plus the same zero-advanced guard: without it,
       // Math.max(2, ...) floors a genuine 0-of-N rate up to a fabricated 2%.
+      // ratePct/widthPct split for the same reason as renderCategoryEffectiveness
+      // above: the bar-visibility floor must never leak into the printed number.
+      const ratePct = Math.round((r.advanced / r.contacted) * 100);
       const widthPct = r.contacted < CHANNEL_EFF_MIN_N_FOR_RATE ? 0
-        : r.advanced > 0 ? Math.max(2, Math.round((r.advanced / r.contacted) * 100)) : 0;
+        : r.advanced > 0 ? Math.max(2, ratePct) : 0;
       const rateHtml = r.contacted >= CHANNEL_EFF_MIN_N_FOR_RATE
-        ? '<span class="channel-eff-rate font-mono">' + widthPct + '% reached active exploration</span>'
+        ? '<span class="channel-eff-rate font-mono">' + ratePct + '% reached active exploration</span>'
         : '<span class="channel-eff-rate font-mono">Sample too small for a rate (n=' + r.contacted + ')</span>';
       return '<div class="channel-eff-row">' +
         '<div class="channel-eff-row-head">' +
