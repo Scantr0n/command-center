@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /*
- * Validates listings.json, pipeline.json, activity.json, sales.json and
- * expenses.json against the field rules documented in public/garage/index.html.
+ * Validates listings.json, pipeline.json, activity.json, sales.json,
+ * expenses.json and disputes.json against the field rules documented in
+ * public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -21,7 +22,9 @@
  * amount: either a logged "amount", or (mileage entries only) real "miles"
  * on a real date the IRS has a published 2026 standard mileage rate for,
  * since a mileage deduction with no rate to apply it against isn't a real
- * number yet.
+ * number yet. Every disputes.json entry needs a real type and status, an
+ * "open" dispute shouldn't already carry a resolvedDate and a resolved one
+ * should, and a resolvedDate can't fall before its own openedDate.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -41,6 +44,8 @@ const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
 // deliberately left out here rather than treated as a validation error.
 const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
+const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
+const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
 // Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
 // Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
 // announced 2026-07-13 (irs.gov/newsroom: "IRS sets 2026 business standard
@@ -70,13 +75,14 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData, salesData, expensesData;
+  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
     activityData = loadJson('activity.json');
     salesData = loadJson('sales.json');
     expensesData = loadJson('expenses.json');
+    disputesData = loadJson('disputes.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -346,6 +352,65 @@ function main() {
     }
   });
 
+  const disputes = disputesData.disputes || [];
+  const seenDisputeIds = new Set();
+
+  disputes.forEach((d, idx) => {
+    const where = 'disputes[' + idx + ']' + (d && d.id ? ' (' + d.id + ')' : '');
+
+    if (!d.id) errors.push(where + ': missing "id"');
+    else if (seenDisputeIds.has(d.id)) errors.push(where + ': duplicate id "' + d.id + '"');
+    else seenDisputeIds.add(d.id);
+
+    if (!d.title) errors.push(where + ': missing "title"');
+
+    if (d.listingId !== null && d.listingId !== undefined && !listingById[d.listingId]) {
+      warnings.push(where + ': listingId "' + d.listingId + '" does not match any listing in listings.json (fine if that listing has since fully sold through and was removed)');
+    }
+
+    if (!d.platform) {
+      errors.push(where + ': missing "platform"');
+    } else if (!PLATFORMS.includes(d.platform)) {
+      errors.push(where + ': platform "' + d.platform + '" is not one of ' + PLATFORMS.join(', '));
+    }
+
+    if (!d.type) {
+      errors.push(where + ': missing "type"');
+    } else if (!DISPUTE_TYPES.includes(d.type)) {
+      errors.push(where + ': type "' + d.type + '" is not one of ' + DISPUTE_TYPES.join(', '));
+    }
+
+    if (!d.status) {
+      errors.push(where + ': missing "status"');
+    } else if (!DISPUTE_STATUSES.includes(d.status)) {
+      errors.push(where + ': status "' + d.status + '" is not one of ' + DISPUTE_STATUSES.join(', '));
+    }
+
+    if (!isDateOrNull(d.openedDate)) {
+      errors.push(where + ': "openedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(d.openedDate));
+    }
+    if (!isDateOrNull(d.resolvedDate)) {
+      errors.push(where + ': "resolvedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(d.resolvedDate));
+    }
+
+    if (d.status === 'open' && d.resolvedDate) {
+      warnings.push(where + ': status is "open" but "resolvedDate" is already set, mark it resolved-seller/resolved-buyer/resolved-split instead');
+    }
+    if (d.status && d.status !== 'open' && !d.resolvedDate) {
+      warnings.push(where + ': status "' + d.status + '" but "resolvedDate" is not logged yet');
+    }
+    if (d.openedDate && d.resolvedDate && d.resolvedDate < d.openedDate) {
+      errors.push(where + ': "resolvedDate" (' + d.resolvedDate + ') is before "openedDate" (' + d.openedDate + ')');
+    }
+
+    if (d.outcome !== null && d.outcome !== undefined && typeof d.outcome !== 'string') {
+      errors.push(where + ': "outcome" must be a string or null');
+    }
+    if (d.notes !== null && d.notes !== undefined && typeof d.notes !== 'string') {
+      errors.push(where + ': "notes" must be a string or null');
+    }
+  });
+
   // Every soldOn entry should have a matching sale logged, since a platform
   // only belongs in soldOn once something has actually sold there.
   listings.forEach(l => {
@@ -402,7 +467,8 @@ function main() {
   }
 
   console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
-    events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s)).');
+    events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
+    disputes.length + ' dispute(s)).');
   process.exit(0);
 }
 

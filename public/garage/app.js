@@ -1,6 +1,7 @@
 let listings = [];
 let salesLog = [];
 let expensesLog = [];
+let disputesLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 let sortKey = null;
@@ -11,6 +12,7 @@ let rawPipelineData = null;
 let rawActivityData = null;
 let rawSalesData = null;
 let rawExpensesData = null;
+let rawDisputesData = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
@@ -56,6 +58,14 @@ const PAYOUT_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
 const EXPENSE_CATEGORY_LABELS = {
   mileage: 'Mileage', supplies: 'Supplies', 'platform-fees': 'Platform fees',
   subscriptions: 'Subscriptions', other: 'Other'
+};
+const DISPUTE_TYPE_LABELS = {
+  return: 'Return', 'not-as-described': 'Not as described', damaged: 'Damaged',
+  'never-arrived': 'Never arrived', other: 'Other'
+};
+const DISPUTE_STATUS_LABELS = {
+  open: 'Open', 'resolved-seller': "Resolved, seller's favor",
+  'resolved-buyer': "Resolved, buyer's favor", 'resolved-split': 'Resolved, split'
 };
 
 // Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
@@ -123,6 +133,46 @@ function estimateNetPayout(platform, price) {
   }
 }
 
+// Real response-clock math for the two platforms with a published fixed
+// window (see the "Return & dispute handling, by platform" reference table
+// above, sourced from each platform's own help-center docs as of September
+// 2026): eBay gives the seller 3 *business* days before the buyer can ask
+// eBay to step in, Poshmark gives about 24 hours. Vinted and Depop have no
+// fixed clock, so there's no real deadline date to compute for them, the
+// table's own guidance is the honest answer instead.
+function addBusinessDays(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00');
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Only ever computed for a dispute that's still open and has a real
+// openedDate logged, a resolved case or one missing its open date has
+// nothing left to respond to (or nothing to compute a deadline from).
+function disputeResponseDeadline(d) {
+  if (d.status !== 'open' || !d.openedDate) return null;
+  if (d.platform === 'ebay') return addBusinessDays(d.openedDate, 3);
+  if (d.platform === 'poshmark') return addBusinessDays(d.openedDate, 1);
+  return null;
+}
+
+function disputeResponseInfo(d) {
+  const deadline = disputeResponseDeadline(d);
+  if (deadline) {
+    const overdue = deadline < todayDateStr();
+    return { text: (overdue ? 'overdue since ' : 'by ') + deadline, badgeClass: overdue ? 'badge-decline' : 'badge-due' };
+  }
+  if (d.status !== 'open') return null;
+  if (d.platform === 'vinted') return { text: 'no fixed clock, payment withheld until you respond', badgeClass: 'badge-hold' };
+  if (d.platform === 'depop') return { text: 'no fixed clock, escalation carries a seller fee', badgeClass: 'badge-hold' };
+  return null;
+}
+
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -176,31 +226,35 @@ function renderDataFreshness(lastModifiedDates) {
 // the same fix Sondrik's loadData already applies for the same reason.
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
-  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
     fetchJson('/garage/data/activity.json'),
     fetchJson('/garage/data/sales.json'),
-    fetchJson('/garage/data/expenses.json')
+    fetchJson('/garage/data/expenses.json'),
+    fetchJson('/garage/data/disputes.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
   const activityData = activityResult.status === 'fulfilled' ? activityResult.value.data : null;
   const salesData = salesResult.status === 'fulfilled' ? salesResult.value.data : null;
   const expensesData = expensesResult.status === 'fulfilled' ? expensesResult.value.data : null;
+  const disputesData = disputesResult.status === 'fulfilled' ? disputesResult.value.data : null;
   rawListingsData = listingsData;
   rawPipelineData = pipelineData;
   rawActivityData = activityData;
   rawSalesData = salesData;
   rawExpensesData = expensesData;
+  rawDisputesData = disputesData;
   const backupBtn = document.getElementById('backupBtn');
-  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData);
+  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
   const expenses = (expensesData && expensesData.expenses) || [];
+  const disputes = (disputesData && disputesData.disputes) || [];
 
-  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult]
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult]
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value.lastModified));
 
@@ -281,6 +335,19 @@ async function loadData() {
     expensesEmpty.setAttribute('role', 'alert');
     expensesEmpty.textContent = "Couldn't load expenses data: " + expensesResult.reason.message;
     document.getElementById('expensesTotals').innerHTML = '';
+  }
+
+  if (disputesData) {
+    disputesLog = disputes;
+    renderDisputes(disputes);
+  } else {
+    disputesLog = [];
+    document.getElementById('disputesTableBody').innerHTML = '';
+    const disputesEmpty = document.getElementById('disputesTableEmpty');
+    disputesEmpty.hidden = false;
+    disputesEmpty.setAttribute('role', 'alert');
+    disputesEmpty.textContent = "Couldn't load disputes data: " + disputesResult.reason.message;
+    document.getElementById('disputesTotals').innerHTML = '';
   }
 
   initTableScrollShadows();
@@ -1906,6 +1973,56 @@ function renderExpenses(expenses) {
     </p>`;
 }
 
+function renderDisputes(disputes) {
+  const tbody = document.getElementById('disputesTableBody');
+  const empty = document.getElementById('disputesTableEmpty');
+  const totalsEl = document.getElementById('disputesTotals');
+
+  if (!disputes.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No returns or disputes logged yet.';
+    totalsEl.innerHTML = '';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...disputes].sort((a, b) => {
+    if (!a.openedDate && !b.openedDate) return 0;
+    if (!a.openedDate) return 1;
+    if (!b.openedDate) return -1;
+    return b.openedDate.localeCompare(a.openedDate);
+  });
+
+  tbody.innerHTML = sorted.map(d => {
+    const respondInfo = disputeResponseInfo(d);
+    return `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(d.title || 'Untitled item')}</div></td>
+      <td>${d.platform ? `<span class="badge badge-${escapeHtml(d.platform)}">${escapeHtml(PLATFORM_LABELS[d.platform] || d.platform)}</span>` : ''}</td>
+      <td class="cell-muted">${d.type ? escapeHtml(DISPUTE_TYPE_LABELS[d.type] || d.type) : ''}</td>
+      <td class="cell-muted">${d.status ? escapeHtml(DISPUTE_STATUS_LABELS[d.status] || d.status) : ''}</td>
+      <td class="cell-muted">${d.openedDate ? escapeHtml(d.openedDate) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td>${respondInfo ? `<span class="badge ${respondInfo.badgeClass}">${escapeHtml(respondInfo.text)}</span>` : '<span class="cell-value empty">-</span>'}</td>
+      <td class="cell-muted">${d.outcome ? escapeHtml(d.outcome) : '<span class="cell-value empty">not logged</span>'}</td>
+    </tr>
+  `;
+  }).join('');
+
+  const open = disputes.filter(d => d.status === 'open');
+  const overdue = open.filter(d => {
+    const deadline = disputeResponseDeadline(d);
+    return deadline && deadline < todayDateStr();
+  });
+  const resolved = disputes.length - open.length;
+
+  totalsEl.innerHTML = `
+    <p class="pace-result-note">
+      <span class="pace-result-figure">${open.length}</span> open, ${resolved} resolved, out of ${disputes.length} real logged case(s).
+      ${overdue.length ? `${overdue.length} past its real platform response window, see "Respond by" above.` : ''}
+    </p>`;
+}
+
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchTerm = e.target.value;
   applyFiltersAndRender();
@@ -2465,12 +2582,12 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 
 // Full-fidelity backup: unlike the CSV exports, which flatten one table at a
 // time to whatever's currently filtered, this keeps listings.json,
-// pipeline.json, activity.json, sales.json, and expenses.json exactly as
-// loaded, so a bad hand-edit to any of them can be diffed against or
-// restored from a known-good copy. Local download only, nothing is sent
-// anywhere. Same approach as CSM's own backup button.
+// pipeline.json, activity.json, sales.json, expenses.json, and
+// disputes.json exactly as loaded, so a bad hand-edit to any of them can be
+// diffed against or restored from a known-good copy. Local download only,
+// nothing is sent anywhere. Same approach as CSM's own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData) return;
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center Garage (/garage), local download only',
@@ -2478,7 +2595,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
     pipelineJson: rawPipelineData,
     activityJson: rawActivityData,
     salesJson: rawSalesData,
-    expensesJson: rawExpensesData
+    expensesJson: rawExpensesData,
+    disputesJson: rawDisputesData
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -2553,6 +2671,38 @@ document.getElementById('expensesCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'garage-expenses-' + todayDateStr() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const DISPUTES_CSV_COLUMNS = [
+  ['title', 'Item'], ['platform', 'Platform'], ['type', 'Type'], ['status', 'Status'],
+  ['openedDate', 'Opened'], ['respondBy', 'Respond by'], ['resolvedDate', 'Resolved'], ['outcome', 'Outcome']
+];
+
+// Exports every real logged return/dispute, with the same computed
+// respond-by deadline as the on-page table (recomputed fresh, not cached).
+document.getElementById('disputesCsvBtn').addEventListener('click', () => {
+  const rows = disputesLog.map(d => {
+    const respondInfo = disputeResponseInfo(d);
+    return {
+      ...d,
+      platform: PLATFORM_LABELS[d.platform] || d.platform || '',
+      type: DISPUTE_TYPE_LABELS[d.type] || d.type || '',
+      status: DISPUTE_STATUS_LABELS[d.status] || d.status || '',
+      respondBy: respondInfo ? respondInfo.text : ''
+    };
+  });
+  const header = DISPUTES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(d => DISPUTES_CSV_COLUMNS.map(([key]) => csvField(d[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-disputes-' + todayDateStr() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2946,6 +3096,91 @@ function wireQuickLogExpenseTool() {
   });
 }
 
+// Same quick-log convention as the sale/expense tools above, for
+// disputes.json: the "Return & dispute handling, by platform" reference
+// table had real per-platform response-clock facts but nowhere to actually
+// track a real open case against them, so a real dispute had to be tracked
+// by memory or a hand-edit with no validation until the next `node
+// validate.js` run. Checked against the same rules validate.js runs on
+// disputes.json (unique id, a real platform/type/status, resolvedDate not
+// before openedDate).
+function wireQuickLogDisputeTool() {
+  const form = document.getElementById('quickDisputeForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('ndWarnings');
+  const output = document.getElementById('ndOutput');
+  const copyBtn = document.getElementById('ndCopyBtn');
+  const live = document.getElementById('quickLogDisputeLive');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('ndId').value.trim();
+    const title = document.getElementById('ndTitle').value.trim();
+    const listingId = document.getElementById('ndListingId').value.trim() || null;
+    const platform = document.getElementById('ndPlatform').value;
+    const type = document.getElementById('ndType').value;
+    const status = document.getElementById('ndStatus').value;
+    const openedDate = document.getElementById('ndOpenedDate').value || null;
+    const resolvedDate = document.getElementById('ndResolvedDate').value || null;
+    const outcome = document.getElementById('ndOutcome').value.trim() || null;
+    const notes = document.getElementById('ndNotes').value.trim() || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (disputesLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another dispute, ids must be unique.');
+    }
+    if (!title) blockers.push('A title is required.');
+    if (!platform) blockers.push('Select a platform.');
+    if (!type) blockers.push('Select a type.');
+    if (!status) blockers.push('Select a status.');
+    if (openedDate && resolvedDate && resolvedDate < openedDate) {
+      blockers.push('Date resolved is before date opened.');
+    }
+
+    if (listingId && !(listings || []).some(l => l.id === listingId)) {
+      advisory.push('"' + listingId + '" does not match any listing in listings.json. Fine if that listing has ' +
+        'since fully sold through and was removed, otherwise double-check the id.');
+    }
+    if (status === 'open' && resolvedDate) {
+      advisory.push('Status is "Open" but a resolved date is set, switch status to one of the resolved options instead.');
+    }
+    if (status !== 'open' && !resolvedDate) {
+      advisory.push('Status is resolved but no date resolved is logged yet.');
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const dispute = { id, title, listingId, platform, type, status, openedDate, resolvedDate, outcome, notes };
+
+    if (status === 'open' && openedDate) {
+      const respondInfo = disputeResponseInfo(dispute);
+      if (respondInfo) advisory.push('Real response window: ' + respondInfo.text + '.');
+    }
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(dispute, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Dispute JSON copied to clipboard.';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 wireCalc();
 wireBreakEven();
 wireBundle();
@@ -2956,6 +3191,7 @@ wirePacePlanner();
 wireQuickLogTool();
 wireQuickLogSaleTool();
 wireQuickLogExpenseTool();
+wireQuickLogDisputeTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
 

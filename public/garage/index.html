@@ -1101,6 +1101,99 @@
     </div>
   </section>
 
+  <section>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Returns &amp; disputes log</h2>
+      <button type="button" id="disputesCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
+    <div class="callout">
+      Every real return or dispute a buyer has opened, one row per case. Nothing here is estimated, this only
+      shows what's actually been hand-logged in <code>disputes.json</code>. "Respond by" is computed from the
+      real per-platform response windows in the table above, eBay's real 3-business-day clock and Poshmark's
+      real ~24-hour clock, Vinted and Depop have no fixed clock so those just carry the same guidance from the
+      table instead of a made-up deadline. No real disputes have happened yet, this log exists so the first one
+      doesn't have to be tracked by memory.
+    </div>
+
+    <details class="schema-help" id="quickLogDisputeTool">
+      <summary>Quick log a return/dispute (generates JSON to paste into disputes.json, saves nothing)</summary>
+      <div class="schema-help-body">
+        <p>Runs the same checks <code>node public/garage/data/validate.js</code> does on <code>disputes.json</code>
+          (a unique id, a real platform, a real type and status), then builds the JSON object to paste into the
+          <code>disputes</code> array yourself. This never writes a file or sends anything, it only puts text on
+          your clipboard.</p>
+
+        <div class="quick-log-grid">
+          <form class="quick-log-form" id="quickDisputeForm">
+            <h3 class="quick-log-title font-mono">New return/dispute &rarr; disputes.json</h3>
+            <label class="quick-log-label" for="ndId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="ndId" placeholder="e.g. black-boots-ebay-return" required>
+            <label class="quick-log-label" for="ndTitle">Title</label>
+            <input class="quick-log-input" type="text" id="ndTitle" placeholder="Item name as it appears in the case" required>
+            <label class="quick-log-label" for="ndListingId">Listing id (optional, matches an id in listings.json)</label>
+            <input class="quick-log-input" type="text" id="ndListingId" placeholder="e.g. black-boots">
+            <label class="quick-log-label" for="ndPlatform">Platform</label>
+            <select class="quick-log-input" id="ndPlatform" required>
+              <option value="" disabled selected>Select a platform</option>
+              <option value="ebay">eBay</option>
+              <option value="vinted">Vinted</option>
+              <option value="poshmark">Poshmark</option>
+              <option value="depop">Depop</option>
+            </select>
+            <label class="quick-log-label" for="ndType">Type</label>
+            <select class="quick-log-input" id="ndType" required>
+              <option value="" disabled selected>Select a type</option>
+              <option value="return">Return (buyer just wants to send it back)</option>
+              <option value="not-as-described">Not as described</option>
+              <option value="damaged">Damaged</option>
+              <option value="never-arrived">Never arrived</option>
+              <option value="other">Other</option>
+            </select>
+            <label class="quick-log-label" for="ndStatus">Status</label>
+            <select class="quick-log-input" id="ndStatus" required>
+              <option value="open" selected>Open</option>
+              <option value="resolved-seller">Resolved in seller's favor</option>
+              <option value="resolved-buyer">Resolved in buyer's favor</option>
+              <option value="resolved-split">Resolved, split/partial</option>
+            </select>
+            <label class="quick-log-label" for="ndOpenedDate">Date opened (optional)</label>
+            <input class="quick-log-input" type="date" id="ndOpenedDate">
+            <label class="quick-log-label" for="ndResolvedDate">Date resolved (optional, leave blank while open)</label>
+            <input class="quick-log-input" type="date" id="ndResolvedDate">
+            <label class="quick-log-label" for="ndOutcome">Outcome (optional, e.g. "Full refund issued")</label>
+            <input class="quick-log-input" type="text" id="ndOutcome">
+            <label class="quick-log-label" for="ndNotes">Notes (optional)</label>
+            <input class="quick-log-input" type="text" id="ndNotes">
+            <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+            <div class="quick-log-warnings" id="ndWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="ndOutput" readonly rows="11" hidden aria-label="Generated dispute JSON, ready to paste into the disputes array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="ndCopyBtn" hidden>Copy JSON</button>
+            <p class="quick-log-hint" id="quickLogDisputeLive" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <div class="table-wrap">
+      <table class="card-table" id="disputesTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Platform</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Opened</th>
+            <th>Respond by</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody id="disputesTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="disputesTableEmpty" hidden></div>
+    </div>
+    <div id="disputesTotals" class="pace-result"></div>
+  </section>
+
   <section id="messageTemplatesSection">
     <h2 class="section-title">Buyer message templates</h2>
     <div class="callout">
