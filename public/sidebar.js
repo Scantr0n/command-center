@@ -98,6 +98,16 @@
     .cc-sb-home-mark { flex-shrink: 0; width: 20px; height: 20px; border-radius: 5px; background: #F5F6F7; color: #0D0E10; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; }
     .cc-sb-label-home { opacity: 0; transition: opacity 0.1s ease; }
     #ccSidebar.expanded .cc-sb-label-home { opacity: 1; }
+
+    /* Every hub's own print stylesheet (index.html/style.css) predates this
+       sidebar, none of them know to hide it, so a fixed-position nav rail
+       with live status dots was printing on top of the left edge of every
+       report. Hidden here once, in the shared file, rather than patching
+       the same rule into five separate print blocks. */
+    @media print {
+      #ccSidebar { display: none !important; }
+      body.cc-has-sidebar, body.cc-has-sidebar.cc-sidebar-expanded { padding-left: 0 !important; }
+    }
   `;
 
   function currentPathIsHub(link) {
