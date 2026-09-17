@@ -2664,6 +2664,85 @@ document.getElementById('backupBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// Same per-section CSV export convention as Sondrik's channelsCsvBtn: the
+// main csvBtn above only ever covered the card inventory table, leaving these
+// two real, hand-logged datasets (raw-card ROI candidates, grading
+// submissions) with no flat-file export of their own, only reachable through
+// the full-fidelity JSON backup below. Ranked in the same order the feed
+// itself renders, unfiltered (buildRankedCandidates covers every real
+// candidate, decided or not, same as the on-screen feed).
+const CANDIDATES_CSV_COLUMNS = [
+  [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'],
+  [c => c.targetGradingCompany, 'Target grading company'], [c => c.targetServiceLevel, 'Target service level'],
+  [c => c.rawValue, 'Raw value'], [c => c.rawValueBasis, 'Raw value basis'], [c => c.rawValueNote, 'Raw value note'],
+  [c => c.estimatedGradingCost, 'Estimated grading cost'], [c => c.shippingCost, 'Shipping cost'],
+  [c => c.expectedGrade, 'Expected grade'], [c => c.expectedGradedValue, 'Expected graded value'],
+  [c => c.gradedValueBasis, 'Graded value basis'], [c => c.gradedValueNote, 'Graded value note'],
+  [c => computeGradingMath(c)?.totalCost ?? null, 'Total cost (grading + shipping)'],
+  [c => computeGradingMath(c)?.expectedGain ?? null, 'Expected gain'],
+  [c => CANDIDATE_VERDICT_META[computeGradingMath(c)?.verdict || 'needs-data'].label, 'Verdict'],
+  [c => c.datePriced, 'Date priced'], [c => c.decision, 'Decision'], [c => c.decisionNote, 'Decision note'],
+  [c => c.notes, 'Notes']
+];
+
+document.getElementById('candidatesCsvBtn').addEventListener('click', () => {
+  const rows = buildRankedCandidates().map(({ c }) => c);
+  const header = CANDIDATES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(c => CANDIDATES_CSV_COLUMNS.map(([accessor]) => csvField(accessor(c))).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cgt-candidates-' + todayIso() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// Unlike the on-screen feed (buildActiveSubmissions, active-only, since a
+// returned batch just collapses into a one-line count there to save space),
+// this exports every real submission, active and returned, oldest submitted
+// first, since a returned batch's real cost/turnaround is exactly the kind
+// of record a flat export exists for and the feed already has no per-row
+// view of it at all.
+const SUBMISSIONS_CSV_COLUMNS = [
+  [s => s.description, 'Description'], [s => s.gradingCompany, 'Grading company'],
+  [s => s.serviceLevel, 'Service level'],
+  [s => (SUBMISSION_STATUS_META[s.status] || {}).label || s.status, 'Status'],
+  [s => s.cardCount, 'Card count'], [s => s.submittedDate, 'Submitted date'],
+  [s => s.trackingNumber, 'Tracking number'], [s => s.returnedDate, 'Returned date'],
+  [s => s.status !== 'returned' ? daysSince(s.submittedDate) : null, 'Days in queue'],
+  [s => computeTurnaroundDays(s), 'Actual turnaround (days)'],
+  [s => s.cost, 'Cost'], [s => s.notes, 'Notes']
+];
+
+function buildAllSubmissionsSorted() {
+  return submissions.slice().sort((a, b) => {
+    if (!a.submittedDate && !b.submittedDate) return 0;
+    if (!a.submittedDate) return 1;
+    if (!b.submittedDate) return -1;
+    return a.submittedDate.localeCompare(b.submittedDate);
+  });
+}
+
+document.getElementById('submissionsCsvBtn').addEventListener('click', () => {
+  const rows = buildAllSubmissionsSorted();
+  const header = SUBMISSIONS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(s => SUBMISSIONS_CSV_COLUMNS.map(([accessor]) => csvField(accessor(s))).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cgt-submissions-' + todayIso() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
 // Quick-log tool: builds one candidate card from the form and runs it
 // through CGTValidateCore.validateCards, the exact same rules the CLI
 // validator and the CSV importer already use (see validate-core.js's own

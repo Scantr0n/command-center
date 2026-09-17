@@ -482,7 +482,10 @@
   </section>
 
   <section>
-    <h2 class="section-title">Worth grading?</h2>
+    <div class="section-toolbar">
+      <h2 class="section-title">Worth grading?</h2>
+      <button type="button" id="candidatesCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
     <p class="section-subtitle">Raw cards being weighed against the real cost of grading them, before anything is
       shipped. Verdict uses the common "2x margin" rule (the expected gain over raw value should clear grading +
       shipping costs by at least 2x, to leave room for coming back at a lower grade than expected), applied only to
@@ -493,7 +496,10 @@
   </section>
 
   <section>
-    <h2 class="section-title">Grading submissions</h2>
+    <div class="section-toolbar">
+      <h2 class="section-title">Grading submissions</h2>
+      <button type="button" id="submissionsCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
     <div class="submissions-feed" id="submissionsFeed"></div>
   </section>
 
