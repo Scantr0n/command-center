@@ -1626,11 +1626,13 @@ function renderSales(sales) {
     const net = estimateNetPayout(s.platform, s.salePrice);
     const hasEither = s.costBasis != null || s.shippingCost != null;
     const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
+    const askingPct = computeAskingPct(s);
     return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(s.title || 'Untitled item')}</div></td>
       <td class="cell-platforms">${s.platform ? `<span class="badge badge-${escapeHtml(s.platform)}">${escapeHtml(PLATFORM_LABELS[s.platform] || s.platform)}</span>` : ''}</td>
       <td class="cell-value${s.salePrice == null ? ' empty' : ''}">${s.salePrice != null ? formatUsd(s.salePrice) : 'not set'}</td>
+      <td class="cell-value${askingPct == null ? ' empty' : ''}">${askingPct != null ? askingPct.toFixed(0) + '% of ' + formatUsd(s.askingPrice) : 'not tracked'}</td>
       <td class="cell-value${net == null ? ' empty' : ''}">${net != null ? formatUsd(net) : 'unknown'}</td>
       <td class="cell-value${s.costBasis == null ? ' empty' : ''}">${s.costBasis != null ? formatUsd(s.costBasis) : 'not logged'}</td>
       <td class="cell-value${s.shippingCost == null ? ' empty' : ''}">${s.shippingCost != null ? formatUsd(s.shippingCost) : 'not logged'}</td>
@@ -1639,6 +1641,19 @@ function renderSales(sales) {
     </tr>
   `;
   }).join('');
+}
+
+// What the real sale price came out to as a percent of the asking price
+// logged at time of sale, e.g. "85% of $40 asking". Both fields are optional
+// and only meaningful together (askingPrice is validated by validate.js and
+// exported to CSV, but was never rendered anywhere on this page), so this
+// returns null unless both are real numbers and askingPrice is a real
+// positive baseline to divide by. Not colored as a loss below 100%: selling
+// under the original ask is the normal outcome of negotiating down, not a
+// problem the way negative profit is.
+function computeAskingPct(s) {
+  if (s.askingPrice == null || s.salePrice == null || !(s.askingPrice > 0)) return null;
+  return (s.salePrice / s.askingPrice) * 100;
 }
 
 const TAX_1099K_USD_THRESHOLD = 20000;
