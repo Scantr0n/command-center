@@ -1231,7 +1231,7 @@ function openModal(id, opts = {}) {
   }
 
   // Real automation health, sourced from actual scheduled-task run history
-  // (see write_snapshot calls in the relevant SKILL.md) — never fabricated
+  // (see write_snapshot calls in the relevant SKILL.md), never fabricated
   // for clusters with no real run history behind them.
   const reliabilityRow = document.getElementById('reliabilityRow');
   if (activeCluster.reliability) {
@@ -1240,7 +1240,7 @@ function openModal(id, opts = {}) {
     const r = activeCluster.reliability;
     const failed = r.lastRunStatus === 'failed';
     const text = document.getElementById('reliabilityText');
-    text.textContent = `${r.recentSuccessRate || 'unknown'}${failed ? ' — last run failed' : ''}${r.lastRunAt ? ` (last: ${r.lastRunAt})` : ''}`;
+    text.textContent = `${r.recentSuccessRate || 'unknown'}${failed ? ', last run failed' : ''}${r.lastRunAt ? ` (last: ${r.lastRunAt})` : ''}`;
     text.style.color = failed ? '#E0725A' : 'var(--faint)';
   } else {
     reliabilityRow.classList.add('hidden');
