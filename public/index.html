@@ -131,6 +131,9 @@
      so filtering to one category still left every other category's spokes
      lit at full brightness, defeating the point of filtering the graph down. */
   .spoke-line.dimmed { opacity: 0.16; }
+  .spoke-badge { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
+  .graph-node:hover .spoke-badge, .graph-node:focus-visible .spoke-badge { opacity: 1; }
+  .graph-node.dimmed .spoke-badge { display: none; }
   .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
   .cat-label { cursor: pointer; }
   .corner-notch { position: relative; }
@@ -151,6 +154,7 @@
       transition: none !important;
     }
     .spoke-live { animation: none; }
+    .spoke-badge { transition: none !important; }
     .graph-node:hover, .cluster-card:hover { transform: none; }
   }
 
@@ -793,6 +797,26 @@ function renderGraph() {
     // implied by <title>, which stays for the native mouse-hover tooltip.
     const nodeLabel = `${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}${stale ? ' (stale, over a month untouched)' : ''}`;
 
+    // Connector badge: real last-update time sitting on the spoke itself
+    // (n8n puts live state directly on its connector lines, not just the
+    // node), revealed on hover/focus of the node like the native <title>
+    // tooltip already is, rather than 22 always-on labels competing with
+    // the node text for attention. Skipped entirely when there's no real
+    // date, same no-fabrication rule as everywhere else here.
+    const badgeText = shortRelativeTime(c.lastUpdate);
+    let badgeHtml = '';
+    if (badgeText) {
+      const bx = hx + (nx - hx) * 0.42;
+      const by = hy + (ny - hy) * 0.42;
+      const bw = 10 + badgeText.length * 4.6;
+      badgeHtml = `
+        <g class="spoke-badge">
+          <rect x="${(bx - bw / 2).toFixed(1)}" y="${(by - 7).toFixed(1)}" width="${bw.toFixed(1)}" height="14" rx="4" fill="var(--void)" stroke="var(--hairlineHover)" stroke-width="1" />
+          <text x="${bx.toFixed(1)}" y="${(by + 3).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8" fill="var(--sub)">${escapeHtml(badgeText)}</text>
+        </g>
+      `;
+    }
+
     nodesHtml += `
       <g class="graph-node" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(nodeLabel)}">
         <title>${escapeHtml(nodeLabel)}</title>
@@ -801,6 +825,7 @@ function renderGraph() {
         <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" opacity="${stale ? 0.45 : 1}" />
         ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
         <text x="${nx.toFixed(1)}" y="${(ny + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${escapeHtml(truncateLabel(nodeLabelWord(c.name), 9))}</text>
+        ${badgeHtml}
       </g>
     `;
   });
@@ -1031,6 +1056,19 @@ document.getElementById('searchClearBtn').addEventListener('click', () => {
   applyFilters();
   searchInputEl.focus();
 });
+
+// Compact form of relativeTime() for the graph's connector badges, where
+// "3 days ago" is too wide to sit on a spoke without crowding a 22-node
+// canvas. No real date means no badge at all (return null, skip rendering)
+// rather than force an awkward "no date on record" pill onto the graph.
+function shortRelativeTime(dateStr) {
+  if (!dateStr) return null;
+  const days = Math.floor((Date.now() - new Date(dateStr + 'T00:00:00')) / 86400000);
+  if (days <= 0) return 'today';
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  return `${months}mo`;
+}
 
 function relativeTime(dateStr) {
   if (!dateStr) return 'no date on record';
