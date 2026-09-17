@@ -168,7 +168,7 @@
   }
 
   // Pinned hubs sort to their own group above the rest, same pattern the
-  // research pass found across Grafana/Raycast/Homarr — a flat equal-weight
+  // research pass found across Grafana/Raycast/Homarr: a flat equal-weight
   // list doesn't scale once there are more than a couple hubs someone
   // actually revisits constantly.
   function renderHubs(hubs) {
