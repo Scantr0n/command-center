@@ -461,6 +461,57 @@
     wireRowsToModal(duplicatesEl);
   }
 
+  const casingDriftEl = document.getElementById('casingDriftList');
+  const casingDriftSection = document.getElementById('casingDriftSection');
+
+  // Same normalize-and-group-by-lowercase check validate.js already runs on
+  // the command line for both category and socialSnapshots[].platform, just
+  // rendered as a clickable panel instead of a CLI warning nobody sees until
+  // they remember to run it. A category or platform spelled two ways doesn't
+  // fail validation (both spellings are individually valid strings), but it
+  // silently fragments the category filter chips and the platform search
+  // match into two, so it needs its own panel rather than folding into
+  // per-prospect computeDataQualityFlags below, which only ever looks at one
+  // prospect at a time and can't see drift across the whole dataset.
+  function findCasingDrift(prospects, getValues) {
+    const byNorm = new Map();
+    (prospects || []).forEach(p => {
+      getValues(p).forEach(raw => {
+        if (!raw) return;
+        const norm = raw.trim().toLowerCase();
+        if (!byNorm.has(norm)) byNorm.set(norm, { variants: new Map(), prospects: [] });
+        const entry = byNorm.get(norm);
+        entry.variants.set(raw, (entry.variants.get(raw) || 0) + 1);
+        entry.prospects.push(p);
+      });
+    });
+    return [...byNorm.values()].filter(entry => entry.variants.size > 1);
+  }
+
+  function renderCasingDrift(prospects) {
+    const categoryDrift = findCasingDrift(prospects, p => [p.category]).map(entry => ({ ...entry, field: 'CATEGORY' }));
+    const platformDrift = findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform))
+      .map(entry => ({ ...entry, field: 'SOCIAL PLATFORM' }));
+    const groups = [...categoryDrift, ...platformDrift];
+
+    if (groups.length === 0) {
+      casingDriftSection.hidden = true;
+      return;
+    }
+    casingDriftSection.hidden = false;
+    casingDriftEl.innerHTML = groups.map(({ variants, prospects: matched, field }) => {
+      const spellings = Array.from(variants.keys()).map(v => JSON.stringify(v)).join(' vs. ');
+      return matched.map(p =>
+        '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
+        '<strong>' + escapeHtml(p.name) + '</strong>' +
+        '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+        '<span class="dq-why">' + field + ' SPELLED ' + escapeHtml(spellings) + '</span>' +
+        '</button>'
+      ).join('');
+    }).join('');
+    wireRowsToModal(casingDriftEl);
+  }
+
   const coldSignalEl = document.getElementById('coldSignalList');
   const coldSignalSection = document.getElementById('coldSignalSection');
 
@@ -2987,6 +3038,7 @@
       renderStalled(allStages, allProspects);
       renderColdSignal(allStages, allProspects);
       renderDuplicates(allProspects);
+      renderCasingDrift(allProspects);
       renderDataQuality(allStages, allProspects);
       renderActivityFeed(allProspects, allStages);
       renderFunnel(allStages, allProspects);

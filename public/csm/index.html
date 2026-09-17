@@ -269,6 +269,15 @@
     <div class="data-quality-list" id="dataQualityList"></div>
   </section>
 
+  <section id="casingDriftSection" hidden>
+    <h2 class="section-title">Casing drift</h2>
+    <p class="section-note">The same category or social platform logged with different casing or spacing across
+      prospects, e.g. "WeChat" vs "Wechat". Each spelling renders as its own separate filter chip or search match
+      instead of one, silently fragmenting the category filter and the platform search, same check
+      <code>validate.js</code> runs. Pick one spelling and fix the others.</p>
+    <div class="data-quality-list" id="casingDriftList"></div>
+  </section>
+
   <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Pipeline</h2>
