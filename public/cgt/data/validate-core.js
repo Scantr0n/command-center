@@ -26,6 +26,20 @@
     return v === null || v === undefined || (typeof v === 'string' && DATE_RE.test(v));
   }
 
+  // Shared by validateCards and validateCandidates below, neither of which
+  // validated "year" at all until now, unlike every other numeric/date field
+  // each already checks. That mattered because findDuplicateGroups and
+  // findGradeLadderInversions both fold year into their real cards.json
+  // grouping key, so a typo'd year (a string, a decimal, a wrong century)
+  // would silently form its own group of one instead of matching the real
+  // duplicate or ladder-mate it belongs with. 1860 covers the earliest known
+  // tobacco-era cards, well before any of SPORTS existed; next year covers a
+  // pre-release card for the upcoming season.
+  function isValidYearOrNull(year) {
+    if (year === null || year === undefined) return true;
+    return Number.isInteger(year) && year >= 1860 && year <= new Date().getFullYear() + 1;
+  }
+
   // Groups cards by cardName + year + gradingCompany + grade, to catch the
   // same physical card accidentally logged twice under two different ids
   // (e.g. a copy-pasted entry that only got the id changed). Distinct cert
@@ -75,6 +89,11 @@
       }
 
       if (!c.cardName) errors.push(where + ': missing "cardName"');
+
+      if (!isValidYearOrNull(c.year)) {
+        errors.push(where + ': "year" must be a whole number between 1860 and ' + (new Date().getFullYear() + 1) +
+          ' or null, got ' + JSON.stringify(c.year));
+      }
 
       if (!c.sport) {
         errors.push(where + ': missing "sport"');
@@ -377,6 +396,11 @@
       else seenIds.add(c.id);
 
       if (!c.cardName) errors.push(where + ': missing "cardName"');
+
+      if (!isValidYearOrNull(c.year)) {
+        errors.push(where + ': "year" must be a whole number between 1860 and ' + (new Date().getFullYear() + 1) +
+          ' or null, got ' + JSON.stringify(c.year));
+      }
 
       if (!c.sport) {
         errors.push(where + ': missing "sport"');
