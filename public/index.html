@@ -232,6 +232,14 @@
 
     #clusterGrid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; }
     .cluster-card { break-inside: avoid; box-shadow: none !important; transform: none !important; }
+    /* A card/activity-row left dimmed to 16% opacity by an active search or
+       category filter (applyFilters(), .dimmed rule above) would otherwise
+       print as a near-invisible ghost instead of this full, unfiltered
+       report the rest of this block already forces regardless of the
+       current view or filter state. */
+    .cluster-card.dimmed, .activity-row.dimmed {
+      opacity: 1 !important;
+    }
 
     #attnCards { display: flex !important; }
     .attn-card { break-inside: avoid; }
