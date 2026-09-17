@@ -25,6 +25,7 @@
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="backupBtn" class="print-btn font-mono" disabled title="Loading listing data...">Download backup (.json)</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
+      <button type="button" id="shortcutsBtn" class="print-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
@@ -1393,6 +1394,14 @@
     <h3 id="modalTitle" class="font-display"></h3>
     <div class="modal-sub font-mono" id="modalSub"></div>
     <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="shortcutsOverlay" hidden>
+  <div class="modal" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+    <button class="modal-close" id="shortcutsClose" aria-label="Close">&times;</button>
+    <h3 id="shortcutsTitle" class="font-display">Keyboard shortcuts</h3>
+    <div class="shortcuts-list" id="shortcutsList"></div>
   </div>
 </div>
 
