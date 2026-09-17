@@ -247,7 +247,14 @@
     .tag-chip { background: none !important; color: #111 !important; border: 1px solid #999 !important; }
     .status-dot, .activity-row > span.rounded-full { display: none !important; }
     #statsRow, #statsRow * { color: #111 !important; }
-    .cluster-card span[style*="3DDC84"] { color: #111 !important; }
+    /* Same fix as the toggle ON indicator (3DDC84) below, extended to the two
+       other inline status colors renderGrid prints on a card: the stale-date
+       amber (E0A030) and the failed-reliability red-orange (E0725A). Both
+       wash out badly against this stylesheet's white background, same as the
+       green did before this rule existed. */
+    .cluster-card span[style*="3DDC84"], .cluster-card span[style*="E0A030"], .cluster-card span[style*="E0725A"] {
+      color: #111 !important;
+    }
   }
 </style>
 </head>
