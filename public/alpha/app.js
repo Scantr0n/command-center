@@ -4,6 +4,119 @@ function escapeHtml(str) {
   }[c]));
 }
 
+// Whether US equities are in their regular NYSE session right now: real,
+// useful context for reading everything else on this page (an empty
+// Positions table or a "no reading since Friday" connection gap reads very
+// differently at 10am on a Tuesday than at 8pm on a Saturday), but not
+// something Alpha's own daemon exposes or needs to, so this is computed
+// entirely client-side from a fixed calendar rather than fetched. NYSE
+// publishes its full-year holiday and early-close calendar about a year
+// ahead and it does not change once published, so there is no live feed to
+// poll here, only an annual re-check the same way system.lastVerifiedAt
+// tracks a hand-confirmed fact above. Source: NYSE's own 2026 trading
+// calendar (nyse.com/publicdocs/nyse/ICE_NYSE_2026_Yearly_Trading_Calendar.pdf),
+// corroborated against independent market-hours aggregators. Update this
+// list (and MARKET_CALENDAR_SOURCE_CHECKED_AT) once NYSE publishes 2027's.
+const MARKET_HOLIDAYS_2026 = new Set([
+  '2026-01-01', // New Year's Day
+  '2026-01-19', // Martin Luther King Jr. Day
+  '2026-02-16', // Washington's Birthday (Presidents Day)
+  '2026-04-03', // Good Friday
+  '2026-05-25', // Memorial Day
+  '2026-06-19', // Juneteenth National Independence Day
+  '2026-07-03', // Independence Day (observed; July 4 falls on a Saturday)
+  '2026-09-07', // Labor Day
+  '2026-11-26', // Thanksgiving Day
+  '2026-12-25'  // Christmas Day
+]);
+// The two recurring annual 1:00pm ET early closes: day after Thanksgiving
+// and Christmas Eve. NYSE does not treat quarterly options-expiration
+// ("triple witching") days as early closes, despite that claim appearing on
+// some secondary market-hours sites; only these two are real.
+const MARKET_EARLY_CLOSES_2026 = new Set([
+  '2026-11-27',
+  '2026-12-24'
+]);
+const MARKET_CALENDAR_SOURCE_CHECKED_AT = '2026-09-17';
+
+function nowInET() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour12: false, weekday: 'short',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  }).formatToParts(new Date());
+  const map = {};
+  parts.forEach(p => { map[p.type] = p.value; });
+  return map;
+}
+
+function isTradingDayKey(dateKey, weekday) {
+  return weekday !== 'Sat' && weekday !== 'Sun' && !MARKET_HOLIDAYS_2026.has(dateKey);
+}
+
+// Walks forward a plain UTC calendar date (used only as a date, never as a
+// real instant) to find the next real trading day, skipping weekends and
+// the fixed 2026 holiday list above. 14-day cap is just a safety bound; the
+// longest real gap on the calendar (the Christmas/New Year stretch) is a
+// handful of days.
+function nextTradingDayFrom(dateKey, includeSame) {
+  let d = new Date(dateKey + 'T00:00:00Z');
+  if (!includeSame) d = new Date(d.getTime() + 86400000);
+  for (let i = 0; i < 14; i++) {
+    const key = d.toISOString().slice(0, 10);
+    const weekday = d.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short' });
+    if (isTradingDayKey(key, weekday)) return { key, weekday };
+    d = new Date(d.getTime() + 86400000);
+  }
+  return null;
+}
+
+// Regular NYSE session only (9:30am-4:00pm ET, 9:30am-1:00pm ET on the two
+// early-close days above); deliberately doesn't model pre-market/after-hours
+// extended sessions, since "regular hours open/closed" is the one distinction
+// that actually explains what the rest of this page is showing.
+function computeMarketStatus() {
+  const p = nowInET();
+  const dateKey = `${p.year}-${p.month}-${p.day}`;
+  const weekday = p.weekday;
+  const minutesNow = Number(p.hour) * 60 + Number(p.minute);
+  const isHoliday = MARKET_HOLIDAYS_2026.has(dateKey);
+  const isWeekend = weekday === 'Sat' || weekday === 'Sun';
+  const isEarlyClose = MARKET_EARLY_CLOSES_2026.has(dateKey);
+  const tradingDay = isTradingDayKey(dateKey, weekday);
+  const openMin = 9 * 60 + 30;
+  const closeMin = isEarlyClose ? 13 * 60 : 16 * 60;
+  const isOpen = tradingDay && minutesNow >= openMin && minutesNow < closeMin;
+
+  if (isOpen) {
+    return {
+      isOpen: true,
+      label: 'Market open',
+      detail: 'Closes ' + (isEarlyClose ? '1:00 PM ET (early close)' : '4:00 PM ET') + ' · regular NYSE session'
+    };
+  }
+
+  const next = (tradingDay && minutesNow < openMin) ? { key: dateKey, weekday } : nextTradingDayFrom(dateKey, false);
+  const reason = isHoliday ? 'holiday' : isWeekend ? 'weekend' : null;
+  let detail = 'Regular NYSE session, next open unknown';
+  if (next) {
+    const dateLabel = next.key === dateKey
+      ? 'today'
+      : new Date(next.key + 'T00:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+    detail = 'Opens ' + dateLabel + ' 9:30 AM ET · regular NYSE session';
+  }
+  return { isOpen: false, label: 'Market closed' + (reason ? ' (' + reason + ')' : ''), detail };
+}
+
+function renderMarketStatus() {
+  const pill = document.getElementById('marketPill');
+  if (!pill) return;
+  const status = computeMarketStatus();
+  pill.classList.toggle('open', status.isOpen);
+  pill.classList.toggle('closed', !status.isOpen);
+  document.getElementById('marketText').textContent = status.label;
+  pill.title = status.detail;
+}
+
 function timeAgo(iso) {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return null;
@@ -1439,7 +1552,13 @@ copyStatusBtn.addEventListener('click', async () => {
 // while the tab is hidden so it never runs pointlessly in the background.
 const REFRESH_INTERVAL_MS = 30000;
 setInterval(() => {
-  if (document.visibilityState === 'visible') loadStatus();
+  if (document.visibilityState === 'visible') {
+    loadStatus();
+    // Market open/closed never comes from the /api/alpha/live fetch above
+    // (see computeMarketStatus's own comment), so it needs its own tick on
+    // the same cadence rather than piggybacking on loadStatus succeeding.
+    renderMarketStatus();
+  }
 }, REFRESH_INTERVAL_MS);
 
 // The interval above only fires while the tab is visible, so a tab left
@@ -1448,7 +1567,10 @@ setInterval(() => {
 // instant the tab regains visibility is what makes a glance-at-status page
 // trustworthy the moment it is glanced at, rather than up to 30s behind.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') loadStatus();
+  if (document.visibilityState === 'visible') {
+    loadStatus();
+    renderMarketStatus();
+  }
 });
 
 // Covers the case where the page itself loads while already offline (the
@@ -1459,4 +1581,8 @@ updateOfflineBanner();
 // so this table is accurate even if that fetch itself fails; loadStatus()
 // re-renders it with fresh counts on every successful tick after this.
 renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length);
+// Same "render immediately, independent of the network fetch" reasoning as
+// the diagnostics call above: market open/closed has no dependency on
+// /api/alpha/live succeeding at all, so it shouldn't wait on it.
+renderMarketStatus();
 loadStatus();

@@ -22,6 +22,10 @@
       <p class="sub font-mono">Live trading system, status overview only, Jack Scanlon</p>
     </div>
     <div class="head-right">
+      <div class="market-pill" id="marketPill" role="status" aria-atomic="true">
+        <span class="market-dot" id="marketDot" aria-hidden="true"></span>
+        <span class="market-text font-mono" id="marketText">Loading...</span>
+      </div>
       <div class="headline-status" id="headlineStatus" role="status" aria-atomic="true">
         <span class="headline-dot" id="headlineDot" aria-hidden="true"></span>
         <span class="headline-text font-mono" id="headlineText">Loading...</span>
@@ -82,6 +86,12 @@
         aged" label instead of blanking to "awaiting connection". Account and positions never do this: they revert
         to "awaiting connection" immediately, since a frozen dollar figure is misleading in a way an old kill-switch
         reading is not.</p>
+      <p>The "Market open / closed" pill next to the headline status is computed entirely in this browser from the
+        current time and a fixed 2026 NYSE regular-session calendar (9:30am to 4:00pm ET on trading days, 9:30am to
+        1:00pm ET on the two annual early-close days, closed on the 10 published NYSE holidays); it does not come
+        from Alpha at all and never will, since Alpha does not expose a market-calendar endpoint and doesn't need
+        to. It exists purely as glance context for reading everything else on this page, for example an empty
+        Positions table on a Saturday means something different from the same empty table at 10am on a Tuesday.</p>
       <p>"Enable critical alerts" turns on a native OS notification, using the browser's own Notification API, the
         moment this tab's headline first shows the kill switch engaged or a page error, if this tab is not the one
         currently focused. Nothing is sent anywhere for this: the browser shows the notification locally from
