@@ -205,7 +205,7 @@ const PUBLISHED_TURNAROUND_DAYS = {
   } },
   BGS: { default: 45, tiers: { base: 75, standard: 45, express: 15, priority: 5 } },
   CGC: { default: 20, tiers: { bulk: 40, economy: 20, standard: 10, express: 5, walkthrough: 2, 'walk-through': 2 } },
-  SGC: { default: 45, tiers: { entry: 45, standard: 45, expedited: 3 } }
+  SGC: { default: 58, tiers: { entry: 58, standard: 58, expedited: 3 } }
 };
 
 // Business days -> calendar days, weekends only (no holiday calendar here),
