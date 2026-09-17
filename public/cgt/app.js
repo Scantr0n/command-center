@@ -38,7 +38,11 @@ function restoreStateFromUrl() {
   if (q) searchTerm = q;
   if (sport && VALID_SPORTS.includes(sport)) activeSport = sport;
   if (basis && VALID_BASES.includes(basis)) activeBasis = basis;
-  if (grader && VALID_GRADERS.includes(grader)) activeGrader = grader;
+  // 'raw' is a real, clickable filter chip (matchesGraderValue below treats it
+  // as its own case, not a grading company), but it isn't in VALID_GRADERS,
+  // so a shared/bookmarked ?grader=raw URL silently fell back to "All" on
+  // load, defeating the whole point of mirroring filters into the URL.
+  if (grader && (grader === 'raw' || VALID_GRADERS.includes(grader))) activeGrader = grader;
   // Not validated against a fixed list like sport/basis/grader, since batch
   // labels are open-ended (one per real pricing session). An unknown batch
   // in the URL just matches nothing once applied, same as a stale bookmark.
