@@ -2566,6 +2566,98 @@ function wireQuickLogTool() {
   });
 }
 
+// Same quick-log convention as wireQuickLogTool above, for sales.json instead
+// of listings.json: sales.json had no logging UI at all before this, only
+// hand-editing the file directly, unlike every other entity in every other
+// app here (CGT submissions/candidates, CSM prospects, Sondrik channels/
+// leads all get an equivalent form). Checked against the same rules
+// validate.js runs on sales.json (unique id, a real platform, a non-negative
+// salePrice), kept in sync by hand like the listing tool above since Garage
+// has no shared browser-safe validator module the way CGT does.
+function wireQuickLogSaleTool() {
+  const form = document.getElementById('quickSaleForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('nsWarnings');
+  const output = document.getElementById('nsOutput');
+  const copyBtn = document.getElementById('nsCopyBtn');
+  const live = document.getElementById('quickLogSaleLive');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('nsId').value.trim();
+    const title = document.getElementById('nsTitle').value.trim();
+    const listingId = document.getElementById('nsListingId').value.trim() || null;
+    const platform = document.getElementById('nsPlatform').value;
+    const salePrice = readOptionalNonNegativeInput(document.getElementById('nsSalePrice'));
+    const askingPrice = readOptionalNonNegativeInput(document.getElementById('nsAskingPrice'));
+    const costBasis = readOptionalNonNegativeInput(document.getElementById('nsCostBasis'));
+    const shippingCost = readOptionalNonNegativeInput(document.getElementById('nsShippingCost'));
+    const saleDate = document.getElementById('nsSaleDate').value || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (salesLog.some(s => s.id === id)) {
+      blockers.push('"' + id + '" is already used by another sale, ids must be unique.');
+    }
+    if (!title) blockers.push('A title is required.');
+    if (!platform) blockers.push('Select a platform.');
+    // salePrice is required (unlike the optional cost/asking fields), so an
+    // empty box is exactly as wrong here as an invalid number, both mean
+    // there is no real non-negative number to log yet.
+    if (salePrice === null || salePrice === undefined) blockers.push('Enter a valid sale price of $0 or more.');
+    if (askingPrice === undefined) blockers.push('Enter a valid asking price of $0 or more, or leave it blank.');
+    if (costBasis === undefined) blockers.push('Enter a valid cost basis of $0 or more, or leave it blank.');
+    if (shippingCost === undefined) blockers.push('Enter a valid shipping cost of $0 or more, or leave it blank.');
+
+    if (listingId && !(listings || []).some(l => l.id === listingId)) {
+      advisory.push('"' + listingId + '" does not match any listing in listings.json. Fine if that listing has ' +
+        'since fully sold through and was removed, otherwise double-check the id.');
+    }
+    if (listingId && platform) {
+      const listing = (listings || []).find(l => l.id === listingId);
+      if (listing && !(listing.soldOn || []).includes(platform)) {
+        advisory.push('Remember to add "' + platform + '" to this listing\'s own "soldOn" array too, logging the ' +
+          'sale here does not do that automatically.');
+      }
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const sale = {
+      id,
+      title,
+      listingId,
+      platform,
+      salePrice,
+      askingPrice: askingPrice === undefined ? null : askingPrice,
+      costBasis: costBasis === undefined ? null : costBasis,
+      shippingCost: shippingCost === undefined ? null : shippingCost,
+      saleDate
+    };
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(sale, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Sale JSON copied to clipboard.';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 wireCalc();
 wireBreakEven();
 wireOfferGuide();
@@ -2573,6 +2665,7 @@ wireMessageTemplates();
 wireChecklist();
 wirePacePlanner();
 wireQuickLogTool();
+wireQuickLogSaleTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
 
