@@ -829,29 +829,10 @@
     }
   }
 
-  // Matches the duplicate check CGT/CSM/Garage each already run on their own
-  // hand-maintained records, adapted to what actually identifies a real
-  // contact here: the same channel plus the same source detail (free text
-  // Jack writes, e.g. "Commenter on r/IMadeThis") is far more likely to be
-  // one real person logged twice than a coincidence. Falls back to channel +
-  // source + summary only when sourceDetail isn't set. Never groups on an
-  // empty key, two unset fields matching each other isn't a real signal, and
-  // validate.js already catches an exact duplicate id separately.
-  function findDuplicateLeads(leads) {
-    const byKey = new Map();
-    (leads || []).forEach(l => {
-      const channel = (l.channelId || '').trim().toLowerCase();
-      const detail = (l.sourceDetail || '').trim().toLowerCase();
-      const source = (l.source || '').trim().toLowerCase();
-      const summary = (l.summary || '').trim().toLowerCase();
-      const key = detail ? channel + '|' + detail : (source && summary ? channel + '|' + source + '|' + summary : null);
-      if (!key) return;
-      if (!byKey.has(key)) byKey.set(key, []);
-      byKey.get(key).push(l);
-    });
-    return [...byKey.values()].filter(group => group.length > 1);
-  }
-
+  // Grouping logic lives in SondrikValidateCore, shared with validate.js
+  // (same reasoning as CGT's, CSM's and Garage's own validate-core.js) so the
+  // two can never drift; validate.js also catches an exact duplicate id
+  // separately, a different, narrower check.
   function renderLeads(data) {
     const leads = data.leads || [];
     if (leads.length === 0) {
@@ -860,7 +841,7 @@
       return;
     }
     const duplicateIds = new Set();
-    findDuplicateLeads(leads).forEach(group => group.forEach(l => duplicateIds.add(l.id)));
+    SondrikValidateCore.findDuplicateLeads(leads).forEach(group => group.forEach(l => duplicateIds.add(l.id)));
     leadsSection.innerHTML = leads.map(l => {
       const o = l.outreach || {};
       const pillText = o.sent
@@ -1002,7 +983,7 @@
       });
     }
 
-    const duplicateLeadGroups = findDuplicateLeads(leads);
+    const duplicateLeadGroups = SondrikValidateCore.findDuplicateLeads(leads);
     if (duplicateLeadGroups.length > 0) {
       const dupCount = duplicateLeadGroups.reduce((n, g) => n + g.length, 0);
       steps.push({

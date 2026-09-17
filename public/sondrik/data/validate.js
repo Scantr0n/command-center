@@ -9,6 +9,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { findDuplicateLeads } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -202,6 +203,20 @@ function main() {
       warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
     emDashFields(o, ['note']).forEach(f =>
       warnings.push(where + ': outreach.' + f + ' contains an em dash, this product never uses one, check for a paste-in'));
+  });
+
+  // Mirrors the leads feed's own inline duplicate flag in app.js: the same
+  // real contact can end up logged twice (e.g. the same commenter replied to
+  // in two places and re-logged), and nothing above catches it since each id
+  // is otherwise valid on its own. Grouping logic shared via validate-core.js
+  // so the two can never drift.
+  findDuplicateLeads(leadsData.leads || []).forEach(group => {
+    const ids = group.map(l => l.id || '(missing id)');
+    const descriptor = group[0].sourceDetail
+      ? 'the same channel and source detail ("' + group[0].sourceDetail + '")'
+      : 'the same channel, source, and summary';
+    warnings.push('possible duplicate lead: ' + ids.length + ' leads (' + ids.join(', ') + ') share ' + descriptor +
+      '. Confirm these are really separate contacts, not the same person logged twice.');
   });
 
   // goals.json (validated after downloads.json and leads.json, since those
