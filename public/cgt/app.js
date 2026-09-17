@@ -696,9 +696,14 @@ function renderBreakdownList(title, groups, opts) {
     `;
   }
   const max = Math.max(...groups.map(g => g.value));
+  // title carries the untruncated label: .breakdown-label clips long ones
+  // with an ellipsis (batch labels especially, which are date-prefixed
+  // slugs long enough that several can share the same visible prefix), and
+  // without this a truncated row is otherwise indistinguishable from
+  // another one, with no way to tell them apart except by hovering.
   const rows = groups.map(g => `
     <div class="breakdown-row">
-      <span class="breakdown-label">${escapeHtml(g.label)}</span>
+      <span class="breakdown-label" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}</span>
       <span class="breakdown-bar-track">
         <span class="breakdown-bar-fill" style="width:${max ? (g.value / max * 100) : 0}%"></span>
       </span>
