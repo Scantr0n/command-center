@@ -873,9 +873,16 @@ const GRADING_RISK_MULTIPLE = 2;
 function computeGradingMath(c) {
   if (c.rawValue == null || c.expectedGradedValue == null || c.estimatedGradingCost == null) return null;
   const totalCost = c.estimatedGradingCost + (c.shippingCost || 0);
-  const expectedGain = c.expectedGradedValue - c.rawValue - totalCost;
+  // The "2x margin" rule above is about the raw upside (graded value over
+  // raw value) clearing the cost of grading by 2x, not the already-cost-net
+  // expectedGain clearing it a second time (that silently demanded a 3x
+  // margin instead of the documented 2x, since expectedGain is gross minus
+  // totalCost already). expectedGain itself stays net, it is the real
+  // "Expected gain" figure shown and sorted on elsewhere.
+  const grossGain = c.expectedGradedValue - c.rawValue;
+  const expectedGain = grossGain - totalCost;
   let verdict;
-  if (expectedGain >= totalCost * GRADING_RISK_MULTIPLE) verdict = 'worth-grading';
+  if (grossGain >= totalCost * GRADING_RISK_MULTIPLE) verdict = 'worth-grading';
   else if (expectedGain > 0) verdict = 'marginal';
   else verdict = 'not-worth';
   return { totalCost, expectedGain, verdict };
