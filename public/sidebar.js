@@ -15,6 +15,7 @@
 // just a dashboard card with no page behind it.
 (function () {
   const STORAGE_KEY = 'cc-sidebar-expanded';
+  const PIN_STORAGE_KEY = 'cc-sidebar-pinned';
   const BREAKPOINT = 860; // below this, the rail is hidden entirely, same call as yesterday's mobile category-row fix: don't eat mobile width for a nav a phone user can already get via the back-link.
 
   function escapeHtml(str) {
@@ -71,7 +72,22 @@
     .cc-sb-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
     .cc-sb-label { overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity 0.1s ease; }
     #ccSidebar.expanded .cc-sb-label { opacity: 1; }
+    #ccSidebar.expanded .cc-sb-row { padding-right: 34px; }
     .cc-sb-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 8px 16px; }
+
+    .cc-sb-row-wrap { position: relative; }
+    .cc-sb-pin {
+      display: none;
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      align-items: center; justify-content: center;
+      width: 20px; height: 20px; padding: 0; border: none; border-radius: 5px;
+      background: transparent; color: #565B64; cursor: pointer;
+      opacity: 0; transition: opacity 0.1s ease, color 0.1s ease;
+    }
+    #ccSidebar.expanded .cc-sb-pin { display: flex; }
+    .cc-sb-row-wrap:hover .cc-sb-pin, .cc-sb-pin:focus-visible, .cc-sb-pin.pinned { opacity: 1; }
+    .cc-sb-pin:hover, .cc-sb-pin:focus-visible { color: #F5F6F7; background: rgba(255,255,255,0.06); outline: none; }
+    .cc-sb-pin.pinned { color: #E0A030; }
     .cc-sb-home {
       display: flex; align-items: center; gap: 10px;
       padding: 14px 16px;
@@ -134,22 +150,62 @@
       if (!res.ok) return;
       const data = await res.json();
       const hubs = (data.clusters || []).filter(c => c.link).sort((a, b) => a.name.localeCompare(b.name));
-      const hubsEl = document.getElementById('ccSidebarHubs');
-      hubsEl.innerHTML = hubs.map(c => {
-        const active = currentPathIsHub(c.link);
-        const color = STATUS_COLOR[c.status] || STATUS_COLOR.unknown;
-        return `
-          <a class="cc-sb-row${active ? ' active' : ''}" href="${escapeHtml(c.link)}" title="${escapeHtml(c.name)}" ${active ? 'aria-current="page"' : ''}>
-            <span class="cc-sb-dot" style="background:${color}" aria-hidden="true"></span>
-            <span class="cc-sb-label">${escapeHtml(c.name)}</span>
-          </a>
-        `;
-      }).join('');
+      renderHubs(hubs);
     } catch {
       // No sidebar hub list on a fetch failure is an honest degrade, same
       // silent-fallback convention /api/clusters itself already uses for
       // Drive being unreachable. The home link and toggle still work.
     }
+  }
+
+  function getPinned() {
+    try { return new Set(JSON.parse(localStorage.getItem(PIN_STORAGE_KEY) || '[]')); }
+    catch { return new Set(); }
+  }
+
+  function setPinned(pinnedSet) {
+    localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify([...pinnedSet]));
+  }
+
+  // Pinned hubs sort to their own group above the rest, same pattern the
+  // research pass found across Grafana/Raycast/Homarr — a flat equal-weight
+  // list doesn't scale once there are more than a couple hubs someone
+  // actually revisits constantly.
+  function renderHubs(hubs) {
+    const hubsEl = document.getElementById('ccSidebarHubs');
+    const pinned = getPinned();
+    const row = c => {
+      const active = currentPathIsHub(c.link);
+      const color = STATUS_COLOR[c.status] || STATUS_COLOR.unknown;
+      const isPinned = pinned.has(c.id);
+      return `
+        <div class="cc-sb-row-wrap">
+          <a class="cc-sb-row${active ? ' active' : ''}" href="${escapeHtml(c.link)}" title="${escapeHtml(c.name)}" ${active ? 'aria-current="page"' : ''}>
+            <span class="cc-sb-dot" style="background:${color}" aria-hidden="true"></span>
+            <span class="cc-sb-label">${escapeHtml(c.name)}</span>
+          </a>
+          <button type="button" class="cc-sb-pin${isPinned ? ' pinned' : ''}" data-pin-id="${escapeHtml(c.id)}" aria-label="${isPinned ? 'Unpin' : 'Pin'} ${escapeHtml(c.name)}" aria-pressed="${isPinned}" title="${isPinned ? 'Unpin' : 'Pin to top'}">
+            <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M8 1l1.5 4.5L14 7l-4 2.5L9.5 14 8 11 6.5 14 6 9.5 2 7l4.5-1.5z" fill="currentColor"/></svg>
+          </button>
+        </div>
+      `;
+    };
+    const pinnedHubs = hubs.filter(c => pinned.has(c.id));
+    const restHubs = hubs.filter(c => !pinned.has(c.id));
+    hubsEl.innerHTML =
+      (pinnedHubs.length ? pinnedHubs.map(row).join('') + '<div class="cc-sb-divider"></div>' : '') +
+      restHubs.map(row).join('');
+
+    hubsEl.querySelectorAll('.cc-sb-pin').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        const id = btn.dataset.pinId;
+        const p = getPinned();
+        if (p.has(id)) p.delete(id); else p.add(id);
+        setPinned(p);
+        renderHubs(hubs);
+      });
+    });
   }
 
   if (document.readyState === 'loading') {

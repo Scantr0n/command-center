@@ -46,6 +46,13 @@
   .node-glow-active { animation: pulseGlow 2.8s ease-in-out infinite; }
   @keyframes pulseGlow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
   .spoke-line { opacity: 0.5; }
+  /* Traveling-dash flow, active-status spokes only: reuses the same real
+     status field .node-glow-active already keys off, never a decorative
+     animation with no data behind it (see this file's own no-fabrication
+     convention). Dash pattern is short-mark/long-gap so it reads as a
+     moving pulse rather than a static dashed line. */
+  .spoke-live { stroke-dasharray: 4, 10; animation: spokeFlow 1.6s linear infinite; }
+  @keyframes spokeFlow { to { stroke-dashoffset: -14; } }
   .hub-node text, .graph-node text { pointer-events: none; user-select: none; }
   .view-toggle-btn { transition: all 0.15s ease; }
   .view-toggle-btn.active { background: var(--ink); color: var(--void); }
@@ -143,6 +150,7 @@
     .graph-node, .cluster-card, .attn-card, .view-toggle-btn, .search-input, #linkRow, .node-glow {
       transition: none !important;
     }
+    .spoke-live { animation: none; }
     .graph-node:hover, .cluster-card:hover { transform: none; }
   }
 
@@ -757,7 +765,8 @@ function renderGraph() {
     const hx = cx + hubR * ((nx - cx) / Math.hypot(nx - cx, ny - cy) || 0);
     const hy = cy + hubR * ((ny - cy) / Math.hypot(nx - cx, ny - cy) || 0);
     const color = categoryColor(c.category);
-    spokesHtml += `<line class="spoke-line" data-id="${escapeHtml(c.id)}" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
+    const liveSpoke = c.status === 'active' ? ' spoke-live' : '';
+    spokesHtml += `<line class="spoke-line${liveSpoke}" data-id="${escapeHtml(c.id)}" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
 
     // Real cross-project relationships only (e.g. Lifting Tracker relays into
     // Macro Tracker), not decorative, only drawn when a cluster's own data
