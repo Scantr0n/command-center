@@ -1506,7 +1506,10 @@ function matchesSearchTerm(c, term) {
     || (c.cardName || '').toLowerCase().includes(term)
     || (c.certNumber || '').toLowerCase().includes(term)
     || (c.storageLocation || '').toLowerCase().includes(term)
-    || String(c.year ?? '').includes(term);
+    || String(c.year ?? '').includes(term)
+    || (c.notes || '').toLowerCase().includes(term)
+    || (c.sourceNote || '').toLowerCase().includes(term)
+    || (c.compNote || '').toLowerCase().includes(term);
 }
 function matchesSportValue(c, sport) { return sport === 'all' || c.sport === sport; }
 function matchesGraderValue(c, grader) {
