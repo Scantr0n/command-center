@@ -2658,6 +2658,93 @@ function wireQuickLogSaleTool() {
   });
 }
 
+// Same gap as sales.json above: expenses.json had no logging UI at all,
+// despite Net business income and the Schedule C-style totals both reading
+// straight from it. Reuses computeExpenseAmount and mileageRateGapReason,
+// the exact same functions renderExpenses already uses to preview what a
+// mileage entry with no manual amount would compute to (or why it can't
+// yet), so the preview shown here can never drift from what the real table
+// would show once this gets pasted in.
+function wireQuickLogExpenseTool() {
+  const form = document.getElementById('quickExpenseForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('neWarnings');
+  const output = document.getElementById('neOutput');
+  const copyBtn = document.getElementById('neCopyBtn');
+  const live = document.getElementById('quickLogExpenseLive');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('neId').value.trim();
+    const description = document.getElementById('neDescription').value.trim();
+    const category = document.getElementById('neCategory').value;
+    const miles = readOptionalNonNegativeInput(document.getElementById('neMiles'));
+    const amount = readOptionalNonNegativeInput(document.getElementById('neAmount'));
+    const date = document.getElementById('neDate').value || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (expensesLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another expense, ids must be unique.');
+    }
+    if (!description) blockers.push('A description is required.');
+    if (!category) blockers.push('Select a category.');
+    if (miles === undefined) blockers.push('Enter a valid mileage of 0 or more, or leave it blank.');
+    if (amount === undefined) blockers.push('Enter a valid amount of $0 or more, or leave it blank.');
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const expense = {
+      id,
+      description,
+      category,
+      miles: miles === undefined ? null : miles,
+      amount: amount === undefined ? null : amount,
+      date
+    };
+
+    // Same three data-quality checks validate.js runs on a real expense row,
+    // reused here so a gap surfaces before pasting instead of on the next
+    // `node validate.js` run.
+    if (expense.miles != null && expense.category !== 'mileage') {
+      advisory.push('"miles" is set but category is "' + category + '", not "mileage", it will be ignored.');
+    }
+    const computed = computeExpenseAmount(expense);
+    const gapReason = mileageRateGapReason(expense);
+    if (computed == null && expense.category === 'mileage') {
+      if (expense.miles == null) advisory.push('Mileage expense has no amount and no miles to compute one from.');
+      else if (!expense.date) advisory.push('Mileage expense has miles but no date, can\'t look up which IRS rate applies.');
+      else if (gapReason) advisory.push(gapReason);
+    } else if (computed == null) {
+      advisory.push('No amount logged yet for this expense.');
+    } else if (expense.amount == null && expense.category === 'mileage') {
+      advisory.push('Amount left blank, the table will compute ' + formatUsd(computed) + ' from ' + expense.miles +
+        ' miles at the real IRS rate for ' + expense.date + '.');
+    }
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(expense, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Expense JSON copied to clipboard.';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 wireCalc();
 wireBreakEven();
 wireOfferGuide();
@@ -2666,6 +2753,7 @@ wireChecklist();
 wirePacePlanner();
 wireQuickLogTool();
 wireQuickLogSaleTool();
+wireQuickLogExpenseTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
 

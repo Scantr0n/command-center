@@ -1121,6 +1121,49 @@
       or miles logged yet shows as such rather than being left out of the count silently, run
       <code>node public/garage/data/validate.js</code> to find any.
     </div>
+
+    <details class="schema-help" id="quickLogExpenseTool">
+      <summary>Quick log an expense (generates JSON to paste into expenses.json, saves nothing)</summary>
+      <div class="schema-help-body">
+        <p>Runs the same checks <code>node public/garage/data/validate.js</code> does on <code>expenses.json</code>
+          (a unique id, a real category), then builds the JSON object to paste into the <code>expenses</code>
+          array yourself. For a <code>mileage</code> expense, leave "Amount" blank and log real miles plus a real
+          date instead, the table above computes the dollar amount itself at the real IRS rate for that date, the
+          same way it already does for a hand-edited entry. This never writes a file or sends anything, it only
+          puts text on your clipboard.</p>
+
+        <div class="quick-log-grid">
+          <form class="quick-log-form" id="quickExpenseForm">
+            <h3 class="quick-log-title font-mono">New expense &rarr; expenses.json</h3>
+            <label class="quick-log-label" for="neId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="neId" placeholder="e.g. shipping-tape-2026-09" required>
+            <label class="quick-log-label" for="neDescription">Description</label>
+            <input class="quick-log-input" type="text" id="neDescription" placeholder="What the expense was for" required>
+            <label class="quick-log-label" for="neCategory">Category</label>
+            <select class="quick-log-input" id="neCategory" required>
+              <option value="" disabled selected>Select a category</option>
+              <option value="mileage">Mileage</option>
+              <option value="supplies">Supplies</option>
+              <option value="platform-fees">Platform fees</option>
+              <option value="subscriptions">Subscriptions</option>
+              <option value="other">Other</option>
+            </select>
+            <label class="quick-log-label" for="neMiles">Miles driven (optional, mileage only)</label>
+            <input class="quick-log-input" type="number" id="neMiles" min="0" step="0.1">
+            <label class="quick-log-label" for="neAmount">Amount, USD (optional, leave blank for mileage to auto-compute)</label>
+            <input class="quick-log-input" type="number" id="neAmount" min="0" step="0.01">
+            <label class="quick-log-label" for="neDate">Date (optional)</label>
+            <input class="quick-log-input" type="date" id="neDate">
+            <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+            <div class="quick-log-warnings" id="neWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="neOutput" readonly rows="9" hidden aria-label="Generated expense JSON, ready to paste into the expenses array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="neCopyBtn" hidden>Copy JSON</button>
+            <p class="quick-log-hint" id="quickLogExpenseLive" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </details>
+
     <div class="table-wrap">
       <table class="card-table" id="expensesTable">
         <thead>
