@@ -1835,6 +1835,10 @@
       warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
         'biggest driver of real reply rate, fill it in as soon as it is known.');
     }
+    if (edited.contactChannel && edited.contactChannel.type && !edited.contactChannel.detail) {
+      warnings.push('Contact channel type is logged but contact channel detail (the actual email/handle/contact) ' +
+        'is not. Knowing it is a named decision-maker is not useful without the real way to reach them.');
+    }
     if (p.stage !== 'researched' && !edited.verifiedHook) {
       warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
         'is a real fit once known.');
@@ -2802,6 +2806,10 @@
     if (p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type)) {
       warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
         'biggest driver of real reply rate, fill it in as soon as it is known.');
+    }
+    if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
+      warnings.push('Contact channel type is logged but contact channel detail (the actual email/handle/contact) ' +
+        'is not. Knowing it is a named decision-maker is not useful without the real way to reach them.');
     }
     if (p.stage !== 'researched' && !p.verifiedHook) {
       warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
