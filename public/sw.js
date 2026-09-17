@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -17,8 +17,8 @@ const SHELL_URLS = [
   '/alpha/', '/alpha/index.html', '/alpha/app.js', '/alpha/style.css',
   '/cgt/', '/cgt/index.html', '/cgt/app.js', '/cgt/style.css',
   '/cgt/import.html', '/cgt/import.js', '/cgt/data/validate-core.js',
-  '/csm/', '/csm/index.html', '/csm/app.js', '/csm/style.css',
-  '/garage/', '/garage/index.html', '/garage/app.js', '/garage/style.css',
+  '/csm/', '/csm/index.html', '/csm/app.js', '/csm/style.css', '/csm/data/validate-core.js',
+  '/garage/', '/garage/index.html', '/garage/app.js', '/garage/style.css', '/garage/data/validate-core.js',
   '/sondrik/', '/sondrik/index.html', '/sondrik/app.js', '/sondrik/style.css'
 ];
 
