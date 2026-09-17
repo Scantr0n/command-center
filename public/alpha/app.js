@@ -396,6 +396,55 @@ function effectiveConnHistory(data, clientHistory) {
   return serverHistory.length ? serverHistory : clientHistory;
 }
 
+// Real-dashboard monitoring guidance for a live trading system consistently
+// names API/connection response time as its own signal alongside up/down
+// state (a connection can be "up" yet degraded). This is genuinely
+// measurable from right here: the time this browser's own fetch of
+// /api/alpha/live takes to resolve, timed with performance.now() around the
+// real request in loadStatus() below, never estimated. It reports how long
+// this page's request to Command Center took, not Alpha's own internal
+// latency (Command Center may itself be reading a local fallback file), so
+// it is labeled "fetch" rather than implying it reflects Alpha's daemon
+// speed. Recorded per browser only, same reasoning and same cap pattern as
+// the connectivity and regime history above.
+const CLIENT_LATENCY_HISTORY_KEY = 'alpha:clientLatencyHistory';
+const CLIENT_LATENCY_HISTORY_CAP = 200;
+const LATENCY_AVG_WINDOW = 20;
+
+function loadClientLatencyHistory() {
+  try {
+    const raw = localStorage.getItem(CLIENT_LATENCY_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function recordClientLatency(ms) {
+  const history = loadClientLatencyHistory();
+  history.push({ at: new Date().toISOString(), ms });
+  const trimmed = history.slice(-CLIENT_LATENCY_HISTORY_CAP);
+  try {
+    localStorage.setItem(CLIENT_LATENCY_HISTORY_KEY, JSON.stringify(trimmed));
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // other client-side histories above, the reading just stops persisting.
+  }
+  return trimmed;
+}
+
+// Averaged over a small recent window rather than the full cap, since a
+// single-request spike (or a real, sustained slowdown) is more useful read
+// against "the last handful of checks" than against everything this browser
+// has ever recorded.
+function averageLatency(history) {
+  if (!history.length) return null;
+  const recent = history.slice(-LATENCY_AVG_WINDOW);
+  const sum = recent.reduce((s, e) => s + (typeof e.ms === 'number' ? e.ms : 0), 0);
+  return Math.round(sum / recent.length);
+}
+
 // live.regime is sent as a single current value, never a history (see the
 // schema-help row for live.regime), so this page has no way to show how
 // Alpha's regime detection has actually behaved over time, only its reading
@@ -483,10 +532,18 @@ function renderRegimeHistory(clientRegimeHistory) {
 // caller can decide the tab's glance indicator alongside the separate,
 // higher-priority kill-switch check (see the GLANCE_COLORS comment above);
 // this function no longer sets that indicator itself.
-function renderConnection(data, clientHistory) {
+function renderConnection(data, clientHistory, latencyHistory) {
   const dot = document.getElementById('connDot');
   const label = document.getElementById('connLabel');
   const sub = document.getElementById('connSub');
+  const latencyEl = document.getElementById('connLatency');
+  if (latencyEl) {
+    const latest = latencyHistory && latencyHistory.length ? latencyHistory[latencyHistory.length - 1].ms : null;
+    const avg = averageLatency(latencyHistory || []);
+    latencyEl.textContent = (typeof latest === 'number')
+      ? 'Fetch ' + latest + 'ms' + (avg != null ? ' (avg ' + avg + 'ms)' : '')
+      : '';
+  }
   const asOf = data.live && data.live.asOf;
   // connection.checkedAt is a distinct real field from live.asOf: it is when
   // connectivity itself was last probed, which can exist even with no live
@@ -1147,7 +1204,7 @@ function diagnosticRow(label, status, badgeText, detail) {
   return `<tr><th>${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
 }
 
-function renderBrowserDiagnostics(connCheckCount, regimeObservationCount) {
+function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount) {
   const body = document.getElementById('browserDiagnosticsBody');
   if (!body) return;
 
@@ -1172,7 +1229,9 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount) {
     diagnosticRow('Connectivity checks recorded', storageOk ? 'ok' : 'blocked', String(connCheckCount),
       'Real connectivity results recorded by this browser (see Connection above).'),
     diagnosticRow('Regime observations recorded', storageOk ? 'ok' : 'blocked', String(regimeObservationCount),
-      'Real regime transitions this browser has actually observed (see Regime history above).')
+      'Real regime transitions this browser has actually observed (see Regime history above).'),
+    diagnosticRow('Fetch latency samples recorded', storageOk ? 'ok' : 'blocked', String(latencySampleCount),
+      'Real round-trip timings of this browser\'s own requests to Command Center (see the Connection strip above).')
   ];
   body.innerHTML = rows.join('');
 }
@@ -1392,10 +1451,15 @@ async function loadStatus() {
     // same merge-with-fallback pattern as /api/clusters. Cache-bust: the
     // underlying data is meant to change out from under the page, a cached
     // 304 would make the glance view lie about how fresh it is.
+    const fetchStartedAt = performance.now();
     const res = await fetch('/api/alpha/live?t=' + Date.now());
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
+    // Real, measured round trip for this browser's own request, timed around
+    // the actual fetch above; see the CLIENT_LATENCY_HISTORY_KEY comment for
+    // why this is a page-to-Command-Center reading, not Alpha's own latency.
+    const clientLatencyHistory = recordClientLatency(Math.round(performance.now() - fetchStartedAt));
     document.getElementById('copyStatusBtn').disabled = false;
     lastLoadedAt = new Date().toISOString();
     updateOfflineBanner();
@@ -1429,7 +1493,7 @@ async function loadStatus() {
     renderHeadline(headline.level, headline.text, headline.asOf);
     renderLastKnownBanner(lastKnown);
     updateLastKnownTags(lastKnown);
-    const connCls = renderConnection(data, clientConnHistory);
+    const connCls = renderConnection(data, clientConnHistory, clientLatencyHistory);
     renderConnectionHistory(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
     renderRegimeHistory(clientRegimeHistory);
@@ -1444,7 +1508,7 @@ async function loadStatus() {
     renderArchitecture(data);
     renderGenealogy(effectiveData);
     renderEventLog(data);
-    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length);
+    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length);
   } catch (e) {
     if (requestId !== latestStatusRequestId) return;
     // Distinct from "down" (Alpha has no live feed yet, an expected,
@@ -1592,7 +1656,7 @@ updateOfflineBanner();
 // Renders once immediately, independent of the /api/alpha/live fetch below,
 // so this table is accurate even if that fetch itself fails; loadStatus()
 // re-renders it with fresh counts on every successful tick after this.
-renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length);
+renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length, loadClientLatencyHistory().length);
 // Same "render immediately, independent of the network fetch" reasoning as
 // the diagnostics call above: market open/closed has no dependency on
 // /api/alpha/live succeeding at all, so it shouldn't wait on it.

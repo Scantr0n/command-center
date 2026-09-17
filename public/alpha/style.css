@@ -392,6 +392,15 @@ header.page-head .sub {
   margin-left: auto;
 }
 
+/* Fetch latency reading: distinct from conn-sub (Alpha's own connection
+   state) since this measures this browser's request to Command Center, a
+   different real quantity. Sits after conn-sub rather than folded into it so
+   the two are never visually conflated as the same reading. */
+.conn-latency {
+  font-size: 0.68rem;
+  color: var(--dim);
+}
+
 .refresh-btn {
   font-size: 0.72rem;
   color: var(--sub);

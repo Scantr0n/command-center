@@ -92,6 +92,12 @@
         from Alpha at all and never will, since Alpha does not expose a market-calendar endpoint and doesn't need
         to. It exists purely as glance context for reading everything else on this page, for example an empty
         Positions table on a Saturday means something different from the same empty table at 10am on a Tuesday.</p>
+      <p>The "Fetch" reading next to the Connection strip is a real, measured round trip: how long this browser's
+        own request to <code>/api/alpha/live</code> just took to resolve, timed around that request in
+        <code>app.js</code>. It reports this page's own speed talking to Command Center, not Alpha's daemon's own
+        internal latency, since Command Center may itself be answering from the static fallback file rather than a
+        live round trip to Jack's Mac. Recorded per browser only, in <code>localStorage</code>, same as the
+        connectivity and regime histories above; the averaged figure next to it covers the most recent 20 samples.</p>
       <p>"Enable critical alerts" turns on a native OS notification, using the browser's own Notification API, the
         moment this tab's headline first shows the kill switch engaged or a page error, if this tab is not the one
         currently focused. Nothing is sent anywhere for this: the browser shows the notification locally from
@@ -147,6 +153,7 @@
       <span class="conn-dot down" id="connDot" aria-hidden="true"></span>
       <span class="conn-label font-mono" id="connLabel">Loading...</span>
       <span class="conn-sub" id="connSub"></span>
+      <span class="conn-latency font-mono" id="connLatency" title="How long this browser's own request to Command Center took to resolve, not Alpha's own daemon latency."></span>
       <button type="button" id="refreshBtn" class="refresh-btn font-mono">Refresh</button>
     </div>
     <div class="conn-history-wrap">
