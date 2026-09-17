@@ -993,6 +993,12 @@ section { margin-bottom: 36px; }
   background: rgba(61,220,132,0.1);
   color: #3DDC84;
 }
+.status-pill-duplicate {
+  border-color: rgba(224,160,48,0.35);
+  background: rgba(224,160,48,0.1);
+  color: #E0A030;
+  cursor: help;
+}
 .lead-note {
   font-size: 0.75rem;
   color: var(--dim);
@@ -1047,7 +1053,7 @@ footer.page-foot {
   .compare-bar-fill { background: #888; }
   .chart-scroll::before, .chart-scroll::after { display: none !important; }
   .compare-bar-count, .stat-number, .channel-value { color: #111; }
-  .status-pill, .status-pill-sent, .channel-pill { border-color: #999; background: none; color: #111; }
+  .status-pill, .status-pill-sent, .status-pill-duplicate, .channel-pill { border-color: #999; background: none; color: #111; }
   .timeline-item { border-color: #ddd; }
   .goal-progress-track { border-color: #999; background: none; }
   .goal-progress-fill { background: #888; }
