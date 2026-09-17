@@ -1509,6 +1509,18 @@ function buildStatusSummary(data) {
     '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),
     '- Robustness score: ' + (typeof ps.robustnessScore === 'number' ? ps.robustnessScore + '/100' : awaiting),
     '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active) ? 'Active' : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
+    '- Genealogy: ' + (() => {
+      const g = live.genealogy || {};
+      if (g.generation == null && g.activeLineages == null && g.lastBreedingEventAt == null) return awaiting;
+      const gen = g.generation != null ? 'gen ' + g.generation : awaiting;
+      const lineageCount = g.activeLineages != null
+        ? g.activeLineages + ' active lineage' + (g.activeLineages === 1 ? '' : 's')
+        : awaiting;
+      const lastEvent = g.lastBreedingEventAt
+        ? 'last breeding event ' + (timeAgo(g.lastBreedingEventAt) || formatAbsolute(g.lastBreedingEventAt))
+        : 'no breeding event recorded';
+      return gen + ', ' + lineageCount + ', ' + lastEvent;
+    })(),
   ];
   return lines.join('\n');
 }
