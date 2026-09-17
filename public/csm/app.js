@@ -328,7 +328,7 @@
     const nudgeRows = computeNudgeRows(prospects);
     const overdueCount = nudgeRows.filter(r => r.days <= 0).length;
     const stalledCount = computeStalled(stages, prospects).length;
-    const coldSignalCount = computeColdSignal(prospects).length;
+    const coldSignalCount = computeColdSignal(prospects).active.length;
     const backfillCount = computeDataQualityFlags(stages, prospects).length;
     const duplicateCount = findDuplicateProspects(prospects).length;
 
@@ -515,6 +515,8 @@
 
   const coldSignalEl = document.getElementById('coldSignalList');
   const coldSignalSection = document.getElementById('coldSignalSection');
+  const coldSignalParkedWrap = document.getElementById('coldSignalParkedWrap');
+  const coldSignalParkedEl = document.getElementById('coldSignalParkedList');
 
   // Real signal from cold-outreach practice, not something invented for this
   // board: a contact who has received several real touches (initial send +
@@ -526,29 +528,68 @@
   // this looks at real touch count vs. real stage movement.
   const COLD_TOUCH_THRESHOLD = 3;
 
+  // Flagging a cold prospect forever with no way to act on it is its own bad
+  // pattern: cold-outreach convention is to stop repeating the identical
+  // nudge after a few unanswered touches and deliberately park a real
+  // re-attempt months out, not nag on the same cadence or drop the lead.
+  // nudgeSchedule.doNotNudgeBefore already exists for exactly this, editable
+  // from this prospect's own edit form, so a future date there is read as
+  // "already decided, come back later" and split into its own list instead
+  // of sitting in the urgent one forever.
   function computeColdSignal(prospects) {
-    return prospects
+    const today = todayIso();
+    const flagged = prospects
       .filter(p => p.stage === 'outreach-sent')
       .map(p => ({ p, touches: (p.outreachLog || []).filter(e => e && e.date).length }))
-      .filter(x => x.touches >= COLD_TOUCH_THRESHOLD)
-      .sort((a, b) => b.touches - a.touches);
+      .filter(x => x.touches >= COLD_TOUCH_THRESHOLD);
+
+    const active = [];
+    const parked = [];
+    flagged.forEach(x => {
+      const notBefore = x.p.nudgeSchedule && x.p.nudgeSchedule.doNotNudgeBefore;
+      if (notBefore && isValidDateStr(notBefore) && notBefore > today) parked.push(x);
+      else active.push(x);
+    });
+
+    active.sort((a, b) => b.touches - a.touches);
+    parked.sort((a, b) => a.p.nudgeSchedule.doNotNudgeBefore.localeCompare(b.p.nudgeSchedule.doNotNudgeBefore));
+    return { active, parked };
   }
 
   function renderColdSignal(stages, prospects) {
-    const flagged = computeColdSignal(prospects);
-    if (flagged.length === 0) {
+    const { active, parked } = computeColdSignal(prospects);
+    if (active.length === 0 && parked.length === 0) {
       coldSignalSection.hidden = true;
       return;
     }
     coldSignalSection.hidden = false;
-    coldSignalEl.innerHTML = flagged.map(({ p, touches }) =>
-      '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
-      '<strong>' + escapeHtml(p.name) + '</strong>' +
-      '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
-      '<span class="dq-why">' + touches + ' REAL TOUCHES LOGGED, STILL WAITING ON A REPLY</span>' +
-      '</button>'
-    ).join('');
-    wireRowsToModal(coldSignalEl);
+
+    if (active.length === 0) {
+      coldSignalEl.innerHTML = '<p class="nudge-empty">Nothing needs a decision right now, everything past the ' +
+        'touch threshold is already parked for a scheduled re-engagement below.</p>';
+    } else {
+      coldSignalEl.innerHTML = active.map(({ p, touches }) =>
+        '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
+        '<strong>' + escapeHtml(p.name) + '</strong>' +
+        '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+        '<span class="dq-why">' + touches + ' REAL TOUCHES LOGGED, STILL WAITING ON A REPLY</span>' +
+        '</button>'
+      ).join('');
+      wireRowsToModal(coldSignalEl);
+    }
+
+    coldSignalParkedWrap.hidden = parked.length === 0;
+    if (parked.length > 0) {
+      coldSignalParkedEl.innerHTML = parked.map(({ p, touches }) =>
+        '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
+        '<strong>' + escapeHtml(p.name) + '</strong>' +
+        '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+        '<span class="dq-why">' + touches + ' TOUCHES SO FAR &middot; RE-ENGAGE ' +
+        fmtDate(p.nudgeSchedule.doNotNudgeBefore).toUpperCase() + '</span>' +
+        '</button>'
+      ).join('');
+      wireRowsToModal(coldSignalParkedEl);
+    }
   }
 
   function computeDataQualityFlags(stages, prospects) {
@@ -1622,10 +1663,13 @@
     const attentionLines = [];
     if (overdue.length) attentionLines.push('  ' + overdue.length + ' nudge' + (overdue.length === 1 ? '' : 's') + ' due or overdue');
     if (stalled.length) attentionLines.push('  ' + stalled.length + ' prospect' + (stalled.length === 1 ? '' : 's') + ' stalled in stage');
-    if (coldSignal.length) attentionLines.push('  ' + coldSignal.length + ' prospect' + (coldSignal.length === 1 ? '' : 's') + ' may need a new approach');
+    if (coldSignal.active.length) attentionLines.push('  ' + coldSignal.active.length + ' prospect' + (coldSignal.active.length === 1 ? '' : 's') + ' may need a new approach');
     if (backfill.length) attentionLines.push('  ' + backfill.length + ' prospect' + (backfill.length === 1 ? '' : 's') + ' needs backfill');
     if (duplicates.length) attentionLines.push('  ' + duplicates.length + ' possible duplicate group' + (duplicates.length === 1 ? '' : 's'));
     lines.push(...(attentionLines.length ? attentionLines : ['  Nothing needs attention right now.']));
+    if (coldSignal.parked.length) {
+      lines.push('  (' + coldSignal.parked.length + ' more parked for a scheduled re-engagement, not urgent)');
+    }
 
     lines.push('');
     lines.push('NUDGE QUEUE');

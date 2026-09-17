@@ -773,6 +773,20 @@ header.page-head .sub {
 .data-quality-list-stale .data-quality-row { border-color: rgba(229,72,77,0.15); }
 .data-quality-list-stale .dq-why { color: #E5484D; }
 
+/* Parked cold-signal prospects: deliberately scheduled for a later
+   re-engagement, not sitting unattended, so this stays neutral/muted
+   instead of the urgent amber the default data-quality-list uses. */
+.data-quality-list-parked {
+  border-color: rgba(86,91,98,0.35);
+  background: rgba(86,91,98,0.05);
+  margin-top: 12px;
+}
+.data-quality-list-parked .data-quality-row { border-color: rgba(86,91,98,0.18); }
+.data-quality-list-parked .data-quality-row:hover, .data-quality-list-parked .data-quality-row:focus-visible {
+  background: rgba(86,91,98,0.1);
+}
+.data-quality-list-parked .dq-why { color: var(--sub); }
+
 .column-empty {
   font-size: 0.72rem;
   color: var(--dim);
