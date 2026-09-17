@@ -558,6 +558,9 @@
           if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
           if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
         }
+        if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
+          reasons.push('CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL');
+        }
         const snapStale = socialSnapshotsStaleInfo(p);
         if (snapStale) reasons.push(snapStale.days + 'D OLD ' + (snapStale.platform ? escapeHtml(snapStale.platform).toUpperCase() + ' ' : '') + 'SNAPSHOT, DUE FOR REFRESH');
         if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');

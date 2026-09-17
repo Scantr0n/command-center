@@ -80,6 +80,11 @@ function main() {
       warnings.push(where + ': stage is "' + p.stage + '" but contactChannel.type is not logged yet. ' +
         'This is the single biggest driver of real reply rate, backfill it when known.');
     }
+    if (ct && !(p.contactChannel && p.contactChannel.detail)) {
+      warnings.push(where + ': contactChannel.type is "' + ct + '" but contactChannel.detail (the actual ' +
+        'email/handle/contact) is not logged. Knowing it is a named decision-maker is not useful without the ' +
+        'real way to reach them, backfill it when known.');
+    }
 
     if (p.stage && p.stage !== 'researched' && !p.verifiedHook) {
       warnings.push(where + ': stage is "' + p.stage + '" but verifiedHook is not logged yet. ' +
