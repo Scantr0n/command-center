@@ -2449,9 +2449,95 @@
 
   // Same "/" jumps to search shortcut as the main Command Center dashboard.
   document.addEventListener('keydown', e => {
-    if (!modalOverlay.hidden || e.key !== '/' || document.activeElement.id === 'searchInput') return;
+    if (!modalOverlay.hidden || shortcutsOpen || e.key !== '/' || document.activeElement.id === 'searchInput') return;
     e.preventDefault();
     searchInput.focus();
+  });
+
+  let shortcutsOpen = false;
+  let shortcutsLastFocusedEl = null;
+
+  // Only the shortcuts this page actually wires up, never an invented or
+  // aspirational one -- same "?" convention as GitHub/Gmail/Linear, and the
+  // same overlay the main Command Center dashboard, CGT, and Garage hubs
+  // already added.
+  const SHORTCUTS = [
+    { keys: ['/'], label: 'Focus search' },
+    { keys: ['Enter', 'Space'], label: 'Open the focused prospect card, or activate a focused list column header to sort' },
+    { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
+    { keys: ['Esc'], label: 'Close the open dialog' },
+    { keys: ['?'], label: 'Show this help' }
+  ];
+
+  function renderShortcutsList() {
+    document.getElementById('shortcutsList').innerHTML = SHORTCUTS.map(s => `
+      <div class="shortcut-row">
+        <span class="shortcut-label">${escapeHtml(s.label)}</span>
+        <span class="shortcut-keys">${s.keys.map(k => `<kbd class="shortcut-key">${escapeHtml(k)}</kbd>`).join('<span class="shortcut-label">or</span>')}</span>
+      </div>
+    `).join('');
+  }
+
+  function getShortcutsFocusable() {
+    return Array.from(document.getElementById('shortcutsModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openShortcuts() {
+    if (shortcutsOpen) return;
+    shortcutsOpen = true;
+    shortcutsLastFocusedEl = document.activeElement;
+    renderShortcutsList();
+    document.getElementById('shortcutsOverlay').hidden = false;
+    lockBodyScroll();
+    document.getElementById('shortcutsClose').focus();
+  }
+
+  function closeShortcuts() {
+    if (!shortcutsOpen) return;
+    shortcutsOpen = false;
+    document.getElementById('shortcutsOverlay').hidden = true;
+    unlockBodyScroll();
+    if (shortcutsLastFocusedEl && typeof shortcutsLastFocusedEl.focus === 'function') shortcutsLastFocusedEl.focus();
+    shortcutsLastFocusedEl = null;
+  }
+
+  document.getElementById('shortcutsBtn').addEventListener('click', openShortcuts);
+  document.getElementById('shortcutsClose').addEventListener('click', closeShortcuts);
+  document.getElementById('shortcutsOverlay').addEventListener('click', e => {
+    if (e.target.id === 'shortcutsOverlay') closeShortcuts();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!shortcutsOpen) return;
+    if (e.key === 'Escape') { closeShortcuts(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getShortcutsFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
+  // "?" opens the shortcuts overlay, but never while the user is actually
+  // typing a "?" character into a real field (search box, the new-prospect
+  // form, or a prospect's edit form all take free text).
+  document.addEventListener('keydown', e => {
+    if (e.key !== '?') return;
+    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen) return;
+    const active = document.activeElement;
+    const tag = active && active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
+    e.preventDefault();
+    openShortcuts();
   });
 
   restoreStateFromUrl();
