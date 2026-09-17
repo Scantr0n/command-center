@@ -241,6 +241,65 @@
     </div>
   </details>
 
+  <details class="schema-help" id="quickLogSubmissionTool">
+    <summary>Quick log a new submission (generates JSON to paste into submissions.json, saves nothing)</summary>
+    <div class="schema-help-body">
+      <p>Fills in the same fields as <code>submissions.json</code>, runs the exact same checks as
+        <code>node public/cgt/data/validate.js</code> (missing id, missing description, an unrecognized status, a
+        returned batch with no returnedDate), then builds the JSON object to paste into the
+        <code>submissions</code> array yourself. This never writes a file or sends anything, it only puts text on
+        your clipboard.</p>
+
+      <div class="quick-log-grid">
+        <form class="quick-log-form" id="quickSubmissionForm">
+          <h3 class="quick-log-title font-mono">New submission &rarr; submissions.json</h3>
+          <label class="quick-log-label" for="nsId">Id (unique slug)</label>
+          <input class="quick-log-input" type="text" id="nsId" placeholder="e.g. 2026-08-psa-regular-batch-1" required>
+          <label class="quick-log-label" for="nsDescription">Description</label>
+          <input class="quick-log-input" type="text" id="nsDescription" placeholder="e.g. 12 cards, 2021 hockey rookies" required>
+          <label class="quick-log-label" for="nsGradingCompany">Grading company</label>
+          <select class="quick-log-input" id="nsGradingCompany" required>
+            <option value="">Select one&hellip;</option>
+            <option value="PSA">PSA</option>
+            <option value="BGS">BGS</option>
+            <option value="SGC">SGC</option>
+            <option value="CGC">CGC</option>
+            <option value="HGA">HGA</option>
+            <option value="KSA">KSA</option>
+          </select>
+          <label class="quick-log-label" for="nsServiceLevel">Service level (optional, as billed)</label>
+          <input class="quick-log-input" type="text" id="nsServiceLevel" placeholder="e.g. Regular, Express, Value Bulk">
+          <label class="quick-log-label" for="nsCardCount">Card count (optional)</label>
+          <input class="quick-log-input" type="number" id="nsCardCount" min="1" step="1">
+          <label class="quick-log-label" for="nsSubmittedDate">Submitted date (optional)</label>
+          <input class="quick-log-input" type="date" id="nsSubmittedDate">
+          <label class="quick-log-label" for="nsTrackingNumber">Tracking number (optional)</label>
+          <input class="quick-log-input" type="text" id="nsTrackingNumber">
+          <label class="quick-log-label" for="nsStatus">Status</label>
+          <select class="quick-log-input" id="nsStatus" required>
+            <option value="">Select one&hellip;</option>
+            <option value="submitted">Submitted</option>
+            <option value="in-queue">In queue</option>
+            <option value="grading">Grading</option>
+            <option value="shipped-back">Shipped back</option>
+            <option value="returned">Returned</option>
+          </select>
+          <label class="quick-log-label" for="nsReturnedDate">Returned date (required once status is Returned)</label>
+          <input class="quick-log-input" type="date" id="nsReturnedDate">
+          <label class="quick-log-label" for="nsCost">Cost, USD (optional, what was actually paid for the whole batch)</label>
+          <input class="quick-log-input" type="number" id="nsCost" min="0" step="0.01">
+          <label class="quick-log-label" for="nsNotes">Notes (optional)</label>
+          <input class="quick-log-input" type="text" id="nsNotes">
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="nsWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="nsOutput" readonly rows="14" hidden aria-label="Generated submission JSON, ready to paste into the submissions array"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="nsCopyBtn" hidden>Copy JSON</button>
+          <p class="quick-log-hint" id="nsLive" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </details>
+
   <details class="schema-help">
     <summary>How to log a "should I grade this?" candidate</summary>
     <div class="schema-help-body">
@@ -307,6 +366,93 @@
   "decisionNote": null,
   "notes": null
 }</pre>
+    </div>
+  </details>
+
+  <details class="schema-help" id="quickLogCandidateTool">
+    <summary>Quick log a new candidate (generates JSON to paste into candidates.json, saves nothing)</summary>
+    <div class="schema-help-body">
+      <p>Fills in the same fields as <code>candidates.json</code>, runs the exact same checks as
+        <code>node public/cgt/data/validate.js</code> (missing id, missing card name, a priced field with no
+        labeled basis, a comp-estimate with no note explaining what it is based on), then builds the JSON object
+        to paste into the <code>candidates</code> array yourself. This never writes a file or sends anything, it
+        only puts text on your clipboard.</p>
+
+      <div class="quick-log-grid">
+        <form class="quick-log-form" id="quickCandidateForm">
+          <h3 class="quick-log-title font-mono">New candidate &rarr; candidates.json</h3>
+          <label class="quick-log-label" for="ncaId">Id (unique slug)</label>
+          <input class="quick-log-input" type="text" id="ncaId" placeholder="e.g. 2022-upper-deck-rookie-raw" required>
+          <label class="quick-log-label" for="ncaCardName">Card name</label>
+          <input class="quick-log-input" type="text" id="ncaCardName" placeholder="Full card description" required>
+          <label class="quick-log-label" for="ncaYear">Year (optional)</label>
+          <input class="quick-log-input" type="number" id="ncaYear" step="1">
+          <label class="quick-log-label" for="ncaSport">Sport</label>
+          <select class="quick-log-input" id="ncaSport" required>
+            <option value="">Select one&hellip;</option>
+            <option value="hockey">Hockey</option>
+            <option value="baseball">Baseball</option>
+            <option value="football">Football</option>
+          </select>
+          <label class="quick-log-label" for="ncaRawValue">Raw value, USD (optional, what it's worth ungraded right now)</label>
+          <input class="quick-log-input" type="number" id="ncaRawValue" min="0" step="0.01">
+          <label class="quick-log-label" for="ncaRawValueBasis">Raw value basis (required if a raw value is entered above)</label>
+          <select class="quick-log-input" id="ncaRawValueBasis">
+            <option value="">Select one&hellip;</option>
+            <option value="recent-sale">Recent sale (a real comp raw)</option>
+            <option value="comp-estimate">Comp estimate (inferred)</option>
+          </select>
+          <label class="quick-log-label" for="ncaRawValueNote">Raw value note (required if basis is comp estimate)</label>
+          <input class="quick-log-input" type="text" id="ncaRawValueNote">
+          <label class="quick-log-label" for="ncaTargetGradingCompany">Target grading company (optional)</label>
+          <select class="quick-log-input" id="ncaTargetGradingCompany">
+            <option value="">Not decided yet</option>
+            <option value="PSA">PSA</option>
+            <option value="BGS">BGS</option>
+            <option value="SGC">SGC</option>
+            <option value="CGC">CGC</option>
+            <option value="HGA">HGA</option>
+            <option value="KSA">KSA</option>
+          </select>
+          <label class="quick-log-label" for="ncaTargetServiceLevel">Target service level (optional)</label>
+          <input class="quick-log-input" type="text" id="ncaTargetServiceLevel" placeholder="e.g. Regular, Express">
+          <label class="quick-log-label" for="ncaEstimatedGradingCost">Estimated grading cost, USD (optional, the real posted fee)</label>
+          <input class="quick-log-input" type="number" id="ncaEstimatedGradingCost" min="0" step="0.01">
+          <label class="quick-log-label" for="ncaShippingCost">Shipping cost, USD (optional)</label>
+          <input class="quick-log-input" type="number" id="ncaShippingCost" min="0" step="0.01">
+          <label class="quick-log-label" for="ncaExpectedGrade">Expected grade (optional, realistic, not an assumed 10)</label>
+          <input class="quick-log-input" type="text" id="ncaExpectedGrade" placeholder="e.g. 9 or 9-10">
+          <label class="quick-log-label" for="ncaExpectedGradedValue">Expected graded value, USD (optional)</label>
+          <input class="quick-log-input" type="number" id="ncaExpectedGradedValue" min="0" step="0.01">
+          <label class="quick-log-label" for="ncaGradedValueBasis">Graded value basis (required if an expected graded value is entered above)</label>
+          <select class="quick-log-input" id="ncaGradedValueBasis">
+            <option value="">Select one&hellip;</option>
+            <option value="recent-sale">Recent sale (a real comp at that grade)</option>
+            <option value="comp-estimate">Comp estimate (inferred)</option>
+          </select>
+          <label class="quick-log-label" for="ncaGradedValueNote">Graded value note (required if basis is comp estimate)</label>
+          <input class="quick-log-input" type="text" id="ncaGradedValueNote">
+          <label class="quick-log-label" for="ncaDatePriced">Date researched (optional)</label>
+          <input class="quick-log-input" type="date" id="ncaDatePriced">
+          <label class="quick-log-label" for="ncaDecision">Decision (optional, leave blank while still weighing it)</label>
+          <select class="quick-log-input" id="ncaDecision">
+            <option value="">Still deciding</option>
+            <option value="submit">Submit</option>
+            <option value="hold">Hold</option>
+            <option value="sell-raw">Sell raw</option>
+            <option value="pass">Pass</option>
+          </select>
+          <label class="quick-log-label" for="ncaDecisionNote">Decision note (optional)</label>
+          <input class="quick-log-input" type="text" id="ncaDecisionNote">
+          <label class="quick-log-label" for="ncaNotes">Notes (optional)</label>
+          <input class="quick-log-input" type="text" id="ncaNotes">
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="ncaWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="ncaOutput" readonly rows="14" hidden aria-label="Generated candidate JSON, ready to paste into the candidates array"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="ncaCopyBtn" hidden>Copy JSON</button>
+          <p class="quick-log-hint" id="ncaLive" aria-live="polite"></p>
+        </form>
+      </div>
     </div>
   </details>
 

@@ -2646,6 +2646,150 @@ function initQuickLogTool() {
 }
 initQuickLogTool();
 
+// Same pattern as initQuickLogTool above, just for submissions.json instead
+// of cards.json: fills a form, runs the real submissions validator against
+// the real existing rows plus this one, and hands back JSON to paste in by
+// hand rather than writing anything itself.
+function initSubmissionQuickLogTool() {
+  const form = document.getElementById('quickSubmissionForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('nsWarnings');
+  const output = document.getElementById('nsOutput');
+  const copyBtn = document.getElementById('nsCopyBtn');
+  const live = document.getElementById('nsLive');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('nsId').value.trim();
+    const cardCountRaw = document.getElementById('nsCardCount').value.trim();
+    const costRaw = document.getElementById('nsCost').value.trim();
+
+    const candidate = {
+      id,
+      gradingCompany: document.getElementById('nsGradingCompany').value || null,
+      serviceLevel: document.getElementById('nsServiceLevel').value.trim() || null,
+      description: document.getElementById('nsDescription').value.trim() || null,
+      cardCount: cardCountRaw === '' ? null : Number(cardCountRaw),
+      submittedDate: document.getElementById('nsSubmittedDate').value || null,
+      trackingNumber: document.getElementById('nsTrackingNumber').value.trim() || null,
+      status: document.getElementById('nsStatus').value || null,
+      returnedDate: document.getElementById('nsReturnedDate').value || null,
+      cost: costRaw === '' ? null : Number(costRaw),
+      notes: document.getElementById('nsNotes').value.trim() || null
+    };
+
+    let blockers = [];
+    let advisory = [];
+    if (window.CGTValidateCore) {
+      const realSubmissions = submissions.filter(s => !isExampleSubmission(s));
+      const merged = realSubmissions.concat([candidate]);
+      const candidateWhere = 'submissions[' + realSubmissions.length + ']';
+      const strip = m => m.slice(m.indexOf(': ') + 2);
+      const { errors, warnings } = window.CGTValidateCore.validateSubmissions(merged);
+      blockers = errors.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
+      advisory = warnings.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(candidate, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Submission JSON copied to clipboard.';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+initSubmissionQuickLogTool();
+
+// Same pattern again, for candidates.json.
+function initCandidateQuickLogTool() {
+  const form = document.getElementById('quickCandidateForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('ncaWarnings');
+  const output = document.getElementById('ncaOutput');
+  const copyBtn = document.getElementById('ncaCopyBtn');
+  const live = document.getElementById('ncaLive');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('ncaId').value.trim();
+    const yearRaw = document.getElementById('ncaYear').value.trim();
+    const rawValueRaw = document.getElementById('ncaRawValue').value.trim();
+    const estimatedGradingCostRaw = document.getElementById('ncaEstimatedGradingCost').value.trim();
+    const shippingCostRaw = document.getElementById('ncaShippingCost').value.trim();
+    const expectedGradedValueRaw = document.getElementById('ncaExpectedGradedValue').value.trim();
+
+    const candidate = {
+      id,
+      cardName: document.getElementById('ncaCardName').value.trim() || null,
+      year: yearRaw === '' ? null : Number(yearRaw),
+      sport: document.getElementById('ncaSport').value || null,
+      rawValue: rawValueRaw === '' ? null : Number(rawValueRaw),
+      rawValueBasis: document.getElementById('ncaRawValueBasis').value || null,
+      rawValueNote: document.getElementById('ncaRawValueNote').value.trim() || null,
+      targetGradingCompany: document.getElementById('ncaTargetGradingCompany').value || null,
+      targetServiceLevel: document.getElementById('ncaTargetServiceLevel').value.trim() || null,
+      estimatedGradingCost: estimatedGradingCostRaw === '' ? null : Number(estimatedGradingCostRaw),
+      shippingCost: shippingCostRaw === '' ? null : Number(shippingCostRaw),
+      expectedGrade: document.getElementById('ncaExpectedGrade').value.trim() || null,
+      expectedGradedValue: expectedGradedValueRaw === '' ? null : Number(expectedGradedValueRaw),
+      gradedValueBasis: document.getElementById('ncaGradedValueBasis').value || null,
+      gradedValueNote: document.getElementById('ncaGradedValueNote').value.trim() || null,
+      datePriced: document.getElementById('ncaDatePriced').value || null,
+      decision: document.getElementById('ncaDecision').value || null,
+      decisionNote: document.getElementById('ncaDecisionNote').value.trim() || null,
+      notes: document.getElementById('ncaNotes').value.trim() || null
+    };
+
+    let blockers = [];
+    let advisory = [];
+    if (window.CGTValidateCore) {
+      const realCandidates = candidates.filter(c => !isExampleCandidate(c));
+      const merged = realCandidates.concat([candidate]);
+      const candidateWhere = 'candidates[' + realCandidates.length + ']';
+      const strip = m => m.slice(m.indexOf(': ') + 2);
+      const { errors, warnings } = window.CGTValidateCore.validateCandidates(merged);
+      blockers = errors.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
+      advisory = warnings.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(candidate, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Candidate JSON copied to clipboard.';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+initCandidateQuickLogTool();
+
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
 // succeeded: the service worker can serve a cached /data/*.json response
