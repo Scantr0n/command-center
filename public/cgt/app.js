@@ -2162,13 +2162,33 @@ function wireCardEditForm(c) {
 
     // Re-pricing without moving the old number into priceHistory first loses
     // it silently, exactly the mistake the schema-help instructions above
-    // warn against.
+    // warn against. Every field a real entry needs (value/date/basis) is
+    // already sitting right here on the pre-edit card, so this appends it
+    // automatically instead of just telling Jack to hand-write it himself.
+    // Only when there's a real old datePriced to use, and only when the new
+    // datePriced is a real date strictly after it: validate-core.js requires
+    // every priceHistory date to be a real date before the card's current
+    // datePriced, so auto-appending without either would just hand back a
+    // JSON blob its own validator rejects. Falls back to the old advisory-
+    // only behavior in that case, since there's no safe entry to build.
     if (c.estimatedValue != null && edited.estimatedValue !== c.estimatedValue &&
         JSON.stringify(edited.priceHistory || null) === JSON.stringify(c.priceHistory || null)) {
-      advisory.push('Estimated value changed from ' + formatUsd(c.estimatedValue) + ' to ' +
-        (edited.estimatedValue != null ? formatUsd(edited.estimatedValue) : 'null') +
-        ' but priceHistory was not updated. Push the old value/date/basis into priceHistory yourself before ' +
-        'pasting this in, or that old price is lost.');
+      const oldDateIsReal = window.CGTValidateCore ? window.CGTValidateCore.DATE_RE.test(c.datePriced || '') : !!c.datePriced;
+      if (oldDateIsReal && edited.datePriced && edited.datePriced > c.datePriced) {
+        edited.priceHistory = (c.priceHistory || []).concat([{
+          value: c.estimatedValue, date: c.datePriced, basis: c.valuationBasis || null
+        }]);
+        advisory.push('Estimated value changed from ' + formatUsd(c.estimatedValue) + ' to ' +
+          (edited.estimatedValue != null ? formatUsd(edited.estimatedValue) : 'null') +
+          '. The old value/date/basis (' + formatUsd(c.estimatedValue) + ', ' + c.datePriced +
+          ') was appended to priceHistory automatically, below. Double-check it before pasting this in.');
+      } else {
+        advisory.push('Estimated value changed from ' + formatUsd(c.estimatedValue) + ' to ' +
+          (edited.estimatedValue != null ? formatUsd(edited.estimatedValue) : 'null') +
+          ' but priceHistory was not updated, and could not be filled in automatically (the old "datePriced" ' +
+          'or the new one is missing, or the new one is not later). Push the old value/date/basis into ' +
+          'priceHistory yourself before pasting this in, or that old price is lost.');
+      }
     }
 
     if (blockers.length) {
