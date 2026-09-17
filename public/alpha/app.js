@@ -1506,6 +1506,9 @@ async function loadStatus() {
     // why this is a page-to-Command-Center reading, not Alpha's own latency.
     const clientLatencyHistory = recordClientLatency(Math.round(performance.now() - fetchStartedAt));
     document.getElementById('copyStatusBtn').disabled = false;
+    const backupBtnEl = document.getElementById('backupBtn');
+    backupBtnEl.disabled = false;
+    backupBtnEl.title = '';
     lastLoadedAt = new Date().toISOString();
     updateOfflineBanner();
 
@@ -1665,6 +1668,37 @@ copyStatusBtn.addEventListener('click', async () => {
   } finally {
     setTimeout(() => { copyStatusBtn.textContent = COPY_STATUS_BTN_DEFAULT_TEXT; }, 2000);
   }
+});
+
+// Every other hub (CGT/CSM/Garage/Sondrik) has a "Download backup (.json)"
+// button; Alpha had none, even though this browser's own connectivity,
+// fetch-latency, and regime-observation logs (CLIENT_CONN_HISTORY_KEY,
+// CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY above) live only in
+// localStorage, with no export path if site data is ever cleared. Local
+// download only, nothing is sent anywhere, and read-only like everything
+// else on this page: it only ever reads state already recorded, never
+// touches Alpha's real daemon.
+const backupBtn = document.getElementById('backupBtn');
+backupBtn.addEventListener('click', () => {
+  if (!lastStatusData) return;
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    source: 'Command Center Alpha overview (/alpha), local download only',
+    isLastKnownSnapshot: lastStatusIsLastKnown,
+    status: lastStatusData,
+    clientConnHistory: loadClientConnHistory(),
+    clientLatencyHistory: loadClientLatencyHistory(),
+    clientRegimeHistory: loadClientRegimeHistory()
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 function lockBodyScroll() {
