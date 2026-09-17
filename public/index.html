@@ -486,6 +486,14 @@ let lastClustersRaw = null;
 let lastFullRenderAt = 0;
 let deepLinkChecked = false;
 
+// True once the user has manually scrolled the mobile graph strip
+// themselves, so centerGraphScroll() (below) stops recentering it back to
+// the hub out from under them on the next poll or forced 5-minute
+// re-render. Never reset back to false, same one-way "the user has taken
+// over" convention the desktop zoom-reset button already uses.
+let graphScrollUserAdjusted = false;
+let suppressGraphScrollTracking = false;
+
 // Grid has the same "blank until the first fetch resolves" gap the graph
 // used to have, except the graph's own #graphSkeleton only ever covers the
 // graph, so a visitor with Grid persisted from localStorage (setView runs
@@ -889,13 +897,23 @@ function renderGraph() {
 // Below 768px the graph renders at a fixed, legible pixel size wider than
 // the screen (see the matching media query) and scrolls horizontally, so
 // start that scroll centered on the hub instead of showing its left edge.
+// Only for the very first render, though: renderGraph() also re-runs on the
+// 30s data poll and a forced 5-minute re-render (see loadClusters), and
+// snapping a since-scrolled visitor back to center on either would undo
+// their own scroll out from under them for no reason tied to real data.
 function centerGraphScroll() {
-  if (window.innerWidth > 767) return;
+  if (window.innerWidth > 767 || graphScrollUserAdjusted) return;
   const scroller = document.getElementById('graphScroll');
   requestAnimationFrame(() => {
+    suppressGraphScrollTracking = true;
     scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+    requestAnimationFrame(() => { suppressGraphScrollTracking = false; });
   });
 }
+document.getElementById('graphScroll').addEventListener('scroll', () => {
+  if (suppressGraphScrollTracking) return;
+  graphScrollUserAdjusted = true;
+});
 
 // Desktop-only scroll-to-zoom / drag-to-pan on the graph, so a sector packed
 // with several projects can be spread out instead of staying capped at the
