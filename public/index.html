@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
-<script src="/vendor/d3-force-selection.min.js"></script>
+<script src="/vendor/d3-force-selection-zoom.min.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -152,6 +152,18 @@
      keeps its own containing block and does not scroll off with the graph)
      pan it horizontally, centered on the hub. */
   .graph-scroll-hint { display: none; }
+
+  /* Desktop counterpart to the mobile scroll hint above: at 20+ projects the
+     category sectors get tight, so scroll-to-zoom and drag-to-pan (d3-zoom,
+     same library already loaded for the force layout) give a way to spread
+     them out that a fixed-size SVG can't. Off below 768px, where the graph
+     already has its own horizontal-scroll-at-fixed-size behavior and native
+     pinch-zoom on the page itself covers the same need. */
+  #graphZoomResetBtn { display: none; position: absolute; top: 10px; right: 14px; }
+  @media (min-width: 768px) {
+    #graphZoomResetBtn.zoomed { display: flex; }
+  }
+
   @media (max-width: 767px) {
     #graphScroll {
       overflow-x: auto;
@@ -281,13 +293,16 @@
 
     <div id="graphView" style="position: relative;">
       <div id="graphScroll" class="flex items-center justify-center py-4">
-        <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"></svg>
+        <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"><g id="graphContent"></g></svg>
         <div id="graphSkeleton" class="flex items-center justify-center" style="position: absolute; inset: 0;">
           <div style="width: 130px; height: 130px; border-radius: 999px; border: 1.5px solid var(--hairlineHover); background: var(--panel); display: flex; align-items: center; justify-content: center;" class="skeleton-pulse">
             <span class="text-[10px] font-mono" style="color: var(--faint)">LOADING</span>
           </div>
         </div>
       </div>
+      <button id="graphZoomResetBtn" type="button" aria-label="Reset graph zoom and pan"
+        class="items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-lg border hairline"
+        style="color: var(--sub); background: var(--panelLight)">Reset zoom</button>
       <span class="graph-scroll-hint" aria-hidden="true">&larr; scroll &rarr;</span>
     </div>
 
@@ -783,7 +798,7 @@ function renderGraph() {
     <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">CENTER</text>
   `;
 
-  svg.html(sectorHtml + spokesHtml + relationsHtml + hubHtml + nodesHtml);
+  d3.select('#graphContent').html(sectorHtml + spokesHtml + relationsHtml + hubHtml + nodesHtml);
   svg.selectAll('.graph-node')
     .attr('tabindex', 0)
     .attr('role', 'button')
@@ -808,6 +823,7 @@ function renderGraph() {
     });
   applyFilters();
   centerGraphScroll();
+  setupGraphZoom();
 }
 
 // Below 768px the graph renders at a fixed, legible pixel size wider than
@@ -819,6 +835,48 @@ function centerGraphScroll() {
   requestAnimationFrame(() => {
     scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
   });
+}
+
+// Desktop-only scroll-to-zoom / drag-to-pan on the graph, so a sector packed
+// with several projects can be spread out instead of staying capped at the
+// fixed 760px viewBox. Off on mobile: #graphScroll already gives that screen
+// size its own fixed-width horizontal scroll (see the matching media query),
+// and stacking d3-zoom's own drag/wheel handling on top of that would fight
+// the same gesture two different ways. Checked once at setup, same as every
+// other innerWidth check in this file, not on resize.
+let graphZoomBehavior = null;
+function setupGraphZoom() {
+  if (window.innerWidth <= 767 || graphZoomBehavior) return;
+  const svgSel = d3.select('#graphSvg');
+  const content = d3.select('#graphContent');
+  const resetBtn = document.getElementById('graphZoomResetBtn');
+  graphZoomBehavior = d3.zoom()
+    .scaleExtent([1, 4])
+    .translateExtent([[0, 0], [900, 900]])
+    .filter(event => event.type !== 'dblclick')
+    .on('zoom', (event) => {
+      content.attr('transform', event.transform);
+      resetBtn.classList.toggle('zoomed', event.transform.k !== 1 || event.transform.x !== 0 || event.transform.y !== 0);
+    });
+  svgSel.call(graphZoomBehavior);
+  // Double-click resets instead of the library's own zoom-in-on-dblclick,
+  // since a node's own click handler (openModal) already owns single-click
+  // and stacking a second, different meaning onto a second click there would
+  // be surprising.
+  svgSel.on('dblclick.zoom', null);
+  svgSel.on('dblclick', () => resetGraphZoom());
+  resetBtn.addEventListener('click', resetGraphZoom);
+}
+
+function resetGraphZoom() {
+  if (!graphZoomBehavior) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sel = d3.select('#graphSvg');
+  if (reduceMotion) {
+    graphZoomBehavior.transform(sel, d3.zoomIdentity);
+  } else {
+    sel.transition().duration(200).call(graphZoomBehavior.transform, d3.zoomIdentity);
+  }
 }
 
 let searchTerm = '';
