@@ -1622,6 +1622,123 @@ copyStatusBtn.addEventListener('click', async () => {
   }
 });
 
+function lockBodyScroll() {
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+  if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + 'px';
+  document.body.style.overflow = 'hidden';
+}
+function unlockBodyScroll() {
+  document.body.style.overflow = '';
+  document.body.style.paddingRight = '';
+}
+
+let shortcutsOpen = false;
+let shortcutsLastFocusedEl = null;
+
+// Only the shortcuts this page actually wires up, never an invented or
+// aspirational one, same "?" convention as GitHub/Gmail/Linear, and the
+// same overlay the main Command Center dashboard, CGT, CSM, Sondrik, and
+// Garage hubs already added. This page has no search box or focusable table
+// rows to bind to (unlike those hubs), only the real actions below.
+const SHORTCUTS = [
+  { keys: ['R'], label: 'Refresh status' },
+  { keys: ['C'], label: 'Copy status summary' },
+  { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
+  { keys: ['Esc'], label: 'Close the open dialog' },
+  { keys: ['?'], label: 'Show this help' }
+];
+
+function renderShortcutsList() {
+  document.getElementById('shortcutsList').innerHTML = SHORTCUTS.map(s => `
+    <div class="shortcut-row">
+      <span class="shortcut-label">${escapeHtml(s.label)}</span>
+      <span class="shortcut-keys">${s.keys.map(k => `<kbd class="shortcut-key">${escapeHtml(k)}</kbd>`).join('<span class="shortcut-label">or</span>')}</span>
+    </div>
+  `).join('');
+}
+
+function getShortcutsFocusable() {
+  return Array.from(document.getElementById('shortcutsModal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function openShortcuts() {
+  if (shortcutsOpen) return;
+  shortcutsOpen = true;
+  shortcutsLastFocusedEl = document.activeElement;
+  renderShortcutsList();
+  document.getElementById('shortcutsOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('shortcutsClose').focus();
+}
+
+function closeShortcuts() {
+  if (!shortcutsOpen) return;
+  shortcutsOpen = false;
+  document.getElementById('shortcutsOverlay').hidden = true;
+  unlockBodyScroll();
+  if (shortcutsLastFocusedEl && typeof shortcutsLastFocusedEl.focus === 'function') shortcutsLastFocusedEl.focus();
+  shortcutsLastFocusedEl = null;
+}
+
+document.getElementById('shortcutsBtn').addEventListener('click', openShortcuts);
+document.getElementById('shortcutsClose').addEventListener('click', closeShortcuts);
+document.getElementById('shortcutsOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'shortcutsOverlay') closeShortcuts();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!shortcutsOpen) return;
+  if (e.key === 'Escape') {
+    closeShortcuts();
+    return;
+  }
+  if (e.key === 'Tab') {
+    const focusable = getShortcutsFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
+
+// A single keydown listener for every real single-key shortcut this page
+// wires up, guarded the same way as the other hubs: never while the overlay
+// is already open (Tab/Esc above own that case), and never while focus sits
+// in a real text field or an open <details> summary's own text-editable
+// content, even though this page has no free-text input today, so a future
+// one doesn't silently start eating keystrokes.
+document.addEventListener('keydown', (e) => {
+  if (shortcutsOpen) return;
+  const active = document.activeElement;
+  const tag = active && active.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
+
+  if (e.key === '?') {
+    e.preventDefault();
+    openShortcuts();
+    return;
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    if (refreshBtn.disabled) return;
+    e.preventDefault();
+    refreshBtn.click();
+    return;
+  }
+  if (e.key === 'c' || e.key === 'C') {
+    if (copyStatusBtn.disabled) return;
+    e.preventDefault();
+    copyStatusBtn.click();
+  }
+});
+
 // This is a glance-at-status page Jack checks without leaving Command
 // Center, so it re-reads status.json on its own rather than requiring a
 // manual reload. Purely a re-fetch of the same read-only file, paused

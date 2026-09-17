@@ -33,6 +33,7 @@
       <button type="button" id="copyStatusBtn" class="refresh-btn font-mono" aria-live="polite" disabled>Copy status</button>
       <button type="button" id="notifyBtn" class="refresh-btn font-mono" hidden aria-live="polite" aria-pressed="false"></button>
       <button type="button" id="testAlertBtn" class="refresh-btn font-mono" hidden>Send test alert</button>
+      <button type="button" id="shortcutsBtn" class="refresh-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
@@ -224,6 +225,14 @@
     <ol class="event-log" id="eventLog"></ol>
   </section>
   </main>
+
+  <div class="modal-overlay" id="shortcutsOverlay" hidden>
+    <div class="modal" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+      <button class="modal-close" id="shortcutsClose" aria-label="Close">&times;</button>
+      <h3 id="shortcutsTitle" class="font-display">Keyboard shortcuts</h3>
+      <div class="shortcuts-list" id="shortcutsList"></div>
+    </div>
+  </div>
 
   <div class="toast-container" id="toastContainer"></div>
 
