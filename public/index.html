@@ -224,9 +224,9 @@
     body { background: #fff; }
     .max-w-7xl { max-width: none; padding: 0.3in 0.4in; }
 
-    #searchWrap, #paletteBtn, #printBtn, #viewToggleGroup, #errorBanner,
+    #searchWrap, #paletteBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
-    #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay {
+    #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay {
       display: none !important;
     }
 
@@ -276,6 +276,9 @@
         <button id="printBtn" type="button" aria-label="Print a project status report"
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">Print</button>
+        <button id="shortcutsBtn" type="button" aria-label="Keyboard shortcuts"
+          class="hidden sm:flex items-center justify-center w-[30px] h-[30px] rounded-lg border hairline text-xs font-mono"
+          style="color: var(--sub); background: var(--panelLight)">?</button>
       </div>
     </header>
 
@@ -397,6 +400,17 @@
       </div>
       <div id="paletteResults" role="listbox" aria-label="Projects" class="flex-1 overflow-y-auto py-1.5"></div>
       <div id="paletteEmpty" class="hidden px-4 py-6 text-xs text-center" style="color: var(--faint)"></div>
+    </div>
+  </div>
+
+  <!-- Keyboard shortcuts help (?), same convention as GitHub/Gmail/Linear -->
+  <div id="shortcutsOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
+    <div class="corner-notch rounded-xl w-full max-w-sm overflow-hidden border hairline" style="background: var(--panel)" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div class="flex items-center justify-between px-5 py-3.5 border-b hairline">
+        <h2 class="font-display font-700 text-sm" style="color: var(--ink)">Keyboard shortcuts</h2>
+        <button id="closeShortcuts" type="button" aria-label="Close" class="text-xl leading-none" style="color: var(--sub)">&times;</button>
+      </div>
+      <div id="shortcutsList" class="px-5 py-4 flex flex-col gap-3 text-sm"></div>
     </div>
   </div>
 
@@ -1394,6 +1408,8 @@ let paletteOpen = false;
 let paletteSelectedIndex = 0;
 let paletteResultsCache = [];
 let paletteLastFocusedEl = null;
+let shortcutsOpen = false;
+let shortcutsLastFocusedEl = null;
 
 // Plain substring scoring, not character-subsequence fuzzy matching: with
 // ~20 real projects a name/category/summary substring already finds the
@@ -1494,6 +1510,55 @@ document.getElementById('paletteOverlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('paletteOverlay')) closePalette();
 });
 document.getElementById('paletteBtn').addEventListener('click', openPalette);
+
+// Same "?" convention GitHub, Gmail, and Linear all use for their own
+// shortcuts overlay, listing only the shortcuts this page actually wires up
+// below (never an invented or aspirational one).
+const SHORTCUTS = [
+  { keys: ['/'], label: 'Focus search' },
+  { keys: ['&#8984;K', 'Ctrl K'], label: 'Jump to a project' },
+  { keys: ['&uarr;', '&darr;'], label: 'Move selection in Jump to' },
+  { keys: ['Enter'], label: 'Open the focused project' },
+  { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
+  { keys: ['Esc'], label: 'Close the open dialog' },
+  { keys: ['?'], label: 'Show this help' }
+];
+
+function renderShortcutsList() {
+  document.getElementById('shortcutsList').innerHTML = SHORTCUTS.map(s => `
+    <div class="flex items-center justify-between gap-4">
+      <span style="color: var(--sub)">${escapeHtml(s.label)}</span>
+      <span class="flex items-center gap-1 flex-shrink-0">${s.keys.map(k => `<kbd class="kbd-chip text-[10px]" style="color: var(--ink)">${k}</kbd>`).join('<span style="color: var(--faint)" class="text-[10px]">or</span>')}</span>
+    </div>
+  `).join('');
+}
+
+function openShortcuts() {
+  if (shortcutsOpen) return;
+  shortcutsOpen = true;
+  shortcutsLastFocusedEl = document.activeElement;
+  renderShortcutsList();
+  document.getElementById('shortcutsOverlay').classList.remove('hidden');
+  document.getElementById('shortcutsOverlay').classList.add('flex');
+  lockBodyScroll();
+  document.getElementById('closeShortcuts').focus();
+}
+
+function closeShortcuts() {
+  if (!shortcutsOpen) return;
+  shortcutsOpen = false;
+  document.getElementById('shortcutsOverlay').classList.add('hidden');
+  document.getElementById('shortcutsOverlay').classList.remove('flex');
+  unlockBodyScroll();
+  if (shortcutsLastFocusedEl && typeof shortcutsLastFocusedEl.focus === 'function') shortcutsLastFocusedEl.focus();
+  shortcutsLastFocusedEl = null;
+}
+
+document.getElementById('shortcutsBtn').addEventListener('click', openShortcuts);
+document.getElementById('closeShortcuts').addEventListener('click', closeShortcuts);
+document.getElementById('shortcutsOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('shortcutsOverlay')) closeShortcuts();
+});
 
 // Same "copy the shareable URL" affordance as the CSM/Garage/CGT hubs, here
 // copying a direct link to the open project's modal rather than a filtered
@@ -1693,6 +1758,11 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
+  if (shortcutsOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeShortcuts(); }
+    return;
+  }
+
   if (modalOpen && e.key === 'Escape') {
     closeModalAndReturnFocus();
     return;
@@ -1714,6 +1784,11 @@ document.addEventListener('keydown', (e) => {
   if (!modalOpen && e.key === '/' && document.activeElement.id !== 'searchInput' && document.activeElement.id !== 'chatInput') {
     e.preventDefault();
     document.getElementById('searchInput').focus();
+    return;
+  }
+  if (!modalOpen && e.key === '?' && document.activeElement.id !== 'searchInput' && document.activeElement.id !== 'chatInput') {
+    e.preventDefault();
+    openShortcuts();
   }
 });
 
