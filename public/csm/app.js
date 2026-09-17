@@ -694,7 +694,7 @@
       return;
     }
     funnelListEl.innerHTML = results.map(r => {
-      const widthPct = total > 0 ? Math.max(2, Math.round((r.reached / total) * 100)) : 0;
+      const widthPct = r.reached > 0 ? Math.max(2, Math.round((r.reached / total) * 100)) : 0;
       const conversionHtml = r.conversionFromPrev == null ? '' :
         '<span class="funnel-conversion font-mono">' + r.conversionFromPrev + '% reached this stage from the ' +
         'previous one</span>';
