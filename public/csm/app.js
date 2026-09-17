@@ -636,7 +636,7 @@
     const needsToggle = events.length > ACTIVITY_PREVIEW_COUNT;
     const rowsHtml = events.map(ev => {
       const tag = ev.type === 'stage'
-        ? '<span class="activity-tag activity-tag-stage" style="color:' + escapeHtml(ev.color) + ';border-color:' + escapeHtml(ev.color) + '66">MOVED</span>'
+        ? '<span class="activity-tag activity-tag-stage" style="color:' + escapeHtml(ev.color) + ';border-color:' + escapeHtml(ev.color) + '66;background:' + escapeHtml(ev.color) + '14">MOVED</span>'
         : ev.type === 'touch'
         ? '<span class="activity-tag activity-tag-touch">TOUCH</span>'
         : '<span class="activity-tag activity-tag-idea">IDEA</span>';
