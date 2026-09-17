@@ -1313,8 +1313,12 @@
       (p.category || '').toLowerCase().includes(query) ||
       (p.verifiedHook || '').toLowerCase().includes(query) ||
       (p.notes || '').toLowerCase().includes(query) ||
+      (p.replyStatus || '').toLowerCase().includes(query) ||
+      (p.nextAction || '').toLowerCase().includes(query) ||
       (p.contactChannel && (p.contactChannel.detail || '').toLowerCase().includes(query)) ||
-      (p.socialSnapshots || []).some(snap => (snap.platform || '').toLowerCase().includes(query));
+      (p.socialSnapshots || []).some(snap => (snap.platform || '').toLowerCase().includes(query)) ||
+      (p.contentIdeas || []).some(entry => (entry.idea || '').toLowerCase().includes(query)) ||
+      (p.outreachLog || []).some(entry => (entry.note || '').toLowerCase().includes(query));
   }
 
   // Counts how many prospects would match if this one chip group (channel or
