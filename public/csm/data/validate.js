@@ -10,6 +10,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { findDuplicateProspects, findCasingDrift } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -278,18 +279,12 @@ function main() {
     }
   });
 
-  const byNormalizedCategory = {};
-  prospects.forEach(p => {
-    if (!p.category) return;
-    const norm = p.category.trim().toLowerCase();
-    (byNormalizedCategory[norm] = byNormalizedCategory[norm] || new Set()).add(p.category);
-  });
-  Object.values(byNormalizedCategory).forEach(variants => {
-    if (variants.size > 1) {
-      warnings.push('category has inconsistent casing/spacing across prospects: ' +
-        Array.from(variants).map(v => JSON.stringify(v)).join(' vs. ') +
-        '. These render as separate filter chips instead of one, pick one spelling.');
-    }
+  // Grouping logic itself lives in validate-core.js, shared with app.js's own
+  // "Casing drift" panel, so the two rules can never quietly drift apart.
+  findCasingDrift(prospects, p => [p.category]).forEach(({ variants }) => {
+    warnings.push('category has inconsistent casing/spacing across prospects: ' +
+      Array.from(variants.keys()).map(v => JSON.stringify(v)).join(' vs. ') +
+      '. These render as separate filter chips instead of one, pick one spelling.');
   });
 
   // Same drift risk as category above, but for socialSnapshots[].platform: the
@@ -298,38 +293,21 @@ function main() {
   // prospects (e.g. "WeChat" vs "Wechat"), which silently fragments the
   // search filter's platform matching (matchesSearchTerm in app.js) the same
   // way an inconsistent category fragments the filter chips.
-  const byNormalizedPlatform = {};
-  prospects.forEach(p => {
-    (p.socialSnapshots || []).forEach(snap => {
-      if (!snap || !snap.platform) return;
-      const norm = snap.platform.trim().toLowerCase();
-      (byNormalizedPlatform[norm] = byNormalizedPlatform[norm] || new Set()).add(snap.platform);
-    });
-  });
-  Object.values(byNormalizedPlatform).forEach(variants => {
-    if (variants.size > 1) {
-      warnings.push('socialSnapshots platform has inconsistent casing/spacing across prospects: ' +
-        Array.from(variants).map(v => JSON.stringify(v)).join(' vs. ') +
-        '. Search filtering matches on this text, pick one spelling.');
-    }
+  findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform)).forEach(({ variants }) => {
+    warnings.push('socialSnapshots platform has inconsistent casing/spacing across prospects: ' +
+      Array.from(variants.keys()).map(v => JSON.stringify(v)).join(' vs. ') +
+      '. Search filtering matches on this text, pick one spelling.');
   });
 
-  // Mirrors findDuplicateProspects in app.js: same person can end up logged
-  // twice under different ids (e.g. a copy-pasted "Log new prospect" entry),
-  // since the only uniqueness check that generator runs is on id itself.
-  const byNameCompany = new Map();
-  prospects.forEach(p => {
-    if (!p.name) return;
-    const key = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
-    if (!byNameCompany.has(key)) byNameCompany.set(key, []);
-    byNameCompany.get(key).push(p);
-  });
-  byNameCompany.forEach(group => {
-    if (group.length > 1) {
-      warnings.push('possible duplicate prospect: ' + group.map(p => p.id).join(', ') +
-        ' all share the same name and company ("' + group[0].name +
-        (group[0].company ? ', ' + group[0].company : '') + '"). If this is really the same person, merge into one entry.');
-    }
+  // Mirrors the "Possible duplicates" panel in app.js: same person can end up
+  // logged twice under different ids (e.g. a copy-pasted "Log new prospect"
+  // entry), since the only uniqueness check that generator runs is on id
+  // itself. Grouping logic shared via validate-core.js, same reasoning as
+  // the casing-drift checks above.
+  findDuplicateProspects(prospects).forEach(group => {
+    warnings.push('possible duplicate prospect: ' + group.map(p => p.id).join(', ') +
+      ' all share the same name and company ("' + group[0].name +
+      (group[0].company ? ', ' + group[0].company : '') + '"). If this is really the same person, merge into one entry.');
   });
 
   if (warnings.length) {

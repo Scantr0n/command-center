@@ -330,7 +330,7 @@
     const stalledCount = computeStalled(stages, prospects).length;
     const coldSignalCount = computeColdSignal(prospects).active.length;
     const backfillCount = computeDataQualityFlags(stages, prospects).length;
-    const duplicateCount = findDuplicateProspects(prospects).length;
+    const duplicateCount = CSMValidateCore.findDuplicateProspects(prospects).length;
 
     const items = [];
     if (overdueCount) {
@@ -426,27 +426,13 @@
   const duplicatesEl = document.getElementById('duplicatesList');
   const duplicatesSection = document.getElementById('duplicatesSection');
 
-  // Same duplicate-detection convention already used elsewhere in this
-  // project (e.g. CGT's findDuplicateGroups): group by a normalized key of
-  // the fields that actually identify who a prospect is, name + company,
-  // case/whitespace-insensitive, and flag any group with more than one
-  // member. The real risk this catches: the "Log new prospect" generator
-  // only guards against an exact id collision (npUniqueId), so hand-typing
-  // the same person into a second entry under a slightly different id would
-  // otherwise go unnoticed. Mirrored in validate.js so the two never drift.
-  function findDuplicateProspects(prospects) {
-    const byKey = new Map();
-    (prospects || []).forEach(p => {
-      if (!p.name) return;
-      const key = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
-      if (!byKey.has(key)) byKey.set(key, []);
-      byKey.get(key).push(p);
-    });
-    return [...byKey.values()].filter(group => group.length > 1);
-  }
-
+  // Real risk this catches: the "Log new prospect" generator only guards
+  // against an exact id collision (npUniqueId), so hand-typing the same
+  // person into a second entry under a slightly different id would otherwise
+  // go unnoticed. Shared with validate.js via CSMValidateCore (same reasoning
+  // as CGT's own validate-core.js) so the two can never drift.
   function renderDuplicates(prospects) {
-    const groups = findDuplicateProspects(prospects);
+    const groups = CSMValidateCore.findDuplicateProspects(prospects);
     if (groups.length === 0) {
       duplicatesSection.hidden = true;
       return;
@@ -473,25 +459,11 @@
   // silently fragments the category filter chips and the platform search
   // match into two, so it needs its own panel rather than folding into
   // per-prospect computeDataQualityFlags below, which only ever looks at one
-  // prospect at a time and can't see drift across the whole dataset.
-  function findCasingDrift(prospects, getValues) {
-    const byNorm = new Map();
-    (prospects || []).forEach(p => {
-      getValues(p).forEach(raw => {
-        if (!raw) return;
-        const norm = raw.trim().toLowerCase();
-        if (!byNorm.has(norm)) byNorm.set(norm, { variants: new Map(), prospects: [] });
-        const entry = byNorm.get(norm);
-        entry.variants.set(raw, (entry.variants.get(raw) || 0) + 1);
-        entry.prospects.push(p);
-      });
-    });
-    return [...byNorm.values()].filter(entry => entry.variants.size > 1);
-  }
-
+  // prospect at a time and can't see drift across the whole dataset. Grouping
+  // logic itself lives in CSMValidateCore, shared with validate.js.
   function renderCasingDrift(prospects) {
-    const categoryDrift = findCasingDrift(prospects, p => [p.category]).map(entry => ({ ...entry, field: 'CATEGORY' }));
-    const platformDrift = findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform))
+    const categoryDrift = CSMValidateCore.findCasingDrift(prospects, p => [p.category]).map(entry => ({ ...entry, field: 'CATEGORY' }));
+    const platformDrift = CSMValidateCore.findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform))
       .map(entry => ({ ...entry, field: 'SOCIAL PLATFORM' }));
     const groups = [...categoryDrift, ...platformDrift];
 
@@ -1656,7 +1628,7 @@
     const stalled = computeStalled(stages, prospects);
     const coldSignal = computeColdSignal(prospects);
     const backfill = computeDataQualityFlags(stages, prospects);
-    const duplicates = findDuplicateProspects(prospects);
+    const duplicates = CSMValidateCore.findDuplicateProspects(prospects);
 
     lines.push('');
     lines.push('NEEDS ATTENTION');
