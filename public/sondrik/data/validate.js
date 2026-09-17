@@ -23,6 +23,22 @@ function isDateOrNull(v) {
   return v === null || v === undefined || (typeof v === 'string' && DATE_RE.test(v));
 }
 
+// Every other real string on this page (release summaries, the traction
+// scope note, lead/channel/goal notes, the assistant's own chat replies per
+// server.js's system prompt) is written without em dashes, so a hand-typed
+// field that has one reads as a paste-in from somewhere else rather than
+// Jack's or this product's own voice. Warning-level only: an em dash never
+// breaks anything the page renders, this is a style nudge, not a data error.
+function emDashFields(obj, fields) {
+  const hits = [];
+  if (!obj) return hits;
+  fields.forEach(f => {
+    const v = obj[f];
+    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+  });
+  return hits;
+}
+
 // Catches the most plausible hand-edit slip in a file with no other input
 // validation: typing last year's habit into the year field (e.g. "2025-09-07"
 // a week after New Year's) or transposing a digit. A 1-day allowance avoids
@@ -86,12 +102,16 @@ function main() {
     else if (isFutureDate(r.date)) warnings.push(where + ': "date" (' + r.date + ') is in the future, a shipped release should have a real past ship date, check for a typo');
     if (!r.date) warnings.push(where + ': no ship date logged yet');
     if (!r.summary) warnings.push(where + ': no summary logged yet');
+    emDashFields(r, ['summary', 'notes']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
   });
 
   // downloads.json
   const metric = downloadsData.metric || {};
   if (!metric.label) errors.push('metric.label is missing');
   if (!metric.source) warnings.push('metric.source is missing, a download count with no cited source reads as an estimate');
+  emDashFields(metric, ['label', 'source', 'scope']).forEach(f =>
+    warnings.push('metric.' + f + ' contains an em dash, this product never uses one, check for a paste-in'));
   const checks = metric.checks || [];
   const seenDates = new Set();
   let prevDate = null;
@@ -121,6 +141,8 @@ function main() {
       }
       prevCount = c.count;
     }
+    emDashFields(c, ['note']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
   });
 
   // channels.json (validated before leads.json so a lead's channelId can be
@@ -146,6 +168,8 @@ function main() {
     if (c.status === 'not-tracked' && !c.note) {
       warnings.push(where + ': status is "not-tracked" with no note explaining why, reads as an unexplained gap');
     }
+    emDashFields(c, ['name', 'note']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
   });
 
   // leads.json
@@ -174,6 +198,10 @@ function main() {
     if (o.sent === undefined) {
       errors.push(where + ': outreach.sent must be explicitly true or false, never left unset.');
     }
+    emDashFields(l, ['summary', 'sourceDetail', 'source', 'type']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
+    emDashFields(o, ['note']).forEach(f =>
+      warnings.push(where + ': outreach.' + f + ' contains an em dash, this product never uses one, check for a paste-in'));
   });
 
   // goals.json (validated after downloads.json and leads.json, since those
@@ -198,6 +226,8 @@ function main() {
     if (!isDateOrNull(g.setDate)) errors.push(where + ': "setDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(g.setDate));
     else if (isFutureDate(g.setDate)) warnings.push(where + ': "setDate" (' + g.setDate + ') is in the future, a goal should be set as of the day Jack actually set it, check for a typo');
     if (!g.setDate) warnings.push(where + ': no setDate logged, cannot tell when this target was actually set');
+    emDashFields(g, ['label', 'note']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
   });
 
   if (warnings.length) {
