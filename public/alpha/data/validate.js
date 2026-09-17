@@ -84,8 +84,41 @@ function main() {
   if (live.killSwitch && !isIsoDatetimeOrNull(live.killSwitch.lastTriggeredAt)) {
     errors.push('live.killSwitch.lastTriggeredAt: not a valid ISO datetime or null');
   }
+  if (live.killSwitch && live.killSwitch.engaged != null && typeof live.killSwitch.engaged !== 'boolean') {
+    errors.push('live.killSwitch.engaged: must be true, false, or null');
+  }
   if (live.genealogy && !isIsoDatetimeOrNull(live.genealogy.lastBreedingEventAt)) {
     errors.push('live.genealogy.lastBreedingEventAt: not a valid ISO datetime or null');
+  }
+  if (live.regime != null && (typeof live.regime !== 'string' || !live.regime)) {
+    errors.push('live.regime: must be null or a non-empty string');
+  }
+  if (live.positionSizing && live.positionSizing.activeMode != null &&
+    (typeof live.positionSizing.activeMode !== 'string' || !live.positionSizing.activeMode)) {
+    errors.push('live.positionSizing.activeMode: must be null or a non-empty string');
+  }
+
+  // Every other object under live (killSwitch, positionSizing, genealogy) is
+  // allowed to be entirely null/missing while a real feed hasn't reported it
+  // yet. live.debatePanel is the one exception, see its schema-table row in
+  // index.html: the debate panel's state (on vs. pending an API key) is
+  // always genuinely known, even from this sandbox, so unlike everything
+  // else here it is required, not just checked when present. app.js reads
+  // it defensively anyway (see its own renderStats comment), but the schema
+  // itself should still say what a well-formed feed must send.
+  if (!live.debatePanel || typeof live.debatePanel !== 'object') {
+    errors.push('live.debatePanel: required object (unlike other live.* sub-objects, this one is never null/missing, ' +
+      'the debate panel\'s pending-vs-active state is always known)');
+  } else {
+    if (typeof live.debatePanel.active !== 'boolean') {
+      errors.push('live.debatePanel.active: required, must be true or false');
+    }
+    if (live.debatePanel.blockedOn != null && typeof live.debatePanel.blockedOn !== 'string') {
+      errors.push('live.debatePanel.blockedOn: must be a string or null');
+    }
+    if (live.debatePanel.active === true && live.debatePanel.blockedOn) {
+      errors.push('live.debatePanel: active is true but blockedOn is still set, contradictory state');
+    }
   }
 
   // The genealogy wall itself: one card per lineage once a real feed knows
