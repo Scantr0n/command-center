@@ -946,6 +946,22 @@
       });
     }
 
+    // Same gap validate.js already warns on: a channel marked "tracked" with
+    // no linkedMetric wired up renders identically to a tracked channel that
+    // just has no data logged yet (both fall through to "No number logged
+    // yet." in renderChannels' linkedValue), so without this the wiring gap
+    // itself was invisible on the page, only ever caught by running the CLI.
+    const unwiredTracked = channels.filter(c => c.status === 'tracked' && !c.linkedMetric);
+    if (unwiredTracked.length > 0) {
+      steps.push({
+        urgent: false,
+        text: 'Wire up a linkedMetric (downloads or leads) for ' +
+          (unwiredTracked.length === 1 ? (unwiredTracked[0].name || 'this channel') : unwiredTracked.length + ' channels') +
+          ' marked tracked, without one there is nothing real to display for it.',
+        href: '#channelsSection'
+      });
+    }
+
     const goals = (goalsData && goalsData.goals) || [];
     if (goals.length === 0) {
       steps.push({
