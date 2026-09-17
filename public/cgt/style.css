@@ -791,6 +791,21 @@ table.card-table {
   line-height: 1.4;
 }
 
+.shortcuts-list { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+.shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 0.85rem; }
+.shortcut-row .shortcut-label { color: var(--sub); }
+.shortcut-keys { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.shortcut-key {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--ink);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  padding: 2px 7px;
+  line-height: 1.4;
+}
+
 footer.page-foot {
   margin-top: 40px;
   font-size: 0.72rem;
