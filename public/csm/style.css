@@ -1111,6 +1111,13 @@ textarea.np-input { resize: vertical; }
   line-height: 1.4;
 }
 .inline-gen-result .np-output { max-height: 160px; }
+.inline-gen-suggest {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--hairline);
+}
+.inline-gen-suggest .field-label { display: block; margin-bottom: 8px; }
+.inline-gen-suggest .np-output { max-height: 120px; }
 
 .snapshot-tag {
   font-family: 'JetBrains Mono', monospace;

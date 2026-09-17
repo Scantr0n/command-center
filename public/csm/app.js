@@ -1921,6 +1921,25 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  function addDaysIso(iso, days) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // Cold-outreach cadence convention (widening gaps between follow-ups,
+  // tightest right after the previous touch): the 2nd touch (first
+  // follow-up) is suggested soonest, then the gap widens. Once the
+  // suggestion reaches COLD_TOUCH_THRESHOLD touches, computeColdSignal below
+  // will flag the prospect anyway, so the gap stays flat from there instead
+  // of growing further, a wider gap would just delay that flag from being
+  // acted on.
+  function suggestedNudgeOffsetDays(nextTouchNumber) {
+    if (nextTouchNumber <= 2) return 3;
+    if (nextTouchNumber === 3) return 5;
+    return 7;
+  }
+
   // The two fields this project has found most predictive of a real reply
   // (see the contact-channel callout in index.html). Warn right where
   // outreach is actually about to be logged as sent, not only after the
@@ -1997,6 +2016,20 @@
       '<button type="button" id="modalTouchCopy" class="print-btn font-mono" aria-live="polite">Copy</button>' +
       '</div>' +
       '<pre class="np-output font-mono" id="modalTouchOutput"></pre>' +
+      '<div id="modalTouchSuggest" class="inline-gen-suggest" hidden>' +
+      '<span class="field-label" style="margin:0">Suggested next nudge (a cadence guess, edit before using)</span>' +
+      '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<label class="sr-only" for="modalTouchSuggestDate">Suggested next nudge date</label>' +
+      '<input type="date" id="modalTouchSuggestDate" class="np-input inline-gen-date">' +
+      '<label class="sr-only" for="modalTouchSuggestAction">Suggested next action</label>' +
+      '<input type="text" id="modalTouchSuggestAction" class="np-input" placeholder="Next action">' +
+      '</div>' +
+      '<div class="np-output-head">' +
+      '<span class="field-label" style="margin:0">Paste into this prospect\'s top-level fields</span>' +
+      '<button type="button" id="modalTouchSuggestCopy" class="print-btn font-mono" aria-live="polite">Copy</button>' +
+      '</div>' +
+      '<pre class="np-output font-mono" id="modalTouchSuggestOutput"></pre>' +
+      '</div>' +
       '</div></div>';
   }
 
@@ -2082,6 +2115,16 @@
     const resultEl = document.getElementById('modalTouchResult');
     const warnEl = document.getElementById('modalTouchWarn');
     const outputEl = document.getElementById('modalTouchOutput');
+    const suggestEl = document.getElementById('modalTouchSuggest');
+    const suggestDateInput = document.getElementById('modalTouchSuggestDate');
+    const suggestActionInput = document.getElementById('modalTouchSuggestAction');
+    const suggestOutputEl = document.getElementById('modalTouchSuggestOutput');
+    function refreshSuggestOutput() {
+      suggestOutputEl.textContent = JSON.stringify({
+        nextNudgeDate: suggestDateInput.value || null,
+        nextAction: suggestActionInput.value.trim() || null
+      }, null, 2);
+    }
     document.getElementById('modalTouchGenerate').addEventListener('click', () => {
       const type = typeSelect.value;
       const date = dateInput.value;
@@ -2091,6 +2134,7 @@
         warnEl.textContent = 'Pick the real date this touch actually happened first.';
         outputEl.textContent = '';
         resultEl.hidden = false;
+        suggestEl.hidden = true;
         return;
       }
       const log = p.outreachLog || [];
@@ -2109,8 +2153,30 @@
       if (note) entry.note = note;
       outputEl.textContent = JSON.stringify(entry, null, 2) + ',';
       resultEl.hidden = false;
+
+      // Cadence suggestion for the touch AFTER this one, based on real
+      // cold-outreach practice (widening follow-up gaps). This is a starting
+      // guess only, both fields stay editable before copying, nothing here
+      // is pasted automatically.
+      const realTouchCount = log.filter(e => e && e.date).length;
+      const thisTouchNumber = realTouchCount + 1;
+      const nextTouchNumber = thisTouchNumber + 1;
+      let suggestedDate = addDaysIso(date, suggestedNudgeOffsetDays(nextTouchNumber));
+      const doNotNudgeBefore = p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore;
+      if (doNotNudgeBefore && isValidDateStr(doNotNudgeBefore) && doNotNudgeBefore > suggestedDate) {
+        suggestedDate = doNotNudgeBefore;
+      }
+      suggestDateInput.value = suggestedDate;
+      suggestActionInput.value = nextTouchNumber > COLD_TOUCH_THRESHOLD
+        ? 'Reconsider hook/channel before touch #' + nextTouchNumber + ', ' + thisTouchNumber + ' touches with no reply so far'
+        : 'Send follow-up nudge (touch #' + nextTouchNumber + ')';
+      refreshSuggestOutput();
+      suggestEl.hidden = false;
     });
     wireCopyButton(document.getElementById('modalTouchCopy'), outputEl);
+    suggestDateInput.addEventListener('change', refreshSuggestOutput);
+    suggestActionInput.addEventListener('input', refreshSuggestOutput);
+    wireCopyButton(document.getElementById('modalTouchSuggestCopy'), suggestOutputEl);
   }
 
   function socialSnapshotGeneratorHtml() {
