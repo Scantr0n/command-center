@@ -185,8 +185,24 @@ const ORDER_STATUS_LOOKUP = {
 // real history exists, buildTurnaroundByGrader's own real average always
 // wins over this. "default" is used when serviceLevel doesn't match a known
 // tier name (including no serviceLevel logged at all).
+//
+// PSA renamed Walk-Through to Premier and Regular to Priority, and added a
+// new Standard tier, on 2026-09-14 (see the reference section). The old
+// "walk-through"/"regular" keys are kept alongside the new ones so a real
+// submission logged before that date under its then-current tier name still
+// resolves to the turnaround that was actually published for it at the
+// time, rather than getting silently reinterpreted under the new name.
+// PSA's "default" (no serviceLevel logged) is the rough average across its
+// currently open tiers (Premier/Super Express/Express/Priority/Standard),
+// not one specific tier's own number.
 const PUBLISHED_TURNAROUND_DAYS = {
-  PSA: { default: 35, tiers: { 'walk-through': 6, walkthrough: 6, 'super express': 9, express: 25, regular: 35, 'value max': 45, 'value plus': 70, 'value bulk': 150, value: 110 } },
+  PSA: { default: 43, tiers: {
+    'walk-through': 6, walkthrough: 6, premier: 9,
+    'super express': 13, express: 25,
+    regular: 35, priority: 75,
+    standard: 95,
+    'value max': 45, 'value plus': 70, 'value bulk': 150, value: 110
+  } },
   BGS: { default: 45, tiers: { base: 75, standard: 45, express: 15, priority: 5 } },
   CGC: { default: 20, tiers: { bulk: 40, economy: 20, standard: 10, express: 5, walkthrough: 2, 'walk-through': 2 } },
   SGC: { default: 45, tiers: { entry: 45, standard: 45, expedited: 3 } }
