@@ -8,5 +8,10 @@
   "status": "active",
   "toggleable": true,
   "toggleId": "daily-job-search-digest",
-  "sessionTitle": null
+  "sessionTitle": null,
+  "reliability": {
+    "lastRunStatus": "succeeded",
+    "lastRunAt": "2026-09-14",
+    "recentSuccessRate": "10/10 succeeded"
+  }
 }

@@ -351,6 +351,10 @@
           <label class="text-xs font-mono" style="color: var(--sub)">Automation:</label>
           <button id="toggleBtn" class="text-xs font-mono px-3 py-1 rounded border hairline"></button>
         </div>
+        <div id="reliabilityRow" class="hidden mt-3 flex items-center gap-2">
+          <span class="text-xs font-mono" style="color: var(--sub)">Recent runs:</span>
+          <span id="reliabilityText" class="text-xs font-mono" style="color: var(--faint)"></span>
+        </div>
         <a id="linkRow" class="hidden mt-3 text-xs font-mono px-3 py-1.5 rounded border hairline items-center gap-1.5 w-fit" style="color: var(--ink)">
           <span id="linkRowLabel"></span><span aria-hidden="true">&rarr;</span>
         </a>
@@ -1117,7 +1121,10 @@ function renderGrid() {
       <div class="mt-3 flex items-center justify-between gap-2">
         <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
         <span class="text-[10px] font-mono truncate" style="color: ${stale ? statusColor('stalled') : 'var(--faint)'}; font-weight: ${stale ? '600' : '400'}">${stale ? 'stale, ' : ''}${escapeHtml(relativeTime(c.lastUpdate))}</span>
-        ${c.toggleable ? `<span class="text-[10px] font-mono flex-shrink-0" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
+        <div class="flex items-center gap-2 flex-shrink-0">
+          ${c.reliability ? `<span class="text-[10px] font-mono" style="color: ${c.reliability.lastRunStatus === 'failed' ? '#E0725A' : 'var(--faint)'}" title="Recent scheduled-task runs">${escapeHtml(c.reliability.recentSuccessRate || '')}</span>` : ''}
+          ${c.toggleable ? `<span class="text-[10px] font-mono" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
+        </div>
       </div>
     </div>
   `;
@@ -1221,6 +1228,23 @@ function openModal(id, opts = {}) {
   } else {
     toggleRow.classList.add('hidden');
     toggleRow.classList.remove('flex');
+  }
+
+  // Real automation health, sourced from actual scheduled-task run history
+  // (see write_snapshot calls in the relevant SKILL.md) — never fabricated
+  // for clusters with no real run history behind them.
+  const reliabilityRow = document.getElementById('reliabilityRow');
+  if (activeCluster.reliability) {
+    reliabilityRow.classList.remove('hidden');
+    reliabilityRow.classList.add('flex');
+    const r = activeCluster.reliability;
+    const failed = r.lastRunStatus === 'failed';
+    const text = document.getElementById('reliabilityText');
+    text.textContent = `${r.recentSuccessRate || 'unknown'}${failed ? ' — last run failed' : ''}${r.lastRunAt ? ` (last: ${r.lastRunAt})` : ''}`;
+    text.style.color = failed ? '#E0725A' : 'var(--faint)';
+  } else {
+    reliabilityRow.classList.add('hidden');
+    reliabilityRow.classList.remove('flex');
   }
 
   const linkRow = document.getElementById('linkRow');
