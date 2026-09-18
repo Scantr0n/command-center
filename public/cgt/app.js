@@ -452,6 +452,7 @@ async function loadCards() {
     renderStalePricing();
     renderDuplicates();
     renderGradeLadderFlags();
+    renderAttentionBar();
     renderBatchFilter();
     renderInsuranceSummary();
     renderCoverageCheck();
@@ -1378,6 +1379,57 @@ function renderGradeLadderFlags() {
   `).join('');
   list.querySelectorAll('.data-quality-row').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
+// Same attention-bar convention as CSM's own renderAttentionBar: these five
+// panels (unpriced, data quality, stale pricing, duplicates, grade ladder)
+// each already hide themselves when nothing's flagged, but each one only
+// becomes visible by scrolling past every section above it, so a real flag
+// buried near the bottom of the page could go unnoticed for a long time.
+// This click-to-scroll summary surfaces all five up top instead, hidden
+// entirely (not an empty bar) when every one of them has nothing flagged.
+function renderAttentionBar() {
+  const bar = document.getElementById('attentionBar');
+  const realCards = cards.filter(c => !isExample(c));
+  const unpricedCount = buildUnpricedFlags().length;
+  const dataQualityCount = buildDataQualityFlags().length;
+  const stalePricingCount = buildStalePricingFlags().length;
+  const duplicateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateGroups(realCards).length : 0;
+  const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
+
+  const items = [];
+  if (unpricedCount) {
+    items.push({ n: unpricedCount, target: 'unpricedSection', label: unpricedCount === 1 ? 'card not priced yet' : 'cards not priced yet' });
+  }
+  if (dataQualityCount) {
+    items.push({ n: dataQualityCount, target: 'dataQualitySection', label: dataQualityCount === 1 ? 'card needs backfill' : 'cards need backfill' });
+  }
+  if (stalePricingCount) {
+    items.push({ n: stalePricingCount, target: 'stalePricingSection', label: stalePricingCount === 1 ? 'price is stale' : 'prices are stale' });
+  }
+  if (duplicateCount) {
+    items.push({ n: duplicateCount, target: 'duplicatesSection', label: duplicateCount === 1 ? 'possible duplicate group' : 'possible duplicate groups' });
+  }
+  if (gradeLadderCount) {
+    items.push({ n: gradeLadderCount, target: 'gradeLadderSection', label: gradeLadderCount === 1 ? 'grade ladder inversion' : 'grade ladder inversions' });
+  }
+
+  if (!items.length) {
+    bar.hidden = true;
+    bar.innerHTML = '';
+    return;
+  }
+  bar.hidden = false;
+  bar.innerHTML = items.map(item =>
+    '<button type="button" class="attention-pill attention-warn" data-target="' + escapeHtml(item.target) + '">' +
+    '<strong>' + item.n + '</strong> ' + escapeHtml(item.label) + '</button>'
+  ).join('');
+  bar.querySelectorAll('[data-target]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = document.getElementById(btn.getAttribute('data-target'));
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   });
 }
 

@@ -116,6 +116,35 @@ header.page-head .sub {
 }
 .callout strong { color: var(--ink); }
 
+/* Same attention-bar convention as CSM's own attentionBar: a click-to-scroll
+   summary of the individually hidden-until-flagged panels below (unpriced,
+   data quality, stale pricing, duplicates, grade ladder), so noticing five
+   real flags doesn't require scrolling past every one of them first. */
+.attention-bar[hidden] { display: none; }
+.attention-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.attention-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  color: var(--sub);
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+.attention-pill:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.attention-pill strong { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--ink); }
+.attention-pill.attention-warn { border-color: rgba(224,160,48,0.3); background: rgba(224,160,48,0.06); }
+.attention-pill.attention-warn strong { color: #E0A030; }
+
 .schema-help {
   border: 1px solid var(--hairline);
   border-radius: 10px;
