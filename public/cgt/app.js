@@ -505,6 +505,7 @@ async function loadCards() {
     renderBatchFilter();
     renderInsuranceSummary();
     renderCoverageCheck();
+    renderFooterStatus();
     applyFiltersAndRender();
     initTableScrollShadows();
   } catch (e) {
@@ -518,6 +519,28 @@ async function loadCards() {
     backupBtn.disabled = true;
     backupBtn.title = "Can't back up, cards.json failed to load (see below)";
   }
+}
+
+// Real per-file counts instead of a hand-typed claim about which files still
+// only hold their placeholder example row: that claim goes stale the moment
+// real rows are actually logged into one file but not the others (which is
+// exactly what happened once candidates.json got its real 2026-07-17 raw-card
+// sweep before submissions.json had any real submission logged), so it's
+// computed the same way every other real-vs-placeholder distinction on this
+// page is, from the loaded data itself.
+function renderFooterStatus() {
+  const el = document.getElementById('footerDataStatus');
+  if (!el) return;
+  const realCardsCount = cards.filter(c => !isExample(c)).length;
+  const realSubsCount = submissions.filter(s => !isExampleSubmission(s)).length;
+  const realCandsCount = candidates.filter(c => !isExampleCandidate(c)).length;
+  const clause = (count, file, noun) => count
+    ? count + ' real ' + noun + (count === 1 ? '' : 's') + ' logged in <code>' + file + '</code>'
+    : '<code>' + file + '</code> still only holds its placeholder example row';
+  el.innerHTML = clause(realCardsCount, 'cards.json', 'card') + '; ' +
+    clause(realSubsCount, 'submissions.json', 'submission') + '; ' +
+    clause(realCandsCount, 'candidates.json', 'candidate') +
+    '. Log more by hand (or Import CSV) as real cards get priced, batches go out, and raw cards get weighed.';
 }
 
 function renderStats() {
