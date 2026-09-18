@@ -2127,6 +2127,16 @@
   // Promise.allSettled data load above (it works even if every data file
   // fails to load), since none of its real shortcuts depend on the fetched
   // data, only on buttons and DOM structure that exist unconditionally.
+  function lockBodyScroll() {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + 'px';
+    document.body.style.overflow = 'hidden';
+  }
+  function unlockBodyScroll() {
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+  }
+
   let shortcutsOpen = false;
   let shortcutsLastFocusedEl = null;
 
@@ -2164,6 +2174,7 @@
     shortcutsLastFocusedEl = document.activeElement;
     renderShortcutsList();
     document.getElementById('shortcutsOverlay').hidden = false;
+    lockBodyScroll();
     document.getElementById('shortcutsClose').focus();
   }
 
@@ -2171,6 +2182,7 @@
     if (!shortcutsOpen) return;
     shortcutsOpen = false;
     document.getElementById('shortcutsOverlay').hidden = true;
+    unlockBodyScroll();
     if (shortcutsLastFocusedEl && typeof shortcutsLastFocusedEl.focus === 'function') shortcutsLastFocusedEl.focus();
     shortcutsLastFocusedEl = null;
   }
