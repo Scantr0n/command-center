@@ -39,6 +39,19 @@ function isDateOrNull(v) {
   return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
 }
 
+// lastUpdate drives the dashboard-wide staleness signal (the graph's dashed
+// ring, Grid's "stale" label), so a mistyped year (2027 instead of 2026)
+// would silently read as freshly updated instead of the typo it actually
+// is. Same isFutureDate check public/sondrik/data/validate.js already runs
+// on its own dated fields, for the same reason.
+function isFutureDate(v) {
+  if (!v || !DATE_RE.test(v)) return false;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return new Date(v + 'T00:00:00') > tomorrow;
+}
+
 function main() {
   const errors = [];
   const warnings = [];
@@ -88,6 +101,8 @@ function main() {
 
     if (!isDateOrNull(c.lastUpdate)) {
       errors.push(where + ': "lastUpdate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.lastUpdate));
+    } else if (isFutureDate(c.lastUpdate)) {
+      warnings.push(where + ': "lastUpdate" (' + c.lastUpdate + ') is in the future, check for a typo\'d year');
     }
 
     if (c.link !== undefined && !c.linkLabel) {
