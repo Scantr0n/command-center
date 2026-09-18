@@ -101,10 +101,39 @@ app.post('/api/toggles/:toggleId', (req, res) => {
   }
 });
 
+// Real chat history from the modal is always a short back-and-forth of
+// plain strings, so anything else (missing/malformed body, an unbounded
+// message count, one absurdly long message) is either a broken client or a
+// stuck retry loop, not a real conversation. Rejected here, before ever
+// reaching the Anthropic API, so a bad request fails fast and free instead
+// of spending a real API call to get the same rejection back from Anthropic.
+const MAX_CHAT_MESSAGES = 40;
+const MAX_CHAT_MESSAGE_LENGTH = 4000;
+
+function validateChatMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return 'messages must be a non-empty array';
+  }
+  if (messages.length > MAX_CHAT_MESSAGES) {
+    return `messages must not exceed ${MAX_CHAT_MESSAGES} entries`;
+  }
+  for (const m of messages) {
+    if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string' || !m.content.trim()) {
+      return 'each message needs a role of "user" or "assistant" and non-empty string content';
+    }
+    if (m.content.length > MAX_CHAT_MESSAGE_LENGTH) {
+      return `message content must not exceed ${MAX_CHAT_MESSAGE_LENGTH} characters`;
+    }
+  }
+  return null;
+}
+
 app.post('/api/clusters/:id/chat', async (req, res) => {
   try {
     const { id } = req.params;
     const { messages } = req.body;
+    const validationError = validateChatMessages(messages);
+    if (validationError) return res.status(400).json({ error: validationError });
     const { clusters } = await readClusters();
     const cluster = clusters.find(c => c.id === id);
     if (!cluster) return res.status(404).json({ error: 'Unknown cluster' });
