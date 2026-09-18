@@ -82,6 +82,7 @@
         (PSA and BGS link straight to the cert when <code>certNumber</code> is filled in, the others open the
         lookup tool for you to enter it by hand since they don't expose a direct-link URL). HGA has no public
         lookup tool as of this writing, so no link is shown for it.</p>
+      <div class="table-wrap">
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"2021-topps-chrome-julio-rodriguez-psa10"</code></td></tr>
@@ -104,6 +105,7 @@
           <tr><th>priceHistory</th><td>Optional array of <code>{ "value": number, "date": "YYYY-MM-DD", "basis": "recent-sale" | "comp-estimate" }</code> objects, one per prior real price this card has had, each dated before the current <code>datePriced</code>. Leave off or empty until the card has actually been re-priced once; see the note above on how to fill it in when that happens. Powers the up/down indicator next to the value in the table, the price-history list in the detail view, and the "Price trend since last check" summary tile.</td></tr>
         </tbody>
       </table>
+      </div>
       <pre class="schema-example font-mono">{
   "id": "example-company-card-slug",
   "cardName": null,
@@ -223,6 +225,7 @@
         <code>submissions.json</code> the same way it validates <code>cards.json</code>: duplicate ids, a
         <code>status</code> outside the known list, a <code>returnedDate</code> that disagrees with
         <code>status</code>, and bad dates.</p>
+      <div class="table-wrap">
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"2026-08-psa-regular-batch-1"</code></td></tr>
@@ -238,6 +241,7 @@
           <tr><th>notes</th><td>Free-text notes</td></tr>
         </tbody>
       </table>
+      </div>
       <pre class="schema-example font-mono">{
   "id": "example-company-batch-slug",
   "gradingCompany": "PSA",
@@ -341,6 +345,7 @@
         0 but under 2x shows as "Marginal" rather than "Worth grading", and any candidate missing one of the three
         real numbers the math needs (<code>rawValue</code>, <code>expectedGradedValue</code>,
         <code>estimatedGradingCost</code>) shows "Needs more data" rather than a guessed verdict.</p>
+      <div class="table-wrap">
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"2022-upper-deck-rookie-raw"</code></td></tr>
@@ -364,6 +369,7 @@
           <tr><th>notes</th><td>Free-text notes</td></tr>
         </tbody>
       </table>
+      </div>
       <pre class="schema-example font-mono">{
   "id": "example-company-card-slug-raw",
   "cardName": null,

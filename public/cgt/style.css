@@ -180,6 +180,9 @@ header.page-head .sub {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--ink);
+  /* real inline paths like public/cgt/data/submissions.json have no space
+     to wrap on and overflow a narrow (~320px) viewport otherwise */
+  overflow-wrap: anywhere;
 }
 .schema-table {
   width: 100%;
@@ -1088,7 +1091,11 @@ code.inline-code {
    layout as Sondrik's own quick-log tool (public/sondrik/style.css). */
 .quick-log-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* minmax(240px, 1fr) alone never shrinks a track below 240px even when
+     the container itself is narrower (a real ~320px phone, once section
+     padding is subtracted, is), which overflows the page instead of
+     wrapping to a single column; min(240px, 100%) lets it shrink there. */
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 20px;
   margin-top: 14px;
 }
