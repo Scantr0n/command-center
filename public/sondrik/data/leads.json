@@ -7,12 +7,12 @@
       "sourceDetail": "Commenter on r/IMadeThis",
       "type": "beta-tester-offer",
       "summary": "Offered to test the product in exchange for lifetime access.",
-      "loggedDate": "2026-09-10",
+      "loggedDate": null,
       "outreach": {
-        "draftStatus": "sent",
-        "approvalStatus": "approved",
-        "sent": true,
-        "note": "DM sent 2026-09-10, confirmed live. Offered lifetime access in exchange for a real test and honest feedback."
+        "draftStatus": "drafted",
+        "approvalStatus": "awaiting-approval",
+        "sent": false,
+        "note": "DM drafted. Waiting on Jack's direct approval before sending. Has not been sent."
       }
     }
   ]

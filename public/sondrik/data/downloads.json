@@ -6,8 +6,7 @@
     "liveBackend": false,
     "checks": [
       { "date": "2026-09-04", "count": 0, "note": "Baseline, 3 days before the next check" },
-      { "date": "2026-09-07", "count": 8, "note": "Confirmed via gh api" },
-      { "date": "2026-09-17", "count": 15, "note": "Confirmed via gh api, up from 8 on 9/7" }
+      { "date": "2026-09-07", "count": 8, "note": "Confirmed via gh api" }
     ]
   }
 }
