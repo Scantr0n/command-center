@@ -117,7 +117,19 @@
     return norm(location.pathname) === norm(link);
   }
 
+  // The home page (this script also loads there via the same shared
+  // <script src="/sidebar.js"> tag) already *is* the hub nav, graph, grid,
+  // and search all at once, so injecting this rail on top of it just adds a
+  // "Command Center" link pointing at the page already on screen, plus a
+  // permanent 56px+ padding-left squeeze on the one page with the least
+  // spare width to give up (a 900x900 force-directed graph).
+  function isHomePage() {
+    const p = location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '') || '/';
+    return p === '/';
+  }
+
   async function init() {
+    if (isHomePage()) return;
     const styleEl = document.createElement('style');
     styleEl.textContent = STYLE;
     document.head.appendChild(styleEl);
