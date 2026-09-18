@@ -1375,7 +1375,7 @@ function diagnosticRow(label, status, badgeText, detail) {
   return `<tr><th>${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
 }
 
-function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount) {
+function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount) {
   const body = document.getElementById('browserDiagnosticsBody');
   if (!body) return;
 
@@ -1391,8 +1391,8 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latenc
   const rows = [
     diagnosticRow('Local storage', storageOk ? 'ok' : 'blocked', storageOk ? 'AVAILABLE' : 'BLOCKED',
       storageOk
-        ? 'Connectivity checks, regime history, and the last-known-state cache all persist here.'
-        : 'Private browsing or a locked profile. Connectivity/regime history and the last-known-state cache will not persist across reloads.'),
+        ? 'Connectivity checks, regime history, drawdown/robustness trend samples, and the last-known-state cache all persist here.'
+        : 'Private browsing or a locked profile. Connectivity/regime/trend history and the last-known-state cache will not persist across reloads.'),
     diagnosticRow('Notifications', notifyStatus, notifyBadge,
       !notifySupported ? 'Not supported in this browser.' : (Notification.permission === 'granted' ? 'Critical alerts can fire natively when this tab is backgrounded.' : Notification.permission === 'denied' ? 'Critical alerts are muted; re-enable from this browser’s own site settings.' : 'Permission not yet requested (use "Enable critical alerts" above).')),
     diagnosticRow('Service worker', swStatus, serviceWorkerDiagnostic.toUpperCase(),
@@ -1402,7 +1402,9 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latenc
     diagnosticRow('Regime observations recorded', storageOk ? 'ok' : 'blocked', String(regimeObservationCount),
       'Real regime transitions this browser has actually observed (see Regime history above).'),
     diagnosticRow('Fetch latency samples recorded', storageOk ? 'ok' : 'blocked', String(latencySampleCount),
-      'Real round-trip timings of this browser\'s own requests to Command Center (see the Connection strip above).')
+      'Real round-trip timings of this browser\'s own requests to Command Center (see the Connection strip above).'),
+    diagnosticRow('Drawdown/robustness trend samples recorded', storageOk ? 'ok' : 'blocked', String((drawdownSampleCount || 0) + (robustnessSampleCount || 0)),
+      'Real position-sizing meter readings this browser has actually polled (see the sparklines under Position sizing above).')
   ];
   body.innerHTML = rows.join('');
 }
@@ -1699,7 +1701,7 @@ async function loadStatus() {
     renderArchitecture(data);
     renderGenealogy(effectiveData);
     renderEventLog(data);
-    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length);
+    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length, clientDrawdownHistory.length, clientRobustnessHistory.length);
   } catch (e) {
     if (requestId !== latestStatusRequestId) return;
     // Distinct from "down" (Alpha has no live feed yet, an expected,
@@ -1736,6 +1738,8 @@ window.addEventListener('storage', (e) => {
   const connHistory = loadClientConnHistory();
   const latencyHistory = loadClientLatencyHistory();
   const regimeHistory = loadClientRegimeHistory();
+  const drawdownHistory = loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY);
+  const robustnessHistory = loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY);
   renderConnection(lastRawData, connHistory, latencyHistory);
   renderConnectionHistory(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
@@ -1746,9 +1750,9 @@ window.addEventListener('storage', (e) => {
   // lastRawData, so a last-known-state view doesn't flip back to "awaiting
   // connection" just because a sibling tab wrote a history entry.
   if (lastStatusData) {
-    renderPositionSizing(lastStatusData, loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY), loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY));
+    renderPositionSizing(lastStatusData, drawdownHistory, robustnessHistory);
   }
-  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length);
+  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length);
 });
 
 // Status-page UX guidance is consistent that a manual refresh action should
@@ -2105,7 +2109,7 @@ updateOfflineBanner();
 // Renders once immediately, independent of the /api/alpha/live fetch below,
 // so this table is accurate even if that fetch itself fails; loadStatus()
 // re-renders it with fresh counts on every successful tick after this.
-renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length, loadClientLatencyHistory().length);
+renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length, loadClientLatencyHistory().length, loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY).length, loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY).length);
 // Same "render immediately, independent of the network fetch" reasoning as
 // the diagnostics call above: market open/closed has no dependency on
 // /api/alpha/live succeeding at all, so it shouldn't wait on it.
