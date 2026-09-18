@@ -166,6 +166,22 @@ function main() {
         if (!isDateOrNull(snap.asOfDate)) {
           errors.push(snapWhere + ': "asOfDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(snap.asOfDate));
         }
+        // app.js sums these with Number(snap.followers) when building Social Reach
+        // totals. A hand-typed "12,000" or "12K" is not an error there, it is a
+        // silent NaN that zeroes that platform's contribution out of the total
+        // with nothing on the board saying why. Catch the bad value here instead.
+        if (snap.followers != null && (typeof snap.followers !== 'number' || !Number.isFinite(snap.followers) || snap.followers < 0)) {
+          errors.push(snapWhere + ': "followers" must be a non-negative number or null, not ' +
+            JSON.stringify(snap.followers) + '. Digits only, no commas or "k" suffix.');
+        }
+        if (snap.engagementRate != null && (typeof snap.engagementRate !== 'number' || !Number.isFinite(snap.engagementRate) || snap.engagementRate < 0)) {
+          errors.push(snapWhere + ': "engagementRate" must be a non-negative number or null, not ' +
+            JSON.stringify(snap.engagementRate) + '.');
+        }
+        if (typeof snap.engagementRate === 'number' && snap.engagementRate > 100) {
+          warnings.push(snapWhere + ': engagementRate ' + snap.engagementRate + ' is over 100. It is logged as a ' +
+            'percent (e.g. 4.2 for 4.2%), double check this was not pulled as a raw fraction or a follower count.');
+        }
         if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {
           errors.push(snapWhere + ': has follower/engagement numbers but no asOfDate. ' +
             'Every social number on this board must be labeled with when it was pulled, never shown as if live.');
