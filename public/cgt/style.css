@@ -646,8 +646,8 @@ table.card-table {
 .card-table thead th.sortable:hover,
 .card-table thead th.sortable:focus-visible {
   color: var(--ink);
-  outline: none;
 }
+.card-table thead th.sortable:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: -2px; }
 .card-table thead th.sortable::after {
   content: '';
   margin-left: 5px;
