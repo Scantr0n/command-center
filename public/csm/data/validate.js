@@ -197,6 +197,13 @@ function main() {
     if (!Array.isArray(p.outreachLog || [])) {
       errors.push(where + ': "outreachLog" must be an array.');
     } else {
+      // Warning, not an error like stageHistory's own ordering check below:
+      // app.js's hasOutOfOrderDates flags this same condition as a
+      // non-blocking "needs backfill" data-quality item (often a hand-typed
+      // formatting slip, e.g. a non-zero-padded "2026-9-5"), so validate.js
+      // should surface it too instead of exiting 0 on something the board
+      // already treats as worth a second look.
+      let prevLogDate = null;
       (p.outreachLog || []).forEach((entry, logIdx) => {
         const logWhere = where + '.outreachLog[' + logIdx + ']';
         if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
@@ -214,6 +221,11 @@ function main() {
         if (entry.note != null && typeof entry.note !== 'string') {
           errors.push(logWhere + ': "note" must be a string or omitted, not ' + JSON.stringify(entry.note));
         }
+        if (entry.date && DATE_RE.test(entry.date) && prevLogDate && entry.date < prevLogDate) {
+          warnings.push(logWhere + ': out of order, dated ' + entry.date + ' but the previous entry is dated ' +
+            prevLogDate + '. Keep outreachLog sorted oldest first, check for a non-zero-padded date typo.');
+        }
+        if (entry.date && DATE_RE.test(entry.date)) prevLogDate = entry.date;
       });
       const sendCount = (p.outreachLog || []).filter(e => e && e.type === 'initial-send').length;
       if (sendCount > 1) {
