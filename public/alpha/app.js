@@ -476,22 +476,32 @@ const SPARK_W = 56;
 const SPARK_H = 18;
 const SPARK_PAD = 2;
 
+// Shared geometry for every sparkline on this page (fetch latency here, the
+// drawdown/robustness meters below): maps a list of real numbers onto the
+// same fixed SPARK_W x SPARK_H box. A flat line through the middle when
+// every sample in the window is identical is a deliberate choice, not a
+// bug, it avoids a divide-by-zero and correctly shows "no movement" rather
+// than a fabricated slope.
+function computeSparklinePoints(values) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  const innerW = SPARK_W - SPARK_PAD * 2;
+  const innerH = SPARK_H - SPARK_PAD * 2;
+  return values.map((v, i) => {
+    const x = SPARK_PAD + (values.length === 1 ? 0 : (i / (values.length - 1)) * innerW);
+    const y = SPARK_PAD + (range === 0 ? innerH / 2 : innerH - ((v - min) / range) * innerH);
+    return [x, y];
+  });
+}
+
 function renderLatencySparkline(history) {
   const recent = (history || []).slice(-LATENCY_AVG_WINDOW).filter(e => typeof e.ms === 'number' && Number.isFinite(e.ms));
   if (recent.length < 2) return '';
   const values = recent.map(e => e.ms);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const range = max - min;
-  const innerW = SPARK_W - SPARK_PAD * 2;
-  const innerH = SPARK_H - SPARK_PAD * 2;
-  const points = values.map((v, i) => {
-    const x = SPARK_PAD + (values.length === 1 ? 0 : (i / (values.length - 1)) * innerW);
-    // range === 0 means every recent sample was identical: draw a flat line
-    // through the middle rather than dividing by zero.
-    const y = SPARK_PAD + (range === 0 ? innerH / 2 : innerH - ((v - min) / range) * innerH);
-    return [x, y];
-  });
+  const points = computeSparklinePoints(values);
   const path = points.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
   const last = points[points.length - 1];
   const title = 'Last ' + recent.length + ' fetches: ' + min + 'ms to ' + max + 'ms';
@@ -540,6 +550,72 @@ function recordClientRegimeObservation(connected, regime) {
     // other client-side histories above, the section just stays empty.
   }
   return next;
+}
+
+// live.positionSizing.currentDrawdownPct and .robustnessScore have the same
+// gap connection latency had before CLIENT_LATENCY_HISTORY_KEY above: Alpha's
+// live feed sends only the current reading, never a history, so a shallow
+// current drawdown gives no sense of whether it just got there or has sat
+// there a while (the max-drawdown meter next to it already covers "how deep
+// has it ever gone", a different question from "what has it been doing
+// lately"). Same fix as latency/regime: this browser keeps its own honest,
+// append-only log of real readings it has actually polled, capped, in
+// localStorage, never backfilled or estimated, feeding a small trend
+// sparkline next to each meter (see renderMeterSparkline below).
+const CLIENT_DRAWDOWN_HISTORY_KEY = 'alpha:clientDrawdownHistory';
+const CLIENT_ROBUSTNESS_HISTORY_KEY = 'alpha:clientRobustnessHistory';
+const CLIENT_METER_HISTORY_CAP = 200;
+const METER_SPARK_WINDOW = 20;
+
+function loadClientMeterHistory(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Only records while genuinely connected with a real numeric reading, same
+// guard as recordClientRegimeObservation above: a last-known/frozen or
+// awaiting-connection value is not a new observation, and recording it would
+// flatten the trend line with repeats of a stale number rather than leaving
+// an honest gap.
+function recordClientMeterReading(key, connected, pct) {
+  const history = loadClientMeterHistory(key);
+  if (!connected || typeof pct !== 'number' || !Number.isFinite(pct)) return history;
+  const next = [...history, { at: new Date().toISOString(), pct }].slice(-CLIENT_METER_HISTORY_CAP);
+  try {
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // other client-side histories above, the sparkline just stays empty.
+  }
+  return next;
+}
+
+// Same compact trend-line treatment as renderLatencySparkline, generalized
+// to any 0-100 meter reading rather than a millisecond one. Returns ''
+// (nothing rendered) with fewer than 2 points in the window, same
+// honest-empty-state rule as every other section on this page.
+function renderMeterSparkline(history, title) {
+  const recent = (history || []).slice(-METER_SPARK_WINDOW).filter(e => typeof e.pct === 'number' && Number.isFinite(e.pct));
+  if (recent.length < 2) return '';
+  const values = recent.map(e => e.pct);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const points = computeSparklinePoints(values);
+  const path = points.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const last = points[points.length - 1];
+  const fullTitle = title + ': last ' + recent.length + ' readings, ' + min + '% to ' + max + '%';
+  return `
+    <svg class="meter-spark" width="${SPARK_W}" height="${SPARK_H}" viewBox="0 0 ${SPARK_W} ${SPARK_H}" role="img" aria-label="${escapeHtml(fullTitle)}">
+      <title>${escapeHtml(fullTitle)}</title>
+      <polyline points="${path}" class="latency-spark-line" fill="none" />
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="1.6" class="latency-spark-dot" />
+    </svg>
+  `;
 }
 
 // Turns the flat transition log above into readable segments: each entry
@@ -847,7 +923,7 @@ function renderStats(data) {
 // meter treatment as current drawdown, same honest empty state, and its own
 // schema field (positionSizing.maxDrawdownPct) rather than derived here,
 // since only a real feed from Alpha knows the true historical peak.
-function rangeMeter(label, pct, ariaSuffix) {
+function rangeMeter(label, pct, ariaSuffix, sparklineHtml) {
   const validPct = typeof pct === 'number' && Number.isFinite(pct) && pct >= 0 && pct <= 100;
   if (!validPct) {
     return `
@@ -866,13 +942,16 @@ function rangeMeter(label, pct, ariaSuffix) {
         aria-label="${escapeHtml(label)}, ${escapeHtml(ariaSuffix)}">
         <div class="meter-fill" style="width:${pct}%"></div>
       </div>
-      <div class="meter-value font-mono">${escapeHtml(String(pct))}%</div>
+      <div class="meter-value-row">
+        <div class="meter-value font-mono">${escapeHtml(String(pct))}%</div>
+        ${sparklineHtml || ''}
+      </div>
     </div>
   `;
 }
 
-function drawdownMeter(label, pct) {
-  return rangeMeter(label, pct, 'percent of range used');
+function drawdownMeter(label, pct, sparklineHtml) {
+  return rangeMeter(label, pct, 'percent of range used', sparklineHtml);
 }
 
 // Robustness-based sizing is named as its own real architecture feature
@@ -882,11 +961,11 @@ function drawdownMeter(label, pct) {
 // honest empty state as those, its own schema field
 // (positionSizing.robustnessScore) rather than derived, since only a real
 // feed from Alpha knows the true reading.
-function robustnessMeter(pct) {
-  return rangeMeter('ROBUSTNESS SCORE', pct, 'score out of 100');
+function robustnessMeter(pct, sparklineHtml) {
+  return rangeMeter('ROBUSTNESS SCORE', pct, 'score out of 100', sparklineHtml);
 }
 
-function renderPositionSizing(data) {
+function renderPositionSizing(data, clientDrawdownHistory, clientRobustnessHistory) {
   const ps = data.live.positionSizing || {};
   const panel = document.getElementById('positionSizingPanel');
   const mode = ps.activeMode;
@@ -899,10 +978,18 @@ function renderPositionSizing(data) {
     </div>
   `;
 
+  // Max drawdown gets no sparkline: it is a running peak-to-trough maximum,
+  // monotonically non-decreasing across the current episode by definition,
+  // so a trend line of it would only ever show a flat or rising line, never
+  // the up-and-down movement a sparkline is actually useful for. Current
+  // drawdown and robustness score both genuinely move poll to poll.
+  const drawdownSpark = renderMeterSparkline(clientDrawdownHistory, 'Current drawdown trend, recorded by this browser only');
+  const robustnessSpark = renderMeterSparkline(clientRobustnessHistory, 'Robustness score trend, recorded by this browser only');
+
   panel.innerHTML = modeHtml +
-    drawdownMeter('CURRENT DRAWDOWN', ps.currentDrawdownPct) +
+    drawdownMeter('CURRENT DRAWDOWN', ps.currentDrawdownPct, drawdownSpark) +
     drawdownMeter('MAX DRAWDOWN (PEAK TO TROUGH)', ps.maxDrawdownPct) +
-    robustnessMeter(ps.robustnessScore);
+    robustnessMeter(ps.robustnessScore, robustnessSpark);
 }
 
 function fmtDollar(n) {
@@ -1574,6 +1661,9 @@ async function loadStatus() {
     const clientConnHistory = recordClientConnCheck(data.connection && data.connection.connected);
     const connectedNow = !!(data.connection && data.connection.connected);
     const clientRegimeHistory = recordClientRegimeObservation(connectedNow, data.live && data.live.regime);
+    const livePs = data.live && data.live.positionSizing;
+    const clientDrawdownHistory = recordClientMeterReading(CLIENT_DRAWDOWN_HISTORY_KEY, connectedNow, livePs && livePs.currentDrawdownPct);
+    const clientRobustnessHistory = recordClientMeterReading(CLIENT_ROBUSTNESS_HISTORY_KEY, connectedNow, livePs && livePs.robustnessScore);
     // Only the three sections built from the cached fields (stats,
     // position sizing, genealogy) read effectiveData; connection, account
     // and positions always read the real `data` so those never show a
@@ -1605,7 +1695,7 @@ async function loadStatus() {
     renderStats(effectiveData);
     renderAccount(data);
     renderPositions(data);
-    renderPositionSizing(effectiveData);
+    renderPositionSizing(effectiveData, clientDrawdownHistory, clientRobustnessHistory);
     renderArchitecture(data);
     renderGenealogy(effectiveData);
     renderEventLog(data);
@@ -1639,7 +1729,10 @@ async function loadStatus() {
 // this event for those) and anything outside this page's own known keys.
 window.addEventListener('storage', (e) => {
   if (!lastRawData || !e.key) return;
-  if (![CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY].includes(e.key)) return;
+  if (![
+    CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY,
+    CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY
+  ].includes(e.key)) return;
   const connHistory = loadClientConnHistory();
   const latencyHistory = loadClientLatencyHistory();
   const regimeHistory = loadClientRegimeHistory();
@@ -1647,6 +1740,14 @@ window.addEventListener('storage', (e) => {
   renderConnectionHistory(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
   renderRegimeHistory(regimeHistory);
+  // Keeps the drawdown/robustness sparklines in agreement across open tabs
+  // too, same reasoning as the sections above; re-renders from lastStatusData
+  // (the same effectiveData the page itself last rendered from) rather than
+  // lastRawData, so a last-known-state view doesn't flip back to "awaiting
+  // connection" just because a sibling tab wrote a history entry.
+  if (lastStatusData) {
+    renderPositionSizing(lastStatusData, loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY), loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY));
+  }
   renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length);
 });
 
@@ -1749,8 +1850,10 @@ copyStatusBtn.addEventListener('click', async () => {
 
 // Every other hub (CGT/CSM/Garage/Sondrik) has a "Download backup (.json)"
 // button; Alpha had none, even though this browser's own connectivity,
-// fetch-latency, and regime-observation logs (CLIENT_CONN_HISTORY_KEY,
-// CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY above) live only in
+// fetch-latency, regime-observation, and drawdown/robustness-trend logs
+// (CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY,
+// CLIENT_REGIME_HISTORY_KEY, CLIENT_DRAWDOWN_HISTORY_KEY,
+// CLIENT_ROBUSTNESS_HISTORY_KEY above) live only in
 // localStorage, with no export path if site data is ever cleared. Local
 // download only, nothing is sent anywhere, and read-only like everything
 // else on this page: it only ever reads state already recorded, never
@@ -1765,7 +1868,9 @@ backupBtn.addEventListener('click', () => {
     status: lastStatusData,
     clientConnHistory: loadClientConnHistory(),
     clientLatencyHistory: loadClientLatencyHistory(),
-    clientRegimeHistory: loadClientRegimeHistory()
+    clientRegimeHistory: loadClientRegimeHistory(),
+    clientDrawdownHistory: loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY),
+    clientRobustnessHistory: loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY)
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

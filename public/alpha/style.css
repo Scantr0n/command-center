@@ -725,9 +725,25 @@ header.page-head .sub {
 .meter-value {
   font-size: 0.85rem;
   color: var(--ink);
-  margin-top: 8px;
 }
 .meter-value.awaiting { color: var(--dim); font-style: italic; font-size: 0.78rem; }
+
+/* Wraps meter-value so an optional trend sparkline (current drawdown,
+   robustness score; see renderMeterSparkline in app.js) sits flush against
+   the reading it belongs to, same "companion to the number, not a separate
+   stat" placement as .conn-latency-spark next to the fetch-latency text. */
+.meter-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.meter-spark {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 
 /* Positions table */
 .pl-good { color: #3DDC84; }
@@ -1121,7 +1137,7 @@ footer.page-foot {
     background: none;
     border: 1px solid #ccc;
   }
-  .conn-latency-spark, .history-tick.placeholder { display: none; }
+  .conn-latency-spark, .meter-spark, .history-tick.placeholder { display: none; }
   .history-tick.up { background: #333; }
   .history-tick.down { background: #ccc; border: 1px solid #999; }
 

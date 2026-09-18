@@ -101,6 +101,12 @@
         internal latency, since Command Center may itself be answering from the static fallback file rather than a
         live round trip to Jack's Mac. Recorded per browser only, in <code>localStorage</code>, same as the
         connectivity and regime histories above; the averaged figure next to it covers the most recent 20 samples.</p>
+      <p>The small trend line next to the Current drawdown and Robustness score meters under Position sizing is the
+        same idea applied to those two readings: Alpha's live feed sends only the current value, never a history, so
+        this browser keeps its own honest, capped log of real readings it has actually polled and draws it as a
+        sparkline, same "recorded by this browser only" caveat as the connectivity, regime, and fetch-latency
+        histories above. Max drawdown has no sparkline since it is a running peak-to-trough maximum and can only
+        stay flat or rise within an episode, never the up-and-down a trend line is useful for.</p>
       <p>"Enable critical alerts" turns on a native OS notification, using the browser's own Notification API, the
         moment this tab's headline first shows the kill switch engaged or a page error, if this tab is not the one
         currently focused. Nothing is sent anywhere for this: the browser shows the notification locally from
