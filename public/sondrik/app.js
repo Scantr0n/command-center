@@ -51,6 +51,30 @@
   const STALE_AFTER_DAYS = 7;
   const AGING_AFTER_DAYS = 4;
 
+  // Round-number milestones a reader would naturally watch for as the real
+  // download count grows, independent of goals.json (which stays empty
+  // until Jack sets an actual target). Purely a derived read of the real
+  // logged counts against a fixed, generic sequence, never a claim specific
+  // to Sondrik, so it adds no fact beyond "this many downloads happened".
+  // Used both to flag which check first crossed a milestone (in the
+  // timeline) and how far the latest count sits from the next one (in
+  // Traction).
+  const DOWNLOAD_MILESTONES = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000];
+
+  function nextMilestone(count) {
+    const m = DOWNLOAD_MILESTONES.find(v => v > count);
+    return m === undefined ? null : m;
+  }
+
+  // Which milestones a check newly crossed versus the check before it. A
+  // null prevCount (the very first check on record) is treated as below
+  // every milestone rather than as zero, so a first check logged already at
+  // a nonzero count still credits it with every milestone up to that count.
+  function milestonesCrossed(prevCount, count) {
+    const lowerBound = (prevCount === null || prevCount === undefined) ? -1 : prevCount;
+    return DOWNLOAD_MILESTONES.filter(m => m > lowerBound && m <= count);
+  }
+
   // div.textContent/innerHTML round-trip only escapes &amp;/&lt;/&gt; in text
   // content, not quotes, so a hand-typed value with a " or ' in it (a channel
   // id, a lead field) could break out of an attribute like value="..." or
@@ -142,8 +166,17 @@
       events.push({ date: r.date, kind: 'release', title: 'v' + r.version + ' shipped', detail: r.summary || null });
     });
     const metric = downloadsData.metric || {};
-    (metric.checks || []).forEach(c => {
-      events.push({ date: c.date, kind: 'check', title: c.count + ' ' + (metric.label || 'downloads') + ' logged', detail: c.note || null });
+    const sortedChecks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    sortedChecks.forEach((c, idx) => {
+      const prevCount = idx > 0 ? sortedChecks[idx - 1].count : null;
+      const crossed = milestonesCrossed(prevCount, c.count);
+      events.push({
+        date: c.date,
+        kind: 'check',
+        title: c.count + ' ' + (metric.label || 'downloads') + ' logged',
+        detail: c.note || null,
+        milestone: crossed.length ? crossed : null
+      });
     });
     (leadsData.leads || []).forEach(l => {
       events.push({ date: l.loggedDate, kind: 'lead', title: l.sourceDetail || l.source || 'Lead logged', detail: l.summary || null });
@@ -187,6 +220,8 @@
           ? '<span class="timeline-date font-mono">' + fmtDate(e.date) + '</span>'
           : '<span class="timeline-date timeline-date-unknown font-mono">DATE NOT LOGGED</span>') +
         (isNew ? '<span class="timeline-new-badge font-mono">NEW</span>' : '') +
+        (e.milestone ? '<span class="timeline-milestone-badge font-mono" title="First real check to reach this round-number count">' +
+          escapeHtml('MILESTONE: ' + e.milestone.join(', ')) + '</span>' : '') +
         '</div>' +
         '<div class="timeline-title">' + escapeHtml(e.title) + '</div>' +
         (e.detail ? '<div class="timeline-detail">' + escapeHtml(e.detail) + '</div>' : '') +
@@ -406,6 +441,16 @@
       }
     }
 
+    // How far the latest real count sits from the next round-number
+    // milestone (see DOWNLOAD_MILESTONES above), a lighter-weight forward
+    // reference than a goal that exists even with no real target set yet.
+    let milestoneHtml = '';
+    const nm = nextMilestone(latest.count);
+    if (nm !== null) {
+      const remaining = nm - latest.count;
+      milestoneHtml = '<div class="stat-milestone font-mono">' + remaining + ' more to reach ' + nm + '</div>';
+    }
+
     // Check-in cadence: a forward-looking companion to the freshness badge
     // below. Freshness only says how old the latest check is against a
     // fixed 4/7-day threshold; this instead projects a suggested next check
@@ -479,6 +524,7 @@
       '<div class="stat-label">' + escapeHtml(metric.label || 'downloads') + '</div>' +
       deltaHtml +
       rateHtml +
+      milestoneHtml +
       freshnessHtml +
       cadenceHtml +
       (metric.source ? '<div class="stat-source">' + escapeHtml(metric.source).toUpperCase() + '</div>' : '') +

@@ -166,6 +166,21 @@ header.page-head .sub {
   margin-left: 6px;
 }
 
+/* First real download check to cross a round-number milestone (see
+   DOWNLOAD_MILESTONES in app.js). Green like .goal-achieved, an actual
+   crossing already happened, this isn't a forward-looking cue like
+   .new-since-pill's blue. */
+.timeline-milestone-badge {
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(61,220,132,0.35);
+  background: rgba(61,220,132,0.12);
+  color: #3DDC84;
+  margin-left: 6px;
+}
+
 /* This device has no network path at all (navigator.onLine / online / offline,
    never inferred from a failed fetch), a different question from whether the
    fetch itself succeeded: the service worker can serve a cached /data/*.json
@@ -468,6 +483,12 @@ section { margin-bottom: 36px; }
   font-size: 0.7rem;
   color: var(--dim);
   margin-top: 4px;
+}
+.stat-milestone {
+  font-size: 0.68rem;
+  color: var(--accent);
+  margin-top: 6px;
+  letter-spacing: 0.02em;
 }
 .stat-source {
   font-family: 'JetBrains Mono', monospace;
@@ -1095,11 +1116,11 @@ footer.page-foot {
   .snapshot-chip-label { color: #333; }
   .snapshot-chip-meta { color: #555; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
-  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .last-updated, .last-updated-stale, .channel-note,
+  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .stat-milestone, .last-updated, .last-updated-stale, .channel-note,
   .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-projection, .goal-note, .goal-achieved { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
-  .release-badge, .timeline-badge,
+  .release-badge, .timeline-badge, .timeline-milestone-badge,
   .timeline-kind-release .timeline-badge, .timeline-kind-check .timeline-badge, .timeline-kind-lead .timeline-badge,
   .timeline-kind-goal .timeline-badge {
     border-color: #999; background: none; color: #111;
