@@ -122,15 +122,34 @@ function computeExpenseAmount(e) {
 // rate with no separate card-processing surcharge on top, so the old "13.25% +
 // 2.9% + $0.30" formula here was double-charging a processing fee that no
 // longer exists, and undercounting every eBay net payout on the page by it.
-function estimateNetPayout(platform, price) {
+function estimateNetPayout(platform, price, category) {
   if (price == null) return null;
   switch (platform) {
-    case 'ebay': return price - (price * 0.136 + (price > 10 ? 0.40 : 0.30));
+    // eBay's Clothing, Shoes & Accessories category charges shoes/boots a
+    // 14.9% final value fee, not the 13.6% standard rate most categories get
+    // (eBay's own published 2026 seller fee schedule). Both real live boots
+    // listings are logged with category:"shoes" in listings.json so this
+    // applies automatically wherever a real listing drives the math; a bare
+    // price with no category (the "price a new item" what-if calculators)
+    // defaults to the standard rate unless that category is opted in there.
+    case 'ebay': {
+      const feeRate = category === 'shoes' ? 0.149 : 0.136;
+      return price - (price * feeRate + (price > 10 ? 0.40 : 0.30));
+    }
     case 'vinted': return price;
     case 'poshmark': return price < 15 ? price - 2.95 : price * 0.80;
     case 'depop': return price - (price * 0.033 + 0.45);
     default: return null;
   }
+}
+
+// Looks up the eBay category of the listing a sale references, so a sold
+// item's realized-profit math uses the same fee rate its live listing was
+// tagged with. Undefined (not "shoes") if the listing can't be found, e.g.
+// it fully sold through everywhere and was removed from listings.json.
+function categoryForListingId(listingId) {
+  const l = listings.find(item => item.id === listingId);
+  return l ? l.category : undefined;
 }
 
 // Real response-clock math for the two platforms with a published fixed
@@ -380,7 +399,7 @@ function remainingPlatforms(l) {
 function bestCaseTotalPayout(live) {
   return live.reduce((sum, l) => {
     const nets = remainingPlatforms(l)
-      .map(p => estimateNetPayout(p, l.price))
+      .map(p => estimateNetPayout(p, l.price, l.category))
       .filter(n => n != null);
     if (nets.length) return sum + Math.max(...nets);
     return sum + (l.price || 0);
@@ -408,7 +427,7 @@ function renderStats(listings, stages, sales, expenses) {
   const realizedRevenue = sales.reduce((s, sale) => s + (sale.salePrice || 0), 0);
   const salesWithCost = sales.filter(sale => sale.costBasis != null || sale.shippingCost != null);
   const realizedProfit = salesWithCost.reduce((s, sale) => {
-    const net = estimateNetPayout(sale.platform, sale.salePrice);
+    const net = estimateNetPayout(sale.platform, sale.salePrice, categoryForListingId(sale.listingId));
     return s + ((net != null ? net : (sale.salePrice || 0)) - (sale.costBasis || 0) - (sale.shippingCost || 0));
   }, 0);
   const computedExpenses = expenses.map(e => computeExpenseAmount(e)).filter(a => a != null);
@@ -1147,7 +1166,7 @@ function applyFiltersAndRender() {
 // "best" to point to.
 function bestPayoutPlatform(l) {
   const candidates = remainingPlatforms(l)
-    .map(p => ({ p, net: estimateNetPayout(p, l.price) }))
+    .map(p => ({ p, net: estimateNetPayout(p, l.price, l.category) }))
     .filter(c => c.net != null);
   if (candidates.length < 2) return null;
   candidates.sort((a, b) => b.net - a.net);
@@ -1178,7 +1197,7 @@ function renderPayoutTable(listings) {
       ${PAYOUT_PLATFORMS.map(p => {
         if (!(l.platforms || []).includes(p)) return '<td class="cell-value empty">not listed</td>';
         if (soldSet.has(p)) return '<td class="cell-value empty" title="Already sold here, no longer sellable on this platform">sold here</td>';
-        const net = estimateNetPayout(p, l.price);
+        const net = estimateNetPayout(p, l.price, l.category);
         const isBest = p === best;
         return `<td class="cell-value${isBest ? ' cell-value-best' : ''}">${net != null ? formatUsd(net) : 'not set'}${isBest ? ' <span class="best-tag" title="Highest net payout for this item">best</span>' : ''}</td>`;
       }).join('')}
@@ -1212,6 +1231,7 @@ function initTableScrollShadows() {
 // payout table above, just driven by a typed price instead of listings.json.
 const CALC_FEE_DESCRIPTIONS = {
   ebay: '13.6% final value fee + $0.30 ($0.40 over $10) per-order fee',
+  ebayShoes: '14.9% final value fee (Clothing, Shoes & Accessories category) + $0.30 ($0.40 over $10) per-order fee',
   vinted: 'No seller fees',
   poshmark: 'Flat $2.95 under $15, otherwise 20% commission',
   depop: '3.3% + $0.45 payment processing, no commission'
@@ -1226,6 +1246,7 @@ const CALC_FEE_DESCRIPTIONS = {
 const DEPOP_BOOST_FEE_PCT = 0.12;
 let calcPlatforms = new Set(PAYOUT_PLATFORMS);
 let includeDepopBoost = false;
+let calcEbayShoesCategory = false;
 
 // Reads a positive-or-zero numeric input, treating blank as "not provided"
 // (null) rather than 0, since a real $0 cost and "haven't entered one yet"
@@ -1269,6 +1290,7 @@ function renderCalc() {
   const hasShipping = shipping != null && shipping !== undefined;
   const showProfit = hasCost || hasShipping;
   document.getElementById('calcDepopBoostWrap').hidden = !calcPlatforms.has('depop');
+  document.getElementById('calcShoesCategoryWrap').hidden = !calcPlatforms.has('ebay');
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;
@@ -1283,11 +1305,13 @@ function renderCalc() {
   profitHead.hidden = !showProfit;
 
   const applyBoost = includeDepopBoost && calcPlatforms.has('depop');
+  const applyShoes = calcEbayShoesCategory && calcPlatforms.has('ebay');
 
   const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => {
+    const category = p === 'ebay' && applyShoes ? 'shoes' : undefined;
     const net = p === 'depop' && applyBoost
       ? estimateNetPayout(p, price) - price * DEPOP_BOOST_FEE_PCT
-      : estimateNetPayout(p, price);
+      : estimateNetPayout(p, price, category);
     return { p, net };
   });
   const bestNet = rows.length > 1 ? Math.max(...rows.map(r => r.net)) : null;
@@ -1298,6 +1322,8 @@ function renderCalc() {
     const profit = showProfit ? r.net - (hasCost ? cost : 0) - (hasShipping ? shipping : 0) : null;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
+      : r.p === 'ebay' && applyShoes
+      ? CALC_FEE_DESCRIPTIONS.ebayShoes
       : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
@@ -1316,6 +1342,10 @@ function wireCalc() {
   document.getElementById('calcShippingInput').addEventListener('input', renderCalc);
   document.getElementById('calcDepopBoostInput').addEventListener('change', e => {
     includeDepopBoost = e.target.checked;
+    renderCalc();
+  });
+  document.getElementById('calcShoesCategoryInput').addEventListener('change', e => {
+    calcEbayShoesCategory = e.target.checked;
     renderCalc();
   });
   const container = document.getElementById('calcPlatformToggle');
@@ -1340,15 +1370,19 @@ function wireCalc() {
 // simple lookup once fees are a function of the unknown price.
 let beCalcPlatforms = new Set(PAYOUT_PLATFORMS);
 let beIncludeDepopBoost = false;
+let beEbayShoesCategory = false;
 
 // eBay's per-order fee is a step function of price ($0.30 at/under $10, else
 // $0.40), so solve assuming the higher step first; if that price doesn't
 // actually clear $10 the assumption was wrong, so re-solve with the lower
-// step instead.
-function ebayMinPriceForNet(targetNet) {
-  const highStep = (targetNet + 0.40) / (1 - 0.136);
+// step instead. category "shoes" uses the 14.9% Clothing, Shoes &
+// Accessories rate instead of the 13.6% standard rate, same distinction
+// estimateNetPayout() draws for real listings.
+function ebayMinPriceForNet(targetNet, category) {
+  const feeRate = category === 'shoes' ? 0.149 : 0.136;
+  const highStep = (targetNet + 0.40) / (1 - feeRate);
   if (highStep > 10) return highStep;
-  return (targetNet + 0.30) / (1 - 0.136);
+  return (targetNet + 0.30) / (1 - feeRate);
 }
 
 function depopMinPriceForNet(targetNet, applyBoost) {
@@ -1366,9 +1400,9 @@ function poshmarkMinPriceForNet(targetNet) {
   return targetNet / 0.80;
 }
 
-function minListingPriceForNet(platform, targetNet, applyBoost) {
+function minListingPriceForNet(platform, targetNet, applyBoost, category) {
   switch (platform) {
-    case 'ebay': return ebayMinPriceForNet(targetNet);
+    case 'ebay': return ebayMinPriceForNet(targetNet, category);
     case 'vinted': return targetNet;
     case 'poshmark': return poshmarkMinPriceForNet(targetNet);
     case 'depop': return depopMinPriceForNet(targetNet, applyBoost);
@@ -1402,6 +1436,7 @@ function renderBreakEven() {
   profitError.textContent = profitInvalid ? 'Enter a valid target profit of $0 or more, ignoring it for now.' : '';
 
   document.getElementById('beDepopBoostWrap').hidden = !beCalcPlatforms.has('depop');
+  document.getElementById('beShoesCategoryWrap').hidden = !beCalcPlatforms.has('ebay');
 
   const hasCost = cost != null && cost !== undefined && cost > 0;
   const hasAnyInput = hasCost || (shipping != null && shipping !== undefined && shipping > 0) ||
@@ -1420,9 +1455,10 @@ function renderBreakEven() {
 
   const targetNet = (cost || 0) + (shipping || 0) + (profit || 0);
   const applyBoost = beIncludeDepopBoost && beCalcPlatforms.has('depop');
+  const applyShoes = beEbayShoesCategory && beCalcPlatforms.has('ebay');
 
   const rows = PAYOUT_PLATFORMS.filter(p => beCalcPlatforms.has(p)).map(p => {
-    const minPrice = minListingPriceForNet(p, targetNet, applyBoost);
+    const minPrice = minListingPriceForNet(p, targetNet, applyBoost, p === 'ebay' && applyShoes ? 'shoes' : undefined);
     return { p, minPrice };
   });
   const lowest = rows.length > 1 ? Math.min(...rows.map(r => r.minPrice)) : null;
@@ -1432,6 +1468,8 @@ function renderBreakEven() {
     const isBest = lowest != null && !tiedForLowest && r.minPrice === lowest;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
+      : r.p === 'ebay' && applyShoes
+      ? CALC_FEE_DESCRIPTIONS.ebayShoes
       : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
@@ -1449,6 +1487,10 @@ function wireBreakEven() {
   document.getElementById('beProfitInput').addEventListener('input', renderBreakEven);
   document.getElementById('beDepopBoostInput').addEventListener('change', e => {
     beIncludeDepopBoost = e.target.checked;
+    renderBreakEven();
+  });
+  document.getElementById('beShoesCategoryInput').addEventListener('change', e => {
+    beEbayShoesCategory = e.target.checked;
     renderBreakEven();
   });
   const container = document.getElementById('bePlatformToggle');
@@ -1712,7 +1754,7 @@ function renderOfferGuide() {
 
   if (l && l.costBasis != null) {
     const checkAmount = counterAmount != null ? counterAmount : offer;
-    const net = estimateNetPayout(offerPlatform, checkAmount);
+    const net = estimateNetPayout(offerPlatform, checkAmount, l.category);
     if (net != null) {
       const margin = net - l.costBasis;
       const label = (counterAmount != null ? 'Counter' : 'Offer') + ' vs. cost basis';
@@ -1878,7 +1920,7 @@ function renderSales(sales) {
   });
 
   tbody.innerHTML = sorted.map(s => {
-    const net = estimateNetPayout(s.platform, s.salePrice);
+    const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
     const hasEither = s.costBasis != null || s.shippingCost != null;
     const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
     const askingPct = computeAskingPct(s);
@@ -2644,7 +2686,7 @@ function openModal(id) {
         if (modalSoldSet.has(p)) {
           return `<tr><td>${label} (sold)</td><td class="cell-value empty" title="Already sold here, no longer sellable on this platform">sold here</td>${hasCostBasis ? '<td class="cell-value empty">not applicable</td>' : ''}</tr>`;
         }
-        const net = estimateNetPayout(p, l.price);
+        const net = estimateNetPayout(p, l.price, l.category);
         const isBest = p === modalBest;
         const profit = net != null && hasCostBasis ? net - l.costBasis : null;
         // net is null whenever the asking price itself isn't set yet (see
@@ -2837,7 +2879,7 @@ const SALES_CSV_COLUMNS = [
 // this exports the full real sales.json.
 document.getElementById('salesCsvBtn').addEventListener('click', () => {
   const rows = salesLog.map(s => {
-    const net = estimateNetPayout(s.platform, s.salePrice);
+    const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
     const hasEither = s.costBasis != null || s.shippingCost != null;
     const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
     return {
@@ -3139,6 +3181,7 @@ function wireQuickLogTool() {
     const title = document.getElementById('nlTitle').value.trim();
     const price = readOptionalNonNegativeInput(document.getElementById('nlPrice'));
     const costBasis = readOptionalNonNegativeInput(document.getElementById('nlCostBasis'));
+    const category = document.getElementById('nlCategory').value || null;
     const platforms = Array.from(document.querySelectorAll('.nl-platform:checked')).map(el => el.value);
     const status = document.getElementById('nlStatus').value;
     const datePublished = document.getElementById('nlDatePublished').value || null;
@@ -3182,6 +3225,7 @@ function wireQuickLogTool() {
       title,
       price: price === undefined ? null : price,
       costBasis: costBasis === undefined ? null : costBasis,
+      category,
       platforms,
       soldOn: [],
       listingUrls: platforms.reduce((o, p) => { o[p] = null; return o; }, {}),

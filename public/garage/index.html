@@ -55,6 +55,7 @@
           <tr><th>title</th><td>Item name as it appears in the listing</td></tr>
           <tr><th>price</th><td>USD asking price, a number or <code>null</code></td></tr>
           <tr><th>costBasis</th><td>USD cost of actually acquiring this item (what it was paid for), a non-negative number or <code>null</code>. Drives real profit figures separate from the fee-only payout estimates below, leave <code>null</code> until you have the real number, never guess it.</td></tr>
+          <tr><th>category</th><td>Optional eBay category classifier, either <code>"shoes"</code> or omitted/<code>null</code> for the standard rate. eBay charges the Clothing, Shoes &amp; Accessories category a 14.9% final value fee instead of the 13.6% standard rate, so every payout/break-even/profit estimate on this page uses the right rate automatically once this is set. Only affects eBay's fee math, doesn't change anything on the other three platforms.</td></tr>
           <tr><th>platforms</th><td>Array of any of: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, <code>depop</code></td></tr>
           <tr><th>soldOn</th><td>Array, subset of <code>platforms</code>, marking which of them the item has actually sold on so it can be manually delisted from the rest. Leave <code>[]</code> until a real sale happens on one platform while the item is still live on others.</td></tr>
           <tr><th>listingUrls</th><td>Optional object keyed by platform (each key a subset of <code>platforms</code>), value the real live listing URL as a string once it's been copied over, or <code>null</code> until logged. Powers a direct "View listing" link per platform in the item detail view, never invent a URL, leave it <code>null</code> rather than guess.</td></tr>
@@ -88,6 +89,7 @@
   "title": null,
   "price": null,
   "costBasis": null,
+  "category": null,
   "platforms": [],
   "soldOn": [],
   "listingUrls": {},
@@ -126,6 +128,11 @@
           <input class="quick-log-input" type="number" id="nlPrice" min="0" step="0.01">
           <label class="quick-log-label" for="nlCostBasis">Cost basis, USD (optional)</label>
           <input class="quick-log-input" type="number" id="nlCostBasis" min="0" step="0.01">
+          <label class="quick-log-label" for="nlCategory">eBay category (affects fee estimate)</label>
+          <select class="quick-log-input" id="nlCategory">
+            <option value="">Standard (13.6% eBay final value fee)</option>
+            <option value="shoes">Shoes / boots (14.9% eBay final value fee)</option>
+          </select>
           <label class="quick-log-label" id="nlPlatformsLabel">Platforms (at least one)</label>
           <div class="quick-log-checkbox-row" role="group" aria-labelledby="nlPlatformsLabel">
             <label class="quick-log-checkbox"><input type="checkbox" class="nl-platform" value="ebay"> eBay</label>
@@ -857,7 +864,7 @@
       <div class="schema-help-body">
         <table class="schema-table">
           <tbody>
-            <tr><th>eBay</th><td>13.6% final value fee (standard rate, most categories) + $0.30 per-order fee, $0.40 on orders over $10</td></tr>
+            <tr><th>eBay</th><td>13.6% final value fee (standard rate, most categories), or 14.9% for the Clothing, Shoes &amp; Accessories category, applied automatically below wherever a listing's logged <code>category</code> is <code>"shoes"</code>, + $0.30 per-order fee, $0.40 on orders over $10</td></tr>
             <tr><th>Vinted</th><td>No seller fees, buyer pays a separate buyer protection fee</td></tr>
             <tr><th>Poshmark</th><td>Flat $2.95 on sales under $15, otherwise 20% commission</td></tr>
             <tr><th>Depop</th><td>3.3% + $0.45 Depop Payments processing fee, no seller commission (US/UK). An optional 12% Boosted Listings fee applies only if you choose to boost that specific listing and it sells through the boost (eligible new listings, since Mar 23, 2026), not included in this table, see the calculator below to model it.</td></tr>
@@ -950,6 +957,10 @@
       <input type="checkbox" id="calcDepopBoostInput">
       Include Depop's optional 12% Boosted Listings fee (opt-in per item, eligible new listings since Mar 2026)
     </label>
+    <label class="quick-log-checkbox calc-boost-toggle" id="calcShoesCategoryWrap" hidden>
+      <input type="checkbox" id="calcShoesCategoryInput">
+      This is a shoes/boots listing (eBay's Clothing, Shoes &amp; Accessories category charges 14.9%, not the standard 13.6%)
+    </label>
     <div class="table-wrap" aria-live="polite" aria-atomic="true">
       <table class="card-table" id="calcTable">
         <thead>
@@ -1030,6 +1041,10 @@
     <label class="quick-log-checkbox calc-boost-toggle" id="beDepopBoostWrap" hidden>
       <input type="checkbox" id="beDepopBoostInput">
       Include Depop's optional 12% Boosted Listings fee (opt-in per item, eligible new listings since Mar 2026)
+    </label>
+    <label class="quick-log-checkbox calc-boost-toggle" id="beShoesCategoryWrap" hidden>
+      <input type="checkbox" id="beShoesCategoryInput">
+      This is a shoes/boots listing (eBay's Clothing, Shoes &amp; Accessories category charges 14.9%, not the standard 13.6%)
     </label>
     <div class="table-wrap" aria-live="polite" aria-atomic="true">
       <table class="card-table" id="beTable">
