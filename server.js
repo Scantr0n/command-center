@@ -88,12 +88,26 @@ app.get('/api/clusters', async (req, res) => {
   }
 });
 
-app.post('/api/toggles/:toggleId', (req, res) => {
+app.post('/api/toggles/:toggleId', async (req, res) => {
   try {
     const { toggleId } = req.params;
     const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+    // Without this check, a stray or malformed request (a stale client, a
+    // typo'd id typed by hand) would silently create and persist a brand
+    // new key in toggles.json forever, with nothing on the dashboard ever
+    // reading it back. Checked against the same real cluster data
+    // /api/clusters itself serves, so a toggle only ever exists for a
+    // cluster that actually declares toggleable/toggleId.
+    const { clusters } = await readClusters();
+    const knownToggleIds = new Set(clusters.filter(c => c.toggleable && c.toggleId).map(c => c.toggleId));
+    if (!knownToggleIds.has(toggleId)) {
+      return res.status(404).json({ error: `Unknown toggleId: ${toggleId}` });
+    }
     const toggles = readToggles();
-    toggles[toggleId] = !!enabled;
+    toggles[toggleId] = enabled;
     writeToggles(toggles);
     res.json({ toggleId, enabled: toggles[toggleId] });
   } catch (err) {
