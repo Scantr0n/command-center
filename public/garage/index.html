@@ -1682,11 +1682,22 @@
     </ul>
     <button type="button" id="resetChecklistBtn" class="print-btn font-mono">Reset checklist</button>
   </section>
+
+  <section>
+    <h2 class="section-title">Data changelog</h2>
+    <div class="callout">Real git commit history of <code>listings.json</code>, <code>pipeline.json</code>,
+      <code>activity.json</code>, <code>sales.json</code>, <code>expenses.json</code>, and <code>disputes.json</code>,
+      not a hand-typed claim: each row below is an actual commit hash, author, and date from this repo, so a new
+      sale or a pipeline count can be checked against real history instead of trusted on its face. Regenerate after
+      new commits with <code>node public/garage/data/changelog.js</code>.</div>
+    <div id="changelogFeed" class="changelog-feed"><p class="changelog-empty">Loading...</p></div>
+  </section>
   </main>
 
   <footer class="page-foot font-mono">
     Data source: <code>/garage/data/listings.json</code>, <code>pipeline.json</code>, <code>activity.json</code>,
-    <code>sales.json</code>, and <code>expenses.json</code>, edited by hand until a real backend is wired in.
+    <code>sales.json</code>, and <code>expenses.json</code>, edited by hand until a real backend is wired in. Run
+    <code>node public/garage/data/changelog.js</code> after any edit to refresh the data changelog from git.
     <span id="dataFreshness"></span>
   </footer>
 </div>

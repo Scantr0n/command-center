@@ -237,6 +237,52 @@ function renderDataFreshness(lastModifiedDates) {
   el.classList.toggle('data-freshness-stale', daysAgo > 14);
 }
 
+// changelog.json is generated (see public/garage/data/changelog.js), not
+// hand-edited, from this repo's real git history over the six data files
+// above. A fresh clone before anyone has run that script is a real,
+// expected state (an honest empty state), not a load failure, so it never
+// blocks or fails the rest of loadData. Same pattern as CSM's, Sondrik's,
+// and CGT's own loadChangelog.
+async function loadChangelog() {
+  try {
+    const res = await fetch('/garage/data/changelog.json');
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    renderChangelog(await res.json());
+  } catch (e) {
+    renderChangelog({ entries: [] });
+    console.error("Couldn't load changelog.json: " + e.message);
+  }
+}
+
+function renderChangelog(data) {
+  const el = document.getElementById('changelogFeed');
+  const entries = (data && data.entries) || [];
+  if (entries.length === 0) {
+    el.innerHTML = '<p class="changelog-empty">No changelog generated yet. Run ' +
+      '<code>node public/garage/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
+    return;
+  }
+  const rowsHtml = entries.map(e => {
+    const files = (e.files || []).join(', ');
+    return '<div class="changelog-row">' +
+      '<span class="changelog-date font-mono">' + escapeHtml(e.date) + '</span>' +
+      '<span class="changelog-hash" title="' + escapeHtml(e.fullHash || e.hash) + '">' + escapeHtml(e.hash) + '</span>' +
+      '<span class="changelog-author">' + escapeHtml(e.author) + '</span>' +
+      '<span class="changelog-subject">' + escapeHtml(e.subject) + '</span>' +
+      (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
+      '</div>';
+  }).join('');
+  el.innerHTML = rowsHtml;
+  let noteEl = el.nextElementSibling;
+  if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
+    noteEl = document.createElement('p');
+    noteEl.className = 'changelog-generated-note';
+    el.after(noteEl);
+  }
+  noteEl.textContent = 'Generated ' + (data.generatedAt || 'at an unknown time').slice(0, 10) +
+    ' from ' + (data.generatedFrom || 'git log') + '.';
+}
+
 // Each of the three files is a hand-edited record that can be typo'd at any
 // time (see the sibling validate.js scripts). A single Promise.all would fail
 // every section over one bad file, e.g. a typo in activity.json alone would
@@ -245,6 +291,7 @@ function renderDataFreshness(lastModifiedDates) {
 // the same fix Sondrik's loadData already applies for the same reason.
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
+  loadChangelog();
   const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),

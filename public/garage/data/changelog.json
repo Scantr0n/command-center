@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-09-18T16:39:25.348Z",
+  "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json}, run node public/garage/data/changelog.js to refresh",
+  "entries": [
+    {
+      "hash": "fb89c3e",
+      "fullHash": "fb89c3e11e2ca68ef4e67b6eb223a66fcd76d75f",
+      "date": "2026-09-18",
+      "author": "Claude",
+      "subject": "Garage: fix eBay fee math undercharging the shoes category rate",
+      "files": [
+        "listings.json"
+      ]
+    },
+    {
+      "hash": "9333b54",
+      "fullHash": "9333b5409bfebc411196b6d7d5235ae8774a15e0",
+      "date": "2026-09-17",
+      "author": "Claude",
+      "subject": "CGT: add hover tooltip for truncated Value breakdown labels",
+      "files": [
+        "activity.json",
+        "disputes.json",
+        "expenses.json",
+        "listings.json",
+        "pipeline.json",
+        "sales.json"
+      ]
+    }
+  ]
+}

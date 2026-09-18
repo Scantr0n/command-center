@@ -787,6 +787,59 @@ table.card-table {
   margin-top: 8px;
 }
 
+/* Data changelog: real git commit history of the hand-edited data files,
+   same compact row shape CSM's, Sondrik's, and CGT's own .changelog-*
+   rules already use, distinct from the card-style activity log above since
+   a commit hash is a different kind of fact than a logged quality fix. */
+.changelog-feed {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 32px;
+  background: var(--panel);
+}
+.changelog-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.changelog-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.82rem;
+}
+.changelog-row:first-child { border-top: none; }
+.changelog-date {
+  color: var(--dim);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  width: 82px;
+}
+.changelog-hash {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  color: var(--sub);
+  flex-shrink: 0;
+}
+.changelog-author { flex-shrink: 0; color: var(--sub); }
+.changelog-subject { color: var(--ink); }
+.changelog-files { color: var(--dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+.changelog-generated-note {
+  font-size: 0.78rem;
+  color: var(--dim);
+  margin: 4px 0 36px;
+  max-width: 72ch;
+}
+
 /* Buyer message templates */
 .template-grid {
   display: grid;
@@ -1194,6 +1247,13 @@ textarea.np-input { resize: vertical; }
   .stat-tile-value, .stat-tile-label, .stat-tile-sub,
   .pipeline-stage-name, .pipeline-stage-count, .pipeline-stage-note,
   .activity-item-title, .activity-item-detail, .activity-item-meta { color: #111 !important; }
+
+  .changelog-feed { background: none; border-color: #bbb; }
+  .changelog-row { border-color: #ddd; }
+  .changelog-date, .changelog-author, .changelog-files { color: #444; }
+  .changelog-subject { color: #111; }
+  .changelog-hash { border-color: #999; background: none !important; color: #111 !important; }
+  .changelog-generated-note { color: #555; }
 
   .table-wrap { background: none; border: 1px solid #ccc; }
   .table-wrap::before, .table-wrap::after { display: none !important; }
