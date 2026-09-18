@@ -378,9 +378,25 @@ function loadClientConnHistory() {
   }
 }
 
+// This page can be open in more than one tab at once, each polling on its
+// own independent 30s timer. Without a guard, two tabs checking within a
+// few seconds of each other would each append their own entry for what a
+// human would call the same real check, quietly halving (or worse, with
+// more tabs) how much real wall-clock time CLIENT_CONN_HISTORY_CAP actually
+// covers. A state that genuinely changed is still always recorded, since a
+// flap is meaningful regardless of how close together it's observed; only
+// a repeat of the same state within this window is treated as the same
+// observation rather than a second one.
+const MIN_CONN_RECORD_GAP_MS = 10000;
+
 function recordClientConnCheck(connected) {
   const history = loadClientConnHistory();
-  history.push({ at: new Date().toISOString(), connected: !!connected });
+  const connectedBool = !!connected;
+  const last = history[history.length - 1];
+  if (last && last.connected === connectedBool && (Date.now() - new Date(last.at).getTime()) < MIN_CONN_RECORD_GAP_MS) {
+    return history;
+  }
+  history.push({ at: new Date().toISOString(), connected: connectedBool });
   const trimmed = history.slice(-CLIENT_CONN_HISTORY_CAP);
   try {
     localStorage.setItem(CLIENT_CONN_HISTORY_KEY, JSON.stringify(trimmed));
@@ -1511,6 +1527,12 @@ let latestStatusRequestId = 0;
 let lastStatusData = null;
 let lastStatusIsLastKnown = false;
 
+// Kept separately from lastStatusData (which merges in the last-known cache)
+// so the cross-tab storage handler below can re-render the connection
+// sections, which always read the real un-merged response, without a second
+// fetch when a sibling tab is the one that changed the shared history.
+let lastRawData = null;
+
 // Kept purely so the "Export CSV" button under Positions can build its file
 // from the same real rows already on screen, never a second fetch. Always
 // the real, unmodified `data.live.positions` (never the last-known cache
@@ -1531,6 +1553,7 @@ async function loadStatus() {
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const data = await res.json();
     if (requestId !== latestStatusRequestId) return;
+    lastRawData = data;
     // Real, measured round trip for this browser's own request, timed around
     // the actual fetch above; see the CLIENT_LATENCY_HISTORY_KEY comment for
     // why this is a page-to-Command-Center reading, not Alpha's own latency.
@@ -1602,6 +1625,30 @@ async function loadStatus() {
     updateGlanceIndicators('error');
   }
 }
+
+// This page's connectivity/latency/regime histories are captioned "recorded
+// by this browser only", but without this listener that claim is only true
+// per tab: two tabs of this page each read and write the same localStorage
+// keys on their own independent poll timers, so each would only see its
+// sibling's checks at its own next 30s tick, and briefly disagree about
+// uptime, incidents, and sample counts in the meantime. The storage event
+// fires on every tab except the one that made the write, so listening for it
+// here re-renders the affected sections from the freshly written data right
+// away, keeping every open tab of this page in agreement without a second
+// network fetch. Ignores writes this same tab made (the browser never fires
+// this event for those) and anything outside this page's own known keys.
+window.addEventListener('storage', (e) => {
+  if (!lastRawData || !e.key) return;
+  if (![CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY].includes(e.key)) return;
+  const connHistory = loadClientConnHistory();
+  const latencyHistory = loadClientLatencyHistory();
+  const regimeHistory = loadClientRegimeHistory();
+  renderConnection(lastRawData, connHistory, latencyHistory);
+  renderConnectionHistory(lastRawData, connHistory);
+  renderIncidents(lastRawData, connHistory);
+  renderRegimeHistory(regimeHistory);
+  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length);
+});
 
 // Status-page UX guidance is consistent that a manual refresh action should
 // show its own loading state, distinct from the data-freshness indicators
