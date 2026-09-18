@@ -356,6 +356,18 @@ header.page-head .sub {
   margin-left: 8px;
 }
 
+/* Same "h2 + Export CSV" toolbar row as the other hubs' own .section-toolbar,
+   for a section whose h2 needs an action button inline instead of standing
+   alone. */
+.section-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.section-toolbar .section-title { margin: 0; }
+
 /* Connection strip */
 .conn-strip {
   display: flex;

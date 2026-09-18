@@ -981,6 +981,13 @@ function renderAccount(data) {
 function renderPositions(data) {
   const panel = document.getElementById('positionsPanel');
   const positions = (data.live && Array.isArray(data.live.positions)) ? data.live.positions : [];
+  lastPositionsSnapshot = positions;
+
+  const csvBtn = document.getElementById('positionsCsvBtn');
+  if (csvBtn) {
+    csvBtn.disabled = !positions.length;
+    csvBtn.title = positions.length ? '' : 'No live positions to export yet.';
+  }
 
   if (!positions.length) {
     panel.innerHTML = `
@@ -1488,6 +1495,13 @@ let latestStatusRequestId = 0;
 let lastStatusData = null;
 let lastStatusIsLastKnown = false;
 
+// Kept purely so the "Export CSV" button under Positions can build its file
+// from the same real rows already on screen, never a second fetch. Always
+// the real, unmodified `data.live.positions` (never the last-known cache
+// account/positions never use), so an export can't silently carry a frozen
+// reading forward.
+let lastPositionsSnapshot = [];
+
 async function loadStatus() {
   const requestId = ++latestStatusRequestId;
   try {
@@ -1695,6 +1709,46 @@ backupBtn.addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'alpha-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+function csvField(v) {
+  let s = v == null ? '' : String(v);
+  // CSV/formula injection (OWASP): a value starting with =, +, -, @, tab, or
+  // a carriage return is read as a live formula by Excel/Sheets when this
+  // export is opened there, not as plain text. Same leading-quote mitigation
+  // as the other hubs' own CSV exports, even though every field here comes
+  // from Alpha's own real feed rather than free-text entry, since a symbol
+  // or side string is still attacker-shaped input from this page's own
+  // point of view.
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+const POSITIONS_CSV_COLUMNS = [
+  ['symbol', 'Symbol'], ['side', 'Side'], ['qty', 'Qty'], ['avgEntryPrice', 'Avg entry'],
+  ['currentPrice', 'Current'], ['marketValue', 'Mkt value'], ['unrealizedPl', 'Unrealized P&L'],
+  ['unrealizedPlPct', 'Unrealized P&L %']
+];
+
+// Exports exactly the real open positions currently on screen, read straight
+// from lastPositionsSnapshot (the same array renderPositions just rendered),
+// never a second fetch or a reconstructed copy. Read-only like every other
+// button on this page: it only ever downloads a file to this browser, never
+// writes anything back to Alpha.
+document.getElementById('positionsCsvBtn').addEventListener('click', () => {
+  if (!lastPositionsSnapshot.length) return;
+  const header = POSITIONS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = lastPositionsSnapshot.map(p => POSITIONS_CSV_COLUMNS.map(([key]) => csvField(p[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-positions-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
