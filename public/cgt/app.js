@@ -2080,7 +2080,12 @@ function unlockBodyScroll() {
   document.body.style.paddingRight = '';
 }
 
-function ceInputInner(id, label, value, type) {
+// step defaults to "0.01" for a number field (USD amounts, the common
+// case), but a whole-number field like Year or Card count needs step="1"
+// passed explicitly -- otherwise the browser's spinner arrows nudge a year
+// like 1982 to 1982.01, and nothing downstream rejects the fractional value
+// since it's a real editable number, not free text.
+function ceInputInner(id, label, value, type, step) {
   type = type || 'text';
   const v = value == null ? '' : escapeHtml(String(value));
   if (type === 'textarea') {
@@ -2089,7 +2094,7 @@ function ceInputInner(id, label, value, type) {
   }
   return '<div><label for="' + id + '">' + escapeHtml(label) + '</label>' +
     '<input type="' + type + '" id="' + id + '" class="np-input" value="' + v + '"' +
-    (type === 'number' ? ' min="0" step="0.01"' : '') + '></div>';
+    (type === 'number' ? ' min="0" step="' + (step || '0.01') + '"' : '') + '></div>';
 }
 
 function ceFieldRow(id, label, value, type) {
@@ -2122,7 +2127,7 @@ function cardEditFormHtml(c) {
     '<div class="np-form">' +
     ceFieldRow('ceCardName', 'Card name', c.cardName) +
     '<div class="form-row-split">' +
-    ceInputInner('ceYear', 'Year', c.year, 'number') +
+    ceInputInner('ceYear', 'Year', c.year, 'number', '1') +
     ceSelectRow('ceSport', 'Sport', c.sport, [['', 'Select one...'], ['hockey', 'Hockey'], ['baseball', 'Baseball'], ['football', 'Football']]) +
     '</div>' +
     '<div class="form-row-split">' +
@@ -2178,7 +2183,7 @@ function candidateEditFormHtml(c) {
     '<div class="np-form">' +
     ceFieldRow('cceCardName', 'Card name', c.cardName) +
     '<div class="form-row-split">' +
-    ceInputInner('cceYear', 'Year', c.year, 'number') +
+    ceInputInner('cceYear', 'Year', c.year, 'number', '1') +
     ceSelectRow('cceSport', 'Sport', c.sport, [['', 'Select one...'], ['hockey', 'Hockey'], ['baseball', 'Baseball'], ['football', 'Football']]) +
     '</div>' +
     '<div class="form-row-split">' +
@@ -2324,7 +2329,7 @@ function submissionEditFormHtml(s) {
     ceInputInner('sceServiceLevel', 'Service level', s.serviceLevel) +
     '</div>' +
     '<div class="form-row-split">' +
-    ceInputInner('sceCardCount', 'Card count', s.cardCount, 'number') +
+    ceInputInner('sceCardCount', 'Card count', s.cardCount, 'number', '1') +
     ceInputInner('sceCost', 'Cost (grading fee), USD', s.cost, 'number') +
     '</div>' +
     '<div class="form-row-split">' +
