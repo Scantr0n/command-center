@@ -633,7 +633,13 @@ section { margin-bottom: 36px; }
   display: flex;
   align-items: flex-end;
   gap: 18px;
-  height: 90px;
+  /* No fixed height: the count label above each bar plus the 70px bar plus
+     the date below add up to more than a flat 90px would allow. Sizing to
+     content instead of a guessed height avoids fighting a CSS overflow
+     quirk on the .chart-scroll ancestor below: setting overflow-x without
+     an explicit overflow-y makes the browser compute overflow-y as "auto"
+     too (never "visible"), so a too-short fixed height here would silently
+     clip the count labels off the top instead of just scrolling sideways. */
   width: fit-content;
 }
 .compare-bar-col {
