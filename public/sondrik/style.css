@@ -329,6 +329,16 @@ header.page-head .sub {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--ink);
+  /* A path like public/sondrik/data/validate.js has no default break point
+     browsers will use; without this it forces the page itself wider than
+     the viewport on a phone instead of wrapping. */
+  overflow-wrap: anywhere;
+}
+/* Safety net, not the primary fix: if a future edit adds a schema key long
+   enough to widen the table beyond its container even in the stacked
+   layout below, this scrolls just the table instead of the whole page. */
+.schema-table-wrap {
+  overflow-x: auto;
 }
 .schema-table {
   width: 100%;
@@ -348,6 +358,35 @@ header.page-head .sub {
   white-space: nowrap;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem;
+}
+
+/* Below ~480px (phone width) this table's two real columns don't fit side
+   by side without either squeezing the description into a sliver or
+   forcing horizontal scroll on every single row. Real responsive-table
+   practice for this case is to stack each row into label-then-value
+   blocks instead, so this converts the whole table to block layout at
+   that width: each <tr> becomes its own record. Same convention already
+   used on the Alpha hub's schema table. */
+@media (max-width: 480px) {
+  .schema-table, .schema-table tbody, .schema-table tr, .schema-table th, .schema-table td {
+    display: block;
+    width: auto;
+  }
+  .schema-table tr {
+    border-top: 1px solid var(--hairline);
+    padding: 10px 0;
+  }
+  .schema-table tr:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+  .schema-table th, .schema-table td {
+    border-top: none;
+    padding: 0;
+  }
+  .schema-table th {
+    margin-bottom: 4px;
+  }
 }
 
 /* Quick-log tool: generates a paste-ready JSON object from a small form,
@@ -468,6 +507,11 @@ header.page-head .sub {
   color: var(--dim);
   margin: -8px 0 14px;
   max-width: 72ch;
+  /* The changelog note quotes changelog.json's own generatedFrom string,
+     a single unbroken path-list ("data/{releases.json,downloads.json,...}")
+     with no natural break point, which forced the whole page wider than
+     the viewport on a phone before this was added. */
+  overflow-wrap: anywhere;
 }
 
 section { margin-bottom: 36px; }
