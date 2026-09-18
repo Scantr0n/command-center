@@ -137,6 +137,12 @@
         yourself. This never writes a file or sends anything, it only puts text on your clipboard. For more than
         one card at a time, use <a href="/cgt/import.html">Import CSV</a> instead.</p>
 
+      <div id="ncDraftBanner" class="quick-log-draft-banner" hidden>
+        <span>Restored an unsaved draft from <span id="ncDraftBannerTime"></span>, this form is autosaved to this
+          browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+        <button type="button" id="ncDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+      </div>
+
       <div class="quick-log-grid">
         <form class="quick-log-form" id="quickCardForm">
           <h3 class="quick-log-title font-mono">New card &rarr; cards.json</h3>
@@ -254,6 +260,12 @@
         returned batch with no returnedDate), then builds the JSON object to paste into the
         <code>submissions</code> array yourself. This never writes a file or sends anything, it only puts text on
         your clipboard.</p>
+
+      <div id="nsDraftBanner" class="quick-log-draft-banner" hidden>
+        <span>Restored an unsaved draft from <span id="nsDraftBannerTime"></span>, this form is autosaved to this
+          browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+        <button type="button" id="nsDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+      </div>
 
       <div class="quick-log-grid">
         <form class="quick-log-form" id="quickSubmissionForm">
@@ -382,6 +394,12 @@
         labeled basis, a comp-estimate with no note explaining what it is based on), then builds the JSON object
         to paste into the <code>candidates</code> array yourself. This never writes a file or sends anything, it
         only puts text on your clipboard.</p>
+
+      <div id="ncaDraftBanner" class="quick-log-draft-banner" hidden>
+        <span>Restored an unsaved draft from <span id="ncaDraftBannerTime"></span>, this form is autosaved to this
+          browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+        <button type="button" id="ncaDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+      </div>
 
       <div class="quick-log-grid">
         <form class="quick-log-form" id="quickCandidateForm">

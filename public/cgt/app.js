@@ -2793,6 +2793,70 @@ document.getElementById('submissionsCsvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// Shared client-side draft-autosave for the three quick-log forms below:
+// none of them write to a real file, this app has no backend to save a
+// half-filled form to, so an accidental reload or navigation away used to
+// throw away real typed data with no way back. Same pattern CSM's own
+// new-prospect form already uses (public/csm/app.js), generalized to read
+// whatever real input/select/textarea fields the given form actually has
+// instead of a hand-maintained id list per form, since these three forms
+// have 11 to 19 fields each that would otherwise need to be kept in sync by
+// hand as fields are added. Autosaved to this browser's localStorage only,
+// never sent anywhere, so it does not conflict with this page's
+// no-fabricated-data rule; a private window or blocked storage just means
+// the draft protection quietly no-ops.
+function attachDraftGuard(form, storageKey, banner) {
+  const bannerEl = document.getElementById(banner.bannerId);
+  const bannerTimeEl = document.getElementById(banner.timeId);
+  const discardBtn = document.getElementById(banner.discardId);
+  if (!bannerEl || !bannerTimeEl || !discardBtn) return { clearDraft() {} };
+
+  const fields = Array.from(form.querySelectorAll('input[id], select[id], textarea[id]'));
+  let saveTimer = null;
+
+  function readValues() {
+    const values = {};
+    fields.forEach(el => { values[el.id] = el.value; });
+    return values;
+  }
+  function hasAnyValue(values) {
+    return fields.some(el => (values[el.id] || '').trim() !== '');
+  }
+  function clearDraft() {
+    try { localStorage.removeItem(storageKey); } catch (e) { /* see saveDraft below */ }
+    bannerEl.hidden = true;
+  }
+  function saveDraft() {
+    try {
+      const values = readValues();
+      if (!hasAnyValue(values)) { clearDraft(); return; }
+      localStorage.setItem(storageKey, JSON.stringify({ savedAt: Date.now(), values }));
+    } catch (e) { /* localStorage unavailable (private window, blocked storage): draft protection just no-ops */ }
+  }
+
+  form.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 400);
+  });
+  discardBtn.addEventListener('click', () => {
+    clearDraft();
+    form.reset();
+    if (banner.onDiscard) banner.onDiscard();
+  });
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const draft = raw ? JSON.parse(raw) : null;
+    if (draft && hasAnyValue(draft.values || {})) {
+      fields.forEach(el => { if (el.id in draft.values) el.value = draft.values[el.id]; });
+      bannerTimeEl.textContent = new Date(draft.savedAt).toLocaleString();
+      bannerEl.hidden = false;
+    }
+  } catch (e) { /* see saveDraft above */ }
+
+  return { clearDraft };
+}
+
 // Quick-log tool: builds one candidate card from the form and runs it
 // through CGTValidateCore.validateCards, the exact same rules the CLI
 // validator and the CSV importer already use (see validate-core.js's own
@@ -2807,6 +2871,10 @@ function initQuickLogTool() {
   const output = document.getElementById('ncOutput');
   const copyBtn = document.getElementById('ncCopyBtn');
   const live = document.getElementById('quickLogLive');
+  const draftGuard = attachDraftGuard(form, 'cgt-nc-draft-v1', {
+    bannerId: 'ncDraftBanner', timeId: 'ncDraftBannerTime', discardId: 'ncDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -2878,6 +2946,7 @@ function initQuickLogTool() {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
       live.textContent = 'Card JSON copied to clipboard.';
+      draftGuard.clearDraft();
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
   });
@@ -2895,6 +2964,10 @@ function initSubmissionQuickLogTool() {
   const output = document.getElementById('nsOutput');
   const copyBtn = document.getElementById('nsCopyBtn');
   const live = document.getElementById('nsLive');
+  const draftGuard = attachDraftGuard(form, 'cgt-ns-draft-v1', {
+    bannerId: 'nsDraftBanner', timeId: 'nsDraftBannerTime', discardId: 'nsDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -2946,6 +3019,7 @@ function initSubmissionQuickLogTool() {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
       live.textContent = 'Submission JSON copied to clipboard.';
+      draftGuard.clearDraft();
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
   });
@@ -2960,6 +3034,10 @@ function initCandidateQuickLogTool() {
   const output = document.getElementById('ncaOutput');
   const copyBtn = document.getElementById('ncaCopyBtn');
   const live = document.getElementById('ncaLive');
+  const draftGuard = attachDraftGuard(form, 'cgt-nca-draft-v1', {
+    bannerId: 'ncaDraftBanner', timeId: 'ncaDraftBannerTime', discardId: 'ncaDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -3022,6 +3100,7 @@ function initCandidateQuickLogTool() {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
       live.textContent = 'Candidate JSON copied to clipboard.';
+      draftGuard.clearDraft();
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
   });

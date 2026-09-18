@@ -1031,6 +1031,27 @@ code.inline-code {
 }
 .quick-log-input:focus-visible { outline: 2px solid var(--hairlineHover); outline-offset: -1px; }
 .quick-log-generate { align-self: flex-start; margin-top: 12px; }
+
+/* None of these quick-log forms have a backend to save to, so an accidental
+   reload or navigation away used to throw away real typed data with no way
+   back. Same "restored draft" notice CSM's own new-prospect form already
+   uses, styled with this page's existing amber info-banner tone. */
+.quick-log-draft-banner[hidden] { display: none; }
+.quick-log-draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: #E8C088;
+  line-height: 1.5;
+  background: rgba(224,160,48,0.06);
+  border: 1px solid rgba(224,160,48,0.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 14px;
+}
+.quick-log-draft-banner span { flex: 1 1 260px; }
 .quick-log-warnings {
   font-size: 0.72rem;
   color: #E0A030;
