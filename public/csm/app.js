@@ -1289,7 +1289,7 @@
       const active = h.key === listSortKey;
       const ariaSort = active ? (listSortDir === 'asc' ? 'ascending' : 'descending') : 'none';
       const arrow = active ? (listSortDir === 'asc' ? ' ↑' : ' ↓') : '';
-      return '<th data-sort-key="' + h.key + '" aria-sort="' + ariaSort + '" tabindex="0" role="button">' +
+      return '<th data-sort-key="' + h.key + '" aria-sort="' + ariaSort + '" tabindex="0">' +
         escapeHtml(h.label) + arrow + '</th>';
     }).join('');
 
