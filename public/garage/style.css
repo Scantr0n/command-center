@@ -373,6 +373,94 @@ section { margin-bottom: 36px; }
 .chip[aria-pressed="true"] .chip-count { color: var(--sub); }
 .chip-zero { opacity: 0.45; }
 
+.view-toggle-group {
+  display: flex;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.view-toggle-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  padding: 6px 12px;
+  border: none;
+  background: var(--panelLight);
+  color: var(--sub);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.view-toggle-btn + .view-toggle-btn { border-left: 1px solid var(--hairline); }
+.view-toggle-btn:hover { color: var(--ink); }
+.view-toggle-btn[aria-pressed="true"] { background: var(--ink); color: var(--void); }
+
+/* Kanban board: real individually-logged listings placed by their actual
+   `status` field. A column's real pipeline.json count can be higher than
+   the number of cards shown, since not every known item has an individual
+   record yet (see pipeline.json's own honest aggregate counts) — that gap
+   is surfaced as a plain-text note, never papered over with fabricated
+   cards. Drag-and-drop never writes to listings.json directly (this app
+   has no live backend); a drop opens the listing's own edit form with the
+   target status pre-selected, same "prep the snippet, don't silently
+   mutate" pattern CSM's own kanban already uses. */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+@media (max-width: 860px) {
+  .kanban-board { grid-template-columns: 1fr; }
+}
+.kanban-column {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 120px;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.kanban-column.column-dragover { border-color: var(--hairlineHover); background: rgba(255,255,255,0.03); }
+.kanban-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--sub);
+  text-transform: uppercase;
+}
+.kanban-column-count {
+  background: var(--panelLight);
+  border-radius: 999px;
+  padding: 1px 7px;
+  color: var(--dim);
+}
+.kanban-card {
+  background: var(--panelLight);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 10px 11px;
+  margin-bottom: 8px;
+  cursor: grab;
+  transition: border-color 0.12s ease;
+}
+.kanban-card:hover, .kanban-card:focus-visible { border-color: var(--hairlineHover); outline: none; }
+.kanban-card.card-dragging { opacity: 0.4; }
+.kanban-card-title { font-size: 0.78rem; color: var(--ink); font-weight: 500; margin-bottom: 4px; }
+.kanban-card-sub { font-size: 0.68rem; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+.kanban-more-note {
+  font-size: 0.68rem;
+  color: var(--dim);
+  font-style: italic;
+  padding: 6px 2px 2px;
+  border-top: 1px dashed var(--hairline);
+  margin-top: 4px;
+}
+.kanban-empty { font-size: 0.7rem; color: var(--dim); font-style: italic; padding: 8px 2px; }
+
 .calc-row {
   display: flex;
   align-items: center;

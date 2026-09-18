@@ -271,6 +271,7 @@ async function loadData() {
     renderPayoutTable(listings);
     renderOfferItemChips(listings);
     renderTemplateItemChips(listings);
+    renderKanban(listings, pipelineData);
   } else {
     listings = [];
     document.getElementById('statRow').innerHTML = '';
@@ -284,6 +285,7 @@ async function loadData() {
     document.getElementById('payoutTableBody').innerHTML = '';
     renderOfferItemChips([]);
     renderTemplateItemChips([]);
+    document.getElementById('kanbanBoard').innerHTML = '';
     errBox.hidden = false;
     errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load Garage data: " + listingsResult.reason.message;
@@ -2429,6 +2431,104 @@ function wireListingEditForm(l) {
   });
 }
 
+// Kanban board: real individually-logged listings placed into columns by
+// their actual `status` field. A column's real pipeline.json count can
+// exceed the number of individual records logged for it (most of the real
+// 48 ready-to-post items, for example, only exist as that one aggregate
+// count) — that gap is shown as a plain note, never papered over with
+// fabricated cards. Same drag-to-prep pattern as CSM's kanban: a drop
+// never writes to listings.json (no live backend here either), it opens
+// the listing's own real edit form with the target status pre-selected
+// and pre-generates the snippet, since this listing already has valid
+// data on every required field and the form's own blockers exist for
+// genuinely incomplete records, not this case.
+const KANBAN_STAGE_ORDER = ['draft', 'ready-to-post', 'live', 'sold'];
+
+function renderKanban(listings, pipelineData) {
+  const board = document.getElementById('kanbanBoard');
+  if (!board) return;
+  const countByStage = {};
+  ((pipelineData && pipelineData.stages) || []).forEach(s => { countByStage[s.stage] = s.count; });
+
+  board.innerHTML = KANBAN_STAGE_ORDER.map(stageId => {
+    const cards = listings.filter(l => l.status === stageId);
+    const known = countByStage[stageId];
+    const moreCount = (typeof known === 'number' && known > cards.length) ? known - cards.length : 0;
+    const cardsHtml = cards.length ? cards.map(l => `
+      <div class="kanban-card" draggable="true" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="${escapeHtml(l.title || 'Untitled item')}, open to edit">
+        <div class="kanban-card-title">${escapeHtml(l.title || 'Untitled item')}</div>
+        <div class="kanban-card-sub">${l.price != null ? formatUsd(l.price) : 'no price set'} &middot; ${(l.platforms || []).length} platform${(l.platforms || []).length === 1 ? '' : 's'}</div>
+      </div>
+    `).join('') : '<div class="kanban-empty">No individually logged items in this stage.</div>';
+    const moreHtml = moreCount > 0
+      ? `<div class="kanban-more-note">+${moreCount} more known from the real pipeline count, not individually logged yet</div>`
+      : '';
+    return `
+      <div class="kanban-column" data-stage-id="${stageId}">
+        <div class="kanban-column-head"><span>${escapeHtml(STAGE_LABELS[stageId] || stageId)}</span><span class="kanban-column-count">${cards.length}${moreCount ? '+' : ''}</span></div>
+        ${cardsHtml}
+        ${moreHtml}
+      </div>
+    `;
+  }).join('');
+
+  board.querySelectorAll('.kanban-card[data-listing-id]').forEach(card => {
+    const id = card.getAttribute('data-listing-id');
+    card.addEventListener('click', () => openModal(id));
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(id); }
+    });
+    card.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', id);
+      e.dataTransfer.effectAllowed = 'move';
+      card.classList.add('card-dragging');
+    });
+    card.addEventListener('dragend', () => card.classList.remove('card-dragging'));
+  });
+
+  board.querySelectorAll('.kanban-column[data-stage-id]').forEach(column => {
+    column.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      column.classList.add('column-dragover');
+    });
+    column.addEventListener('dragleave', e => {
+      if (!column.contains(e.relatedTarget)) column.classList.remove('column-dragover');
+    });
+    column.addEventListener('drop', e => {
+      e.preventDefault();
+      column.classList.remove('column-dragover');
+      const id = e.dataTransfer.getData('text/plain');
+      const targetStageId = column.getAttribute('data-stage-id');
+      const l = listings.find(item => item.id === id);
+      if (!l || l.status === targetStageId) return;
+      openModalForStatusMove(id, targetStageId);
+    });
+  });
+}
+
+function openModalForStatusMove(id, targetStatus) {
+  openModal(id);
+  const details = document.querySelector('#modalBody details.schema-help');
+  if (details) details.open = true;
+  const select = document.getElementById('leStatus');
+  if (select) select.value = targetStatus;
+  const generateBtn = document.getElementById('leGenerateBtn');
+  if (generateBtn) generateBtn.click();
+}
+
+function setGarageView(view) {
+  const isKanban = view === 'kanban';
+  document.getElementById('kanbanBoard').hidden = !isKanban;
+  document.getElementById('listingsTableWrap').hidden = isKanban;
+  document.getElementById('tableViewBtn').setAttribute('aria-pressed', String(!isKanban));
+  document.getElementById('kanbanViewBtn').setAttribute('aria-pressed', String(isKanban));
+  try { localStorage.setItem('garage-view', view); } catch { /* private browsing etc, not worth failing over */ }
+}
+
+document.getElementById('tableViewBtn').addEventListener('click', () => setGarageView('table'));
+document.getElementById('kanbanViewBtn').addEventListener('click', () => setGarageView('kanban'));
+
 function openModal(id) {
   const l = listings.find(item => item.id === id);
   if (!l) return;
@@ -3234,5 +3334,9 @@ function updateOfflineBanner() {
 window.addEventListener('offline', updateOfflineBanner);
 window.addEventListener('online', updateOfflineBanner);
 updateOfflineBanner();
+
+let initialGarageView = 'table';
+try { if (localStorage.getItem('garage-view') === 'kanban') initialGarageView = 'kanban'; } catch { /* private browsing etc */ }
+setGarageView(initialGarageView);
 
 loadData();
