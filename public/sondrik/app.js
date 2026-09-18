@@ -338,8 +338,27 @@
     const days = daysBetween(release.date, todayIso());
     if (days < 0) return null;
 
+    // A checkpoint whose grace window closes before the *next* checkpoint
+    // arrives (true for 7, since 7+3=10 is before 14) used to just fall
+    // through this loop unrecorded: past day 10 with no check-in logged,
+    // this jumped straight to treating the 14-day checkpoint as "upcoming"
+    // with no trace that the 7-day one was ever due, let alone missed.
+    // There's no persisted "confirmed" flag in releases.json (a check-in is
+    // just Jack looking and seeing nothing new), so the only honest signal
+    // available here is "its grace window closed without this function ever
+    // getting to report it as due" -- tracked in missedCheckpoints and
+    // surfaced instead of silently dropped.
+    const missedCheckpoints = [];
     for (const checkpoint of BUGFIX_CHECKPOINTS) {
       if (days < checkpoint) {
+        if (missedCheckpoints.length) {
+          return {
+            tier: 'missed',
+            text: 'Missed the ' + missedCheckpoints.join('- and ') + '-day check-in (day ' + days + '); next is the ' +
+              checkpoint + '-day check-in in ' + (checkpoint - days) + (checkpoint - days === 1 ? ' day' : ' days') +
+              ' (' + fmtDate(addDays(release.date, checkpoint)) + ')'
+          };
+        }
         return {
           tier: 'upcoming',
           text: checkpoint + '-day check-in in ' + (checkpoint - days) + (checkpoint - days === 1 ? ' day' : ' days') +
@@ -352,6 +371,14 @@
           text: 'Past the ' + checkpoint + '-day check-in (day ' + days + '), confirm no new reports of the fixed bug'
         };
       }
+      missedCheckpoints.push(checkpoint);
+    }
+    if (missedCheckpoints.length) {
+      return {
+        tier: 'missed',
+        text: 'Missed the ' + missedCheckpoints.join(' and ') + '-day check-in' + (missedCheckpoints.length > 1 ? 's' : '') +
+          ' (day ' + days + ')'
+      };
     }
     return {
       tier: 'passed',
@@ -976,7 +1003,7 @@
     const datedReleases = releases.filter(r => r.date).slice().sort((a, b) => b.date.localeCompare(a.date));
     if (datedReleases.length > 0) {
       const checkinStatus = bugfixCheckinStatus(datedReleases[0]);
-      if (checkinStatus && checkinStatus.tier === 'due') {
+      if (checkinStatus && (checkinStatus.tier === 'due' || checkinStatus.tier === 'missed')) {
         steps.push({
           urgent: true,
           text: 'v' + datedReleases[0].version + ': ' + checkinStatus.text.charAt(0).toLowerCase() + checkinStatus.text.slice(1) + '.',

@@ -867,7 +867,10 @@ section { margin-bottom: 36px; }
 
 /* Post-ship bugfix check-in: "upcoming" and "passed" are informational
    (same --dim/--accent tiers as .freshness-fresh/.freshness-aging), "due"
-   is the actionable window and gets the same amber .freshness-stale uses. */
+   is the actionable window and gets the same amber .freshness-stale uses.
+   "missed" (an earlier checkpoint's grace window closed with no check-in
+   ever logged) is the same amber, since it's still an open, actionable
+   item, just for a window that already passed rather than the current one. */
 .bugfix-checkin {
   width: 100%;
   font-size: 0.68rem;
@@ -876,7 +879,7 @@ section { margin-bottom: 36px; }
 }
 .bugfix-checkin-upcoming { color: var(--accent); }
 .bugfix-checkin-passed { color: var(--dim); }
-.bugfix-checkin-due {
+.bugfix-checkin-due, .bugfix-checkin-missed {
   color: #E0A030;
   font-weight: 500;
 }
