@@ -343,6 +343,7 @@ async function loadData() {
     empty.hidden = false;
     empty.setAttribute('role', 'alert');
     empty.textContent = "Couldn't load sales data: " + salesResult.reason.message;
+    document.getElementById('salesTotals').innerHTML = '';
     document.getElementById('taxTrackerBody').innerHTML =
       '<tr><td colspan="6" class="table-empty" role="alert">Failed to load sales data: ' + escapeHtml(salesResult.reason.message) + '</td></tr>';
   }
@@ -1929,11 +1930,13 @@ function renderActivity(events) {
 function renderSales(sales) {
   const tbody = document.getElementById('salesTableBody');
   const empty = document.getElementById('salesTableEmpty');
+  const totalsEl = document.getElementById('salesTotals');
 
   if (!sales.length) {
     tbody.innerHTML = '';
     empty.hidden = false;
     empty.textContent = 'No sales logged yet.';
+    totalsEl.innerHTML = '';
     return;
   }
   empty.hidden = true;
@@ -1945,11 +1948,28 @@ function renderSales(sales) {
     return b.saleDate.localeCompare(a.saleDate);
   });
 
+  // Tallied in the same pass as each row's own net/profit math (never
+  // recomputed separately, so the totals below can't drift from what the
+  // table itself shows), grouped by platform since nothing else on this page
+  // shows which platform is actually the profitable one, only aggregate
+  // realized-revenue/profit stat tiles at the top of the page.
+  const byPlatform = {};
+
   tbody.innerHTML = sorted.map(s => {
     const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
     const hasEither = s.costBasis != null || s.shippingCost != null;
     const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
     const askingPct = computeAskingPct(s);
+
+    const platformKey = s.platform || 'unknown';
+    if (!byPlatform[platformKey]) byPlatform[platformKey] = { revenue: 0, count: 0, profit: 0, profitCount: 0 };
+    byPlatform[platformKey].count++;
+    byPlatform[platformKey].revenue += s.salePrice || 0;
+    if (profit != null) {
+      byPlatform[platformKey].profit += profit;
+      byPlatform[platformKey].profitCount++;
+    }
+
     return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(s.title || 'Untitled item')}</div></td>
@@ -1964,6 +1984,31 @@ function renderSales(sales) {
     </tr>
   `;
   }).join('');
+
+  const totalRevenue = sales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+  const profitTrackedCount = Object.values(byPlatform).reduce((sum, b) => sum + b.profitCount, 0);
+  const totalProfit = Object.values(byPlatform).reduce((sum, b) => sum + b.profit, 0);
+
+  // Sorted by revenue so the biggest platform leads, same convention as
+  // renderExpenses' by-category breakdown below its own table.
+  const platformParts = Object.keys(byPlatform)
+    .sort((a, b) => byPlatform[b].revenue - byPlatform[a].revenue)
+    .map(p => {
+      const bucket = byPlatform[p];
+      const label = PLATFORM_LABELS[p] || p;
+      const profitText = bucket.profitCount === bucket.count ? formatUsd(bucket.profit) + ' profit'
+        : bucket.profitCount ? formatUsd(bucket.profit) + ` profit (${bucket.profitCount}/${bucket.count} tracked)`
+        : 'profit not tracked';
+      return `${label}: ${formatUsd(bucket.revenue)} revenue, ${profitText}`;
+    })
+    .join('; ');
+
+  totalsEl.innerHTML = `
+    <p class="pace-result-note">
+      <span class="pace-result-figure">${formatUsd(totalRevenue)}</span> total realized revenue across
+      ${sales.length} real logged sale(s)${platformParts ? ', by platform: ' + escapeHtml(platformParts) : ''}.
+      ${profitTrackedCount ? `${formatUsd(totalProfit)} total profit across the ${profitTrackedCount}/${sales.length} sale(s) with cost data logged.` : 'No sale has a cost basis or shipping cost logged yet, so profit by platform is not tracked.'}
+    </p>`;
 }
 
 // What the real sale price came out to as a percent of the asking price
