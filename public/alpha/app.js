@@ -1184,11 +1184,22 @@ function eventItem(evt) {
   `;
 }
 
+// Kept purely so the Activity log's "Export CSV" button can build its file
+// from the same real, already-sorted rows just rendered, never a second
+// fetch or a re-sort that could disagree with what's on screen.
+let lastEventLogSnapshot = [];
+
 function renderEventLog(data) {
   const log = document.getElementById('eventLog');
   const events = Array.isArray(data.events) ? data.events : [];
+  const csvBtn = document.getElementById('eventLogCsvBtn');
 
   if (!events.length) {
+    lastEventLogSnapshot = [];
+    if (csvBtn) {
+      csvBtn.disabled = true;
+      csvBtn.title = 'No events recorded yet.';
+    }
     log.classList.add('event-log-empty');
     log.innerHTML = `
       <li class="empty-panel">
@@ -1204,6 +1215,11 @@ function renderEventLog(data) {
 
   log.classList.remove('event-log-empty');
   const sorted = [...events].sort((a, b) => new Date(b.at) - new Date(a.at));
+  lastEventLogSnapshot = sorted;
+  if (csvBtn) {
+    csvBtn.disabled = false;
+    csvBtn.title = '';
+  }
   log.innerHTML = sorted.map(eventItem).join('');
 }
 
@@ -1749,6 +1765,29 @@ document.getElementById('positionsCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'alpha-positions-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const EVENT_LOG_CSV_COLUMNS = [
+  ['at', 'When'], ['type', 'Type'], ['tone', 'Tone'], ['label', 'Label'], ['detail', 'Detail']
+];
+
+// Same real-rows-on-screen export as the Positions CSV button above, for the
+// Activity log's own real events (kill-switch triggers, regime changes,
+// evolution runs, anomalies) instead of positions.
+document.getElementById('eventLogCsvBtn').addEventListener('click', () => {
+  if (!lastEventLogSnapshot.length) return;
+  const header = EVENT_LOG_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = lastEventLogSnapshot.map(evt => EVENT_LOG_CSV_COLUMNS.map(([key]) => csvField(evt[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-events-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
