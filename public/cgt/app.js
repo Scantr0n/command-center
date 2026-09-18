@@ -14,6 +14,9 @@ let activeBatch = 'all';
 let activeOwnership = 'all';
 let sortKey = null;
 let sortDir = 'asc';
+let candidateSearchTerm = '';
+let activeCandidateSport = 'all';
+let activeCandidateVerdict = 'all';
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "PSA hockey cards sorted by value") can be bookmarked
@@ -961,17 +964,90 @@ function buildRankedCandidates() {
     });
 }
 
+// Same search/sport/verdict filtering convention as the main inventory table
+// (matchesSearchTerm/matchesSportValue/facetCount above), kept as a separate
+// set of predicates since candidates use a computed verdict rather than a
+// stored field and have no grader/basis/ownership dimensions to filter by.
+function matchesCandidateSearchTerm(c, term) {
+  term = term.trim().toLowerCase();
+  return !term
+    || (c.cardName || '').toLowerCase().includes(term)
+    || (c.notes || '').toLowerCase().includes(term)
+    || (c.rawValueNote || '').toLowerCase().includes(term)
+    || (c.gradedValueNote || '').toLowerCase().includes(term);
+}
+function matchesCandidateSportValue(c, sport) { return sport === 'all' || c.sport === sport; }
+function matchesCandidateVerdictValue(verdictKey, verdict) { return verdict === 'all' || verdictKey === verdict; }
+
+function matchesCandidateFilters(c, verdictKey) {
+  return matchesCandidateSearchTerm(c, candidateSearchTerm)
+    && matchesCandidateSportValue(c, activeCandidateSport)
+    && matchesCandidateVerdictValue(verdictKey, activeCandidateVerdict);
+}
+
+function anyCandidateFilterActive() {
+  return candidateSearchTerm.trim() !== '' || activeCandidateSport !== 'all' || activeCandidateVerdict !== 'all';
+}
+
+function candidateFacetCount(dimension, value) {
+  return buildRankedCandidates().filter(({ c, math }) => {
+    const verdictKey = math ? math.verdict : 'needs-data';
+    if (!matchesCandidateSearchTerm(c, candidateSearchTerm)) return false;
+    if (dimension !== 'sport' && !matchesCandidateSportValue(c, activeCandidateSport)) return false;
+    if (dimension !== 'verdict' && !matchesCandidateVerdictValue(verdictKey, activeCandidateVerdict)) return false;
+    if (dimension === 'sport') return matchesCandidateSportValue(c, value);
+    if (dimension === 'verdict') return matchesCandidateVerdictValue(verdictKey, value);
+    return true;
+  }).length;
+}
+
+const CANDIDATE_FACET_DIMENSIONS = [
+  ['candidateSportFilter', 'data-cand-sport', 'sport'],
+  ['candidateVerdictFilter', 'data-cand-verdict', 'verdict']
+];
+
+function updateCandidateChipCounts() {
+  CANDIDATE_FACET_DIMENSIONS.forEach(([containerId, dataAttr, dimension]) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.chip').forEach(chip => {
+      const countEl = chip.querySelector('.chip-count');
+      if (!countEl) return;
+      const value = chip.getAttribute(dataAttr);
+      const count = candidateFacetCount(dimension, value);
+      countEl.textContent = ' ' + count;
+      chip.classList.toggle('chip-zero', count === 0 && chip.getAttribute('aria-pressed') !== 'true');
+    });
+  });
+}
+
 function renderCandidates() {
   const el = document.getElementById('candidatesFeed');
   const ranked = buildRankedCandidates();
+  updateCandidateChipCounts();
+  document.getElementById('candidatesClearFiltersBtn').hidden = !anyCandidateFilterActive();
 
   if (!ranked.length) {
     el.innerHTML = '<p class="submissions-empty" role="status">No raw-card candidates logged yet.' +
       emptyStateCta('quickLogCandidateTool', 'quickCandidateForm', 'Log one now') + '</p>';
+    document.getElementById('candidatesFilterStatus').textContent = '';
     return;
   }
 
-  const rows = ranked.map(({ c, math }) => {
+  const filtered = ranked.filter(({ c, math }) => matchesCandidateFilters(c, math ? math.verdict : 'needs-data'));
+
+  const status = document.getElementById('candidatesFilterStatus');
+  status.textContent = anyCandidateFilterActive()
+    ? filtered.length + ' candidate' + (filtered.length === 1 ? '' : 's') + ' match' + (filtered.length === 1 ? 'es' : '') +
+      (candidateSearchTerm.trim() ? ' for "' + candidateSearchTerm.trim() + '"' : '')
+    : '';
+
+  if (!filtered.length) {
+    el.innerHTML = '<p class="submissions-empty" role="status">No candidates match the current filters.</p>';
+    return;
+  }
+
+  const rows = filtered.map(({ c, math }) => {
     const verdictKey = math ? math.verdict : 'needs-data';
     const meta = CANDIDATE_VERDICT_META[verdictKey];
     const gainText = math ? formatSignedUsd(math.expectedGain) : 'n/a';
@@ -2601,14 +2677,15 @@ document.addEventListener('keydown', (e) => {
   openShortcuts();
 });
 
-function wireChipGroup(containerId, dataAttr, setter) {
+function wireChipGroup(containerId, dataAttr, setter, render) {
   const container = document.getElementById(containerId);
+  render = render || applyFiltersAndRender;
   container.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
       container.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
       chip.setAttribute('aria-pressed', 'true');
       setter(chip.getAttribute(dataAttr));
-      applyFiltersAndRender();
+      render();
     });
   });
 }
@@ -2623,6 +2700,22 @@ wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
 wireChipGroup('graderFilter', 'data-grader', (v) => { activeGrader = v; });
 wireChipGroup('ownershipFilter', 'data-owned', (v) => { activeOwnership = v; });
+wireChipGroup('candidateSportFilter', 'data-cand-sport', (v) => { activeCandidateSport = v; }, renderCandidates);
+wireChipGroup('candidateVerdictFilter', 'data-cand-verdict', (v) => { activeCandidateVerdict = v; }, renderCandidates);
+document.getElementById('candidateSearchInput').addEventListener('input', (e) => {
+  candidateSearchTerm = e.target.value;
+  renderCandidates();
+});
+document.getElementById('candidatesClearFiltersBtn').addEventListener('click', () => {
+  candidateSearchTerm = '';
+  activeCandidateSport = 'all';
+  activeCandidateVerdict = 'all';
+  document.getElementById('candidateSearchInput').value = '';
+  setInitialChipState('candidateSportFilter', 'data-cand-sport', activeCandidateSport);
+  setInitialChipState('candidateVerdictFilter', 'data-cand-verdict', activeCandidateVerdict);
+  renderCandidates();
+  document.getElementById('candidateSearchInput').focus();
+});
 wireCoverageCheck();
 
 // Resets search, all four chip groups (batch included, even though its own

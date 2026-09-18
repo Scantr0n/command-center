@@ -508,6 +508,7 @@
   <section>
     <div class="section-toolbar">
       <h2 class="section-title">Worth grading?</h2>
+      <button type="button" id="candidatesClearFiltersBtn" class="print-btn font-mono" hidden>Clear filters</button>
       <button type="button" id="candidatesCsvBtn" class="print-btn font-mono">Export CSV</button>
     </div>
     <p class="section-subtitle">Raw cards being weighed against the real cost of grading them, before anything is
@@ -516,6 +517,28 @@
       real researched numbers, never a guess. See "Grading service tiers reference" below for current published
       per-tier pricing and turnaround to fill in <code class="inline-code">estimatedGradingCost</code> with a real
       number instead of a guess.</p>
+    <input
+      type="search"
+      id="candidateSearchInput"
+      class="search-input font-mono"
+      placeholder="Filter by card name or notes..."
+      aria-label="Filter candidates by card name or notes">
+    <div class="filter-row" id="candidateSportFilter" role="group" aria-label="Filter candidates by sport">
+      <span class="filter-row-label font-mono">SPORT</span>
+      <button type="button" class="chip" data-cand-sport="all" aria-pressed="true">All<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-sport="hockey" aria-pressed="false">Hockey<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-sport="baseball" aria-pressed="false">Baseball<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-sport="football" aria-pressed="false">Football<span class="chip-count"></span></button>
+    </div>
+    <div class="filter-row" id="candidateVerdictFilter" role="group" aria-label="Filter candidates by verdict">
+      <span class="filter-row-label font-mono">VERDICT</span>
+      <button type="button" class="chip" data-cand-verdict="all" aria-pressed="true">All<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-verdict="worth-grading" aria-pressed="false">Worth grading<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-verdict="marginal" aria-pressed="false">Marginal<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-verdict="not-worth" aria-pressed="false">Not worth it<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-verdict="needs-data" aria-pressed="false">Needs more data<span class="chip-count"></span></button>
+    </div>
+    <div id="candidatesFilterStatus" class="sr-only" role="status" aria-live="polite"></div>
     <div class="candidates-feed" id="candidatesFeed"></div>
   </section>
 
