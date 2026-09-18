@@ -992,6 +992,7 @@ header.page-head .sub {
   color: var(--ink);
 }
 
+.np-draft-banner[hidden] { display: none; }
 .np-draft-banner {
   display: flex;
   flex-wrap: wrap;
