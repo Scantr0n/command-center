@@ -93,6 +93,7 @@
           <tr><th>valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
           <tr><th>compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
           <tr><th>sourceNote</th><td>Where the price came from, e.g. <code>"eBay sold listings, 3 comps, Aug 2026"</code></td></tr>
+          <tr><th>imageUrl</th><td>Optional URL to a real photo of this exact card, for the detail view and the insurance/appraisal print summary. Real collectibles-insurance guidance treats photos plus cert numbers as the core of an insurance file, so this is worth filling in once a card actually has a photo somewhere reachable by URL. Leave <code>null</code> until a real photo exists, never a stock/placeholder image.</td></tr>
           <tr><th>costBasis</th><td>USD number, what was actually paid for the card. Optional and independent of <code>estimatedValue</code>: log it when known, leave <code>null</code> when not. Powers the "Unrealized gain / loss" summary tile and the detail view, only computed for cards where both this and <code>estimatedValue</code> are on record.</td></tr>
           <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
           <tr><th>soldDate</th><td>ISO date this card was actually sold. Leave <code>null</code> while still owned. Once set, the card counts as sold: it drops out of the portfolio value, breakdowns, and insurance summary (nothing left to insure), but stays in the file as a permanent record. <strong>Required together with <code>soldPrice</code></strong>, one without the other is a validation error.</td></tr>
@@ -114,6 +115,7 @@
   "valuationBasis": null,
   "compNote": null,
   "sourceNote": null,
+  "imageUrl": null,
   "costBasis": null,
   "datePriced": null,
   "soldDate": null,
@@ -179,6 +181,8 @@
           <input class="quick-log-input" type="text" id="ncCompNote" placeholder="e.g. No PSA10 sales found, based on 3 PSA9 sales + typical grade premium">
           <label class="quick-log-label" for="ncSourceNote">Source note (optional)</label>
           <input class="quick-log-input" type="text" id="ncSourceNote" placeholder="e.g. eBay sold listings, 3 comps, Aug 2026">
+          <label class="quick-log-label" for="ncImageUrl">Photo URL (optional, a real photo of this exact card)</label>
+          <input class="quick-log-input" type="url" id="ncImageUrl" placeholder="e.g. https://...">
           <label class="quick-log-label" for="ncCostBasis">Cost basis, USD (optional)</label>
           <input class="quick-log-input" type="number" id="ncCostBasis" min="0" step="0.01">
           <label class="quick-log-label" for="ncDatePriced">Date priced (leave blank if not priced yet)</label>

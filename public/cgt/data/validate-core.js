@@ -143,6 +143,21 @@
         errors.push(where + ': "storageLocation" must be a string or null');
       }
 
+      // Same "wrong type passes clean and only shows up garbled on render"
+      // risk as storageLocation above, since imageUrl also only ever gets
+      // rendered as-is (an <img src>, never re-validated as a URL string at
+      // render time). Deliberately not requiring an http(s) prefix: a real
+      // photo could legitimately come from a local file path or a data URI
+      // during hand-editing, and rejecting those would just push someone to
+      // fake a fully-formed URL instead of leaving the field honestly null.
+      if (c.imageUrl !== null && c.imageUrl !== undefined) {
+        if (typeof c.imageUrl !== 'string') {
+          errors.push(where + ': "imageUrl" must be a string or null');
+        } else if (!c.imageUrl.trim()) {
+          errors.push(where + ': "imageUrl" is an empty string, use null instead of a blank string');
+        }
+      }
+
       // A real sale is one event with two halves (when, for how much), so
       // each half requires the other, same "never half-log a real number"
       // rule valuationBasis/estimatedValue already enforce on the price

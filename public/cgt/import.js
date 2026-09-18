@@ -95,6 +95,7 @@ const DATASETS = {
       { key: 'valuationBasis', label: 'Valuation basis', aliases: ['valuationbasis', 'basis'], type: 'basis' },
       { key: 'compNote', label: 'Comp note', aliases: ['compnote'] },
       { key: 'sourceNote', label: 'Source', aliases: ['sourcenote', 'source'] },
+      { key: 'imageUrl', label: 'Photo URL', aliases: ['imageurl', 'image', 'photo', 'photourl', 'picture', 'img'] },
       { key: 'costBasis', label: 'Cost basis (what was paid)', aliases: ['costbasis', 'paid', 'pricepaid', 'cost'], type: 'number' },
       { key: 'datePriced', label: 'Date priced', aliases: ['datepriced', 'date'] },
       { key: 'soldDate', label: 'Sold date (blank if still owned)', aliases: ['solddate', 'datesold'] },

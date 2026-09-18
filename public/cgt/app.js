@@ -1386,8 +1386,10 @@ function renderInsuranceSummary() {
   }
 
   const total = priced.reduce((s, c) => s + c.estimatedValue, 0);
+  const anyPhotos = priced.some(c => c.imageUrl);
   const rows = priced.map(c => `
     <tr>
+      ${anyPhotos ? `<td>${c.imageUrl ? `<img src="${escapeHtml(c.imageUrl)}" alt="" class="insurance-summary-photo">` : ''}</td>` : ''}
       <td>${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</td>
       <td>${escapeHtml(c.sport || '')}</td>
       <td>${escapeHtml(c.gradingCompany || '')}</td>
@@ -1407,10 +1409,13 @@ function renderInsuranceSummary() {
       unpricedCount ? unpricedCount + ' additional card' + (unpricedCount === 1 ? '' : 's') + ' logged with no researched value yet, excluded from this list and from the total below.' : null,
       soldCount ? soldCount + ' sold card' + (soldCount === 1 ? '' : 's') + ' excluded, no longer owned and nothing to insure.' : null
     ].filter(Boolean).join(' ') || 'Every logged card has a researched value on record; none excluded.'
-    } A value marked "Comp-based estimate" has no directly comparable sale on record and is inferred from related sales, not a confirmed sale of this exact card and grade. A blank "Location" means no storage location has been logged for that card yet.</p>
+    } A value marked "Comp-based estimate" has no directly comparable sale on record and is inferred from related sales, not a confirmed sale of this exact card and grade. A blank "Location" means no storage location has been logged for that card yet.${
+      anyPhotos ? ' A blank "Photo" cell means no photo URL has been logged for that specific card yet, even though at least one other card in this list has one.' : ''
+    }</p>
     <table class="insurance-summary-table">
       <thead>
         <tr>
+          ${anyPhotos ? '<th>Photo</th>' : ''}
           <th>Card</th><th>Sport</th><th>Grader</th><th>Grade</th><th>Cert #</th><th>Location</th>
           <th class="num">Est. value</th><th>Basis</th><th>Date priced</th>
         </tr>
@@ -1418,7 +1423,7 @@ function renderInsuranceSummary() {
       <tbody>${rows}</tbody>
       <tfoot>
         <tr class="insurance-summary-total">
-          <td colspan="6">Total (${priced.length} card${priced.length === 1 ? '' : 's'})</td>
+          <td colspan="${anyPhotos ? 7 : 6}">Total (${priced.length} card${priced.length === 1 ? '' : 's'})</td>
           <td class="num">${formatUsd(total)}</td>
           <td colspan="2"></td>
         </tr>
@@ -1879,6 +1884,7 @@ function cardEditFormHtml(c) {
     '</div>' +
     ceFieldRow('ceCompNote', 'Comp note', c.compNote) +
     ceFieldRow('ceSourceNote', 'Source note', c.sourceNote) +
+    ceFieldRow('ceImageUrl', 'Photo URL (optional)', c.imageUrl) +
     '<div class="form-row-split">' +
     ceInputInner('ceCostBasis', 'Cost basis, USD', c.costBasis, 'number') +
     ceInputInner('ceDatePriced', 'Date priced', c.datePriced, 'date') +
@@ -2183,6 +2189,7 @@ function wireCardEditForm(c) {
       valuationBasis: document.getElementById('ceValuationBasis').value || null,
       compNote: ceVal('ceCompNote'),
       sourceNote: ceVal('ceSourceNote'),
+      imageUrl: ceVal('ceImageUrl'),
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
       datePriced: document.getElementById('ceDatePriced').value || null,
       soldDate: document.getElementById('ceSoldDate').value || null,
@@ -2280,6 +2287,12 @@ function openModal(id) {
   document.getElementById('modalSub').textContent = subParts.length ? subParts.join(' · ') : 'No sport/grader/grade logged yet';
 
   let body = '';
+  if (activeCard.imageUrl) {
+    body += `<div class="modal-photo-wrap">
+      <img src="${escapeHtml(activeCard.imageUrl)}" alt="Photo of ${escapeHtml(activeCard.cardName || 'this card')}" class="modal-photo" loading="lazy">
+      <p class="field-note modal-photo-error" hidden>Photo URL on record but the image did not load.</p>
+    </div>`;
+  }
   body += cardEditFormHtml(activeCard);
   body += field('Cert number', activeCard.certNumber, !activeCard.certNumber);
   const lookup = certLookupLink(activeCard);
@@ -2332,6 +2345,14 @@ function openModal(id) {
   body += field('Notes', activeCard.notes, !activeCard.notes);
 
   document.getElementById('modalBody').innerHTML = body;
+  const photoImg = document.querySelector('.modal-photo');
+  if (photoImg) {
+    photoImg.addEventListener('error', () => {
+      photoImg.hidden = true;
+      const errNote = document.querySelector('.modal-photo-error');
+      if (errNote) errNote.hidden = false;
+    });
+  }
   wireCardEditForm(activeCard);
   document.getElementById('modalOverlay').hidden = false;
   lockBodyScroll();
@@ -2636,6 +2657,7 @@ const CSV_COLUMNS = [
   [c => computeValueTrend(c)?.prevValue ?? null, 'Previous value'],
   [c => computeValueTrend(c)?.abs ?? null, 'Change since last check'],
   [c => c.valuationBasis, 'Valuation basis'], [c => c.compNote, 'Comp note'], [c => c.sourceNote, 'Source'],
+  [c => c.imageUrl, 'Photo URL'],
   [c => c.costBasis, 'Cost basis'],
   [c => isSold(c) ? c.soldDate : null, 'Sold date'],
   [c => isSold(c) ? c.soldPrice : null, 'Sold price'],
@@ -2807,6 +2829,7 @@ function initQuickLogTool() {
       valuationBasis: document.getElementById('ncValuationBasis').value || null,
       compNote: document.getElementById('ncCompNote').value.trim() || null,
       sourceNote: document.getElementById('ncSourceNote').value.trim() || null,
+      imageUrl: document.getElementById('ncImageUrl').value.trim() || null,
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
       datePriced: document.getElementById('ncDatePriced').value || null,
       backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
