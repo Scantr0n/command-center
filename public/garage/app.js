@@ -971,6 +971,32 @@ function buildRelistReminders(currentListings) {
   return reminders;
 }
 
+// Same "real calendar event, computed only from real logged data, pulled
+// forward to today rather than exported in the past" convention as
+// buildRelistReminders above, but for the one deadline that actually has
+// money attached: missing eBay's 3-business-day or Poshmark's ~24-hour
+// response window can mean the case auto-resolves in the buyer's favor.
+// Only built for disputes disputeResponseDeadline can actually compute a
+// real date for (open, a logged openedDate, and a platform with a fixed
+// clock), same guard that function already applies.
+function buildDisputeReminders(disputesList) {
+  const today = todayDateStr();
+  return disputesList.filter(d => d.status === 'open').map(d => {
+    const deadline = disputeResponseDeadline(d);
+    if (!deadline) return null;
+    const title = d.title || 'Untitled item';
+    const overdue = deadline < today;
+    return {
+      id: `${d.id}-dispute-respond`,
+      date: overdue ? today : deadline,
+      summary: `Respond to ${PLATFORM_LABELS[d.platform] || d.platform} dispute: ${title}`,
+      description: `${DISPUTE_TYPE_LABELS[d.type] || d.type || 'Dispute'} case opened ${d.openedDate}, ` +
+        `response ${overdue ? 'was due ' + deadline + ' (overdue)' : 'due ' + deadline} or it may auto-resolve ` +
+        `in the buyer's favor. Command Center Garage.`
+    };
+  }).filter(Boolean);
+}
+
 function icsEscapeText(text) {
   return String(text).replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
 }
@@ -997,7 +1023,7 @@ function icsDateStamp(date) {
 // day so it actually shows up rather than sitting silent on an all-day row.
 function buildIcsCalendar(reminders) {
   const stamp = icsDateStamp(new Date());
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Command Center//Garage Relist Reminders//EN', 'CALSCALE:GREGORIAN'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Command Center//Garage Reminders//EN', 'CALSCALE:GREGORIAN'];
   reminders.forEach(r => {
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:garage-${r.id}-${r.date}@command-center.local`);
@@ -2963,6 +2989,29 @@ document.getElementById('disputesCsvBtn').addEventListener('click', () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+const disputesIcsBtn = document.getElementById('disputesIcsBtn');
+const DISPUTES_ICS_LABEL = disputesIcsBtn.textContent;
+disputesIcsBtn.addEventListener('click', () => {
+  const reminders = buildDisputeReminders(disputesLog);
+  if (!reminders.length) {
+    disputesIcsBtn.textContent = 'No open disputes with a real response deadline yet';
+    setTimeout(() => { disputesIcsBtn.textContent = DISPUTES_ICS_LABEL; }, 2400);
+    return;
+  }
+  const ics = buildIcsCalendar(reminders);
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-dispute-deadlines-' + todayDateStr() + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  disputesIcsBtn.textContent = `Downloaded ${reminders.length} reminder${reminders.length === 1 ? '' : 's'}`;
+  setTimeout(() => { disputesIcsBtn.textContent = DISPUTES_ICS_LABEL; }, 2400);
 });
 
 // Pre-publish checklist: state is per-browser only (not shared data, and
