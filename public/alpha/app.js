@@ -1701,6 +1701,14 @@ backupBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// Every other hub (CGT/CSM/Garage/Sondrik) has a "Print / export PDF"
+// button backed by its own @media print stylesheet; Alpha had neither, so
+// the browser's default print output ran a fixed-position sticky bar and
+// every action button straight onto the page. window.print() itself is
+// exactly as read-only as the Refresh button above: it only ever renders
+// what is already on screen, never touches Alpha's real daemon.
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+
 function lockBodyScroll() {
   const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
   if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + 'px';

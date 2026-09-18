@@ -1079,3 +1079,61 @@ footer.page-foot {
   padding: 2px 7px;
   line-height: 1.4;
 }
+
+/* Same grayscale-on-white convention as CGT/CSM/Garage/Sondrik's own print
+   blocks. The persistent sidebar hides itself (see sidebar.js), so this
+   only has to handle what's native to this page: the action buttons, the
+   sticky critical bar (a screen-only convenience, its own information is
+   already in Connection/Summary below it), the collapsible schema-help
+   detail (documentation about the page, not part of the status itself),
+   and the modal/toast layers, which have nothing to show when idle anyway. */
+@media print {
+  body { background: #fff; color: #111; }
+  .wrap { max-width: none; padding: 0.4in 0.5in; }
+
+  .sticky-critical-bar, .refresh-btn, .back-link, .schema-help,
+  .modal-overlay, .toast-container {
+    display: none !important;
+  }
+  body.has-sticky-critical { padding-top: 0 !important; }
+
+  .market-pill, .headline-status { border-color: #999; background: none; }
+  .market-text, .headline-text { color: #111 !important; }
+  .market-dot, .headline-dot, .conn-dot { background: #111 !important; box-shadow: none !important; }
+
+  .callout, .offline-banner, .lastknown-banner { border-color: #999; background: none; color: #333; }
+  .callout strong, .offline-banner strong, .lastknown-banner strong { color: #111; }
+
+  .conn-strip, .stat-tile, .ps-mode, .ps-meter, .arch-card, .lineage-card,
+  .event-item, .empty-panel, .pos-table-wrap {
+    background: none;
+    border: 1px solid #ccc;
+  }
+  .conn-latency-spark, .history-tick.placeholder { display: none; }
+  .history-tick.up { background: #333; }
+  .history-tick.down { background: #ccc; border: 1px solid #999; }
+
+  .stat-tile-value, .stat-tile-label, .stat-tile-sub,
+  .ps-mode-value, .ps-field-label, .ps-mode-sub, .meter-value,
+  .arch-card-title, .arch-card-note, .lineage-label, .lineage-meta,
+  .event-label, .event-detail, .empty-panel-title, .empty-panel-sub,
+  .pos-symbol, .pos-num, .conn-label, .conn-sub {
+    color: #111 !important;
+  }
+  .stat-tile-value.awaiting, .ps-mode-value.awaiting, .meter-value.awaiting,
+  .conn-history-source, .regime-history-source, .lastknown-tag {
+    color: #555 !important;
+  }
+
+  .meter-track { background: none; border: 1px solid #ccc; }
+  .meter-fill { background: #888 !important; }
+
+  .badge { border-color: #999; background: none !important; color: #111 !important; }
+  .event-tag { border-color: #999; background: none !important; color: #111 !important; }
+
+  .pos-table th { color: #333; border-color: #ccc; }
+  .pos-table td { border-color: #ddd; color: #111; }
+  .pos-side-long, .pos-side-short { color: #111 !important; }
+
+  footer.page-foot { border-color: #ccc; color: #555; }
+}
