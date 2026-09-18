@@ -699,7 +699,14 @@ table.card-table {
    with, just one level in. See renderSubmissions in app.js. */
 .submission-row-main { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; min-width: 0; }
 .submission-days { color: var(--dim); font-size: 0.7rem; flex-shrink: 0; width: 92px; }
-.submission-who { flex-shrink: 0; color: var(--ink); }
+/* A real card name/note (e.g. a bracketed source note with no spaces to
+   break on) can run long enough that, at flex-shrink:0, this pushed the
+   whole row, and with it the page itself, wider than a phone viewport
+   instead of wrapping within .submission-row's own flex-wrap. Letting it
+   shrink (the flex default) plus overflow-wrap so it can still break
+   mid-word when needed keeps it on one line for the normal short case and
+   wraps in place for a long one. */
+.submission-who { color: var(--ink); overflow-wrap: anywhere; }
 .submission-meta { color: var(--sub); }
 .submission-link { color: var(--sub); font-size: 0.72rem; }
 .submission-link:hover { color: var(--ink); }
