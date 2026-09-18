@@ -3039,6 +3039,77 @@ function renderPhotoAuditResults(results, loaded, total, flagged) {
   }).join('');
 }
 
+// Shared client-side draft-autosave for the four quick-log forms below: none
+// of them write to a real file, this app has no backend to save a
+// half-filled form to, so an accidental reload or navigation away used to
+// throw away real typed data with no way back. Same pattern CGT's own
+// attachDraftGuard uses (public/cgt/app.js), reading whatever real
+// input/select/textarea fields the given form actually has rather than a
+// hand-maintained id list. Extended here with an optional checkboxGroup
+// selector, since the listing form's platform checkboxes have no individual
+// ids to key on (see initQuickLogTool's own '.nl-platform' selector), keyed
+// by their real `value` instead. Autosaved to this browser's localStorage
+// only, never sent anywhere, so it does not conflict with this page's
+// no-fabricated-data rule; a private window or blocked storage just means
+// the draft protection quietly no-ops.
+function attachDraftGuard(form, storageKey, opts) {
+  const bannerEl = document.getElementById(opts.bannerId);
+  const bannerTimeEl = document.getElementById(opts.timeId);
+  const discardBtn = document.getElementById(opts.discardId);
+  if (!bannerEl || !bannerTimeEl || !discardBtn) return { clearDraft() {} };
+
+  const fields = Array.from(form.querySelectorAll('input[id], select[id], textarea[id]'));
+  const checkboxGroup = opts.checkboxGroupSelector ? Array.from(form.querySelectorAll(opts.checkboxGroupSelector)) : [];
+  let saveTimer = null;
+
+  function readValues() {
+    const values = {};
+    fields.forEach(el => { values[el.id] = el.value; });
+    if (checkboxGroup.length) values.__checked = checkboxGroup.filter(el => el.checked).map(el => el.value);
+    return values;
+  }
+  function hasAnyValue(values) {
+    return fields.some(el => (values[el.id] || '').trim() !== '') ||
+      !!(values.__checked && values.__checked.length);
+  }
+  function clearDraft() {
+    try { localStorage.removeItem(storageKey); } catch (e) { /* see saveDraft below */ }
+    bannerEl.hidden = true;
+  }
+  function saveDraft() {
+    try {
+      const values = readValues();
+      if (!hasAnyValue(values)) { clearDraft(); return; }
+      localStorage.setItem(storageKey, JSON.stringify({ savedAt: Date.now(), values }));
+    } catch (e) { /* localStorage unavailable (private window, blocked storage): draft protection just no-ops */ }
+  }
+
+  form.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 400);
+  });
+  discardBtn.addEventListener('click', () => {
+    clearDraft();
+    form.reset();
+    if (opts.onDiscard) opts.onDiscard();
+  });
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const draft = raw ? JSON.parse(raw) : null;
+    if (draft && hasAnyValue(draft.values || {})) {
+      fields.forEach(el => { if (el.id in draft.values) el.value = draft.values[el.id]; });
+      if (checkboxGroup.length && draft.values.__checked) {
+        checkboxGroup.forEach(el => { el.checked = draft.values.__checked.includes(el.value); });
+      }
+      bannerTimeEl.textContent = new Date(draft.savedAt).toLocaleString();
+      bannerEl.hidden = false;
+    }
+  } catch (e) { /* see saveDraft above */ }
+
+  return { clearDraft };
+}
+
 // Quick-log tool: builds one candidate listing from the form and checks it
 // against the same rules validate.js enforces (a unique id, a non-empty
 // platforms array, a title over a platform's real character cap), so a
@@ -3056,6 +3127,11 @@ function wireQuickLogTool() {
   const output = document.getElementById('nlOutput');
   const copyBtn = document.getElementById('nlCopyBtn');
   const live = document.getElementById('quickLogLive');
+  const draftGuard = attachDraftGuard(form, 'garage-nl-draft-v1', {
+    bannerId: 'nlDraftBanner', timeId: 'nlDraftBannerTime', discardId: 'nlDiscardDraftBtn',
+    checkboxGroupSelector: '.nl-platform',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -3126,6 +3202,7 @@ function wireQuickLogTool() {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
       live.textContent = 'Listing JSON copied to clipboard.';
+      draftGuard.clearDraft();
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
   });
@@ -3146,6 +3223,10 @@ function wireQuickLogSaleTool() {
   const output = document.getElementById('nsOutput');
   const copyBtn = document.getElementById('nsCopyBtn');
   const live = document.getElementById('quickLogSaleLive');
+  const draftGuard = attachDraftGuard(form, 'garage-ns-draft-v1', {
+    bannerId: 'nsDraftBanner', timeId: 'nsDraftBannerTime', discardId: 'nsDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -3218,6 +3299,7 @@ function wireQuickLogSaleTool() {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
       live.textContent = 'Sale JSON copied to clipboard.';
+      draftGuard.clearDraft();
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
   });
@@ -3237,6 +3319,10 @@ function wireQuickLogExpenseTool() {
   const output = document.getElementById('neOutput');
   const copyBtn = document.getElementById('neCopyBtn');
   const live = document.getElementById('quickLogExpenseLive');
+  const draftGuard = attachDraftGuard(form, 'garage-ne-draft-v1', {
+    bannerId: 'neDraftBanner', timeId: 'neDraftBannerTime', discardId: 'neDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -3305,6 +3391,7 @@ function wireQuickLogExpenseTool() {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
       live.textContent = 'Expense JSON copied to clipboard.';
+      draftGuard.clearDraft();
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
   });
@@ -3325,6 +3412,10 @@ function wireQuickLogDisputeTool() {
   const output = document.getElementById('ndOutput');
   const copyBtn = document.getElementById('ndCopyBtn');
   const live = document.getElementById('quickLogDisputeLive');
+  const draftGuard = attachDraftGuard(form, 'garage-nd-draft-v1', {
+    bannerId: 'ndDraftBanner', timeId: 'ndDraftBannerTime', discardId: 'ndDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -3390,6 +3481,7 @@ function wireQuickLogDisputeTool() {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
       live.textContent = 'Dispute JSON copied to clipboard.';
+      draftGuard.clearDraft();
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
   });

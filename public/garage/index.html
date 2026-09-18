@@ -109,6 +109,12 @@
         yet; fill those in by hand once they're real. This never writes a file or sends anything, it only puts
         text on your clipboard.</p>
 
+      <div id="nlDraftBanner" class="quick-log-draft-banner" hidden>
+        <span>Restored an unsaved draft from <span id="nlDraftBannerTime"></span>, this form is autosaved to this
+          browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+        <button type="button" id="nlDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+      </div>
+
       <div class="quick-log-grid">
         <form class="quick-log-form" id="quickListingForm">
           <h3 class="quick-log-title font-mono">New listing &rarr; listings.json</h3>
@@ -1227,6 +1233,12 @@
           <code>disputes</code> array yourself. This never writes a file or sends anything, it only puts text on
           your clipboard.</p>
 
+        <div id="ndDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="ndDraftBannerTime"></span>, this form is autosaved to this
+            browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="ndDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
+
         <div class="quick-log-grid">
           <form class="quick-log-form" id="quickDisputeForm">
             <h3 class="quick-log-title font-mono">New return/dispute &rarr; disputes.json</h3>
@@ -1334,6 +1346,12 @@
           paste into the <code>sales</code> array yourself. This never writes a file or sends anything, it only
           puts text on your clipboard. Still needs marking that platform in the item's own <code>soldOn</code>
           array by hand, same as the callout above says, this tool only builds the sale record itself.</p>
+
+        <div id="nsDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="nsDraftBannerTime"></span>, this form is autosaved to this
+            browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="nsDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
 
         <div class="quick-log-grid">
           <form class="quick-log-form" id="quickSaleForm">
@@ -1444,6 +1462,12 @@
           date instead, the table above computes the dollar amount itself at the real IRS rate for that date, the
           same way it already does for a hand-edited entry. This never writes a file or sends anything, it only
           puts text on your clipboard.</p>
+
+        <div id="neDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="neDraftBannerTime"></span>, this form is autosaved to this
+            browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="neDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
 
         <div class="quick-log-grid">
           <form class="quick-log-form" id="quickExpenseForm">

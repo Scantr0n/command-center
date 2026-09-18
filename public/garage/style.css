@@ -1047,6 +1047,27 @@ footer.page-foot {
 .quick-log-checkbox-row { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 6px; }
 .quick-log-checkbox { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--ink); }
 .quick-log-generate { align-self: flex-start; margin-top: 12px; }
+
+/* None of these quick-log forms have a backend to save to, so an accidental
+   reload or navigation away used to throw away real typed data with no way
+   back. Same "restored draft" notice CSM's and CGT's own quick-log forms
+   already use, styled with this page's existing amber info-banner tone. */
+.quick-log-draft-banner[hidden] { display: none; }
+.quick-log-draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: #E8C088;
+  line-height: 1.5;
+  background: rgba(224,160,48,0.06);
+  border: 1px solid rgba(224,160,48,0.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 14px;
+}
+.quick-log-draft-banner span { flex: 1 1 260px; }
 .quick-log-warnings {
   font-size: 0.72rem;
   color: #E0A030;
