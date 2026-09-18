@@ -1160,7 +1160,7 @@ textarea.np-input { resize: vertical; }
      on paper. */
   .section-details > summary.section-title::before { display: none; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, #calcSection, #photoAuditSection, #paceSection {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, #calcSection, #photoAuditSection, #paceSection, #poshmarkShareSection {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
