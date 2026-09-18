@@ -82,6 +82,33 @@ function escapeHtml(str) {
   }[c]));
 }
 
+// An empty state that just says "add one to whatever.json" is a dead end,
+// the matching quick-log tool already exists further up the page but stays
+// collapsed and easy to miss. This turns each empty state into a real CTA:
+// it opens that tool's own <details> (each of the three has its own here,
+// unlike a single shared one), scrolls its form into view, and focuses the
+// first field. Delegated on document since empty states are re-created on
+// every render.
+function openQuickLogForm(detailsId, formId) {
+  const details = document.getElementById(detailsId);
+  const form = document.getElementById(formId);
+  if (!details || !form) return;
+  details.open = true;
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const firstField = form.querySelector('input, select, textarea');
+  if (firstField) firstField.focus();
+}
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-open-quick-log]');
+  if (!btn) return;
+  const [detailsId, formId] = btn.getAttribute('data-open-quick-log').split(':');
+  openQuickLogForm(detailsId, formId);
+});
+function emptyStateCta(detailsId, formId, label) {
+  return '<button type="button" class="print-btn empty-state-cta" data-open-quick-log="' +
+    escapeHtml(detailsId) + ':' + escapeHtml(formId) + '">' + escapeHtml(label) + '</button>';
+}
+
 function formatUsd(n) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
@@ -921,7 +948,8 @@ function renderCandidates() {
   const ranked = buildRankedCandidates();
 
   if (!ranked.length) {
-    el.innerHTML = '<p class="submissions-empty" role="status">No raw-card candidates logged yet.</p>';
+    el.innerHTML = '<p class="submissions-empty" role="status">No raw-card candidates logged yet.' +
+      emptyStateCta('quickLogCandidateTool', 'quickCandidateForm', 'Log one now') + '</p>';
     return;
   }
 
@@ -1073,7 +1101,7 @@ function renderSubmissions() {
   if (!active.length) {
     el.innerHTML = '<p class="submissions-empty" role="status">Nothing currently out for grading.' +
       (returnedCount ? ' ' + returnedCount + ' past submission' + (returnedCount === 1 ? '' : 's') + ' logged as returned.' : '') +
-      '</p>';
+      emptyStateCta('quickLogSubmissionTool', 'quickSubmissionForm', 'Log one now') + '</p>';
     return;
   }
 
@@ -1718,7 +1746,8 @@ function applyFiltersAndRender() {
     renderTableFooter(filtered);
     empty.hidden = false;
     empty.setAttribute('role', 'status');
-    empty.textContent = cards.length ? 'No cards match the current filters.' : 'No cards logged yet.';
+    empty.innerHTML = cards.length ? 'No cards match the current filters.' :
+      'No cards logged yet.' + emptyStateCta('quickLogTool', 'quickCardForm', 'Log one now');
     return;
   }
   empty.hidden = true;

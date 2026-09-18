@@ -676,6 +676,7 @@ table.card-table {
 .submission-link:hover { color: var(--ink); }
 .submissions-empty { font-size: 0.85rem; color: var(--dim); padding: 12px 0; }
 .submissions-returned-note { font-size: 0.72rem; color: var(--dim); padding: 0 0 10px; }
+.empty-state-cta { display: block; margin: 14px auto 0; }
 
 /* Candidates are the one submission-row variant that opens a detail modal
    (see openCandidateModal in app.js), so unlike a plain .submission-row it
