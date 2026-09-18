@@ -9,6 +9,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { findDuplicateLeads } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
@@ -267,6 +268,37 @@ function main() {
     emDashFields(g, ['label', 'note']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
   });
+
+  // changelog.json is generated, not hand-edited (see changelog.js), so it
+  // can't have the typo-style errors above, only one real failure mode: it
+  // silently falls behind after someone commits a real edit to one of the
+  // hand-edited files above without re-running the generator. Comparing its
+  // recorded latest commit against this repo's actual latest commit for
+  // those same files is the only way to catch that drift; git itself is the
+  // source of truth here, same as changelog.js.
+  try {
+    const latestRealHash = execFileSync('git', [
+      'log', '-1', '--format=%H', '--',
+      'releases.json', 'downloads.json', 'leads.json', 'channels.json', 'goals.json'
+    ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
+    let changelogData = null;
+    try {
+      changelogData = loadJson('changelog.json');
+    } catch (e) {
+      warnings.push('changelog.json is missing or unreadable (' + e.message + '), run node public/sondrik/data/changelog.js');
+    }
+    if (changelogData && latestRealHash) {
+      const recordedHash = (changelogData.entries && changelogData.entries[0] && changelogData.entries[0].fullHash) || null;
+      if (recordedHash !== latestRealHash) {
+        warnings.push('changelog.json is stale (its latest recorded commit does not match this repo\'s actual latest commit ' +
+          'touching these data files), run node public/sondrik/data/changelog.js to refresh it');
+      }
+    }
+  } catch (e) {
+    // Not a git checkout, or git isn't on PATH: can't check changelog
+    // freshness, but that's an environment gap, not a data error, so this
+    // stays silent rather than adding a warning no one can act on.
+  }
 
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
