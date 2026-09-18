@@ -196,6 +196,29 @@ function main() {
       errors.push(where + ': outreach.sent is true but approvalStatus is not "approved". A send must never be ' +
         'recorded without an explicit approval on record.');
     }
+    // A 2026-09-17 incident (see git history) set sent:true and
+    // approvalStatus:"approved" together, justified only by an unverifiable
+    // "per project memory" note, when the send had not actually happened.
+    // approvalStatus alone is trivial to flip alongside sent in the same
+    // edit, so it caught nothing. Requiring a real, dated sentDate distinct
+    // from loggedDate raises the bar: it forces whoever marks a lead sent to
+    // write down the specific day it happened, not just echo the two status
+    // fields back at each other. This still cannot prove the send was real,
+    // so it is not sufficient on its own: outreach must only ever be marked
+    // sent because Jack said, in his own words, that he sent it, never
+    // inferred, assumed, or reconstructed from "memory".
+    if (o.sent === true && typeof o.sentDate !== 'string') {
+      errors.push(where + ': outreach.sent is true but "sentDate" is missing. Record the real date Jack said ' +
+        'he sent it, never leave this implicit.');
+    } else if (o.sent === true && !DATE_RE.test(o.sentDate)) {
+      errors.push(where + ': outreach.sentDate (' + JSON.stringify(o.sentDate) + ') is not a YYYY-MM-DD date.');
+    } else if (o.sent === true && isFutureDate(o.sentDate)) {
+      errors.push(where + ': outreach.sentDate (' + o.sentDate + ') is in the future, check for a typo.');
+    }
+    if (o.sent !== true && o.sentDate) {
+      errors.push(where + ': outreach.sentDate is set but sent is not true, remove it until the message is ' +
+        'actually sent.');
+    }
     if (o.sent === undefined) {
       errors.push(where + ': outreach.sent must be explicitly true or false, never left unset.');
     }

@@ -82,7 +82,11 @@
             as a spreadsheet.</td></tr>
           <tr><th>leads.json</th><td>One object per real lead. <code>outreach.sent</code> must stay
             <code>false</code> until the message has actually been sent by a human. The validator refuses a
-            <code>sent: true</code> entry unless <code>approvalStatus</code> is also <code>"approved"</code>.
+            <code>sent: true</code> entry unless <code>approvalStatus</code> is also <code>"approved"</code> and
+            <code>sentDate</code> is a real <code>YYYY-MM-DD</code> date. Only flip these fields because Jack has
+            said, in his own words, that he sent it; a 2026-09-17 incident marked a real lead sent based on an
+            unverifiable "per project memory" claim when it had not been sent, so never infer, assume, or
+            reconstruct a send from anything other than a direct statement.
             Set <code>channelId</code> to the id of the channel (in <code>channels.json</code>) this lead actually
             came from, so its count attributes to the right channel card instead of every "leads"-linked channel
             showing the same total. Leave it unset rather than guessing if the real source isn't one of the

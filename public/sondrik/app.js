@@ -891,7 +891,7 @@
     leadsSection.innerHTML = leads.map(l => {
       const o = l.outreach || {};
       const pillText = o.sent
-        ? 'SENT'
+        ? 'SENT' + (o.sentDate ? ' ' + fmtDate(o.sentDate) : '')
         : (o.approvalStatus === 'awaiting-approval' ? 'DRAFT READY, AWAITING APPROVAL' : (o.draftStatus || 'NO DRAFT YET').toUpperCase());
       const pillClass = o.sent ? 'status-pill status-pill-sent' : 'status-pill';
       return '<div class="lead-card">' +
