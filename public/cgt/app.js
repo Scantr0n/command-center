@@ -1089,6 +1089,25 @@ function buildActiveSubmissions() {
     });
 }
 
+// Shared by renderSubmissions below (the on-page "est. back ~" label) and
+// buildSubmissionReturnReminders (the .ics export), so the two never drift:
+// same real-history-beats-published-estimate rule, same "no estimate once
+// it's already running long" cutoff.
+function estimatedReturnFor(s, turnaroundByGrader) {
+  const days = daysSince(s.submittedDate);
+  const graderStats = s.gradingCompany && turnaroundByGrader.get(s.gradingCompany);
+  const hasRealHistory = graderStats && graderStats.count >= 2;
+  const runningLong = days != null && hasRealHistory && days > graderStats.value;
+  const publishedDays = !hasRealHistory && s.gradingCompany ? publishedTurnaroundDays(s.gradingCompany, s.serviceLevel) : null;
+  const estReturnDate = (!runningLong && s.submittedDate && hasRealHistory)
+    ? addDaysIso(s.submittedDate, graderStats.value)
+    : (!runningLong && s.submittedDate && publishedDays != null)
+      ? addDaysIso(s.submittedDate, businessDaysToCalendarDays(publishedDays))
+      : null;
+  const estReturnIsPublished = estReturnDate != null && !hasRealHistory;
+  return { days, graderStats, hasRealHistory, runningLong, publishedDays, estReturnDate, estReturnIsPublished };
+}
+
 // A separate feed from Pricing activity above: this is the front of the
 // pipeline (cards shipped off, not graded yet) rather than the back of it
 // (cards already priced). Kept in its own section since the two answer
@@ -1115,29 +1134,8 @@ function renderSubmissions() {
 
   const rows = active.map(s => {
     const meta = SUBMISSION_STATUS_META[s.status] || { label: s.status, cls: 'badge-status-queue' };
-    const days = daysSince(s.submittedDate);
+    const { days, graderStats, runningLong, publishedDays, estReturnDate, estReturnIsPublished } = estimatedReturnFor(s, turnaroundByGrader);
     const daysText = days == null ? 'no date logged' : days + ' day' + (days === 1 ? '' : 's') + ' in queue';
-    const graderStats = s.gradingCompany && turnaroundByGrader.get(s.gradingCompany);
-    const runningLong = days != null && graderStats && graderStats.count >= 2 && days > graderStats.value;
-    // Only projected forward while the submission is still within that
-    // grader's own average window; once it's running long the "past avg"
-    // badge below already says so, and a projected date already in the past
-    // would just read as a broken estimate rather than a useful one.
-    const hasRealHistory = graderStats && graderStats.count >= 2;
-    // Real returned-submission history for this grader beats the published
-    // schedule whenever there's enough of it (2+ returns); until then, fall
-    // back to the grader's own published estimate (PUBLISHED_TURNAROUND_DAYS,
-    // see the Grading service tiers reference section) rather than showing
-    // nothing at all. Same "recent-sale beats comp-estimate, but a labeled
-    // estimate beats a blank" rule the card pricing side of this hub already
-    // uses, applied to turnaround instead of price.
-    const publishedDays = !hasRealHistory && s.gradingCompany ? publishedTurnaroundDays(s.gradingCompany, s.serviceLevel) : null;
-    const estReturnDate = (!runningLong && s.submittedDate && hasRealHistory)
-      ? addDaysIso(s.submittedDate, graderStats.value)
-      : (!runningLong && s.submittedDate && publishedDays != null)
-        ? addDaysIso(s.submittedDate, businessDaysToCalendarDays(publishedDays))
-        : null;
-    const estReturnIsPublished = estReturnDate != null && !hasRealHistory;
     const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
     const metaParts = [
       s.gradingCompany,
@@ -2805,6 +2803,95 @@ function buildAllSubmissionsSorted() {
     return a.submittedDate.localeCompare(b.submittedDate);
   });
 }
+
+// RFC 5545 (iCalendar) text escaping and 75-octet line folding, same
+// approach Garage's and Sondrik's own .ics exports already use.
+function icsEscapeText(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
+function icsFoldLine(line) {
+  if (line.length <= 75) return line;
+  let out = line.slice(0, 75);
+  let rest = line.slice(75);
+  while (rest.length) {
+    out += '\r\n ' + rest.slice(0, 74);
+    rest = rest.slice(74);
+  }
+  return out;
+}
+
+// One all-day VEVENT per active submission with a real computable estimate,
+// never anything invented for a submission with no submittedDate or no
+// grader history/published schedule to estimate from (estimatedReturnFor
+// already returns null in that case, filtered out below).
+function buildSubmissionReturnReminders() {
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const today = todayIso();
+  return buildActiveSubmissions().map(s => {
+    const { estReturnDate, estReturnIsPublished, graderStats, publishedDays } = estimatedReturnFor(s, turnaroundByGrader);
+    if (!estReturnDate) return null;
+    const title = s.description || 'Untitled submission';
+    const date = estReturnDate < today ? today : estReturnDate;
+    const basis = estReturnIsPublished
+      ? `${s.gradingCompany}'s own published estimate (about ${publishedDays} business days for this service level, not a guarantee)`
+      : `${s.gradingCompany}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee`;
+    return {
+      id: s.id,
+      date,
+      summary: `Expect back from ${s.gradingCompany || 'grader'}: ${title}`,
+      description: `Estimated return around ${estReturnDate}, based on ${basis}. Command Center CGT.`
+    };
+  }).filter(Boolean);
+}
+
+function buildSubmissionsIcs(reminders) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Command Center//CGT Submission Reminders//EN', 'CALSCALE:GREGORIAN'];
+  reminders.forEach(r => {
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:cgt-${r.id}-${r.date}@command-center.local`);
+    lines.push(`DTSTAMP:${stamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${r.date.replace(/-/g, '')}`);
+    lines.push(icsFoldLine(`SUMMARY:${icsEscapeText(r.summary)}`));
+    lines.push(icsFoldLine(`DESCRIPTION:${icsEscapeText(r.description)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(icsFoldLine(`DESCRIPTION:${icsEscapeText(r.summary)}`));
+    lines.push('TRIGGER:PT9H');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n') + '\r\n';
+}
+
+const submissionsIcsBtn = document.getElementById('submissionsIcsBtn');
+const SUBMISSIONS_ICS_LABEL = submissionsIcsBtn.textContent;
+submissionsIcsBtn.addEventListener('click', () => {
+  const reminders = buildSubmissionReturnReminders();
+  if (!reminders.length) {
+    submissionsIcsBtn.textContent = 'No active submissions with an estimate yet';
+    setTimeout(() => { submissionsIcsBtn.textContent = SUBMISSIONS_ICS_LABEL; }, 2400);
+    return;
+  }
+  const ics = buildSubmissionsIcs(reminders);
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cgt-submission-reminders-' + todayIso() + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  submissionsIcsBtn.textContent = `Downloaded ${reminders.length} reminder${reminders.length === 1 ? '' : 's'}`;
+  setTimeout(() => { submissionsIcsBtn.textContent = SUBMISSIONS_ICS_LABEL; }, 2400);
+});
 
 document.getElementById('submissionsCsvBtn').addEventListener('click', () => {
   const rows = buildAllSubmissionsSorted();
