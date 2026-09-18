@@ -431,10 +431,56 @@ async function loadCandidates() {
   }
 }
 
+// changelog.json is generated (see public/cgt/data/changelog.js), not
+// hand-edited, from this repo's real git history over cards.json,
+// submissions.json, and candidates.json. A fresh clone before anyone has
+// run that script is a real, expected state (an honest empty state), not a
+// load failure, so it never blocks or fails the rest of loadCards.
+async function loadChangelog() {
+  try {
+    const res = await fetch('/cgt/data/changelog.json');
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    renderChangelog(await res.json());
+  } catch (e) {
+    renderChangelog({ entries: [] });
+    console.error("Couldn't load changelog.json: " + e.message);
+  }
+}
+
+function renderChangelog(data) {
+  const el = document.getElementById('changelogFeed');
+  const entries = (data && data.entries) || [];
+  if (entries.length === 0) {
+    el.innerHTML = '<p class="changelog-empty">No changelog generated yet. Run ' +
+      '<code>node public/cgt/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
+    return;
+  }
+  const rowsHtml = entries.map(e => {
+    const files = (e.files || []).join(', ');
+    return '<div class="changelog-row">' +
+      '<span class="changelog-date font-mono">' + escapeHtml(e.date) + '</span>' +
+      '<span class="changelog-hash" title="' + escapeHtml(e.fullHash || e.hash) + '">' + escapeHtml(e.hash) + '</span>' +
+      '<span class="changelog-author">' + escapeHtml(e.author) + '</span>' +
+      '<span class="changelog-subject">' + escapeHtml(e.subject) + '</span>' +
+      (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
+      '</div>';
+  }).join('');
+  el.innerHTML = rowsHtml;
+  let noteEl = el.nextElementSibling;
+  if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
+    noteEl = document.createElement('p');
+    noteEl.className = 'section-note changelog-generated-note';
+    el.after(noteEl);
+  }
+  noteEl.textContent = 'Generated ' + (data.generatedAt || 'at an unknown time').slice(0, 10) +
+    ' from ' + (data.generatedFrom || 'git log') + '.';
+}
+
 async function loadCards() {
   const errBox = document.getElementById('tableEmpty');
   await loadSubmissions();
   await loadCandidates();
+  loadChangelog();
   try {
     const res = await fetch('/cgt/data/cards.json');
     if (!res.ok) throw new Error('Server returned ' + res.status);

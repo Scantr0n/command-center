@@ -750,6 +750,15 @@
     </div>
   </section>
 
+  <section>
+    <h2 class="section-title">Data changelog</h2>
+    <p class="section-note">Real git commit history of <code>cards.json</code>, <code>submissions.json</code>, and
+      <code>candidates.json</code>, not a hand-typed claim: each row below is an actual commit hash, author, and
+      date from this repo, so a new grading batch or a backfilled value can be checked against real history instead
+      of trusted on its face. Regenerate after new commits with <code>node public/cgt/data/changelog.js</code>.</p>
+    <div id="changelogFeed" class="changelog-feed"><p class="changelog-empty">Loading...</p></div>
+  </section>
+
   <!--
     Built for print only (see #insuranceSummary in style.css and the
     insurancePrintBtn handler in app.js). The regular "Print / export PDF"
@@ -769,7 +778,8 @@
     <code>/cgt/data/candidates.json</code>, all edited by hand until a real backend is wired in. The real hockey/
     baseball/football backlog has been imported into <code>cards.json</code>; <code>submissions.json</code> and
     <code>candidates.json</code> still only hold their placeholder example rows and need real entries logged by
-    hand (or import CSV) as batches actually go out and raw cards actually get weighed.
+    hand (or import CSV) as batches actually go out and raw cards actually get weighed. Run
+    <code>node public/cgt/data/changelog.js</code> after any edit to refresh the data changelog from git.
   </footer>
 </div>
 
