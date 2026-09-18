@@ -65,7 +65,8 @@ header.page-head .sub {
   gap: 6px;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.back-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.back-link:hover, .back-link:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
+.back-link:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: 2px; }
 
 .page-head-actions {
   display: flex;
@@ -84,7 +85,8 @@ header.page-head .sub {
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.print-btn:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
+.print-btn:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: 2px; }
 .print-btn:disabled { opacity: 0.45; cursor: default; }
 .print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
