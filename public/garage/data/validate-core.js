@@ -35,5 +35,20 @@
     return [...byKey.values()].filter(group => group.length > 1);
   }
 
-  return { findDuplicateListings };
+  // Catches the exact shape of the real eBay return-policy bug logged in
+  // activity.json: all three eBay listings had silently inherited a
+  // "30-Day Seller-Paid Returns (Parts & Accessories)" policy meant for auto
+  // parts, which blocked publish until caught by hand. Nothing else here
+  // reads the real per-listing eBay return policy at all, so a future
+  // relist or copy-pasted listing could inherit the same wrong template
+  // again with no flag ever surfacing. Text match only, since there's no
+  // live eBay connection to read the real policy id from; a policy name
+  // mentioning parts, accessories, or auto is never right for this store's
+  // actual inventory (shoes, electronics, clothing).
+  const SUSPICIOUS_EBAY_RETURN_POLICY_RE = /\b(parts|accessor(?:y|ies)|auto(?:motive)?)\b/i;
+  function isSuspiciousEbayReturnPolicy(policy) {
+    return typeof policy === 'string' && SUSPICIOUS_EBAY_RETURN_POLICY_RE.test(policy);
+  }
+
+  return { findDuplicateListings, isSuspiciousEbayReturnPolicy };
 });

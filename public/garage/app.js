@@ -812,9 +812,14 @@ function renderDelistList(listings) {
 // costBasis silently drops the profit column from its own payout-by-platform
 // table in the detail modal (see openModal). Neither is a validate.js error,
 // both are schema-documented "leave null until known, never guess" fields,
-// so nothing forces a hand-edit to notice the gap. Same "Needs backfill"
-// pattern as the CSM/CGT hubs' own data-quality panels, hidden entirely when
-// nothing is flagged rather than showing an empty box.
+// so nothing forces a hand-edit to notice the gap. Also flags a live eBay
+// listing with no ebayReturnPolicy logged, or one that looks like it
+// inherited an unrelated template (see isSuspiciousEbayReturnPolicy in
+// validate-core.js): the exact silent-failure shape as the real "30-Day
+// Seller-Paid Returns (Parts & Accessories)" bug already caught once (see
+// activity.json), so a future relist can't repeat it unnoticed. Same "Needs
+// backfill" pattern as the CSM/CGT hubs' own data-quality panels, hidden
+// entirely when nothing is flagged rather than showing an empty box.
 function buildDataQualityFlags(listings) {
   return listings
     .filter(l => l.status === 'live')
@@ -823,6 +828,13 @@ function buildDataQualityFlags(listings) {
       if (!l.datePublished) reasons.push('NO DATE PUBLISHED LOGGED (BLOCKS RELIST GUIDANCE)');
       if (l.costBasis == null) reasons.push('NO COST BASIS LOGGED (BLOCKS PROFIT CALC)');
       if (!l.location) reasons.push('NO STORAGE LOCATION LOGGED (SLOWS FULFILLMENT ON SALE)');
+      if ((l.platforms || []).includes('ebay')) {
+        if (!l.ebayReturnPolicy) {
+          reasons.push('NO EBAY RETURN POLICY LOGGED (COULD BE A SILENTLY INHERITED WRONG POLICY)');
+        } else if (GarageValidateCore.isSuspiciousEbayReturnPolicy(l.ebayReturnPolicy)) {
+          reasons.push('EBAY RETURN POLICY "' + l.ebayReturnPolicy.toUpperCase() + '" LOOKS INHERITED FROM AN UNRELATED TEMPLATE, CONFIRM IT');
+        }
+      }
       const missingUrlPlatforms = (l.platforms || []).filter(p =>
         !(l.soldOn || []).includes(p) && !(l.listingUrls && l.listingUrls[p])
       );
@@ -2569,6 +2581,7 @@ function listingEditFormHtml(l) {
     leSelectRow('leStatus', 'Status', l.status, [['draft', 'Draft'], ['ready-to-post', 'Ready to post'], ['live', 'Live'], ['sold', 'Sold']]) +
     leFieldRow('leDatePublished', 'Date published', l.datePublished, 'date') +
     leFieldRow('leLocation', 'Storage location', l.location) +
+    leFieldRow('leEbayReturnPolicy', 'eBay return policy (the real policy set on the eBay listing, if any)', l.ebayReturnPolicy) +
     leFieldRow('leNotes', 'Notes', l.notes, 'textarea') +
     '</div>' +
     '<button type="button" id="leGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
@@ -2607,6 +2620,7 @@ function wireListingEditForm(l) {
     const status = document.getElementById('leStatus').value;
     const datePublished = leVal('leDatePublished');
     const location = leVal('leLocation');
+    const ebayReturnPolicy = leVal('leEbayReturnPolicy');
     const notes = leVal('leNotes');
 
     const blockers = [];
@@ -2641,6 +2655,10 @@ function wireListingEditForm(l) {
         }
       });
     }
+    if (platforms.includes('ebay') && ebayReturnPolicy && GarageValidateCore.isSuspiciousEbayReturnPolicy(ebayReturnPolicy)) {
+      advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
+        'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing.');
+    }
 
     if (blockers.length) {
       warningsEl.innerHTML = blockers.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
@@ -2658,6 +2676,7 @@ function wireListingEditForm(l) {
       status,
       datePublished,
       location,
+      ebayReturnPolicy,
       notes
     });
 
@@ -2823,6 +2842,16 @@ function openModal(id) {
 
   rows.push(fieldRow('Storage location', l.location ? escapeHtml(l.location) : 'Not logged', !l.location));
 
+  if ((l.platforms || []).includes('ebay')) {
+    const suspicious = l.ebayReturnPolicy && GarageValidateCore.isSuspiciousEbayReturnPolicy(l.ebayReturnPolicy);
+    const returnPolicyHtml = !l.ebayReturnPolicy
+      ? 'Not logged, confirm the real eBay listing isn\'t silently carrying a wrong inherited policy'
+      : suspicious
+        ? escapeHtml(l.ebayReturnPolicy) + ' <span class="badge badge-hold" title="Mentions parts/accessories/auto, the same wrong-template pattern as the real bug already caught once">check this</span>'
+        : escapeHtml(l.ebayReturnPolicy);
+    rows.push(fieldRow('eBay return policy', returnPolicyHtml, !l.ebayReturnPolicy || suspicious));
+  }
+
   const compsHtml = l.title
     ? `<a class="badge badge-link" href="${escapeHtml(ebaySoldSearchUrl(l.title))}" target="_blank" rel="noopener noreferrer" title="Opens eBay's real sold-listings search for this title in a new tab">eBay sold listings for "${escapeHtml(l.title)}" <span aria-hidden="true">&#8599;</span></a>`
     : 'Not applicable, no title logged.';
@@ -2921,7 +2950,7 @@ function csvField(v) {
 const CSV_COLUMNS = [
   ['title', 'Item'], ['price', 'Price'], ['costBasis', 'Cost basis'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
   ['status', 'Status'], ['datePublished', 'Published'], ['daysListed', 'Days listed'],
-  ['relistGuidance', 'Relist guidance'], ['location', 'Location'], ['notes', 'Notes']
+  ['relistGuidance', 'Relist guidance'], ['location', 'Location'], ['ebayReturnPolicy', 'eBay return policy'], ['notes', 'Notes']
 ];
 
 // Exports exactly what the table currently shows (same search, platform
@@ -3327,6 +3356,7 @@ function wireQuickLogTool() {
     const status = document.getElementById('nlStatus').value;
     const datePublished = document.getElementById('nlDatePublished').value || null;
     const location = document.getElementById('nlLocation').value.trim() || null;
+    const ebayReturnPolicy = document.getElementById('nlEbayReturnPolicy').value.trim() || null;
     const notes = document.getElementById('nlNotes').value.trim() || null;
 
     const blockers = [];
@@ -3353,6 +3383,10 @@ function wireQuickLogTool() {
         }
       });
     }
+    if (platforms.includes('ebay') && ebayReturnPolicy && GarageValidateCore.isSuspiciousEbayReturnPolicy(ebayReturnPolicy)) {
+      advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
+        'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing before publishing.');
+    }
 
     if (blockers.length) {
       warningsBox.textContent = blockers.join(' ');
@@ -3373,7 +3407,8 @@ function wireQuickLogTool() {
       status,
       datePublished,
       notes,
-      location
+      location,
+      ebayReturnPolicy
     };
 
     warningsBox.textContent = advisory.join(' ');

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-18T16:39:25.348Z",
+  "generatedAt": "2026-09-18T18:53:46.892Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
     {
@@ -13,11 +13,11 @@
       ]
     },
     {
-      "hash": "9333b54",
-      "fullHash": "9333b5409bfebc411196b6d7d5235ae8774a15e0",
-      "date": "2026-09-17",
+      "hash": "e2cf969",
+      "fullHash": "e2cf96916732436b7197888eced1700d86d5c142",
+      "date": "2026-09-18",
       "author": "Claude",
-      "subject": "CGT: add hover tooltip for truncated Value breakdown labels",
+      "subject": "CGT: add optional per-card photo URL field",
       "files": [
         "activity.json",
         "disputes.json",

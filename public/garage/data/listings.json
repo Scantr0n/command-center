@@ -12,7 +12,8 @@
       "status": "live",
       "datePublished": null,
       "notes": null,
-      "location": null
+      "location": null,
+      "ebayReturnPolicy": "No Return Accepted"
     },
     {
       "id": "white-boots",
@@ -26,7 +27,8 @@
       "status": "live",
       "datePublished": null,
       "notes": null,
-      "location": null
+      "location": null,
+      "ebayReturnPolicy": "No Return Accepted"
     },
     {
       "id": "softball-swing-analyzer",
@@ -39,7 +41,8 @@
       "status": "live",
       "datePublished": null,
       "notes": null,
-      "location": null
+      "location": null,
+      "ebayReturnPolicy": "No Return Accepted"
     }
   ]
 }

@@ -63,6 +63,7 @@
           <tr><th>datePublished</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet. Also drives the "Relist reminders" section below, log the real date an item first went live to get relist guidance for it.</td></tr>
           <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
           <tr><th>location</th><td>Real physical storage spot for this item right now, e.g. <code>"Bin 3"</code> or <code>"Closet shelf B"</code>, a string or <code>null</code> until logged. Standard reseller inventory practice: pairs a bin/shelf label with each item so it can actually be found and shipped fast once it sells, rather than searched for. Purely descriptive, doesn't drive any calculation on this page.</td></tr>
+          <tr><th>ebayReturnPolicy</th><td>The real return policy name set on the actual eBay listing, e.g. <code>"No Return Accepted"</code>, or <code>null</code> until confirmed. Only meaningful when <code>ebay</code> is in <code>platforms</code>. Exists because of a real bug: three eBay listings silently inherited a "30-Day Seller-Paid Returns (Parts &amp; Accessories)" policy meant for auto parts, which blocked publish (see the Activity log below). A live eBay listing with this left <code>null</code>, or set to anything mentioning parts/accessories/auto, gets flagged in "Needs backfill" below so that exact bug can't repeat unnoticed.</td></tr>
           <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>.</td></tr>
           <tr><th>activity.json</th><td>One object per logged event in the <code>events</code> array: real bug fixes, photo audits, and other quality checks. Requires <code>id</code>, <code>title</code>, and <code>type</code> (<code>bug-fix</code>, <code>photo-audit</code>, or <code>other</code>).</td></tr>
           <tr><th>sales.json</th><td>One object per real completed sale in the <code>sales</code> array. Log a sale here <em>and</em> add that platform to the item's <code>soldOn</code> array in listings.json, both matter: this is the sale history, soldOn is what still needs delisting elsewhere.</td></tr>
@@ -96,7 +97,8 @@
   "status": "draft",
   "datePublished": null,
   "notes": null,
-  "location": null
+  "location": null,
+  "ebayReturnPolicy": null
 }</pre>
     </div>
   </details>
@@ -151,6 +153,8 @@
           <input class="quick-log-input" type="date" id="nlDatePublished">
           <label class="quick-log-label" for="nlLocation">Storage location (optional)</label>
           <input class="quick-log-input" type="text" id="nlLocation" placeholder="e.g. Bin 3">
+          <label class="quick-log-label" for="nlEbayReturnPolicy">eBay return policy (optional, only if listed on eBay)</label>
+          <input class="quick-log-input" type="text" id="nlEbayReturnPolicy" placeholder="e.g. No Return Accepted">
           <label class="quick-log-label" for="nlNotes">Notes (optional)</label>
           <input class="quick-log-input" type="text" id="nlNotes">
           <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>

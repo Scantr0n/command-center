@@ -31,7 +31,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { findDuplicateListings } = require('./validate-core.js');
+const { findDuplicateListings, isSuspiciousEbayReturnPolicy } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -186,6 +186,20 @@ function main() {
 
     if (l.location !== null && l.location !== undefined && typeof l.location !== 'string') {
       errors.push(where + ': "location" must be a string (real bin/shelf label) or null');
+    }
+
+    if (l.ebayReturnPolicy !== null && l.ebayReturnPolicy !== undefined && typeof l.ebayReturnPolicy !== 'string') {
+      errors.push(where + ': "ebayReturnPolicy" must be a string (the real policy name set on the eBay listing) or null');
+    }
+    if (l.status === 'live' && Array.isArray(l.platforms) && l.platforms.includes('ebay')) {
+      if (!l.ebayReturnPolicy) {
+        warnings.push(where + ': live on eBay with no "ebayReturnPolicy" logged, confirm the real listing isn\'t ' +
+          'silently carrying a wrong inherited policy (the exact bug already caught once, see activity.json)');
+      } else if (isSuspiciousEbayReturnPolicy(l.ebayReturnPolicy)) {
+        warnings.push(where + ': "ebayReturnPolicy" is "' + l.ebayReturnPolicy + '", which mentions parts/' +
+          'accessories/auto, the same wrong-template pattern as the real bug already caught once. Confirm this ' +
+          'listing\'s actual eBay return policy and fix it if it really did inherit that template again.');
+      }
     }
 
     if (l.title && Array.isArray(l.platforms)) {
