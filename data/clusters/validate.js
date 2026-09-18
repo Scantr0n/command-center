@@ -27,8 +27,16 @@ const CATEGORIES = [
 const STATUSES = ['active', 'done', 'stalled', 'broken', 'unknown'];
 const PRIORITIES = ['top', 'normal', 'low'];
 
+// The shape regex alone accepts any two digits for month/day, including
+// "2026-13-45" or a real-looking but impossible "2026-02-30", so this
+// cross-checks the parsed date's own year/month/day against what was
+// actually typed: an impossible date never matches back.
 function isDateOrNull(v) {
-  return v === null || v === undefined || (typeof v === 'string' && DATE_RE.test(v));
+  if (v === null || v === undefined) return true;
+  if (typeof v !== 'string' || !DATE_RE.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  const parsed = new Date(y, m - 1, d);
+  return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
 }
 
 function main() {

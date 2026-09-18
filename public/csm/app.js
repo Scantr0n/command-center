@@ -99,8 +99,20 @@
   // the browser, kept here too since a hand-edit that skipped validate.js
   // (a non-zero-padded "2026-9-5", for example) reaches daysUntil() as a
   // string that parses to Invalid Date/NaN with no error, not a thrown one.
+  //
+  // The shape regex plus a bare NaN check isn't enough on its own: JS's Date
+  // constructor doesn't reject an impossible calendar day, it silently rolls
+  // it into the next one ("2026-02-30" parses as March 2, 2026, with no
+  // error), so a fat-fingered "Feb 30" or "Sept 31" used to sail through as
+  // a fully valid date and quietly shift every days-until/days-since label
+  // built from it. Cross-checking the parsed date's own year/month/day
+  // against what was actually typed catches that: a rolled-over date never
+  // matches back.
   function isValidDateStr(iso) {
-    return typeof iso === 'string' && DATE_RE.test(iso) && !isNaN(new Date(iso + 'T00:00:00').getTime());
+    if (typeof iso !== 'string' || !DATE_RE.test(iso)) return false;
+    const [y, m, d] = iso.split('-').map(Number);
+    const parsed = new Date(y, m - 1, d);
+    return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
   }
 
   function daysUntil(iso) {

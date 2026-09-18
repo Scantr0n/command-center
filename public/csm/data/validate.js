@@ -27,8 +27,18 @@ function loadJson(name) {
   return JSON.parse(raw);
 }
 
+// The shape regex alone accepts any two digits for month/day, including
+// "2026-13-45" or a real-looking but impossible "2026-02-30" (which the
+// browser-side isValidDateStr in app.js used to silently roll into March 2
+// instead of flagging), so this cross-checks the parsed date's own
+// year/month/day against what was actually typed: a rolled-over date never
+// matches back.
 function isDateOrNull(v) {
-  return v === null || v === undefined || (typeof v === 'string' && DATE_RE.test(v));
+  if (v === null || v === undefined) return true;
+  if (typeof v !== 'string' || !DATE_RE.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  const parsed = new Date(y, m - 1, d);
+  return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
 }
 
 function main() {
