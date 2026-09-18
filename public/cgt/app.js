@@ -2925,7 +2925,9 @@ const CANDIDATES_CSV_COLUMNS = [
 ];
 
 document.getElementById('candidatesCsvBtn').addEventListener('click', () => {
-  const rows = buildRankedCandidates().map(({ c }) => c);
+  const rows = buildRankedCandidates()
+    .filter(({ c, math }) => matchesCandidateFilters(c, math ? math.verdict : 'needs-data'))
+    .map(({ c }) => c);
   const header = CANDIDATES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(c => CANDIDATES_CSV_COLUMNS.map(([accessor]) => csvField(accessor(c))).join(','));
   const csv = [header, ...lines].join('\n');
