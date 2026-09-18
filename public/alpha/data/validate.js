@@ -39,6 +39,20 @@ function isIsoDatetimeOrNull(v) {
   return v === null || v === undefined || (typeof v === 'string' && ISO_DATETIME_RE.test(v));
 }
 
+// live.asOf and system.lastVerifiedAt drive every staleness signal this page
+// shows (freshnessClass's live/stale/down thresholds, the "last verified"
+// architecture trust label), so a mistyped year would otherwise silently
+// read as a fresh, trustworthy reading instead of the typo it actually is.
+// Same isFutureDate idea public/sondrik/data/validate.js and
+// data/clusters/validate.js already run on their own date fields, adapted
+// here for full ISO datetimes: a few minutes of tolerance for real clock
+// skew between whatever wrote this file and whatever validates it.
+const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
+function isFutureDatetime(v) {
+  if (!v || !ISO_DATETIME_RE.test(v)) return false;
+  return new Date(v).getTime() > Date.now() + CLOCK_SKEW_TOLERANCE_MS;
+}
+
 function scanForForbiddenKeys(obj, pathSoFar, errors) {
   if (obj === null || typeof obj !== 'object') return;
   for (const key of Object.keys(obj)) {
@@ -79,16 +93,23 @@ function main() {
   }
   if (!isIsoDatetimeOrNull(live.asOf)) {
     errors.push('live.asOf: not a valid ISO datetime or null: ' + JSON.stringify(live.asOf));
+  } else if (isFutureDatetime(live.asOf)) {
+    warnings.push('live.asOf (' + live.asOf + ') is in the future, a real reading should be timestamped when it ' +
+      'was actually taken, check for a typo\'d year');
   }
 
   if (live.killSwitch && !isIsoDatetimeOrNull(live.killSwitch.lastTriggeredAt)) {
     errors.push('live.killSwitch.lastTriggeredAt: not a valid ISO datetime or null');
+  } else if (live.killSwitch && isFutureDatetime(live.killSwitch.lastTriggeredAt)) {
+    warnings.push('live.killSwitch.lastTriggeredAt (' + live.killSwitch.lastTriggeredAt + ') is in the future, check for a typo\'d year');
   }
   if (live.killSwitch && live.killSwitch.engaged != null && typeof live.killSwitch.engaged !== 'boolean') {
     errors.push('live.killSwitch.engaged: must be true, false, or null');
   }
   if (live.genealogy && !isIsoDatetimeOrNull(live.genealogy.lastBreedingEventAt)) {
     errors.push('live.genealogy.lastBreedingEventAt: not a valid ISO datetime or null');
+  } else if (live.genealogy && isFutureDatetime(live.genealogy.lastBreedingEventAt)) {
+    warnings.push('live.genealogy.lastBreedingEventAt (' + live.genealogy.lastBreedingEventAt + ') is in the future, check for a typo\'d year');
   }
   if (live.regime != null && (typeof live.regime !== 'string' || !live.regime)) {
     errors.push('live.regime: must be null or a non-empty string');
@@ -151,6 +172,8 @@ function main() {
         }
         if (!isIsoDatetimeOrNull(l.lastEventAt)) {
           errors.push(where + '.lastEventAt: not a valid ISO datetime or null');
+        } else if (isFutureDatetime(l.lastEventAt)) {
+          warnings.push(where + '.lastEventAt (' + l.lastEventAt + ') is in the future, check for a typo\'d year');
         }
         if (l.lastEventNote != null && typeof l.lastEventNote !== 'string') {
           errors.push(where + '.lastEventNote: must be a string if set');
@@ -208,6 +231,9 @@ function main() {
         if (!isIsoDatetimeOrNull(entry.at) || entry.at == null) {
           errors.push(where + '.at: required, must be a valid ISO datetime (every check needs a real timestamp)');
         } else {
+          if (isFutureDatetime(entry.at)) {
+            warnings.push(where + '.at (' + entry.at + ') is in the future, check for a typo\'d year');
+          }
           // The page reads this array oldest-first without re-sorting (the
           // tick strip renders it in place, and mostRecentConnectedAt() scans
           // backward from the end assuming the end is newest), so an
@@ -238,6 +264,8 @@ function main() {
   // "33 agents" the same way they'd judge a live reading's age.
   if (data.system && !isIsoDatetimeOrNull(data.system.lastVerifiedAt)) {
     errors.push('system.lastVerifiedAt: not a valid ISO datetime or null: ' + JSON.stringify(data.system.lastVerifiedAt));
+  } else if (data.system && isFutureDatetime(data.system.lastVerifiedAt)) {
+    warnings.push('system.lastVerifiedAt (' + data.system.lastVerifiedAt + ') is in the future, check for a typo\'d year');
   }
 
   if ('events' in data) {
@@ -252,6 +280,8 @@ function main() {
         }
         if (!isIsoDatetimeOrNull(evt.at) || evt.at == null) {
           errors.push(where + '.at: required, must be a valid ISO datetime (every event needs a real timestamp)');
+        } else if (isFutureDatetime(evt.at)) {
+          warnings.push(where + '.at (' + evt.at + ') is in the future, check for a typo\'d year');
         }
         if (typeof evt.type !== 'string' || !evt.type) {
           errors.push(where + '.type: required, must be a non-empty string');
