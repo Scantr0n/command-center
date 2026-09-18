@@ -27,6 +27,7 @@ const VALID_BASES = ['recent-sale', 'comp-estimate', 'unpriced'];
 const VALID_GRADERS = ['PSA', 'BGS', 'SGC', 'CGC', 'HGA', 'KSA'];
 const VALID_SPORTS = ['hockey', 'baseball', 'football'];
 const VALID_OWNERSHIP = ['owned', 'sold'];
+const VALID_CANDIDATE_VERDICTS = ['worth-grading', 'marginal', 'not-worth', 'needs-data'];
 
 function restoreStateFromUrl() {
   const params = new URLSearchParams(location.search);
@@ -38,6 +39,12 @@ function restoreStateFromUrl() {
   const ownership = params.get('owned');
   const sort = params.get('sort');
   const dir = params.get('dir');
+  // Own query params, distinct from the cards tab's q/sport above, since the
+  // Candidates section (renderCandidates) has its own independent search box
+  // and sport/verdict chip filters that need to be bookmarkable/shareable too.
+  const candQ = params.get('candQ');
+  const candSport = params.get('candSport');
+  const candVerdict = params.get('candVerdict');
   if (q) searchTerm = q;
   if (sport && VALID_SPORTS.includes(sport)) activeSport = sport;
   if (basis && VALID_BASES.includes(basis)) activeBasis = basis;
@@ -53,6 +60,9 @@ function restoreStateFromUrl() {
   if (ownership && VALID_OWNERSHIP.includes(ownership)) activeOwnership = ownership;
   if (sort) sortKey = sort;
   if (dir === 'desc') sortDir = 'desc';
+  if (candQ) candidateSearchTerm = candQ;
+  if (candSport && VALID_SPORTS.includes(candSport)) activeCandidateSport = candSport;
+  if (candVerdict && VALID_CANDIDATE_VERDICTS.includes(candVerdict)) activeCandidateVerdict = candVerdict;
 }
 
 function setInitialChipState(containerId, dataAttr, value) {
@@ -74,6 +84,9 @@ function syncUrl() {
     params.set('sort', sortKey);
     if (sortDir === 'desc') params.set('dir', 'desc');
   }
+  if (candidateSearchTerm.trim()) params.set('candQ', candidateSearchTerm.trim());
+  if (activeCandidateSport !== 'all') params.set('candSport', activeCandidateSport);
+  if (activeCandidateVerdict !== 'all') params.set('candVerdict', activeCandidateVerdict);
   const qs = params.toString();
   const url = location.pathname + (qs ? '?' + qs : '');
   history.replaceState(null, '', url);
@@ -1091,6 +1104,7 @@ function updateCandidateChipCounts() {
 }
 
 function renderCandidates() {
+  syncUrl();
   const el = document.getElementById('candidatesFeed');
   const ranked = buildRankedCandidates();
   updateCandidateChipCounts();
@@ -2764,6 +2778,14 @@ setInitialChipState('sportFilter', 'data-sport', activeSport);
 setInitialChipState('basisFilter', 'data-basis', activeBasis);
 setInitialChipState('graderFilter', 'data-grader', activeGrader);
 setInitialChipState('ownershipFilter', 'data-owned', activeOwnership);
+// Same restore as the cards tab's chips/search box just above: without this,
+// a shared/bookmarked ?candSport=hockey URL filtered the candidates list
+// correctly (renderCandidates reads the restored state directly) but left
+// every candidate chip showing "All" and the candidate search box empty,
+// silently misrepresenting which filter was actually active.
+document.getElementById('candidateSearchInput').value = candidateSearchTerm;
+setInitialChipState('candidateSportFilter', 'data-cand-sport', activeCandidateSport);
+setInitialChipState('candidateVerdictFilter', 'data-cand-verdict', activeCandidateVerdict);
 
 wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
