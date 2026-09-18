@@ -530,6 +530,54 @@ header.page-head .sub {
 .activity-who { flex-shrink: 0; }
 .activity-label { color: var(--sub); }
 .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: none; }
+/* Data changelog: real git commit history of prospects.json/stages.json,
+   same row shape as the activity feed above but its own tag color (a
+   commit hash, not a business event) so the two don't read as the same
+   kind of fact. */
+.changelog-feed {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 12px;
+  background: var(--panel);
+}
+.changelog-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.changelog-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.82rem;
+}
+.changelog-row:first-child { border-top: none; }
+.changelog-date {
+  color: var(--dim);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  width: 82px;
+}
+.changelog-hash {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  color: var(--sub);
+  flex-shrink: 0;
+}
+.changelog-author { flex-shrink: 0; color: var(--sub); }
+.changelog-subject { color: var(--ink); }
+.changelog-files { color: var(--dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+.changelog-generated-note { margin-top: 4px; margin-bottom: 36px; }
+
 .activity-toggle {
   display: block;
   background: none;
@@ -1278,6 +1326,13 @@ footer.page-foot {
   .activity-tag { border-color: #999; background: none !important; color: #111 !important; }
   .activity-toggle { display: none !important; }
   .activity-list.is-collapsed .activity-row:nth-child(n+9) { display: flex !important; }
+
+  .changelog-feed { background: none; border-color: #bbb; }
+  .changelog-row { border-color: #ddd; }
+  .changelog-date, .changelog-author, .changelog-files { color: #444; }
+  .changelog-subject { color: #111; }
+  .changelog-hash { border-color: #999; background: none !important; color: #111 !important; }
+  .changelog-generated-note { color: #555; }
 
   .velocity-list { background: none; border-color: #bbb; }
   .velocity-row { border-color: #ddd; }

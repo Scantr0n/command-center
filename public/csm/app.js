@@ -29,6 +29,7 @@
   const categoryEffListEl = document.getElementById('categoryEffList');
   const socialReachListEl = document.getElementById('socialReachList');
   const attentionBarEl = document.getElementById('attentionBar');
+  const changelogFeedEl = document.getElementById('changelogFeed');
   const ACTIVITY_PREVIEW_COUNT = 8;
 
   printBtn.addEventListener('click', () => window.print());
@@ -765,6 +766,40 @@
         toggleBtn.setAttribute('aria-expanded', String(!collapsed));
       });
     }
+  }
+
+  // Renders changelog.json, a file no one hand-edits: it's regenerated from
+  // this repo's real git history by public/csm/data/changelog.js, so every
+  // hash, author, and date here is independently checkable against the
+  // repo instead of resting on a hand-typed claim. Missing the file
+  // entirely (never generated yet, or a fresh clone) is an honest empty
+  // state, not an error, same as an empty prospects list.
+  function renderChangelog(data) {
+    const entries = (data && data.entries) || [];
+    if (entries.length === 0) {
+      changelogFeedEl.innerHTML = '<p class="changelog-empty">No changelog generated yet. Run ' +
+        '<code>node public/csm/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
+      return;
+    }
+    const rowsHtml = entries.map(e => {
+      const files = (e.files || []).join(', ');
+      return '<div class="changelog-row">' +
+        '<span class="changelog-date font-mono">' + escapeHtml(fmtDate(e.date)) + '</span>' +
+        '<span class="changelog-hash" title="' + escapeHtml(e.fullHash || e.hash) + '">' + escapeHtml(e.hash) + '</span>' +
+        '<span class="changelog-author">' + escapeHtml(e.author) + '</span>' +
+        '<span class="changelog-subject">' + escapeHtml(e.subject) + '</span>' +
+        (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
+        '</div>';
+    }).join('');
+    changelogFeedEl.innerHTML = rowsHtml;
+    let noteEl = changelogFeedEl.nextElementSibling;
+    if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
+      noteEl = document.createElement('p');
+      noteEl.className = 'section-note changelog-generated-note';
+      changelogFeedEl.after(noteEl);
+    }
+    noteEl.textContent = 'Generated ' + (fmtDate((data.generatedAt || '').slice(0, 10)) || 'at an unknown time') +
+      ' from ' + (data.generatedFrom || 'git log') + '.';
   }
 
   // How many prospects have ever reached each stage, inferred from current
@@ -3300,6 +3335,11 @@
   // in either file. Promise.allSettled degrades to the real half of the data
   // instead, the same fix already applied to Sondrik's and Garage's loaders
   // for the same reason.
+  // changelog.json is generated (see public/csm/data/changelog.js), not
+  // hand-edited, and a fresh clone before anyone has run that script is a
+  // real, expected state, not a load failure, so it gets its own settled
+  // slot rather than joining the stages/prospects error handling below,
+  // same as Sondrik's own changelog fetch.
   Promise.allSettled([
     fetch('/csm/data/stages.json').then(r => {
       if (!r.ok) throw new Error('stages.json returned ' + r.status);
@@ -3310,8 +3350,13 @@
       if (!r.ok) throw new Error('prospects.json returned ' + r.status);
       const lastModifiedHeader = r.headers.get('last-modified');
       return r.json().then(data => ({ data, lastModified: lastModifiedHeader ? new Date(lastModifiedHeader) : null }));
+    }),
+    fetch('/csm/data/changelog.json').then(r => {
+      if (!r.ok) throw new Error('changelog.json returned ' + r.status);
+      return r.json();
     })
-  ]).then(([stagesResult, prospectsResult]) => {
+  ]).then(([stagesResult, prospectsResult, changelogResult]) => {
+    renderChangelog(changelogResult.status === 'fulfilled' ? changelogResult.value : { entries: [] });
     const stagesData = stagesResult.status === 'fulfilled' ? stagesResult.value.data : null;
     const prospectsData = prospectsResult.status === 'fulfilled' ? prospectsResult.value.data : null;
     allStages = (stagesData && stagesData.stages) || [];

@@ -349,11 +349,21 @@
       <div id="boardList"></div>
     </div>
   </section>
+
+  <section>
+    <h2 class="section-title">Data changelog</h2>
+    <p class="section-note">Real git commit history of <code>prospects.json</code> and <code>stages.json</code>,
+      not a hand-typed claim: each row below is an actual commit hash, author, and date from this repo, so a
+      stage move or a backfilled field can be checked against real history instead of trusted on its face.
+      Regenerate after new commits with <code>node public/csm/data/changelog.js</code>.</p>
+    <div id="changelogFeed" class="changelog-feed"><p class="changelog-empty">Loading...</p></div>
+  </section>
   </main>
 
   <footer class="page-foot font-mono">
     Data source: <code>/csm/data/prospects.json</code> and <code>/csm/data/stages.json</code>, edited by hand until a
-    real backend is wired in.
+    real backend is wired in. Run <code>node public/csm/data/validate.js</code> after any edit, then
+    <code>node public/csm/data/changelog.js</code> to refresh the data changelog from git.
     <span id="dataFreshness"></span>
   </footer>
 </div>
