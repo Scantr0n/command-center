@@ -233,6 +233,42 @@ header.page-head .sub {
   margin: 0 0 14px;
 }
 
+/* Reference and analytics widgets (platform reference, funnel, velocity,
+   channel/category effectiveness, social reach) are real but secondary to
+   the board itself, which used to sit below all of them, several screens
+   of scrolling past. Collapsed by default, same disclosure convention as
+   .schema-help above, so the actionable board and nudge queue are reached
+   faster while every widget stays one click away, never removed. */
+.section-details { margin: 0 0 36px; }
+.section-details > .funnel-list, .section-details > .velocity-list,
+.section-details > .channel-eff-list, .section-details > .callout {
+  margin-bottom: 0;
+}
+.section-details > summary.section-title {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.section-details > summary.section-title::-webkit-details-marker { display: none; }
+.section-details > summary.section-title::before {
+  content: '+';
+  color: var(--dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.section-details[open] > summary.section-title::before { content: '-'; }
+.section-details > summary.section-title:hover { color: var(--ink); }
+.section-details > summary.section-title:focus-visible {
+  outline: 1px solid var(--hairlineHover);
+  outline-offset: 3px;
+}
+.section-details > .section-note { margin-top: 0; }
+
 .section-note {
   font-size: 0.78rem;
   color: var(--dim);
@@ -1169,6 +1205,14 @@ footer.page-foot {
 @media print {
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
+
+  /* Content of a closed <details> lives behind an internal browser slot
+     that ignores an author "display: block !important" override on the
+     slotted children, so forcing it open for print has to happen in JS
+     (see the beforeprint/afterprint handling in app.js) rather than here.
+     This just drops the on-screen +/- marker once nothing is collapsible
+     on paper. */
+  .section-details > summary.section-title::before { display: none; }
 
   .print-btn, .back-link, .search-input, .channel-filter, .category-filter, .schema-help,
   .modal-overlay, .attention-bar, .view-toggle, .board-list-wrap {

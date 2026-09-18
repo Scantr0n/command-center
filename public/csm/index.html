@@ -117,7 +117,8 @@
   </details>
 
   <section id="platformOutreachSection">
-    <h2 class="section-title">Platform outreach reference</h2>
+    <details class="section-details" id="platformOutreachDetails">
+    <summary class="section-title">Platform outreach reference</summary>
     <div class="callout">
       What each platform's own official brand/creator collaboration path actually is, as of September 2026,
       sourced from each platform's own documented marketplace mechanics. This is why <code>contactChannel.type</code>
@@ -176,6 +177,7 @@
         </tbody>
       </table>
     </div>
+    </details>
   </section>
 
   <section>
@@ -198,7 +200,8 @@
   </section>
 
   <section>
-    <h2 class="section-title">Pipeline funnel</h2>
+    <details class="section-details" id="funnelDetails">
+    <summary class="section-title">Pipeline funnel</summary>
     <p class="section-note">How many prospects have ever reached each stage, based on where they are right now (a
       prospect further along has necessarily already passed every earlier stage). Conversion is the share of the
       previous stage's reach that made it to this one. Different from the column counts below, which only show
@@ -206,20 +209,24 @@
     <div class="funnel-list" id="funnelList">
       <p class="funnel-empty">Loading...</p>
     </div>
+    </details>
   </section>
 
   <section>
-    <h2 class="section-title">Stage velocity</h2>
+    <details class="section-details" id="velocityDetails">
+    <summary class="section-title">Stage velocity</summary>
     <p class="section-note">Average days spent in each stage, computed only from completed moves logged in
       <code>stageHistory</code> (entering a stage, then later leaving it). This is a different signal from the
       "stalled" flags below, which only look at prospects still sitting in a stage right now.</p>
     <div class="velocity-list" id="velocityList">
       <p class="velocity-empty">Loading...</p>
     </div>
+    </details>
   </section>
 
   <section>
-    <h2 class="section-title">Channel effectiveness</h2>
+    <details class="section-details" id="channelEffDetails">
+    <summary class="section-title">Channel effectiveness</summary>
     <p class="section-note">Of prospects who have actually been contacted, how many reached real active
       exploration, broken down by whether the contact channel was a named decision-maker or a generic inbox.
       This is the single field this project has historically found most predictive of a real reply, tracked here
@@ -228,10 +235,12 @@
     <div class="channel-eff-list" id="channelEffList">
       <p class="channel-eff-empty">Loading...</p>
     </div>
+    </details>
   </section>
 
   <section>
-    <h2 class="section-title">Category effectiveness</h2>
+    <details class="section-details" id="categoryEffDetails">
+    <summary class="section-title">Category effectiveness</summary>
     <p class="section-note">Same breakdown as channel effectiveness above, grouped by category instead: of
       prospects who have actually been contacted, how many reached real active exploration, per category. Shows
       which verticals are actually worth the outreach effort, not just which contact method is. Counts only, no
@@ -239,10 +248,12 @@
     <div class="channel-eff-list" id="categoryEffList">
       <p class="channel-eff-empty">Loading...</p>
     </div>
+    </details>
   </section>
 
   <section>
-    <h2 class="section-title">Social reach by platform</h2>
+    <details class="section-details" id="socialReachDetails">
+    <summary class="section-title">Social reach by platform</summary>
     <p class="section-note">Real <code>socialSnapshots</code> logged on any prospect, aggregated by platform. Uses
       only the most recent as-of entry per prospect per platform, so a logged refresh never double-counts the same
       account. These are one-time manual research pulls captured when a prospect was researched, not a live feed,
@@ -250,6 +261,7 @@
     <div class="channel-eff-list" id="socialReachList">
       <p class="channel-eff-empty">Loading...</p>
     </div>
+    </details>
   </section>
 
   <section id="stalledSection" hidden>

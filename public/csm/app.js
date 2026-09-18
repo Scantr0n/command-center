@@ -33,6 +33,47 @@
 
   printBtn.addEventListener('click', () => window.print());
 
+  // Reference/analytics widgets below the attention bar (platform reference,
+  // funnel, velocity, channel/category effectiveness, social reach) are
+  // collapsed by default so the actionable nudge queue and board are closer
+  // to the top of the page. Once a real visitor opens one to check it,
+  // re-collapsing it on every reload would just make them reopen it again
+  // next time, so the open/closed state persists per section, same
+  // this-browser-only localStorage convention as the sidebar's own
+  // expanded/collapsed state.
+  const SECTION_OPEN_KEY_PREFIX = 'csm-section-open-';
+  document.querySelectorAll('.section-details[id]').forEach(details => {
+    const key = SECTION_OPEN_KEY_PREFIX + details.id;
+    try {
+      if (localStorage.getItem(key) === '1') details.open = true;
+    } catch (e) { /* localStorage unavailable (private window, blocked storage): stays collapsed */ }
+    details.addEventListener('toggle', () => {
+      try { localStorage.setItem(key, details.open ? '1' : '0'); } catch (e) { /* see above */ }
+    });
+  });
+
+  // A closed <details>'s content sits behind an internal browser slot that
+  // a plain CSS "display: block !important" on the slotted children can't
+  // override (verified: computed style reports "block" but nothing paints),
+  // so printing whatever was left collapsed has to force each one open in
+  // JS instead, for both the in-page "Print / export PDF" button and a
+  // browser/OS print triggered directly. Restored after printing so the
+  // on-screen state (and its localStorage record above) isn't disturbed by
+  // having printed.
+  let printReopenedDetails = null;
+  window.addEventListener('beforeprint', () => {
+    printReopenedDetails = [];
+    document.querySelectorAll('.section-details').forEach(d => {
+      printReopenedDetails.push([d, d.open]);
+      d.open = true;
+    });
+  });
+  window.addEventListener('afterprint', () => {
+    if (!printReopenedDetails) return;
+    printReopenedDetails.forEach(([d, wasOpen]) => { d.open = wasOpen; });
+    printReopenedDetails = null;
+  });
+
   function fmtDate(iso) {
     if (!iso) return null;
     const d = new Date(iso + 'T00:00:00');
