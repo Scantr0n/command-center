@@ -1,7 +1,17 @@
 {
-  "generatedAt": "2026-09-18T08:23:16.495Z",
+  "generatedAt": "2026-09-18T16:23:05.333Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "2e2f55d",
+      "fullHash": "2e2f55dd1be165c5e891e792584160058439ea0d",
+      "date": "2026-09-18",
+      "author": "Claude",
+      "subject": "Sondrik: add a read-only preview of the actual drafted outreach text",
+      "files": [
+        "leads.json"
+      ]
+    },
     {
       "hash": "ad97c08",
       "fullHash": "ad97c089f056f3253b00b27a97a9a57bf012bb38",
@@ -25,11 +35,11 @@
       ]
     },
     {
-      "hash": "8fec7d3",
-      "fullHash": "8fec7d3f2a9979fc73892eae64cff35948144287",
+      "hash": "b3bbf87",
+      "fullHash": "b3bbf87aa9bd3eb818ef91e2c92f237b2d398ace",
       "date": "2026-09-17",
       "author": "Claude",
-      "subject": "Garage: add a \"?\" keyboard shortcuts overlay, same convention as the other hubs",
+      "subject": "CGT: fix worth-grading verdict silently requiring 3x margin instead of 2x",
       "files": [
         "channels.json",
         "downloads.json",
