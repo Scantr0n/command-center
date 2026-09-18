@@ -2552,6 +2552,22 @@ document.querySelectorAll('th.sortable').forEach(th => {
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
 
+// The grading service tiers reference is collapsed by default so the
+// actionable submissions/inventory are closer to the top of the page.
+// Once a real visitor opens it to check the current rates, re-collapsing
+// on every reload would just make them reopen it again next time, so the
+// open/closed state persists in this browser only.
+const SECTION_OPEN_KEY_PREFIX = 'cgt-section-open-';
+document.querySelectorAll('.section-details[id]').forEach(details => {
+  const key = SECTION_OPEN_KEY_PREFIX + details.id;
+  try {
+    if (localStorage.getItem(key) === '1') details.open = true;
+  } catch (e) { /* localStorage unavailable (private window, blocked storage): stays collapsed */ }
+  details.addEventListener('toggle', () => {
+    try { localStorage.setItem(key, details.open ? '1' : '0'); } catch (e) { /* see above */ }
+  });
+});
+
 // Separate from the plain print button above: this prints only the
 // itemized insurance/appraisal summary (see renderInsuranceSummary), not
 // whatever the dashboard happens to be filtered/sorted to right now. The

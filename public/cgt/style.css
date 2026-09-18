@@ -191,6 +191,36 @@ header.page-head .sub {
 }
 .section-subtitle { color: var(--sub); font-size: 0.8rem; line-height: 1.6; margin: -8px 0 14px; }
 
+/* The grading service tiers reference is real but secondary to the actual
+   inventory table below it, several screens of scrolling past. Collapsed
+   by default, same disclosure convention as .schema-help above, so the
+   actionable inventory and submissions are reached faster while the
+   reference stays one click away, never removed. */
+.section-details { margin-bottom: 28px; }
+.section-details > summary.section-title {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.section-details > summary.section-title::-webkit-details-marker { display: none; }
+.section-details > summary.section-title::before {
+  content: '+';
+  color: var(--dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.section-details[open] > summary.section-title::before { content: '-'; }
+.section-details > summary.section-title:hover { color: var(--ink); }
+.section-details > summary.section-title:focus-visible {
+  outline: 1px solid var(--hairlineHover);
+  outline-offset: 3px;
+}
+
 /* Same "h2 + Export CSV" toolbar row as Sondrik's own .section-toolbar, for a
    section whose h2 needs an action button inline instead of standing alone. */
 .section-toolbar {
@@ -1089,7 +1119,7 @@ textarea.np-input { resize: vertical; }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .section-details, .modal-overlay {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
