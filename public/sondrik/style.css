@@ -74,7 +74,8 @@ header.page-head .sub {
   gap: 6px;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.back-link:hover, .back-link:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: none; }
+.back-link:hover, .back-link:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
+.back-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .page-head-actions {
   display: flex;
@@ -93,7 +94,8 @@ header.page-head .sub {
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: none; }
+.print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
+.print-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* csvBtn and copyStatusBtn get .disabled set by app.js when the data file
    they depend on fails to load. Without this, a disabled button still shows
    cursor: pointer and full-strength text, indistinguishable from a working
@@ -120,8 +122,8 @@ header.page-head .sub {
 .attention-pill:hover, .attention-pill:focus-visible {
   border-color: rgba(224,160,48,0.6);
   background: rgba(224,160,48,0.16);
-  outline: none;
 }
+.attention-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* The unconditional display: inline-flex above overrides the browser's
    default [hidden] { display: none } rule (a class selector outranks that
    UA-stylesheet rule), so without this the pill still rendered as an empty
@@ -149,8 +151,8 @@ header.page-head .sub {
 .new-since-pill:hover, .new-since-pill:focus-visible {
   border-color: rgba(91,140,255,0.6);
   background: rgba(91,140,255,0.16);
-  outline: none;
 }
+.new-since-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Same [hidden] override as .attention-pill above, this pill has the same
    unconditional display declaration. */
 .new-since-pill[hidden] { display: none; }
@@ -307,7 +309,8 @@ header.page-head .sub {
 .schema-help summary:focus-visible {
   color: var(--ink);
   background: rgba(255,255,255,0.03);
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .schema-help summary::-webkit-details-marker { display: none; }
 .schema-help summary::before {
