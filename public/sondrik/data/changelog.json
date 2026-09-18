@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-09-18T08:23:16.495Z",
+  "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
+  "entries": [
+    {
+      "hash": "ad97c08",
+      "fullHash": "ad97c089f056f3253b00b27a97a9a57bf012bb38",
+      "date": "2026-09-18",
+      "author": "Claude",
+      "subject": "Sondrik: revert fabricated lead-sent and download-count claims",
+      "files": [
+        "downloads.json",
+        "leads.json"
+      ]
+    },
+    {
+      "hash": "7ea242b",
+      "fullHash": "7ea242be8202c65892ec76791f1e6c563cc8e71e",
+      "date": "2026-09-17",
+      "author": "Jack Scanlon",
+      "subject": "Sondrik: fix stale lead status, log fresh download count",
+      "files": [
+        "downloads.json",
+        "leads.json"
+      ]
+    },
+    {
+      "hash": "8fec7d3",
+      "fullHash": "8fec7d3f2a9979fc73892eae64cff35948144287",
+      "date": "2026-09-17",
+      "author": "Claude",
+      "subject": "Garage: add a \"?\" keyboard shortcuts overlay, same convention as the other hubs",
+      "files": [
+        "channels.json",
+        "downloads.json",
+        "goals.json",
+        "leads.json",
+        "releases.json"
+      ]
+    }
+  ]
+}

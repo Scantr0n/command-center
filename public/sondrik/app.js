@@ -5,6 +5,7 @@
   const goalsSection = document.getElementById('goalsSection');
   const channelsSection = document.getElementById('channelsSection');
   const leadsSection = document.getElementById('leadsSection');
+  const changelogSection = document.getElementById('changelogSection');
   const snapshotStrip = document.getElementById('snapshotStrip');
   const nextStepsList = document.getElementById('nextStepsList');
   const csvBtn = document.getElementById('csvBtn');
@@ -907,6 +908,43 @@
         (o.note ? '<div class="lead-note">' + escapeHtml(o.note) + '</div>' : '') +
         '</div>';
     }).join('');
+  }
+
+  // Renders changelog.json, a file no one hand-edits: it's regenerated from
+  // this repo's real git history by public/sondrik/data/changelog.js, so
+  // every hash, author, and date here is independently checkable against
+  // the repo instead of resting on a hand-typed claim. Missing the file
+  // entirely (never generated yet) is an honest empty state, not an error,
+  // same as an empty goals.json.
+  function renderChangelog(data) {
+    const entries = data.entries || [];
+    if (entries.length === 0) {
+      changelogSection.innerHTML = '<div class="empty-state">No changelog generated yet. Run ' +
+        '<code>node public/sondrik/data/changelog.js</code> to build one from this repo\'s git history.</div>';
+      return;
+    }
+    const FILE_LABEL = {
+      'releases.json': 'releases', 'downloads.json': 'downloads', 'leads.json': 'leads',
+      'channels.json': 'channels', 'goals.json': 'goals'
+    };
+    const html = '<ol class="timeline changelog-list" aria-label="Real git commit history of the data files above, most recent first">' +
+      entries.map(e => {
+        const files = (e.files || []).map(f => FILE_LABEL[f] || f);
+        return '<li class="timeline-item changelog-item">' +
+          '<div class="timeline-meta">' +
+          '<span class="timeline-badge changelog-hash font-mono" title="' + escapeHtml(e.fullHash || e.hash) + '">' +
+          escapeHtml(e.hash) + '</span>' +
+          '<span class="timeline-date font-mono">' + fmtDate(e.date) + '</span>' +
+          '<span class="changelog-author font-mono">' + escapeHtml(e.author) + '</span>' +
+          '</div>' +
+          '<div class="timeline-title">' + escapeHtml(e.subject) + '</div>' +
+          (files.length ? '<div class="timeline-detail changelog-files">Touched: ' + escapeHtml(files.join(', ')) + '</div>' : '') +
+          '</li>';
+      }).join('') + '</ol>' +
+      '<p class="section-note changelog-generated-note">Generated ' +
+      (fmtDate((data.generatedAt || '').slice(0, 10)) || 'at an unknown time') +
+      ' from ' + escapeHtml(data.generatedFrom || 'git log') + '.</p>';
+    changelogSection.innerHTML = html;
   }
 
   // Consolidates the "needs a real human action" signals that otherwise sit
@@ -1823,13 +1861,15 @@
     loadDataFile('downloads'),
     loadDataFile('leads'),
     loadDataFile('channels'),
-    loadDataFile('goals')
-  ]).then(([releasesResult, downloadsResult, leadsResult, channelsResult, goalsResult]) => {
+    loadDataFile('goals'),
+    loadDataFile('changelog')
+  ]).then(([releasesResult, downloadsResult, leadsResult, channelsResult, goalsResult, changelogResult]) => {
     const releasesData = releasesResult.status === 'fulfilled' ? releasesResult.value : null;
     const downloadsData = downloadsResult.status === 'fulfilled' ? downloadsResult.value : null;
     const leadsData = leadsResult.status === 'fulfilled' ? leadsResult.value : null;
     const channelsData = channelsResult.status === 'fulfilled' ? channelsResult.value : null;
     const goalsData = goalsResult.status === 'fulfilled' ? goalsResult.value : null;
+    const changelogData = changelogResult.status === 'fulfilled' ? changelogResult.value : null;
 
     const failures = [];
     if (releasesResult.status === 'rejected') failures.push('releases.json: ' + releasesResult.reason.message);
@@ -1905,6 +1945,20 @@
       leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
         escapeHtml(leadsResult.reason.message) + '</div>';
       leadsCsvBtn.disabled = true;
+    }
+
+    // Unlike the other files, a missing changelog.json means it just hasn't
+    // been generated yet (a fresh clone before anyone ran changelog.js),
+    // not necessarily a real error, so a 404 gets the same "empty" render
+    // renderChangelog already gives an empty entries array rather than the
+    // alarmed "Failed to load" wording the other sections use.
+    if (changelogData) {
+      renderChangelog(changelogData);
+    } else if (changelogResult.reason && /HTTP 404/.test(changelogResult.reason.message)) {
+      renderChangelog({ entries: [] });
+    } else {
+      changelogSection.innerHTML = '<div class="empty-state" role="alert">Failed to load the data changelog: ' +
+        escapeHtml(changelogResult.reason.message) + '</div>';
     }
 
     if (releasesData || downloadsData || leadsData || goalsData || channelsData) {
@@ -1989,7 +2043,8 @@
           downloadsJson: downloadsData,
           leadsJson: leadsData,
           channelsJson: channelsData,
-          goalsJson: goalsData
+          goalsJson: goalsData,
+          changelogJson: changelogData
         };
         const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
         const url = URL.createObjectURL(blob);

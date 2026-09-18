@@ -726,6 +726,20 @@ section { margin-bottom: 36px; }
   letter-spacing: 0.02em;
 }
 
+/* Data changelog: real git commits, so its hash badge gets its own neutral
+   (not release/check/lead/goal) color, distinct from the timeline kinds. */
+.changelog-hash {
+  border-color: rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  color: var(--sub);
+}
+.changelog-author {
+  font-size: 0.7rem;
+  color: var(--dim);
+}
+.changelog-files { font-family: 'JetBrains Mono', monospace; }
+.changelog-generated-note { margin-top: 10px; }
+
 /* Release card */
 .release-card {
   border: 1px solid var(--hairline);
@@ -1140,7 +1154,8 @@ footer.page-foot {
   .snapshot-chip-meta { color: #555; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
   .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .stat-milestone, .last-updated, .last-updated-stale, .channel-note,
-  .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-projection, .goal-note, .goal-achieved { color: #555; }
+  .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-projection, .goal-note, .goal-achieved,
+  .changelog-author, .changelog-generated-note { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
   .release-badge, .timeline-badge, .timeline-milestone-badge,

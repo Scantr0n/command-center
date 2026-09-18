@@ -105,6 +105,11 @@
             aiming for, <code>targetDate</code> the real date he's aiming for it by (or <code>null</code> if
             open-ended). Set <code>setDate</code> to the actual date the goal was set, not today's date by
             default, so the progress bar isn't silently backdated.</td></tr>
+          <tr><th>changelog.json</th><td>Generated, never hand-edit. Run
+            <code>node public/sondrik/data/changelog.js</code> after committing changes to any of the files
+            above, it reads this repo's real git history and regenerates the whole file from actual commit
+            hashes, authors, and dates. This is the one part of this page you can't fake by hand-editing JSON,
+            which is the point.</td></tr>
         </tbody>
       </table>
     </div>
@@ -285,13 +290,22 @@
     </div>
     <div id="leadsSection"></div>
   </section>
+
+  <section>
+    <h2 class="section-title">Data changelog</h2>
+    <p class="section-note">Real git commit history of the five data files above, not a hand-typed claim.
+      Each row is an actual commit hash, author, and date from this repo. Regenerate after new commits with
+      <code>node public/sondrik/data/changelog.js</code>.</p>
+    <div id="changelogSection"></div>
+  </section>
   </main>
 
   <footer class="page-foot font-mono">
     Data source: <code>/sondrik/data/releases.json</code>, <code>/sondrik/data/downloads.json</code>,
     <code>/sondrik/data/leads.json</code>, <code>/sondrik/data/channels.json</code>, and
     <code>/sondrik/data/goals.json</code>, edited by hand until a real backend is wired in. Run
-    <code>node public/sondrik/data/validate.js</code> after any edit.
+    <code>node public/sondrik/data/validate.js</code> after any edit, then
+    <code>node public/sondrik/data/changelog.js</code> to refresh the data changelog from git.
   </footer>
 </div>
 
