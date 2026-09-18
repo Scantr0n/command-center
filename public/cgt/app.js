@@ -1142,7 +1142,7 @@ function renderCandidates() {
       math ? 'costs ' + formatUsd(math.totalCost) : null
     ].filter(Boolean);
     return `
-      <div class="submission-row candidate-row" tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
+      <div class="submission-row candidate-row" tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled candidate')}" data-id="${escapeHtml(c.id)}">
         <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
@@ -1330,7 +1330,7 @@ function renderSubmissions() {
     // and the link is a sibling next to it, not a descendant.
     return `
       <div class="submission-row">
-        <div class="candidate-row submission-row-main" tabindex="0" role="button" data-id="${escapeHtml(s.id)}">
+        <div class="candidate-row submission-row-main" tabindex="0" role="button" aria-label="View details for ${escapeHtml(s.description || 'Untitled submission')}" data-id="${escapeHtml(s.id)}">
           <span class="submission-days font-mono${runningLong ? ' submission-days-late' : ''}">${escapeHtml(daysText)}</span>
           <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
           <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
@@ -1980,7 +1980,7 @@ function applyFiltersAndRender() {
   renderTableFooter(filtered);
 
   tbody.innerHTML = filtered.map(c => `
-    <tr tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
+    <tr tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled card')}" data-id="${escapeHtml(c.id)}">
       <td>
         <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}</div>
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
