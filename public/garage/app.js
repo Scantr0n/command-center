@@ -2523,7 +2523,7 @@ function wireListingEditForm(l) {
 // their actual `status` field. A column's real pipeline.json count can
 // exceed the number of individual records logged for it (most of the real
 // 48 ready-to-post items, for example, only exist as that one aggregate
-// count) — that gap is shown as a plain note, never papered over with
+// count), that gap is shown as a plain note, never papered over with
 // fabricated cards. Same drag-to-prep pattern as CSM's kanban: a drop
 // never writes to listings.json (no live backend here either), it opens
 // the listing's own real edit form with the target status pre-selected
