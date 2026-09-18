@@ -708,6 +708,20 @@ function buildValueGroupsByBatch() {
     .sort((a, b) => b.label.localeCompare(a.label));
 }
 
+// Groups real priced cards' estimatedValue by storageLocation. Real
+// collectibles-insurance guidance treats where an item is actually kept as
+// part of its risk profile, a home safe, an off-site safe deposit box, and
+// a public storage unit each carry different coverage conditions, so how
+// much real logged value sits in one place is worth seeing on its own, not
+// just the "how many cards have a location logged" count already in the
+// stat row. Reuses buildValueGroups directly (storageLocation is a plain
+// string field, same shape as sport/gradingCompany), a card with no
+// storageLocation logged is skipped here the same way any other blank
+// field is skipped in the other breakdowns.
+function buildValueGroupsByStorageLocation() {
+  return buildValueGroups('storageLocation');
+}
+
 // formatValue and emptyText are overridable since this same row/bar layout
 // also drives the grading-turnaround card below, where the value is a day
 // count with a returned-submission tally attached, not a plain dollar figure.
@@ -794,6 +808,9 @@ function renderValueBreakdown() {
     renderBreakdownList('By year', buildValueGroupsByYear()) +
     renderBreakdownList('By pricing batch', buildValueGroupsByBatch(), {
       emptyText: 'No priced real cards with a backlogBatch logged yet.'
+    }) +
+    renderBreakdownList('By storage location', buildValueGroupsByStorageLocation(), {
+      emptyText: 'No priced real cards with a storageLocation logged yet.'
     }) +
     renderBreakdownList('Avg. grading turnaround', buildTurnaroundByGrader(), {
       formatValue: g => g.value + 'd avg (' + g.min + '-' + g.max + 'd, ' + g.count + ' returned)',
