@@ -33,6 +33,18 @@
 
   printBtn.addEventListener('click', () => window.print());
 
+  // Every "overdue" / "in Xd" label in the nudge queue below is computed
+  // against this device's local clock at page load, not a server clock, so
+  // a wrong device date or a screenshot viewed later can make those numbers
+  // read as wrong when they were actually correct at the time. Stating the
+  // reference date plainly lets that be checked at a glance instead of
+  // taken on faith, same honesty standard as the "as of" social snapshot
+  // dates and the footer's "last hand-edited" note.
+  const nudgeTodayNoteEl = document.getElementById('nudgeTodayNote');
+  if (nudgeTodayNoteEl) {
+    nudgeTodayNoteEl.textContent = 'Due dates below are computed against today, ' + fmtDate(todayIso()) + ', this device’s local date.';
+  }
+
   // Reference/analytics widgets below the attention bar (platform reference,
   // funnel, velocity, channel/category effectiveness, social reach) are
   // collapsed by default so the actionable nudge queue and board are closer
