@@ -256,7 +256,7 @@ header.page-head .sub {
   list-style: none;
 }
 .schema-help summary::-webkit-details-marker { display: none; }
-.schema-help summary:focus-visible { color: var(--ink); background: rgba(255,255,255,0.03); outline: none; }
+.schema-help summary:focus-visible { color: var(--ink); background: rgba(255,255,255,0.03); outline: 2px solid var(--hairlineHover); outline-offset: -2px; }
 .schema-help summary::before {
   content: '+ ';
   color: var(--dim);
@@ -1035,7 +1035,8 @@ body.has-sticky-critical { padding-top: 40px; }
   padding: 0;
   flex-shrink: 0;
 }
-.toast-close:hover, .toast-close:focus-visible { color: var(--ink); outline: none; }
+.toast-close:hover, .toast-close:focus-visible { color: var(--ink); }
+.toast-close:focus-visible { outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
 .toast-critical { border-left-color: #E05050; }
 .toast-caution { border-left-color: #E0A030; }
 .toast-good { border-left-color: #3DDC84; }
@@ -1087,7 +1088,8 @@ footer.page-foot {
   cursor: pointer;
   font-size: 0.9rem;
 }
-.modal-close:hover, .modal-close:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: none; }
+.modal-close:hover, .modal-close:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
+.modal-close:focus-visible { outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
 .modal h3 {
   font-size: 1.2rem;
   margin: 0 0 16px;
