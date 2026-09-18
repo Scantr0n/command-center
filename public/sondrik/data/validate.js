@@ -231,9 +231,21 @@ function main() {
     if (o.sent === undefined) {
       errors.push(where + ': outreach.sent must be explicitly true or false, never left unset.');
     }
+    // draftText is the actual message content, purely for a human to read
+    // while deciding whether to approve it, this page never sends it. Only
+    // type-checked here, same as every other free-text field; whether it's
+    // present at all is checked below since an awaiting-approval lead with
+    // nothing to preview is a real gap, not a data error.
+    if (o.draftText !== null && o.draftText !== undefined && typeof o.draftText !== 'string') {
+      errors.push(where + ': outreach.draftText must be a string or null, got ' + JSON.stringify(o.draftText));
+    }
+    if (o.approvalStatus === 'awaiting-approval' && o.sent !== true && !o.draftText) {
+      warnings.push(where + ': approvalStatus is "awaiting-approval" but outreach.draftText is not logged, ' +
+        'there is nothing to preview on this page yet to help decide whether to approve it');
+    }
     emDashFields(l, ['summary', 'sourceDetail', 'source', 'type']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
-    emDashFields(o, ['note']).forEach(f =>
+    emDashFields(o, ['note', 'draftText']).forEach(f =>
       warnings.push(where + ': outreach.' + f + ' contains an em dash, this product never uses one, check for a paste-in'));
   });
 

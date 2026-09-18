@@ -1113,6 +1113,31 @@ section { margin-bottom: 36px; }
   color: var(--dim);
   line-height: 1.5;
 }
+.lead-draft-preview {
+  margin-top: 12px;
+  border: 1px dashed var(--hairlineHover);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.02);
+}
+.lead-draft-preview-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: #E0A030;
+  margin-bottom: 8px;
+}
+.lead-draft-preview-text {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lead-draft-preview-empty {
+  font-size: 0.75rem;
+  color: var(--dim);
+  font-style: italic;
+}
 
 footer.page-foot {
   margin-top: 40px;
@@ -1181,6 +1206,13 @@ footer.page-foot {
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
   .print-btn, .back-link, .schema-help, .attention-pill, .new-since-pill, .next-steps-section, .timeline-new-badge, .modal-overlay {
+    display: none !important;
+  }
+
+  /* A drafted, not-yet-approved outreach message is meant for Jack's own
+     approval decision on screen, not to end up in a PDF export that could
+     get shared further before he's decided whether to send it. */
+  .lead-draft-preview {
     display: none !important;
   }
 

@@ -91,7 +91,10 @@
             Set <code>channelId</code> to the id of the channel (in <code>channels.json</code>) this lead actually
             came from, so its count attributes to the right channel card instead of every "leads"-linked channel
             showing the same total. Leave it unset rather than guessing if the real source isn't one of the
-            tracked channels yet.</td></tr>
+            tracked channels yet. Once a real message is actually drafted, paste its exact text into
+            <code>outreach.draftText</code> so the page can show what's actually being asked for approval instead
+            of just the fact that something is pending; leave it <code>null</code> until there is real drafted
+            text to paste in. This only ever displays that text for review, it is never sent from this page.</td></tr>
           <tr><th>channels.json</th><td>One object per distribution channel Jack actually watches.
             <code>status</code> is <code>"tracked"</code> (a real linked metric exists), <code>"manual-log"</code>
             (real, but hand-logged rather than a live count), or <code>"not-tracked"</code> (honest gap, no

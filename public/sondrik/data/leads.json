@@ -12,6 +12,7 @@
         "draftStatus": "drafted",
         "approvalStatus": "awaiting-approval",
         "sent": false,
+        "draftText": null,
         "note": "DM drafted. Waiting on Jack's direct approval before sending. Has not been sent."
       }
     }

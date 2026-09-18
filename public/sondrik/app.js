@@ -922,6 +922,29 @@
         ? 'SENT' + (o.sentDate ? ' ' + fmtDate(o.sentDate) : '')
         : (o.approvalStatus === 'awaiting-approval' ? 'DRAFT READY, AWAITING APPROVAL' : (o.draftStatus || 'NO DRAFT YET').toUpperCase());
       const pillClass = o.sent ? 'status-pill status-pill-sent' : 'status-pill';
+
+      // Shows the actual drafted message text, read-only, so an approval
+      // decision can be made from this page instead of Jack having to go
+      // find the draft wherever he wrote it. This never sends anything and
+      // has no send action anywhere near it, same "display tool, not a send
+      // tool" boundary as the rest of the page. Only rendered pre-send: once
+      // outreach.sent is true, the message already went out through
+      // whatever channel Jack actually used, and re-showing draft text here
+      // would read as if this page had a role in that.
+      let draftPreviewHtml = '';
+      if (!o.sent) {
+        if (o.draftText) {
+          draftPreviewHtml = '<div class="lead-draft-preview">' +
+            '<div class="lead-draft-preview-label font-mono">DRAFT PREVIEW, NOT SENT FROM HERE</div>' +
+            '<div class="lead-draft-preview-text">' + escapeHtml(o.draftText) + '</div>' +
+            '</div>';
+        } else if (o.approvalStatus === 'awaiting-approval') {
+          draftPreviewHtml = '<div class="lead-draft-preview lead-draft-preview-empty">' +
+            'No draft text logged here yet, review the actual draft wherever it was written until it\'s added here.' +
+            '</div>';
+        }
+      }
+
       return '<div class="lead-card">' +
         '<div class="lead-head">' +
         '<span class="lead-source">' + escapeHtml(l.sourceDetail || l.source || 'Unknown source') + '</span>' +
@@ -933,6 +956,7 @@
         (duplicateIds.has(l.id) ? '<span class="status-pill status-pill-duplicate font-mono" title="Another lead matches on channel + source detail. Check this is not the same real contact logged twice before counting both.">POSSIBLE DUPLICATE</span>' : '') +
         '</div>' +
         (o.note ? '<div class="lead-note">' + escapeHtml(o.note) + '</div>' : '') +
+        draftPreviewHtml +
         '</div>';
     }).join('');
   }
@@ -1021,6 +1045,14 @@
           text: 'Approve or send the drafted message to ' + (l.sourceDetail || l.source || 'this lead') + '.',
           href: '#leadsSection'
         });
+        if (!o.draftText) {
+          steps.push({
+            urgent: false,
+            text: 'Paste the actual drafted text for ' + (l.sourceDetail || l.source || 'this lead') +
+              ' into outreach.draftText so it can be previewed on this page before approving it.',
+            href: '#leadsSection'
+          });
+        }
       }
     });
 
@@ -1409,10 +1441,10 @@
 
   function exportLeadsCsv(leadsData) {
     const leads = (leadsData.leads || []).slice().sort((a, b) => (a.loggedDate || '').localeCompare(b.loggedDate || ''));
-    const header = ['Id', 'Source', 'Source detail', 'Type', 'Summary', 'Logged date', 'Draft status', 'Approval status', 'Sent'].map(csvField).join(',');
+    const header = ['Id', 'Source', 'Source detail', 'Type', 'Summary', 'Logged date', 'Draft status', 'Approval status', 'Sent', 'Draft text'].map(csvField).join(',');
     const lines = leads.map(l => {
       const o = l.outreach || {};
-      return [l.id, l.source, l.sourceDetail, l.type, l.summary, l.loggedDate, o.draftStatus, o.approvalStatus, o.sent ? 'yes' : 'no'].map(csvField).join(',');
+      return [l.id, l.source, l.sourceDetail, l.type, l.summary, l.loggedDate, o.draftStatus, o.approvalStatus, o.sent ? 'yes' : 'no', o.draftText].map(csvField).join(',');
     });
     const csv = [header, ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
