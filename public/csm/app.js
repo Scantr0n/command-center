@@ -617,6 +617,20 @@
     }
   }
 
+  // True once some forward-looking plan is on record for this prospect, by
+  // any of the three real ways one can be logged: a queued nextNudgeDate, a
+  // planned nudgeSchedule.nudgePoint, or a deliberate parked
+  // nudgeSchedule.doNotNudgeBefore (the same "on purpose, not neglected"
+  // signal the cold-signal parked list below already treats as a real
+  // decision, not a gap).
+  function hasNudgePlan(p) {
+    if (p.nextNudgeDate && isValidDateStr(p.nextNudgeDate)) return true;
+    const ns = p.nudgeSchedule || {};
+    if (ns.nudgePoint && isValidDateStr(ns.nudgePoint)) return true;
+    if (ns.doNotNudgeBefore && isValidDateStr(ns.doNotNudgeBefore)) return true;
+    return false;
+  }
+
   function computeDataQualityFlags(stages, prospects) {
     return prospects
       .map(p => {
@@ -627,6 +641,16 @@
         }
         if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
           reasons.push('CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL');
+        }
+        // The nudge queue, the "unqueued" (nudgePoint-passed) flag above it,
+        // and the cold-signal panel each only fire once *some* nudge field is
+        // already logged. A prospect that was actually contacted and then
+        // never got any nudgeSchedule or nextNudgeDate at all falls through
+        // every one of those checks and is otherwise invisible anywhere on
+        // this board, the exact real failure mode this pipeline is trying to
+        // catch (a real reply lost because no follow-up was ever scheduled).
+        if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
+          reasons.push('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT');
         }
         const snapStale = socialSnapshotsStaleInfo(p);
         if (snapStale) reasons.push(snapStale.days + 'D OLD ' + (snapStale.platform ? escapeHtml(snapStale.platform).toUpperCase() + ' ' : '') + 'SNAPSHOT, DUE FOR REFRESH');
@@ -3082,6 +3106,11 @@
     if (p.nextNudgeDate && !p.nextAction) {
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
+    }
+    if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
+      warnings.push('Stage is "' + p.stage + '" but nothing is scheduled, no next nudge date, nudge point, or ' +
+        'do-not-nudge-before. Without one of those this prospect will not show up anywhere the board flags a ' +
+        'follow-up as due, log a real plan even if it is just a rough one.');
     }
     (p.socialSnapshots || []).forEach(snap => {
       if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {

@@ -133,6 +133,23 @@ function main() {
           'anywhere on the board, log a real nextNudgeDate.');
       }
     }
+    // Same gap app.js's computeDataQualityFlags now flags on the board: the
+    // nudge queue, the unqueued-nudgePoint check above, and the cold-signal
+    // panel all only fire once some nudge field already exists. A prospect
+    // that was actually contacted and never got any of nextNudgeDate,
+    // nudgeSchedule.nudgePoint, or nudgeSchedule.doNotNudgeBefore logged is
+    // otherwise invisible everywhere on the board, the real failure mode
+    // this pipeline exists to catch.
+    if (p.stage === 'outreach-sent' || p.stage === 'silent-replied') {
+      const hasPlan = (p.nextNudgeDate && DATE_RE.test(p.nextNudgeDate)) ||
+        (ns.nudgePoint && DATE_RE.test(ns.nudgePoint)) ||
+        (ns.doNotNudgeBefore && DATE_RE.test(ns.doNotNudgeBefore));
+      if (!hasPlan) {
+        warnings.push(where + ': stage is "' + p.stage + '" but nothing is scheduled, no nextNudgeDate, ' +
+          'nudgeSchedule.nudgePoint, or nudgeSchedule.doNotNudgeBefore. This prospect will not show up anywhere ' +
+          'the board flags a follow-up as due, log a real plan even if it is just a rough one.');
+      }
+    }
 
     if (!Array.isArray(p.socialSnapshots || [])) {
       errors.push(where + ': "socialSnapshots" must be an array (one entry per platform), not ' +
