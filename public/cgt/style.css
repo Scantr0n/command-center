@@ -521,7 +521,12 @@ header.page-head .sub {
 .changelog-author { flex-shrink: 0; color: var(--sub); }
 .changelog-subject { color: var(--ink); }
 .changelog-files { color: var(--dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
-.changelog-generated-note { margin-top: 4px; margin-bottom: 36px; }
+/* generatedFrom in changelog.json is a real unbroken path string (e.g.
+   "public/cgt/data/{cards.json,submissions.json,candidates.json}") with no
+   spaces to wrap on, same class of bug as .submission-who/.mapping-source
+   above, so it needs the same overflow-wrap fix rather than pushing the
+   whole page wider on a narrow viewport. */
+.changelog-generated-note { margin-top: 4px; margin-bottom: 36px; overflow-wrap: anywhere; }
 
 .board-toolbar {
   display: flex;
