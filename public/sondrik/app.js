@@ -1398,6 +1398,71 @@
     URL.revokeObjectURL(url);
   }
 
+  // Shared client-side draft-autosave for the five quick-log forms below:
+  // none of them write to a real file, this app has no backend to save a
+  // half-filled form to, so an accidental reload or navigation away used to
+  // throw away real typed data with no way back. Same pattern CGT's and
+  // Garage's own attachDraftGuard use (public/cgt/app.js, public/garage/
+  // app.js), reading whatever real input/select/textarea fields the given
+  // form actually has rather than a hand-maintained id list. Autosaved to
+  // this browser's localStorage only, never sent anywhere, so it does not
+  // conflict with this page's no-fabricated-data rule; a private window or
+  // blocked storage just means the draft protection quietly no-ops. Call
+  // this only after a form's own defaults (today's date, a populated select)
+  // are already set, so a real restored draft value is what wins, not the
+  // default it would otherwise overwrite.
+  function attachDraftGuard(form, storageKey, opts) {
+    const bannerEl = document.getElementById(opts.bannerId);
+    const bannerTimeEl = document.getElementById(opts.timeId);
+    const discardBtn = document.getElementById(opts.discardId);
+    if (!bannerEl || !bannerTimeEl || !discardBtn) return { clearDraft() {} };
+
+    const fields = Array.from(form.querySelectorAll('input[id], select[id], textarea[id]'));
+    let saveTimer = null;
+
+    function readValues() {
+      const values = {};
+      fields.forEach(el => { values[el.id] = el.value; });
+      return values;
+    }
+    function hasAnyValue(values) {
+      return fields.some(el => (values[el.id] || '').trim() !== '');
+    }
+    function clearDraft() {
+      try { localStorage.removeItem(storageKey); } catch (e) { /* see saveDraft below */ }
+      bannerEl.hidden = true;
+    }
+    function saveDraft() {
+      try {
+        const values = readValues();
+        if (!hasAnyValue(values)) { clearDraft(); return; }
+        localStorage.setItem(storageKey, JSON.stringify({ savedAt: Date.now(), values }));
+      } catch (e) { /* localStorage unavailable (private window, blocked storage): draft protection just no-ops */ }
+    }
+
+    form.addEventListener('input', () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveDraft, 400);
+    });
+    discardBtn.addEventListener('click', () => {
+      clearDraft();
+      form.reset();
+      if (opts.onDiscard) opts.onDiscard();
+    });
+
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const draft = raw ? JSON.parse(raw) : null;
+      if (draft && hasAnyValue(draft.values || {})) {
+        fields.forEach(el => { if (el.id in draft.values) el.value = draft.values[el.id]; });
+        bannerTimeEl.textContent = new Date(draft.savedAt).toLocaleString();
+        bannerEl.hidden = false;
+      }
+    } catch (e) { /* see saveDraft above */ }
+
+    return { clearDraft };
+  }
+
   // Quick-log tool: turns a small form into the exact JSON object to paste
   // into downloads.json or leads.json by hand, same "generate paste-ready
   // JSON, save nothing" pattern CSM's quick-add uses for prospects. Never
@@ -1418,6 +1483,10 @@
 
     qcDate.value = todayIso();
     qcDate.max = todayIso();
+    const qcDraftGuard = attachDraftGuard(qcForm, 'sondrik-qc-draft-v1', {
+      bannerId: 'qcDraftBanner', timeId: 'qcDraftBannerTime', discardId: 'qcDiscardDraftBtn',
+      onDiscard: () => { qcOutput.hidden = true; qcCopyBtn.hidden = true; qcWarnings.textContent = ''; qcDate.value = todayIso(); }
+    });
 
     qcForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -1462,6 +1531,7 @@
         const original = qcCopyBtn.textContent;
         qcCopyBtn.textContent = 'Copied!';
         quickLogLive.textContent = 'Download check JSON copied to clipboard.';
+        qcDraftGuard.clearDraft();
         setTimeout(() => { qcCopyBtn.textContent = original; }, 1800);
       }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
     });
@@ -1482,6 +1552,10 @@
     const qchWarnings = document.getElementById('qchWarnings');
     const qchOutput = document.getElementById('qchOutput');
     const qchCopyBtn = document.getElementById('qchCopyBtn');
+    const qchDraftGuard = attachDraftGuard(qchForm, 'sondrik-qch-draft-v1', {
+      bannerId: 'qchDraftBanner', timeId: 'qchDraftBannerTime', discardId: 'qchDiscardDraftBtn',
+      onDiscard: () => { qchOutput.hidden = true; qchCopyBtn.hidden = true; qchWarnings.textContent = ''; }
+    });
 
     qchForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -1524,6 +1598,7 @@
         const original = qchCopyBtn.textContent;
         qchCopyBtn.textContent = 'Copied!';
         quickLogLive.textContent = 'Channel JSON copied to clipboard.';
+        qchDraftGuard.clearDraft();
         setTimeout(() => { qchCopyBtn.textContent = original; }, 1800);
       }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
     });
@@ -1545,6 +1620,14 @@
     const channels = (channelsData && channelsData.channels) || [];
     qlChannel.innerHTML = '<option value="">No tracked channel / not sure</option>' +
       channels.map(c => '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name || c.id) + '</option>').join('');
+
+    // Attached after qlChannel's real options are populated above, so a
+    // restored draft's channel id can actually be selected (setting .value
+    // to an id with no matching <option> yet would silently no-op).
+    const qlDraftGuard = attachDraftGuard(qlForm, 'sondrik-ql-draft-v1', {
+      bannerId: 'qlDraftBanner', timeId: 'qlDraftBannerTime', discardId: 'qlDiscardDraftBtn',
+      onDiscard: () => { qlOutput.hidden = true; qlCopyBtn.hidden = true; qlWarnings.textContent = ''; qlDate.value = todayIso(); }
+    });
 
     qlForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -1595,6 +1678,7 @@
         const original = qlCopyBtn.textContent;
         qlCopyBtn.textContent = 'Copied!';
         quickLogLive.textContent = 'Lead JSON copied to clipboard.';
+        qlDraftGuard.clearDraft();
         setTimeout(() => { qlCopyBtn.textContent = original; }, 1800);
       }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
     });
@@ -1616,6 +1700,10 @@
 
     qrDate.value = todayIso();
     qrDate.max = todayIso();
+    const qrDraftGuard = attachDraftGuard(qrForm, 'sondrik-qr-draft-v1', {
+      bannerId: 'qrDraftBanner', timeId: 'qrDraftBannerTime', discardId: 'qrDiscardDraftBtn',
+      onDiscard: () => { qrOutput.hidden = true; qrCopyBtn.hidden = true; qrWarnings.textContent = ''; qrDate.value = todayIso(); }
+    });
 
     qrForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -1652,6 +1740,7 @@
         const original = qrCopyBtn.textContent;
         qrCopyBtn.textContent = 'Copied!';
         quickLogLive.textContent = 'Release JSON copied to clipboard.';
+        qrDraftGuard.clearDraft();
         setTimeout(() => { qrCopyBtn.textContent = original; }, 1800);
       }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
     });
@@ -1669,6 +1758,10 @@
 
     qgSetDate.value = todayIso();
     qgSetDate.max = todayIso();
+    const qgDraftGuard = attachDraftGuard(qgForm, 'sondrik-qg-draft-v1', {
+      bannerId: 'qgDraftBanner', timeId: 'qgDraftBannerTime', discardId: 'qgDiscardDraftBtn',
+      onDiscard: () => { qgOutput.hidden = true; qgCopyBtn.hidden = true; qgWarnings.textContent = ''; qgSetDate.value = todayIso(); }
+    });
 
     qgForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -1706,6 +1799,7 @@
         const original = qgCopyBtn.textContent;
         qgCopyBtn.textContent = 'Copied!';
         quickLogLive.textContent = 'Goal JSON copied to clipboard.';
+        qgDraftGuard.clearDraft();
         setTimeout(() => { qgCopyBtn.textContent = original; }, 1800);
       }).catch(() => { quickLogLive.textContent = 'Could not copy to clipboard.'; });
     });

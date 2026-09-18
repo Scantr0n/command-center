@@ -119,6 +119,11 @@
       <div class="quick-log-grid">
         <form class="quick-log-form" id="quickCheckForm">
           <h3 class="quick-log-title font-mono">Download check &rarr; downloads.json</h3>
+          <div id="qcDraftBanner" class="quick-log-draft-banner" hidden>
+            <span>Restored an unsaved draft from <span id="qcDraftBannerTime"></span>, autosaved to this browser
+              only (never sent anywhere).</span>
+            <button type="button" id="qcDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+          </div>
           <label class="quick-log-label" for="qcDate">Date checked</label>
           <input class="quick-log-input" type="date" id="qcDate" required>
           <label class="quick-log-label" for="qcCount">Count</label>
@@ -133,6 +138,11 @@
 
         <form class="quick-log-form" id="quickChannelForm">
           <h3 class="quick-log-title font-mono">Channel &rarr; channels.json</h3>
+          <div id="qchDraftBanner" class="quick-log-draft-banner" hidden>
+            <span>Restored an unsaved draft from <span id="qchDraftBannerTime"></span>, autosaved to this browser
+              only (never sent anywhere).</span>
+            <button type="button" id="qchDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+          </div>
           <label class="quick-log-label" for="qchId">Id (short, unique, kebab-case)</label>
           <input class="quick-log-input" type="text" id="qchId" placeholder="e.g. hacker-news" required>
           <label class="quick-log-label" for="qchName">Name</label>
@@ -159,6 +169,11 @@
 
         <form class="quick-log-form" id="quickLeadForm">
           <h3 class="quick-log-title font-mono">Lead &rarr; leads.json</h3>
+          <div id="qlDraftBanner" class="quick-log-draft-banner" hidden>
+            <span>Restored an unsaved draft from <span id="qlDraftBannerTime"></span>, autosaved to this browser
+              only (never sent anywhere).</span>
+            <button type="button" id="qlDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+          </div>
           <label class="quick-log-label" for="qlId">Id (short, unique, kebab-case)</label>
           <input class="quick-log-input" type="text" id="qlId" placeholder="e.g. hn-comment-tester-offer" required>
           <label class="quick-log-label" for="qlChannel">Channel</label>
@@ -181,6 +196,11 @@
 
         <form class="quick-log-form" id="quickReleaseForm">
           <h3 class="quick-log-title font-mono">Release &rarr; releases.json</h3>
+          <div id="qrDraftBanner" class="quick-log-draft-banner" hidden>
+            <span>Restored an unsaved draft from <span id="qrDraftBannerTime"></span>, autosaved to this browser
+              only (never sent anywhere).</span>
+            <button type="button" id="qrDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+          </div>
           <label class="quick-log-label" for="qrVersion">Version</label>
           <input class="quick-log-input" type="text" id="qrVersion" placeholder="e.g. 0.3.8" required>
           <label class="quick-log-label" for="qrDate">Ship date</label>
@@ -197,6 +217,11 @@
 
         <form class="quick-log-form" id="quickGoalForm">
           <h3 class="quick-log-title font-mono">Goal &rarr; goals.json</h3>
+          <div id="qgDraftBanner" class="quick-log-draft-banner" hidden>
+            <span>Restored an unsaved draft from <span id="qgDraftBannerTime"></span>, autosaved to this browser
+              only (never sent anywhere).</span>
+            <button type="button" id="qgDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+          </div>
           <label class="quick-log-label" for="qgId">Id (short, unique, kebab-case)</label>
           <input class="quick-log-input" type="text" id="qgId" placeholder="e.g. downloads-100-oct" required>
           <label class="quick-log-label" for="qgLabel">Label</label>

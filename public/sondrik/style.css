@@ -392,6 +392,29 @@ header.page-head .sub {
 }
 .quick-log-input:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--hairlineHover); }
 .quick-log-generate { align-self: flex-start; margin-top: 12px; }
+
+/* None of these quick-log forms have a backend to save to, so an accidental
+   reload or navigation away used to throw away real typed data with no way
+   back. Same "restored draft" notice CSM's/CGT's/Garage's own quick-log
+   forms already use, styled with this page's existing amber info-banner
+   tone. Sits inside each form (not above the shared grid, like the other
+   hubs) since all five of these forms share one .quick-log-grid here. */
+.quick-log-draft-banner[hidden] { display: none; }
+.quick-log-draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: #E8C088;
+  line-height: 1.5;
+  background: rgba(224,160,48,0.06);
+  border: 1px solid rgba(224,160,48,0.35);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+}
+.quick-log-draft-banner span { flex: 1 1 200px; }
 .quick-log-warnings {
   font-size: 0.72rem;
   color: #E0A030;
