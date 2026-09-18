@@ -1298,7 +1298,7 @@
       const info = stallInfo(p, stageById);
       const lastTouchDays = daysSinceLastTouch(p);
       return '<tr class="board-list-row' + (info && info.isStale ? ' board-list-row-stale' : '') +
-        '" data-prospect-id="' + escapeHtml(p.id) + '" tabindex="0">' +
+        '" data-prospect-id="' + escapeHtml(p.id) + '" tabindex="0" role="button" aria-label="View details for ' + escapeHtml(p.name) + '">' +
         '<td><div class="board-list-name">' + escapeHtml(p.name) + '</div><div class="board-list-company">' +
         escapeHtml(p.company || 'Company not logged') + '</div></td>' +
         '<td>' + (stage
