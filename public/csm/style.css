@@ -122,6 +122,7 @@ header.page-head .sub {
    real overdue nudge or a stalled deal doesn't require reading every section
    below to notice. Purely a jump-link to the section that already computed
    it, never a second source of truth. */
+.attention-bar[hidden] { display: none; }
 .attention-bar {
   display: flex;
   flex-wrap: wrap;
