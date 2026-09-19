@@ -8,7 +8,7 @@
   --ink: #F5F6F7;
   --sub: #9A9FA6;
   --dim: #7B8188;
-  --accent: #5B8CFF;
+  --accent: #D9A441;
 }
 
 * { box-sizing: border-box; }
@@ -161,8 +161,8 @@ header.page-head .sub {
   font-size: 0.75rem;
   color: var(--accent);
   text-decoration: none;
-  border: 1px solid rgba(91,140,255,0.35);
-  background: rgba(91,140,255,0.1);
+  border: 1px solid rgba(217,164,65,0.35);
+  background: rgba(217,164,65,0.1);
   padding: 6px 12px;
   border-radius: 999px;
   display: inline-flex;
@@ -170,8 +170,8 @@ header.page-head .sub {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .new-since-pill:hover, .new-since-pill:focus-visible {
-  border-color: rgba(91,140,255,0.6);
-  background: rgba(91,140,255,0.16);
+  border-color: rgba(217,164,65,0.6);
+  background: rgba(217,164,65,0.16);
 }
 .new-since-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Same [hidden] override as .attention-pill above, this pill has the same
@@ -183,8 +183,8 @@ header.page-head .sub {
   letter-spacing: 0.04em;
   padding: 2px 7px;
   border-radius: 999px;
-  border: 1px solid rgba(91,140,255,0.35);
-  background: rgba(91,140,255,0.12);
+  border: 1px solid rgba(217,164,65,0.35);
+  background: rgba(217,164,65,0.12);
   color: var(--accent);
   margin-left: 6px;
 }
@@ -786,7 +786,7 @@ section { margin-bottom: 36px; }
   color: var(--dim);
 }
 .timeline-kind-release .timeline-badge { border-color: rgba(224,160,48,0.35); background: rgba(224,160,48,0.1); color: #E0A030; }
-.timeline-kind-check .timeline-badge { border-color: rgba(91,140,255,0.35); background: rgba(91,140,255,0.1); color: var(--accent); }
+.timeline-kind-check .timeline-badge { border-color: rgba(217,164,65,0.35); background: rgba(217,164,65,0.1); color: var(--accent); }
 .timeline-kind-lead .timeline-badge { border-color: rgba(61,220,132,0.35); background: rgba(61,220,132,0.1); color: #3DDC84; }
 .timeline-kind-goal .timeline-badge { border-color: rgba(155,110,255,0.35); background: rgba(155,110,255,0.1); color: #9B6EFF; }
 .timeline-date {
@@ -979,7 +979,7 @@ section { margin-bottom: 36px; }
   white-space: nowrap;
 }
 .channel-pill-tracked { border-color: rgba(61,220,132,0.35); background: rgba(61,220,132,0.1); color: #3DDC84; }
-.channel-pill-manual { border-color: rgba(91,140,255,0.35); background: rgba(91,140,255,0.1); color: var(--accent); }
+.channel-pill-manual { border-color: rgba(217,164,65,0.35); background: rgba(217,164,65,0.1); color: var(--accent); }
 .channel-pill-gap { border-color: var(--hairline); background: rgba(255,255,255,0.02); color: var(--dim); }
 .channel-value {
   font-size: 1.05rem;
