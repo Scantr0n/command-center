@@ -1252,6 +1252,18 @@ footer.page-foot {
 }
 .data-freshness-stale { color: #E0A030; }
 
+/* Same precedent as public/alpha/style.css: real transitions (card
+   hover/focus, drag state, sortable list headers, toggles), not just
+   keyframe animations, still trigger vestibular discomfort for someone who
+   has set this preference, so cut them to near-instant. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Print / export to PDF: a plain, light, single-column handout.
    Interactive-only controls (search, chips, links, the schema editor
    help, the modal) are dropped since they do nothing on paper. */
