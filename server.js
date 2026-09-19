@@ -282,7 +282,18 @@ function evolutionEvents(history) {
 }
 
 app.get('/api/alpha/live', async (req, res) => {
-  const fallback = JSON.parse(fs.readFileSync(ALPHA_STATUS_FILE, 'utf8'));
+  // Same skip-and-log guard as readLocalClusters/readToggles above: this read
+  // sat outside the try block below, so a missing or malformed status.json
+  // (a killed process mid-save, a stray hand-edit) threw an unhandled error
+  // out of the route instead of the honest degraded response every other
+  // file read on this server already falls back to.
+  let fallback;
+  try {
+    fallback = JSON.parse(fs.readFileSync(ALPHA_STATUS_FILE, 'utf8'));
+  } catch (err) {
+    console.error(`Alpha fallback status file unreadable: ${err.message}`);
+    return res.status(500).json({ error: `Alpha fallback status file unreadable: ${err.message}` });
+  }
   try {
     const health = await fetchAlpha('/health');
     const [state, evoHistory, anomalies, debates, equity] = await Promise.all([
