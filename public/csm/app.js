@@ -14,6 +14,7 @@
   const modalBody = document.getElementById('modalBody');
   const modalClose = document.getElementById('modalClose');
   const modalCopyLinkBtn = document.getElementById('modalCopyLinkBtn');
+  const modalBriefBtn = document.getElementById('modalBriefBtn');
   const printBtn = document.getElementById('printBtn');
   const csvBtn = document.getElementById('csvBtn');
   const backupBtn = document.getElementById('backupBtn');
@@ -1729,6 +1730,107 @@
     downloadFile(csv, 'csm-pipeline-' + todayIso() + '.csv', 'text/csv;charset=utf-8;');
   });
 
+  // Same real, documented per-platform contact mechanics as the "Platform
+  // outreach reference" table in index.html (Xingtu, Pugongying, Weirenwu,
+  // Huahuo, WeChat's lack of one), condensed to the one line that matters for
+  // an outreach brief: where a real contact actually is, not just the
+  // platform's own marketplace. Keyed lowercase/trimmed so "Douyin" and
+  // "douyin " both match, same normalization findCasingDrift already uses.
+  const PLATFORM_TIPS = {
+    douyin: 'Xingtu is a generic marketplace inbox that gets flooded. A named decision-maker, reached directly or via a listed business email, is still the higher-reply-rate path.',
+    xiaohongshu: 'Pugongying only confirms the account already does paid work, it is not itself a contact. Look for a listed business email or named contact in the bio first.',
+    weibo: 'Weirenwu is geared toward macro-influencer/celebrity deals. For a smaller or niche account, a personal contact or email in the bio is more realistic.',
+    bilibili: 'Huahuo is mandatory for disclosure compliance, not itself a contact. The real contact is whoever runs the account or their listed agent.',
+    wechat: 'No centralized marketplace exists. Outreach is direct: a personal WeChat ID or a listed business-cooperation email on an Official Account profile. Named vs. generic matters most here.'
+  };
+  function platformTip(platform) {
+    if (!platform) return null;
+    return PLATFORM_TIPS[platform.trim().toLowerCase()] || null;
+  }
+
+  // Pulls everything needed to actually draft a real message to one prospect
+  // into a single copyable block: the hook, the channel (and its matching
+  // platform-specific contact guidance above), every logged social snapshot
+  // with its honest as-of/staleness label, and the current next action, so
+  // none of it has to be re-found by re-opening this modal mid-draft. Reuses
+  // only what the modal already renders from real logged fields, never
+  // invents a subject line or message body, that would cross from a planning
+  // tool into a send tool.
+  function buildProspectBriefText(p, stages) {
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    const lines = [];
+    lines.push('OUTREACH BRIEF - ' + p.name + (p.company ? ' (' + p.company + ')' : '') + ' - generated ' + fmtDate(todayIso()));
+    lines.push('');
+
+    const stageDef = stageById[p.stage];
+    const stall = stallInfo(p, stageById);
+    lines.push('STAGE: ' + (stageDef ? stageDef.label : p.stage) +
+      (p.stageEnteredDate ? ' (entered ' + fmtDate(p.stageEnteredDate) + ', ' + daysSince(p.stageEnteredDate) + 'd in stage' +
+        (stall && stall.isStale ? ', STALLED past ' + stall.staleAfterDays + 'd threshold' : '') + ')' : ' (stage entered date not logged)'));
+    lines.push('CATEGORY: ' + (p.category || 'Not logged yet'));
+    lines.push('VERIFIED HOOK: ' + (p.verifiedHook || 'Not logged yet, do not send until this is a real, checked reason.'));
+    lines.push('');
+
+    const channel = p.contactChannel || {};
+    const channelLabel = channel.type === 'named-decision-maker' ? 'NAMED DECISION-MAKER'
+      : channel.type === 'generic-inbox' ? 'GENERIC INBOX' : 'NOT LOGGED';
+    lines.push('CONTACT CHANNEL: ' + channelLabel + (channel.detail ? ' - ' + channel.detail : ''));
+    if (channel.type === 'generic-inbox') {
+      lines.push('  Generic inbox has historically been this project\'s lowest real reply rate, a named decision-maker is worth another look before sending.');
+    }
+    const tips = new Set();
+    (p.socialSnapshots || []).forEach(snap => {
+      const tip = platformTip(snap.platform);
+      if (tip) tips.add((snap.platform.trim()) + ': ' + tip);
+    });
+    tips.forEach(t => lines.push('  ' + t));
+    lines.push('');
+
+    lines.push('SOCIAL SNAPSHOTS (one-time manual research, never live):');
+    const snaps = (p.socialSnapshots || []).slice().sort((a, b) => (b.asOfDate || '').localeCompare(a.asOfDate || ''));
+    if (snaps.length) {
+      snaps.forEach(snap => {
+        const staleInfo = socialSnapshotStaleInfo(snap);
+        const parts = [snap.platform || 'Platform not logged'];
+        if (snap.followers != null) parts.push(Number(snap.followers).toLocaleString() + ' followers');
+        if (snap.engagementRate != null) parts.push(snap.engagementRate + '% engagement');
+        const asOf = snap.asOfDate
+          ? 'as of ' + fmtDate(snap.asOfDate) + (staleInfo ? ', ' + staleInfo.days + 'd old, DUE FOR REFRESH' : '')
+          : 'no as-of date logged';
+        lines.push('  - ' + parts.join(', ') + ' (' + asOf + ')');
+      });
+    } else {
+      lines.push('  None logged yet.');
+    }
+    lines.push('');
+
+    lines.push('REPLY STATUS: ' + (p.replyStatus || 'Not logged yet'));
+    lines.push('NEXT ACTION: ' + (p.nextAction || 'Not logged yet') +
+      (p.nextNudgeDate ? ' (next nudge ' + fmtDate(p.nextNudgeDate) + ')' : ''));
+    const ns = p.nudgeSchedule || {};
+    if (ns.doNotNudgeBefore || ns.nudgePoint) {
+      lines.push('NUDGE SCHEDULE: ' +
+        [
+          ns.doNotNudgeBefore ? 'do not nudge before ' + fmtDate(ns.doNotNudgeBefore) : null,
+          ns.nudgePoint ? 'nudge point ' + fmtDate(ns.nudgePoint) : null
+        ].filter(Boolean).join(', '));
+    }
+    lines.push('');
+
+    lines.push('RECENT CONTENT IDEAS:');
+    const ideas = (p.contentIdeas || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 5);
+    if (ideas.length) {
+      ideas.forEach(entry => lines.push('  - ' + (entry.date ? fmtDate(entry.date) + ': ' : '') + entry.idea));
+    } else {
+      lines.push('  None logged yet.');
+    }
+    lines.push('');
+
+    lines.push('Prep reference only, copied locally, nothing here has been sent. Re-check the hook, channel, and ' +
+      'reply status above are still accurate before writing or sending any real message.');
+    return lines.join('\n');
+  }
+
   // Plain-text digest for pasting into a notes app, journal, or a message to
   // yourself, not the tool itself: there is no backend to check the pipeline
   // from anywhere but this page, so this is the fastest way to carry today's
@@ -2738,6 +2840,21 @@
       .catch(() => { modalCopyLinkBtn.textContent = "Couldn't copy, link is in the address bar"; })
       .finally(() => {
         setTimeout(() => { modalCopyLinkBtn.textContent = MODAL_COPY_LINK_LABEL; }, 1800);
+      });
+  });
+
+  // Same open prospect, compiled into a draft-ready brief instead of just a
+  // link back to this modal. openProspectId is kept in sync by openModal, so
+  // this always reads whichever prospect is currently open.
+  const MODAL_BRIEF_LABEL = modalBriefBtn.textContent;
+  modalBriefBtn.addEventListener('click', () => {
+    const p = byId[openProspectId];
+    if (!p) return;
+    copyText(buildProspectBriefText(p, allStages))
+      .then(() => { modalBriefBtn.textContent = 'Brief copied'; })
+      .catch(() => { modalBriefBtn.textContent = "Couldn't copy"; })
+      .finally(() => {
+        setTimeout(() => { modalBriefBtn.textContent = MODAL_BRIEF_LABEL; }, 1800);
       });
   });
 
