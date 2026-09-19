@@ -872,30 +872,29 @@
       (isStale ? ', over a week old' : '');
   }
 
-  // Surfaces the single most actionable fact on the page, real drafted
-  // outreach sitting on a human approval, as a header pill rather than
-  // making a visitor read the whole engagement queue to find it. Also
-  // swaps the tab's own favicon to the same amber dot the attention pill
-  // uses, the same "glance indicator" convention Alpha's app.js already
-  // established for its own tab (favicon + title both carry the state a
-  // background tab can't otherwise show), so Jack can tell a draft is
-  // waiting on him without this tab being focused. Reverts to the shared
-  // favicon.svg, never edits it, once nothing is pending.
-  function renderAttentionPill(data) {
-    const leads = data.leads || [];
-    const pending = leads.filter(l => {
-      const o = l.outreach || {};
-      return !o.sent && o.approvalStatus === 'awaiting-approval';
-    });
-    if (pending.length === 0) {
+  // Surfaces every real urgent next step (see computeNextSteps above, not
+  // just a pending lead approval) as a header pill rather than making a
+  // visitor read the whole page to find it. Before this counted pending
+  // lead approvals only, so a backgrounded tab gave no glance signal for a
+  // stale download check or a missed bugfix check-in, the two other
+  // "urgent: true" steps computeNextSteps already tracks; a visitor had to
+  // scroll to Next steps to see either. Also swaps the tab's own favicon to
+  // the same amber dot the attention pill uses, the same "glance indicator"
+  // convention Alpha's app.js already established for its own tab (favicon
+  // + title both carry the state a background tab can't otherwise show), so
+  // Jack can tell something real needs him without this tab being focused.
+  // Reverts to the shared favicon.svg, never edits it, once nothing is urgent.
+  function renderAttentionPill(steps) {
+    const urgent = steps.filter(s => s.urgent);
+    if (urgent.length === 0) {
       attentionPill.hidden = true;
       document.title = 'Sondrik / Command Center';
       if (pageFavicon && DEFAULT_FAVICON_HREF) pageFavicon.setAttribute('href', DEFAULT_FAVICON_HREF);
       return;
     }
     attentionPill.hidden = false;
-    attentionPill.textContent = pending.length + (pending.length === 1 ? ' draft awaiting your approval' : ' drafts awaiting your approval');
-    document.title = '(' + pending.length + ') Sondrik / Command Center';
+    attentionPill.textContent = urgent.length + (urgent.length === 1 ? ' item needs your attention' : ' items need your attention');
+    document.title = '(' + urgent.length + ') Sondrik / Command Center';
     if (pageFavicon) {
       const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
         '<circle cx="16" cy="16" r="13" fill="#E0A030"/></svg>';
@@ -1009,7 +1008,14 @@
   // flags as warnings (an undated release, an uncited metric, an unexplained
   // "not-tracked" channel), so those show up here on page load instead of
   // only when someone remembers to run the validator from the command line.
-  function renderNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData) {
+  //
+  // Split into compute + render so the header attention pill (see
+  // renderAttentionPill below) can count the same real "urgent" steps this
+  // section lists, instead of only ever knowing about pending lead
+  // approvals. Before this split, a stale download check or a missed
+  // bugfix check-in only ever showed up if you scrolled down to Next
+  // steps; a backgrounded tab gave no glance signal for either.
+  function computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData) {
     const steps = [];
 
     const releases = (releasesData && releasesData.releases) || [];
@@ -1136,12 +1142,16 @@
       });
     }
 
+    steps.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
+    return steps;
+  }
+
+  function renderNextSteps(steps) {
     if (steps.length === 0) {
       nextStepsList.innerHTML = '<div class="empty-state">Nothing needs your attention right now.</div>';
       return;
     }
 
-    steps.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
     nextStepsList.innerHTML = '<ul class="next-steps-list">' + steps.map(s =>
       '<li class="next-step-item ' + (s.urgent ? 'next-step-urgent' : 'next-step-info') + '">' +
       '<a href="' + s.href + '">' +
@@ -2008,7 +2018,6 @@
 
     if (leadsData) {
       renderLeads(leadsData);
-      renderAttentionPill(leadsData);
       leadsCsvBtn.addEventListener('click', () => exportLeadsCsv(leadsData));
     } else {
       leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
@@ -2031,7 +2040,9 @@
     }
 
     if (releasesData || downloadsData || leadsData || goalsData || channelsData) {
-      renderNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData);
+      const steps = computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData);
+      renderNextSteps(steps);
+      renderAttentionPill(steps);
     } else {
       nextStepsList.innerHTML = '<div class="empty-state" role="alert">Could not compute next steps, data failed to load.</div>';
     }
