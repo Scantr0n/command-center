@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T12:32:28.447Z",
+  "generatedAt": "2026-09-19T14:50:54.396Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "ae2eabf",
-      "fullHash": "ae2eabfe3a41ab79c919de22c79eb077ce6b6419",
+      "hash": "23a6c08",
+      "fullHash": "23a6c084612f27bba6392e5be78fa3362d36f008",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "CSM: fix aria-allowed-attr violation on sortable list table headers",
+      "subject": "CGT/CSM/Garage: add a real focus-visible ring to Back and Print buttons",
       "files": [
         "activity.json",
         "disputes.json",
