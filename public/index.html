@@ -461,6 +461,7 @@
 <script>
 let clusters = [];
 let activeCluster = null;
+let activityFeedExpanded = false;
 let chatHistory = [];
 // Bumped every time a modal opens, so an in-flight chat response for a
 // project the user has since navigated away from (closed the modal, or
@@ -629,11 +630,15 @@ async function loadClusters() {
   }
 }
 
+const ACTIVITY_FEED_COLLAPSED_COUNT = 10;
+
 function renderActivityFeed() {
   const feed = document.getElementById('activityFeed');
   const dated = clusters.filter(c => c.lastUpdate).sort((a, b) => b.lastUpdate.localeCompare(a.lastUpdate));
   if (!dated.length) { feed.innerHTML = `<p class="text-xs" style="color: var(--faint)">Nothing dated yet.</p>`; return; }
-  feed.innerHTML = dated.slice(0, 10).map(c => {
+  const hasMore = dated.length > ACTIVITY_FEED_COLLAPSED_COUNT;
+  const shown = hasMore && !activityFeedExpanded ? dated.slice(0, ACTIVITY_FEED_COLLAPSED_COUNT) : dated;
+  feed.innerHTML = shown.map(c => {
     const color = categoryColor(c.category);
     return `
       <div class="activity-row flex items-center gap-3 py-1.5 cursor-pointer" data-id="${escapeHtml(c.id)}">
@@ -644,7 +649,29 @@ function renderActivityFeed() {
       </div>
     `;
   }).join('');
+  // Truncating at ACTIVITY_FEED_COLLAPSED_COUNT with no visible cue left
+  // over half of real activity invisible once there were 20+ dated projects,
+  // with nothing on screen indicating the list was cut short at all.
+  if (hasMore) {
+    feed.innerHTML += `
+      <button type="button" id="activityFeedToggle" class="text-xs font-mono px-3 py-1.5 rounded border hairline w-fit mt-1" style="color: var(--sub)">
+        ${activityFeedExpanded ? 'Show fewer' : `Show ${dated.length - ACTIVITY_FEED_COLLAPSED_COUNT} more`}
+      </button>
+    `;
+    document.getElementById('activityFeedToggle').addEventListener('click', () => {
+      activityFeedExpanded = !activityFeedExpanded;
+      renderActivityFeed();
+      applyFilters();
+    });
+  }
   feed.querySelectorAll('[data-id]').forEach(makeCardClickable);
+  // Rebuilding this feed's rows from scratch drops whatever dimmed/matched
+  // state the active search/category filter had applied, and this render
+  // runs after renderGraph/renderGrid's own end-of-render applyFilters
+  // calls (which only reach the cards/nodes that already existed when they
+  // ran), so a poll re-render was silently un-filtering the activity feed
+  // until the next keystroke.
+  applyFilters();
 }
 
 function renderStats() {
