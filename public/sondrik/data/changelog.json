@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-19T04:18:09.334Z",
+  "generatedAt": "2026-09-19T04:44:39.930Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
@@ -13,11 +13,11 @@
       ]
     },
     {
-      "hash": "5f09aa5",
-      "fullHash": "5f09aa5bc5942084a8901ddb18f9d3a05520e5c8",
+      "hash": "bd24c13",
+      "fullHash": "bd24c133fda92da063fb2e795507a6f73b4f2e71",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "CGT: add an attention bar summarizing all five flagged-data panels",
+      "subject": "CGT: add a Value breakdown card grouping priced cards by storage location",
       "files": [
         "channels.json",
         "downloads.json",
