@@ -127,7 +127,7 @@
     background: rgba(255,255,255,0.03);
   }
   #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed { opacity: 0.16; }
+  .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed, .attn-pill.dimmed, .attn-card.dimmed { opacity: 0.16; }
   /* A dimmed node's own spoke line back to the hub was previously left out of
      this rule entirely (it's a sibling <line>, not a child of .graph-node),
      so filtering to one category still left every other category's spokes
@@ -292,7 +292,7 @@
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
       <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
-        <div id="searchWrap" class="relative">
+        <div id="searchWrap" class="relative" role="search">
           <input id="searchInput" type="text" placeholder="Search projects..." aria-label="Search projects"
             class="search-input text-xs font-mono rounded-lg pl-3 pr-6 py-1.5 border hairline focus:outline-none w-[175px] sm:w-[190px]"
             style="background: var(--panelLight); color: var(--ink)">
@@ -461,6 +461,7 @@
 <script>
 let clusters = [];
 let activeCluster = null;
+let activityFeedExpanded = false;
 let chatHistory = [];
 // Bumped every time a modal opens, so an in-flight chat response for a
 // project the user has since navigated away from (closed the modal, or
@@ -629,11 +630,15 @@ async function loadClusters() {
   }
 }
 
+const ACTIVITY_FEED_COLLAPSED_COUNT = 10;
+
 function renderActivityFeed() {
   const feed = document.getElementById('activityFeed');
   const dated = clusters.filter(c => c.lastUpdate).sort((a, b) => b.lastUpdate.localeCompare(a.lastUpdate));
   if (!dated.length) { feed.innerHTML = `<p class="text-xs" style="color: var(--faint)">Nothing dated yet.</p>`; return; }
-  feed.innerHTML = dated.slice(0, 10).map(c => {
+  const hasMore = dated.length > ACTIVITY_FEED_COLLAPSED_COUNT;
+  const shown = hasMore && !activityFeedExpanded ? dated.slice(0, ACTIVITY_FEED_COLLAPSED_COUNT) : dated;
+  feed.innerHTML = shown.map(c => {
     const color = categoryColor(c.category);
     return `
       <div class="activity-row flex items-center gap-3 py-1.5 cursor-pointer" data-id="${escapeHtml(c.id)}">
@@ -644,7 +649,29 @@ function renderActivityFeed() {
       </div>
     `;
   }).join('');
+  // Truncating at ACTIVITY_FEED_COLLAPSED_COUNT with no visible cue left
+  // over half of real activity invisible once there were 20+ dated projects,
+  // with nothing on screen indicating the list was cut short at all.
+  if (hasMore) {
+    feed.innerHTML += `
+      <button type="button" id="activityFeedToggle" class="text-xs font-mono px-3 py-1.5 rounded border hairline w-fit mt-1" style="color: var(--sub)">
+        ${activityFeedExpanded ? 'Show fewer' : `Show ${dated.length - ACTIVITY_FEED_COLLAPSED_COUNT} more`}
+      </button>
+    `;
+    document.getElementById('activityFeedToggle').addEventListener('click', () => {
+      activityFeedExpanded = !activityFeedExpanded;
+      renderActivityFeed();
+      applyFilters();
+    });
+  }
   feed.querySelectorAll('[data-id]').forEach(makeCardClickable);
+  // Rebuilding this feed's rows from scratch drops whatever dimmed/matched
+  // state the active search/category filter had applied, and this render
+  // runs after renderGraph/renderGrid's own end-of-render applyFilters
+  // calls (which only reach the cards/nodes that already existed when they
+  // ran), so a poll re-render was silently un-filtering the activity feed
+  // until the next keystroke.
+  applyFilters();
 }
 
 function renderStats() {
@@ -924,6 +951,11 @@ function renderGraph() {
       const p0 = { x: nx, y: ny }, p2 = { x: other.x, y: other.y };
       const others = simNodes.filter(n => n.id !== c.id && n.id !== other.id)
         .map(n => ({ x: n.x, y: n.y, radius: n.radius }));
+      // The hub circle itself was never in this list, so a relation curve
+      // between two nodes on opposite sides of it (any future cross-category
+      // relation, none of today's happen to be) could bow straight through
+      // the "COMMAND CENTER" hub with no clearance check ever catching it.
+      others.push({ x: cx, y: cy, radius: hubR });
       // Start at the same minimum as before and grow in real steps, checking
       // the actual curve against every other node's real circle each time,
       // until it clears by a comfortable margin or a sane cap is hit (a
@@ -1102,8 +1134,33 @@ function resetGraphZoom() {
   }
 }
 
-let searchTerm = '';
-let activeCategory = null;
+// Seeded from the URL on load (the same "q"/"cat" params syncFilterUrl below
+// keeps in sync on every change), so a filtered view is bookmarkable and
+// survives a reload the same way an open project's own "?project=" link
+// already does. A "cat" that doesn't match any real category just matches
+// nothing once clusters load, same as filtering by hand to a typo'd value.
+const initialFilterParams = new URLSearchParams(location.search);
+let searchTerm = initialFilterParams.get('q') || '';
+let activeCategory = initialFilterParams.get('cat') || null;
+if (searchTerm) document.getElementById('searchInput').value = searchTerm;
+
+// Mirrors the live search/category filter into the URL via replaceState
+// only, never pushState: it should be shareable and reload-safe like the
+// project modal's own deep link, but unlike that link a filter change isn't
+// a real navigation step, so it must never create a back-button entry (that
+// would make every keystroke in the search box its own "back" stop) or
+// disturb the modal's own pushState/popstate handling below, which is why
+// it preserves whatever "project" param and history.state are already there.
+function syncFilterUrl() {
+  const params = new URLSearchParams(location.search);
+  if (searchTerm.trim()) params.set('q', searchTerm); else params.delete('q');
+  if (activeCategory) params.set('cat', activeCategory); else params.delete('cat');
+  const qs = params.toString();
+  const url = location.pathname + (qs ? `?${qs}` : '');
+  if (url !== location.pathname + location.search) {
+    history.replaceState(history.state, '', url);
+  }
+}
 
 // Shared by the graph's sector labels and the standalone category filter
 // row, so clicking a category filters the whole board no matter which view
@@ -1156,7 +1213,7 @@ function applyFilters() {
     el.classList.toggle('dimmed', anyFilterActive && !(matchesSearch && matchesCategory));
   });
 
-  document.querySelectorAll('.graph-node, .cluster-card, .activity-row').forEach(el => {
+  document.querySelectorAll('.graph-node, .cluster-card, .activity-row, .attn-pill, .attn-card').forEach(el => {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
     if (!c) return;
@@ -1206,6 +1263,7 @@ function applyFilters() {
     document.getElementById('noResultsText').textContent =
       `No projects match${activeCategory ? ` in ${activeCategory}` : ''}${term ? ` for "${term}"` : ''}.`;
   }
+  syncFilterUrl();
 }
 
 function clearAllFilters() {
@@ -1531,7 +1589,12 @@ function openModal(id, opts = {}) {
   if (isDeepLink) {
     modalHistoryPushed = false;
   } else {
-    const url = `${location.pathname}?project=${encodeURIComponent(id)}`;
+    // Preserves whatever "q"/"cat" filter params are already in the URL
+    // (see syncFilterUrl), so opening a project from a filtered view keeps
+    // that filter in the shareable link instead of silently dropping it.
+    const params = new URLSearchParams(location.search);
+    params.set('project', id);
+    const url = `${location.pathname}?${params.toString()}`;
     history.pushState({ ccProject: id }, '', url);
     modalHistoryPushed = true;
   }
@@ -1562,7 +1625,10 @@ function closeModalAndReturnFocus(opts = {}) {
     if (modalHistoryPushed) {
       history.back();
     } else if (new URLSearchParams(location.search).has('project')) {
-      history.replaceState(null, '', location.pathname);
+      const params = new URLSearchParams(location.search);
+      params.delete('project');
+      const qs = params.toString();
+      history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''));
     }
   }
   modalHistoryPushed = false;

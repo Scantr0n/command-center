@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-09-19T16:07:42.409Z",
+  "generatedAt": "2026-09-19T20:50:40.029Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "7a6d263",
-      "fullHash": "7a6d2635576ce5d0565f26f280c9e45e86e62cc7",
-      "date": "2026-09-18",
+      "hash": "f8eecb8",
+      "fullHash": "f8eecb87233cf9339fbaf01c7844b377826699a3",
+      "date": "2026-09-19",
       "author": "Claude",
       "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
       "historyReset": true,

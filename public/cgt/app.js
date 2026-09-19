@@ -516,6 +516,7 @@ async function loadCards() {
     renderSubmissions();
     renderValueBreakdown();
     renderBiggestMovers();
+    renderPortfolioValueTimeline();
     renderPricingActivity();
     renderUnpriced();
     renderDataQuality();
@@ -952,6 +953,91 @@ function renderBiggestMovers() {
   section.querySelectorAll('.movers-row').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.id));
   });
+}
+
+// Reconstructs the real collection's total value at every distinct date any
+// unsold, priced real card actually had a value on record (its current
+// datePriced plus every dated entry in its own priceHistory), the "value over
+// time" trend CollX and Card Ladder-style trackers lead with once a
+// collection has real re-pricing history. At each snapshot date a card counts
+// at the latest real value it had on or before that date (not counted at all
+// before its first real price, dropped entirely once its own soldDate has
+// passed, same scope as every other portfolio total on this page). Returns
+// null when fewer than two distinct real dates exist across the whole
+// collection, since one shared date (or none) is not a trend, it is
+// everything having been priced once on the same day.
+function buildPortfolioValueTimeline() {
+  const perCard = cards
+    .filter(c => !isExample(c) && c.estimatedValue != null && c.datePriced)
+    .map(c => {
+      const points = (c.priceHistory || [])
+        .filter(p => p.date && p.value != null)
+        .map(p => ({ date: p.date, value: p.value }));
+      points.push({ date: c.datePriced, value: c.estimatedValue });
+      points.sort((a, b) => a.date.localeCompare(b.date));
+      return { card: c, points };
+    });
+  if (!perCard.length) return null;
+
+  const allDates = new Set();
+  perCard.forEach(({ points }) => points.forEach(p => allDates.add(p.date)));
+  const sortedDates = [...allDates].sort();
+  if (sortedDates.length < 2) return null;
+
+  return sortedDates.map(date => {
+    let total = 0;
+    let countedCards = 0;
+    perCard.forEach(({ card, points }) => {
+      if (isSold(card) && card.soldDate && card.soldDate <= date) return;
+      const known = points.filter(p => p.date <= date);
+      if (!known.length) return;
+      total += known[known.length - 1].value;
+      countedCards++;
+    });
+    return { date, total, countedCards };
+  });
+}
+
+// Hand-rolled inline SVG line chart rather than pulling in a charting library
+// for one chart. Points are spaced evenly by index, not truly proportional to
+// the real calendar gaps between them, since those gaps are irregular and the
+// point here is the real shape of the trend and the real totals (given as an
+// accessible label plus a per-point <title> and the two endpoint captions
+// below it), not exact time spacing.
+function renderPortfolioValueTimeline() {
+  const el = document.getElementById('valueTimelineChart');
+  const series = buildPortfolioValueTimeline();
+  if (!series) {
+    el.innerHTML = '<p class="activity-empty" role="status">Not enough real re-pricing history yet to chart a ' +
+      'trend. This needs at least two distinct real dates (from <code class="inline-code">datePriced</code> or ' +
+      '<code class="inline-code">priceHistory</code>) across the priced, unsold collection; right now everything ' +
+      'priced shares one date, or nothing is priced yet. It fills in on its own as cards get re-priced over ' +
+      'time.</p>';
+    return;
+  }
+  const width = 720, height = 220, padX = 12, padY = 24;
+  const values = series.map(p => p.total);
+  const minV = Math.min(...values), maxV = Math.max(...values);
+  const range = maxV - minV || 1;
+  const xStep = (width - padX * 2) / (series.length - 1);
+  const xFor = i => padX + i * xStep;
+  const yFor = v => height - padY - ((v - minV) / range) * (height - padY * 2);
+  const pathD = series.map((p, i) => (i === 0 ? 'M' : 'L') + xFor(i).toFixed(1) + ',' + yFor(p.total).toFixed(1)).join(' ');
+  const baseline = (height - padY).toFixed(1);
+  const areaD = pathD + ` L${xFor(series.length - 1).toFixed(1)},${baseline} L${xFor(0).toFixed(1)},${baseline} Z`;
+  const dots = series.map((p, i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(p.total).toFixed(1)}" r="3.5" class="timeline-dot"><title>${escapeHtml(p.date)}: ${escapeHtml(formatUsd(p.total))} (${p.countedCards} card${p.countedCards === 1 ? '' : 's'})</title></circle>`).join('');
+  const first = series[0], last = series[series.length - 1];
+  el.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" class="timeline-svg" role="img" aria-label="Real portfolio total value from ${escapeHtml(first.date)} (${escapeHtml(formatUsd(first.total))}) to ${escapeHtml(last.date)} (${escapeHtml(formatUsd(last.total))}), ${series.length} real pricing dates">
+      <path d="${areaD}" class="timeline-area"></path>
+      <path d="${pathD}" class="timeline-line"></path>
+      ${dots}
+    </svg>
+    <div class="timeline-endpoints font-mono">
+      <span>${escapeHtml(first.date)} &middot; ${escapeHtml(formatUsd(first.total))}</span>
+      <span>${escapeHtml(last.date)} &middot; ${escapeHtml(formatUsd(last.total))}</span>
+    </div>
+  `;
 }
 
 // Pulls "what got priced when" out of every card's own datePriced/backlogBatch

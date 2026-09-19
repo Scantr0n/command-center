@@ -1070,6 +1070,10 @@ header.page-head .sub {
   margin-top: 5px;
   line-height: 1.4;
 }
+.changelog-title-reset {
+  color: #E0A030;
+  font-style: italic;
+}
 .changelog-generated-note {
   font-size: 0.72rem;
   color: var(--dim);
