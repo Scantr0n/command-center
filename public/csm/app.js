@@ -2904,7 +2904,17 @@
       // without hunting for the "+ Add another row" button again, so the
       // last row clears in place instead of disappearing.
       if (npQuickRowsEl.children.length > 1) {
+        // The remove button itself has focus when clicked, and rowEl.remove()
+        // below detaches it along with the whole row, dropping keyboard/
+        // screen-reader focus to <body> with no indication of where the row
+        // went. Move focus to the equivalent field on whichever row takes
+        // this one's place (the next row, or the previous row if this was
+        // last) before removing it, same "never let focus fall off the edge"
+        // rule the modal's own open/close already follows.
+        const nextRow = rowEl.nextElementSibling || rowEl.previousElementSibling;
+        const focusTarget = nextRow ? nextRow.querySelector('input[data-field="name"]') : npQuickAddRowBtn;
         rowEl.remove();
+        if (focusTarget) focusTarget.focus();
       } else {
         rowEl.querySelectorAll('input').forEach(inp => { inp.value = ''; });
       }
