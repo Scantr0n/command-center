@@ -1,23 +1,13 @@
 {
-  "generatedAt": "2026-09-19T04:44:39.930Z",
+  "generatedAt": "2026-09-19T08:22:04.109Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "2e2f55d",
-      "fullHash": "2e2f55dd1be165c5e891e792584160058439ea0d",
+      "hash": "17453c1",
+      "fullHash": "17453c1cd10bf5c62085e422c4d851d5e856923f",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Sondrik: add a read-only preview of the actual drafted outreach text",
-      "files": [
-        "leads.json"
-      ]
-    },
-    {
-      "hash": "bd24c13",
-      "fullHash": "bd24c133fda92da063fb2e795507a6f73b4f2e71",
-      "date": "2026-09-18",
-      "author": "Claude",
-      "subject": "CGT: add a Value breakdown card grouping priced cards by storage location",
+      "subject": "Sondrik: refresh the data changelog after the draftText commit",
       "files": [
         "channels.json",
         "downloads.json",
