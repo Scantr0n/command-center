@@ -1207,6 +1207,18 @@ footer.page-foot {
   line-height: 1.4;
 }
 
+/* Same precedent as CSM's style.css: every hover/focus transition on this
+   page, even without a real keyframe animation behind it, still triggers
+   vestibular discomfort for someone who has set this preference, so cut
+   them to near-instant. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Print / export to PDF: a plain, light, single-column handout.
    Interactive-only controls (print button, back link, schema help) are
    dropped since they do nothing on paper. */
