@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T08:32:53.002Z",
+  "generatedAt": "2026-09-19T11:51:55.616Z",
   "generatedFrom": "git log over public/alpha/data/{status.json}, run node public/alpha/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "b88d922",
-      "fullHash": "b88d92217efff47183f56af2832b66f47ec350a9",
+      "hash": "f84a640",
+      "fullHash": "f84a640d5a822befc465c9dcea8bf548338a547b",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Garage: add a Data changelog section with real git provenance",
+      "subject": "CGT: compute the footer's real-vs-placeholder data status from live counts",
       "files": [
         "status.json"
       ]
