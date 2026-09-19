@@ -292,7 +292,7 @@
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
       <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
-        <div id="searchWrap" class="relative">
+        <div id="searchWrap" class="relative" role="search">
           <input id="searchInput" type="text" placeholder="Search projects..." aria-label="Search projects"
             class="search-input text-xs font-mono rounded-lg pl-3 pr-6 py-1.5 border hairline focus:outline-none w-[175px] sm:w-[190px]"
             style="background: var(--panelLight); color: var(--ink)">
@@ -1134,8 +1134,33 @@ function resetGraphZoom() {
   }
 }
 
-let searchTerm = '';
-let activeCategory = null;
+// Seeded from the URL on load (the same "q"/"cat" params syncFilterUrl below
+// keeps in sync on every change), so a filtered view is bookmarkable and
+// survives a reload the same way an open project's own "?project=" link
+// already does. A "cat" that doesn't match any real category just matches
+// nothing once clusters load, same as filtering by hand to a typo'd value.
+const initialFilterParams = new URLSearchParams(location.search);
+let searchTerm = initialFilterParams.get('q') || '';
+let activeCategory = initialFilterParams.get('cat') || null;
+if (searchTerm) document.getElementById('searchInput').value = searchTerm;
+
+// Mirrors the live search/category filter into the URL via replaceState
+// only, never pushState: it should be shareable and reload-safe like the
+// project modal's own deep link, but unlike that link a filter change isn't
+// a real navigation step, so it must never create a back-button entry (that
+// would make every keystroke in the search box its own "back" stop) or
+// disturb the modal's own pushState/popstate handling below, which is why
+// it preserves whatever "project" param and history.state are already there.
+function syncFilterUrl() {
+  const params = new URLSearchParams(location.search);
+  if (searchTerm.trim()) params.set('q', searchTerm); else params.delete('q');
+  if (activeCategory) params.set('cat', activeCategory); else params.delete('cat');
+  const qs = params.toString();
+  const url = location.pathname + (qs ? `?${qs}` : '');
+  if (url !== location.pathname + location.search) {
+    history.replaceState(history.state, '', url);
+  }
+}
 
 // Shared by the graph's sector labels and the standalone category filter
 // row, so clicking a category filters the whole board no matter which view
@@ -1238,6 +1263,7 @@ function applyFilters() {
     document.getElementById('noResultsText').textContent =
       `No projects match${activeCategory ? ` in ${activeCategory}` : ''}${term ? ` for "${term}"` : ''}.`;
   }
+  syncFilterUrl();
 }
 
 function clearAllFilters() {
@@ -1563,7 +1589,12 @@ function openModal(id, opts = {}) {
   if (isDeepLink) {
     modalHistoryPushed = false;
   } else {
-    const url = `${location.pathname}?project=${encodeURIComponent(id)}`;
+    // Preserves whatever "q"/"cat" filter params are already in the URL
+    // (see syncFilterUrl), so opening a project from a filtered view keeps
+    // that filter in the shareable link instead of silently dropping it.
+    const params = new URLSearchParams(location.search);
+    params.set('project', id);
+    const url = `${location.pathname}?${params.toString()}`;
     history.pushState({ ccProject: id }, '', url);
     modalHistoryPushed = true;
   }
@@ -1594,7 +1625,10 @@ function closeModalAndReturnFocus(opts = {}) {
     if (modalHistoryPushed) {
       history.back();
     } else if (new URLSearchParams(location.search).has('project')) {
-      history.replaceState(null, '', location.pathname);
+      const params = new URLSearchParams(location.search);
+      params.delete('project');
+      const qs = params.toString();
+      history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''));
     }
   }
   modalHistoryPushed = false;
