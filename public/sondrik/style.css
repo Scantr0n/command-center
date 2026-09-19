@@ -575,6 +575,17 @@ section { margin-bottom: 36px; }
   color: var(--dim);
   margin-top: 4px;
 }
+/* Honest disclosure that a rate/projection line above it is backed by too
+   few real checks to call a trend (see trendCaveatText in app.js), not a
+   warning, so it uses the same muted --dim as .stat-source rather than the
+   amber reserved for something that actually needs attention. */
+.trend-caveat {
+  font-size: 0.64rem;
+  color: var(--dim);
+  margin-top: 2px;
+  font-style: italic;
+  letter-spacing: 0.01em;
+}
 .stat-milestone {
   font-size: 0.68rem;
   color: var(--accent);
@@ -1274,7 +1285,7 @@ footer.page-foot {
   .snapshot-chip-label { color: #333; }
   .snapshot-chip-meta { color: #555; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
-  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .stat-milestone, .last-updated, .last-updated-stale, .channel-note,
+  .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .stat-milestone, .trend-caveat, .last-updated, .last-updated-stale, .channel-note,
   .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-projection, .goal-note, .goal-achieved,
   .changelog-author, .changelog-generated-note { color: #555; }
   .stat-delta { color: #111; }

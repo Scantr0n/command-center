@@ -67,6 +67,26 @@
     return m === undefined ? null : m;
   }
 
+  // A per-day rate or a projected target date is arithmetically valid off
+  // just 2 real checks (one interval), but presenting it with the same
+  // confidence as a rate backed by many checks overstates what 2 real data
+  // points actually support, exactly the kind of overconfident read this
+  // page's "never a filled-in guess" rule is meant to guard against.
+  // MIN_TREND_CHECKS is a judgment call, not a statistical threshold: below
+  // it, the rate/projection lines still render (the real math is still
+  // shown), they just carry an explicit, honest caveat about how thin the
+  // real sample behind them is instead of silently reading as an
+  // established trend. Shared by the Traction rate line and the Goals
+  // projection line, the two places on this page that turn 2+ real download
+  // checks into a forward-looking number.
+  const MIN_TREND_CHECKS = 4;
+  function trendCaveatText(checkCount) {
+    if (checkCount >= MIN_TREND_CHECKS) return null;
+    return checkCount === 2
+      ? 'based on a single interval (2 checks), too early to call this a trend'
+      : 'based on only ' + checkCount + ' checks, too early to call this a trend';
+  }
+
   // Which milestones a check newly crossed versus the check before it. A
   // null prevCount (the very first check on record) is treated as below
   // every milestone rather than as zero, so a first check logged already at
@@ -466,6 +486,8 @@
       if (span > 0) {
         const perDay = delta / span;
         rateHtml = '<div class="stat-rate font-mono">~' + perDay.toFixed(1) + '/day over that span</div>';
+        const caveat = trendCaveatText(checks.length);
+        if (caveat) rateHtml += '<div class="trend-caveat font-mono">' + escapeHtml(caveat.toUpperCase()) + '</div>';
       }
     }
 
@@ -761,6 +783,9 @@
             '/day between ' + fmtDate(rate.first.date) + ' and ' + fmtDate(rate.latest.date) + '">' +
             'AT CURRENT PACE (~' + rate.perDay.toFixed(1) + '/DAY), TARGET AROUND ' + fmtDate(projectedDate).toUpperCase() +
             ' (~' + daysNeeded + (daysNeeded === 1 ? ' DAY' : ' DAYS') + ')</div>';
+          const checkCount = ((downloadsData && downloadsData.metric && downloadsData.metric.checks) || []).length;
+          const caveat = trendCaveatText(checkCount);
+          if (caveat) projectionHtml += '<div class="trend-caveat font-mono">' + escapeHtml(caveat.toUpperCase()) + '</div>';
         } else if (rate) {
           projectionHtml = '<div class="goal-projection goal-projection-flat font-mono">' +
             'FLAT OR DECLINING PACE SINCE ' + fmtDate(rate.first.date).toUpperCase() + ', NO PROJECTED DATE AT THIS RATE</div>';

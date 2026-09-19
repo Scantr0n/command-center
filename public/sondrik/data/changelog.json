@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T08:32:53.040Z",
+  "generatedAt": "2026-09-19T12:17:35.848Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "b88d922",
-      "fullHash": "b88d92217efff47183f56af2832b66f47ec350a9",
+      "hash": "1826017",
+      "fullHash": "18260177a4060e7c31d70a8be0e974518d8dce2e",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Garage: add a Data changelog section with real git provenance",
+      "subject": "Alpha: warn on a future asOf/lastVerifiedAt timestamp in validate.js",
       "files": [
         "channels.json",
         "downloads.json",
