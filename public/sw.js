@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -90,7 +90,20 @@ async function staleWhileRevalidate(request) {
     if (fresh.ok) cache.put(cacheKey, fresh.clone());
     return fresh;
   }).catch(() => null);
-  return cached || (await networkFetch) || Response.error();
+  const fresh = cached || (await networkFetch);
+  if (fresh) return fresh;
+  // A page navigation (not a sub-resource like a font or script) that misses
+  // the cache with the network down previously fell straight to
+  // Response.error(), which the browser turns into its own generic "no
+  // internet" interstitial instead of anything this app shows. Falling back
+  // to the real cached dashboard shell here gives Jack something he can
+  // actually navigate from instead of a dead end, same real-cached-content
+  // rule as every other fallback in this file (never a fabricated page).
+  if (request.mode === 'navigate') {
+    const shellFallback = await cache.match(url.origin + '/');
+    if (shellFallback) return shellFallback;
+  }
+  return Response.error();
 }
 
 self.addEventListener('fetch', event => {
