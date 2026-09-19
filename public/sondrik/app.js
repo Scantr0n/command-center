@@ -613,8 +613,15 @@
       wrap.classList.toggle('can-scroll-left', wrap.scrollLeft > 1);
       wrap.classList.toggle('can-scroll-right', wrap.scrollLeft < maxScrollLeft - 1);
     };
-    wrap.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
+    // Same bound guard CGT/Garage's own copy of this already uses: without
+    // it, a second call (any future refresh path added to this page, same
+    // as the other four hubs already have) would stack a duplicate
+    // scroll/resize listener instead of just updating.
+    if (!wrap.dataset.scrollShadowBound) {
+      wrap.dataset.scrollShadowBound = '1';
+      wrap.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+    }
     update();
   }
 
