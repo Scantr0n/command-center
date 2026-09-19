@@ -2818,6 +2818,16 @@
     clearTimeout(npDraftSaveTimer);
     npDraftSaveTimer = setTimeout(npSaveDraft, 400);
   });
+  // The 400ms debounce above means a value typed right before a reload or
+  // tab close can be lost before it ever reaches localStorage, defeating
+  // the whole point of this guard. visibilitychange (hidden) is the last
+  // reliably-fired lifecycle event on both desktop and mobile, pagehide
+  // covers same-tab navigation; unload/beforeunload are deprecated and
+  // increasingly unreliable, so neither is used here.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { clearTimeout(npDraftSaveTimer); npSaveDraft(); }
+  });
+  window.addEventListener('pagehide', () => { clearTimeout(npDraftSaveTimer); npSaveDraft(); });
 
   npDiscardDraftBtn.addEventListener('click', () => {
     npClearDraft();
@@ -2994,6 +3004,14 @@
     npQuickDraftSaveTimer = setTimeout(npQuickSaveDraft, 400);
   });
   npQuickDateInput.addEventListener('input', npQuickSaveDraft);
+  // Same debounce-loses-the-last-keystroke fix as the full new-prospect
+  // form above: visibilitychange (hidden) is the last reliably-fired
+  // lifecycle event on both desktop and mobile, pagehide covers same-tab
+  // navigation.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { clearTimeout(npQuickDraftSaveTimer); npQuickSaveDraft(); }
+  });
+  window.addEventListener('pagehide', () => { clearTimeout(npQuickDraftSaveTimer); npQuickSaveDraft(); });
 
   npQuickDiscardDraftBtn.addEventListener('click', () => {
     npQuickClearDraft();

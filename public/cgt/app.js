@@ -3244,6 +3244,16 @@ function attachDraftGuard(form, storageKey, banner) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveDraft, 400);
   });
+  // The 400ms debounce above means a value typed right before a reload or
+  // tab close can be lost before it ever reaches localStorage, defeating
+  // the whole point of this guard. visibilitychange (hidden) is the last
+  // reliably-fired lifecycle event on both desktop and mobile, pagehide
+  // covers same-tab navigation; unload/beforeunload are deprecated and
+  // increasingly unreliable, so neither is used here.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { clearTimeout(saveTimer); saveDraft(); }
+  });
+  window.addEventListener('pagehide', () => { clearTimeout(saveTimer); saveDraft(); });
   discardBtn.addEventListener('click', () => {
     clearDraft();
     form.reset();
