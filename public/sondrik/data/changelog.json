@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-18T16:23:05.333Z",
+  "generatedAt": "2026-09-19T00:22:10.498Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
@@ -35,15 +35,43 @@
       ]
     },
     {
-      "hash": "b3bbf87",
-      "fullHash": "b3bbf87aa9bd3eb818ef91e2c92f237b2d398ace",
-      "date": "2026-09-17",
+      "hash": "c39e8bb",
+      "fullHash": "c39e8bb31ecfc2a7c50bfce9d5f0a6317b5d31af",
+      "date": "2026-09-13",
       "author": "Claude",
-      "subject": "CGT: fix worth-grading verdict silently requiring 3x margin instead of 2x",
+      "subject": "Add real-target goal tracking to Sondrik hub",
       "files": [
-        "channels.json",
+        "goals.json"
+      ]
+    },
+    {
+      "hash": "a8dacd5",
+      "fullHash": "a8dacd56c6ba82689dda8c89d28802312b372807",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Fix Sondrik lead count attributing to wrong channel",
+      "files": [
+        "leads.json"
+      ]
+    },
+    {
+      "hash": "131c697",
+      "fullHash": "131c6975ded6d20306ca22bccc62d1fceb72c3ef",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Add channel coverage section to Sondrik hub",
+      "files": [
+        "channels.json"
+      ]
+    },
+    {
+      "hash": "e8c72ad",
+      "fullHash": "e8c72ad193fc8d7f2218ddd39cdca9471735f082",
+      "date": "2026-09-12",
+      "author": "Claude",
+      "subject": "Add Sondrik product/traction hub",
+      "files": [
         "downloads.json",
-        "goals.json",
         "leads.json",
         "releases.json"
       ]
