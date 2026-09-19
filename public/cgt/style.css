@@ -1252,6 +1252,18 @@ textarea.np-input { resize: vertical; }
   max-height: 300px;
 }
 
+/* Same precedent as CSM's style.css: every hover/focus transition on this
+   page, even without a real keyframe animation behind it, still triggers
+   vestibular discomfort for someone who has set this preference, so cut
+   them to near-instant. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
   body { background: #fff; color: #111; }
