@@ -1425,13 +1425,13 @@ function renderChangelog(data) {
     return;
   }
   const items = entries.map(e => `
-    <li class="changelog-item">
+    <li class="changelog-item${e.historyReset ? ' changelog-item-reset' : ''}">
       <div class="changelog-meta">
         <span class="changelog-hash font-mono" title="${escapeHtml(e.fullHash || e.hash)}">${escapeHtml(e.hash)}</span>
         <span class="changelog-date font-mono">${escapeHtml(fmtDate(e.date) || 'unknown date')}</span>
         <span class="changelog-author font-mono">${escapeHtml(e.author || 'unknown author')}</span>
       </div>
-      <div class="changelog-title">${escapeHtml(e.subject || '(no commit message)')}</div>
+      <div class="changelog-title${e.historyReset ? ' changelog-title-reset' : ''}">${e.historyReset ? '&#9888; ' : ''}${escapeHtml(e.subject || '(no commit message)')}</div>
     </li>
   `).join('');
   const generatedNote = data.generatedAt

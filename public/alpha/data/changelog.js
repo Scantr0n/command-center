@@ -37,7 +37,7 @@ function run() {
     'log',
     '--date=short',
     '--name-only',
-    '--pretty=format:' + RECORD_SEP + '%H|%ad|%an|%s',
+    '--pretty=format:' + RECORD_SEP + '%H|%P|%ad|%an|%s',
     '--',
     ...paths
   ], { encoding: 'utf8' });
@@ -45,14 +45,35 @@ function run() {
   const basenames = new Set(TRACKED_FILES);
   const entries = log.split(RECORD_SEP).map(block => block.trim()).filter(Boolean).map(block => {
     const lines = block.split('\n');
-    const [hash, date, author, ...subjectParts] = lines[0].split('|');
+    const [hash, parents, date, author, ...subjectParts] = lines[0].split('|');
     const subject = subjectParts.join('|');
     const files = lines.slice(1)
       .map(l => l.trim())
       .filter(Boolean)
       .map(l => path.basename(l))
       .filter(name => basenames.has(name));
-    return { hash: hash.slice(0, 7), fullHash: hash, date, author, subject, files };
+    // A commit with no parent is a repo root, which this project's history
+    // periodically gets collapsed down to (see the recurring "regenerate
+    // ... drifted after upstream history rewrite" commits across every hub).
+    // Its subject line is whatever the rewrite happened to carry over, which
+    // has nothing to do with status.json (seen in practice: a root commit
+    // here with a foreign subject about a different hub entirely). Showing
+    // that subject as this file's real change history would be exactly the
+    // kind of unverified claim this changelog exists to avoid, so it's
+    // replaced with an honest note instead. Same fix already landed on the
+    // CSM, Sondrik, CGT, and Garage hubs for the identical bug.
+    const isHistoryReset = parents.trim() === '';
+    return {
+      hash: hash.slice(0, 7),
+      fullHash: hash,
+      date,
+      author,
+      subject: isHistoryReset
+        ? 'Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved'
+        : subject,
+      historyReset: isHistoryReset,
+      files
+    };
   }).filter(e => e.files.length > 0);
 
   const out = {

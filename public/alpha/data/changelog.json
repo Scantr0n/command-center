@@ -1,13 +1,14 @@
 {
-  "generatedAt": "2026-09-19T12:32:28.485Z",
+  "generatedAt": "2026-09-19T19:53:12.263Z",
   "generatedFrom": "git log over public/alpha/data/{status.json}, run node public/alpha/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "ae2eabf",
-      "fullHash": "ae2eabfe3a41ab79c919de22c79eb077ce6b6419",
-      "date": "2026-09-18",
+      "hash": "408036e",
+      "fullHash": "408036ef26d702b40276076d0f7518a0b1e2ef62",
+      "date": "2026-09-19",
       "author": "Claude",
-      "subject": "CSM: fix aria-allowed-attr violation on sortable list table headers",
+      "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
+      "historyReset": true,
       "files": [
         "status.json"
       ]
