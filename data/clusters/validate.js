@@ -140,6 +140,9 @@ function main() {
     if (c.relatedTo !== undefined && !Array.isArray(c.relatedTo)) {
       errors.push(where + ': "relatedTo" must be an array of cluster ids');
     }
+    if (c.relationReasons !== undefined && (typeof c.relationReasons !== 'object' || c.relationReasons === null || Array.isArray(c.relationReasons))) {
+      errors.push(where + ': "relationReasons" must be an object keyed by cluster id');
+    }
 
     emDashFields(c, ['name', 'summary', 'linkLabel']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this dashboard never uses one, check for a paste-in'));
@@ -149,11 +152,24 @@ function main() {
   // forward reference (id declared in a file later than the one pointing
   // to it) is normal and not itself an error.
   const knownIds = new Set(clusters.map(({ data: c }) => c.id).filter(Boolean));
+  const byId = new Map(clusters.map(({ data: c }) => [c.id, c]));
   clusters.forEach(({ file, data: c }) => {
     (c.relatedTo || []).forEach(id => {
       if (!knownIds.has(id)) {
         warnings.push(file + (c.id ? ' (' + c.id + ')' : '') + ': relatedTo references unknown cluster id "' + id +
           '", that relationship line will never be drawn');
+        return;
+      }
+      // A relation with no real reason on either side never renders (see
+      // renderGraph's own comment in public/index.html) rather than draw a
+      // dashed line whose meaning a viewer has to guess at. Warning, not an
+      // error, since a relatedTo entry with the reason still being written
+      // is a real, temporary in-progress state, not a broken one.
+      const other = byId.get(id);
+      const hasReason = (c.relationReasons && c.relationReasons[id]) || (other && other.relationReasons && other.relationReasons[c.id]);
+      if (!hasReason) {
+        warnings.push(file + (c.id ? ' (' + c.id + ')' : '') + ': relatedTo "' + id + '" has no relationReasons entry on either side, ' +
+          'that relationship line will not be drawn until one explains what the connection actually is');
       }
     });
   });
