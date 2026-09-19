@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T08:22:04.109Z",
+  "generatedAt": "2026-09-19T08:32:53.040Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "17453c1",
-      "fullHash": "17453c1cd10bf5c62085e422c4d851d5e856923f",
+      "hash": "b88d922",
+      "fullHash": "b88d92217efff47183f56af2832b66f47ec350a9",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Sondrik: refresh the data changelog after the draftText commit",
+      "subject": "Garage: add a Data changelog section with real git provenance",
       "files": [
         "channels.json",
         "downloads.json",

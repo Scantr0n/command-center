@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T05:32:32.036Z",
+  "generatedAt": "2026-09-19T08:32:52.887Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "f6a48d1",
-      "fullHash": "f6a48d15823e4715005757036c5a7766330ffafe",
+      "hash": "b88d922",
+      "fullHash": "b88d92217efff47183f56af2832b66f47ec350a9",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Alpha: add real trend sparklines for current drawdown and robustness score",
+      "subject": "Garage: add a Data changelog section with real git provenance",
       "files": [
         "candidates.json",
         "cards.json",
