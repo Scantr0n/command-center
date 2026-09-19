@@ -148,8 +148,36 @@ function validateChatMessages(messages) {
   return null;
 }
 
+// Every message in the array above still passes through to a real, billed
+// api.anthropic.com call, so the array-shape checks alone don't bound how
+// often this endpoint itself can be hit. The chat modal already disables its
+// own send button while a request is in flight and caps a single
+// conversation at MAX_CHAT_MESSAGES, but neither guard helps against a stuck
+// retry loop, a bug that re-fires sendChat, or a request bypassing the UI
+// entirely. A plain in-memory sliding window is enough here (single-process,
+// no separate rate-limit dependency needed for a personal dashboard): each
+// caller gets CHAT_RATE_LIMIT requests per CHAT_RATE_WINDOW_MS, tracked by IP.
+const CHAT_RATE_LIMIT = 20;
+const CHAT_RATE_WINDOW_MS = 10 * 60 * 1000;
+const chatRequestLog = new Map();
+
+function isChatRateLimited(key) {
+  const now = Date.now();
+  const timestamps = (chatRequestLog.get(key) || []).filter(t => now - t < CHAT_RATE_WINDOW_MS);
+  if (timestamps.length >= CHAT_RATE_LIMIT) {
+    chatRequestLog.set(key, timestamps);
+    return true;
+  }
+  timestamps.push(now);
+  chatRequestLog.set(key, timestamps);
+  return false;
+}
+
 app.post('/api/clusters/:id/chat', async (req, res) => {
   try {
+    if (isChatRateLimited(req.ip)) {
+      return res.status(429).json({ error: `Too many chat requests, try again in a few minutes (limit is ${CHAT_RATE_LIMIT} per ${CHAT_RATE_WINDOW_MS / 60000} minutes).` });
+    }
     const { id } = req.params;
     const { messages } = req.body;
     const validationError = validateChatMessages(messages);
