@@ -138,6 +138,30 @@
   .graph-node.dimmed .spoke-badge { display: none; }
   .graph-node.matched .node-glow, .cluster-card.matched { opacity: 1; }
   .cat-label { cursor: pointer; }
+  .relation-line { cursor: pointer; }
+  /* SVG <title> gives desktop hover a real tooltip for free, but has no
+     touch equivalent at all (confirmed: no tap-and-hold, no fallback,
+     nothing renders) — a real WCAG 1.4.13 gap on the exact feature this
+     redesign added today to explain what each relation line means. This
+     is the tap/click fallback: dismissible (outside click, Escape, or the
+     same line again), hoverable (it's a plain div, pointer events fine),
+     persistent (stays until dismissed, not on a hover timer). */
+  #graphTooltip {
+    position: fixed;
+    z-index: 60;
+    max-width: 260px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--hairlineHover);
+    background: var(--panel);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    pointer-events: none;
+  }
+  #graphTooltip[hidden] { display: none; }
   .corner-notch { position: relative; }
   .corner-notch::before, .corner-notch::after {
     content: ''; position: absolute; width: 10px; height: 10px; border-color: var(--hairlineHover); pointer-events: none;
@@ -358,6 +382,7 @@
             <span class="text-[10px] font-mono" style="color: var(--faint)">LOADING</span>
           </div>
         </div>
+        <div id="graphTooltip" role="status" hidden></div>
       </div>
       <button id="graphZoomResetBtn" type="button" aria-label="Reset graph zoom and pan"
         class="items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-lg border hairline"
@@ -841,6 +866,45 @@ function curveMinClearance(p0, p1, p2, otherNodes) {
   return min;
 }
 
+// Touch/tap fallback for the relation-line reason (see the #graphTooltip CSS
+// comment for why this exists — SVG <title> has no touch equivalent at all).
+// A real tooltip element instead of relying on the browser's own hover
+// tooltip, positioned at the tap/click point, dismissed on outside click,
+// Escape, or tapping the same line again (WCAG 1.4.13: dismissible,
+// hoverable, persistent — not a hover timeout).
+function showRelationTooltip(text, x, y) {
+  const el = document.getElementById('graphTooltip');
+  el.textContent = text;
+  el.hidden = false;
+  // Clamp so it never renders off the right/bottom edge of the viewport.
+  const rect = el.getBoundingClientRect();
+  const left = Math.min(x + 10, window.innerWidth - rect.width - 12);
+  const top = Math.min(y + 14, window.innerHeight - rect.height - 12);
+  el.style.left = Math.max(12, left) + 'px';
+  el.style.top = Math.max(12, top) + 'px';
+  el.dataset.openFor = text;
+}
+function hideRelationTooltip() {
+  const el = document.getElementById('graphTooltip');
+  el.hidden = true;
+  delete el.dataset.openFor;
+}
+function toggleRelationTooltip(pathEl, x, y) {
+  const el = document.getElementById('graphTooltip');
+  const reason = pathEl.getAttribute('data-reason');
+  if (!el.hidden && el.dataset.openFor === reason) {
+    hideRelationTooltip();
+  } else {
+    showRelationTooltip(reason, x, y);
+  }
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.relation-line')) hideRelationTooltip();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideRelationTooltip();
+});
+
 function renderGraph() {
   ensureGraphDefs();
   const svg = d3.select('#graphSvg');
@@ -970,7 +1034,8 @@ function renderGraph() {
       }
       const midX = midRawX + perpX * bulge * outwardSign;
       const midY = midRawY + perpY * bulge * outwardSign;
-      relationsHtml += `<path class="relation-line" d="M${nx.toFixed(1)},${ny.toFixed(1)} Q${midX.toFixed(1)},${midY.toFixed(1)} ${other.x.toFixed(1)},${other.y.toFixed(1)}" fill="none" stroke="var(--sub)" stroke-width="1" stroke-dasharray="1,4" opacity="0.5"><title>${escapeHtml(c.name)} ↔ ${escapeHtml(other.name)}: ${escapeHtml(realReason)}</title></path>`;
+      const reasonLabel = `${c.name} ↔ ${other.name}: ${realReason}`;
+      relationsHtml += `<path class="relation-line" tabindex="0" role="img" aria-label="${escapeHtml(reasonLabel)}" data-reason="${escapeHtml(reasonLabel)}" d="M${nx.toFixed(1)},${ny.toFixed(1)} Q${midX.toFixed(1)},${midY.toFixed(1)} ${other.x.toFixed(1)},${other.y.toFixed(1)}" fill="none" stroke="var(--sub)" stroke-width="1" stroke-dasharray="1,4" opacity="0.5"><title>${escapeHtml(reasonLabel)}</title></path>`;
     });
 
     const r = c.radius;
@@ -1064,6 +1129,20 @@ function renderGraph() {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         toggleCategoryFilter(this);
+      }
+    });
+  svg.selectAll('.relation-line')
+    .on('click', function(event) {
+      event.stopPropagation();
+      toggleRelationTooltip(this, event.clientX, event.clientY);
+    })
+    .on('keydown', function(event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        const rect = this.getBoundingClientRect();
+        toggleRelationTooltip(this, rect.left + rect.width / 2, rect.top);
+      } else if (event.key === 'Escape') {
+        hideRelationTooltip();
       }
     });
   applyFilters();
