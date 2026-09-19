@@ -1110,6 +1110,16 @@ function renderCandidates() {
   updateCandidateChipCounts();
   document.getElementById('candidatesClearFiltersBtn').hidden = !anyCandidateFilterActive();
 
+  // rawCandidatesData is only ever null when loadCandidates' own fetch/parse
+  // failed (see app.js's loadCandidates), never for a real, honestly-empty
+  // candidates.json, so this is what tells a load failure apart from "log one
+  // now" here, same distinction loadCards' own tableEmpty already makes.
+  if (rawCandidatesData === null) {
+    el.innerHTML = '<p class="submissions-empty" role="alert">Failed to load candidates.json.</p>';
+    document.getElementById('candidatesFilterStatus').textContent = '';
+    return;
+  }
+
   if (!ranked.length) {
     el.innerHTML = '<p class="submissions-empty" role="status">No raw-card candidates logged yet.' +
       emptyStateCta('quickLogCandidateTool', 'quickCandidateForm', 'Log one now') + '</p>';
@@ -1291,6 +1301,16 @@ function estimatedReturnFor(s, turnaroundByGrader) {
 // different questions: "what's still out" vs. "what got priced recently".
 function renderSubmissions() {
   const el = document.getElementById('submissionsFeed');
+
+  // Same real-failure-vs-honestly-empty distinction as renderCandidates
+  // above: rawSubmissionsData is only null when loadSubmissions' own
+  // fetch/parse failed, never for a real submissions.json with nothing
+  // active in it.
+  if (rawSubmissionsData === null) {
+    el.innerHTML = '<p class="submissions-empty" role="alert">Failed to load submissions.json.</p>';
+    return;
+  }
+
   const active = buildActiveSubmissions();
   const returnedCount = submissions.filter(s => s.status === 'returned' && !isExampleSubmission(s)).length;
 
