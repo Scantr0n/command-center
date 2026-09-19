@@ -147,6 +147,28 @@
   #linkRow { text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease; }
   #linkRow:hover { background: rgba(255,255,255,0.06); border-color: var(--hairlineHover) !important; }
 
+  /* Skip link: same bypass-blocks precedent as Alpha's style.css. The header
+     here carries search, jump-to, the view toggle, print, and shortcuts
+     before any real content, so a keyboard or screen-reader user landing on
+     the page would otherwise have to tab through all of them first.
+     Off-screen until focused. No sidebar offset needed: sidebar.js
+     deliberately skips injecting its nav rail on this page. */
+  .skip-link {
+    position: absolute;
+    top: -60px;
+    left: 12px;
+    z-index: 1000;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--hairlineHover);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    text-decoration: none;
+    transition: top 0.15s ease;
+  }
+  .skip-link:focus { top: 12px; outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
+
   @media (prefers-reduced-motion: reduce) {
     .node-glow-active { animation: none; opacity: 0.7; }
     .skeleton-pulse { animation: none; opacity: 0.7; }
@@ -259,6 +281,7 @@
 </style>
 </head>
 <body class="min-h-screen font-sans" style="color: var(--ink)">
+  <a href="#mainContent" class="skip-link font-mono">Skip to main content</a>
   <div class="max-w-7xl mx-auto px-6 py-10">
     <header class="mb-7 flex flex-wrap items-end justify-between gap-4">
       <div>
@@ -297,7 +320,7 @@
       </div>
     </header>
 
-    <main>
+    <main id="mainContent">
     <div id="errorBanner" class="hidden text-xs font-mono px-3 py-2 rounded-lg mb-4" role="alert" style="background: #E04A4A1A; color: #E0807A; border: 1px solid #E04A4A40"></div>
     <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
 
