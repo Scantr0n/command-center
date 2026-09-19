@@ -68,6 +68,27 @@ header.page-head .sub {
 .back-link:hover, .back-link:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
 .back-link:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: 2px; }
 
+/* Skip link: same bypass-blocks precedent as Alpha's style.css. The header
+   carries seven interactive controls before main content, so a keyboard or
+   screen-reader user landing on the page would otherwise have to tab
+   through all of them first. Off-screen until focused. */
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 68px; /* clears the collapsed 56px project sidebar (sidebar.js) plus a gap */
+  z-index: 1000;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--hairlineHover);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus { top: 12px; outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
+@media (max-width: 860px) { .skip-link { left: 12px; } } /* sidebar hides itself below this width */
+
 .page-head-actions {
   display: flex;
   align-items: center;
