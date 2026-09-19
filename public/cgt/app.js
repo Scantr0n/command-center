@@ -125,8 +125,15 @@ function emptyStateCta(detailsId, formId, label) {
     escapeHtml(detailsId) + ':' + escapeHtml(formId) + '">' + escapeHtml(label) + '</button>';
 }
 
+// Same fix as garage/app.js's own formatUsd: '$' + (-1.95) reads as the
+// confusing "$-1.95" instead of "-$1.95", and toLocaleString drops trailing
+// zero cents on its own (45.50 -> "45.5"), which reads as a formatting bug
+// next to a real "19.99" grading fee in the same table.
 function formatUsd(n) {
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  const hasCents = Math.round(abs * 100) % 100 !== 0;
+  return sign + '$' + abs.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 });
 }
 
 function formatSignedUsd(n) {
