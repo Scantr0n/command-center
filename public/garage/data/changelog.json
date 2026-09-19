@@ -1,13 +1,14 @@
 {
-  "generatedAt": "2026-09-19T14:50:54.396Z",
+  "generatedAt": "2026-09-19T18:50:15.185Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "23a6c08",
-      "fullHash": "23a6c084612f27bba6392e5be78fa3362d36f008",
-      "date": "2026-09-18",
+      "hash": "943d5e7",
+      "fullHash": "943d5e7605b821e763e94dd539d1183d3bd9e4d2",
+      "date": "2026-09-19",
       "author": "Claude",
-      "subject": "CGT/CSM/Garage: add a real focus-visible ring to Back and Print buttons",
+      "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
+      "historyReset": true,
       "files": [
         "activity.json",
         "disputes.json",

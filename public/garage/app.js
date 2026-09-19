@@ -269,11 +269,12 @@ function renderChangelog(data) {
   }
   const rowsHtml = entries.map(e => {
     const files = (e.files || []).join(', ');
-    return '<div class="changelog-row">' +
+    return '<div class="changelog-row' + (e.historyReset ? ' changelog-row-reset' : '') + '">' +
       '<span class="changelog-date font-mono">' + escapeHtml(e.date) + '</span>' +
       '<span class="changelog-hash" title="' + escapeHtml(e.fullHash || e.hash) + '">' + escapeHtml(e.hash) + '</span>' +
       '<span class="changelog-author">' + escapeHtml(e.author) + '</span>' +
-      '<span class="changelog-subject">' + escapeHtml(e.subject) + '</span>' +
+      '<span class="changelog-subject' + (e.historyReset ? ' changelog-subject-reset' : '') + '">' +
+      (e.historyReset ? '&#9888; ' : '') + escapeHtml(e.subject) + '</span>' +
       (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
       '</div>';
   }).join('');
