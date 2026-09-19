@@ -2322,7 +2322,7 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 
 // Same "/" jumps to search shortcut as the main Command Center dashboard.
 document.addEventListener('keydown', (e) => {
-  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen) return;
+  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen || jumpNavOpen) return;
   if (e.key === '/' && document.activeElement.id !== 'searchInput') {
     e.preventDefault();
     document.getElementById('searchInput').focus();
@@ -2410,12 +2410,112 @@ document.addEventListener('keydown', (e) => {
 // calculators, and search box all take free text or numbers).
 document.addEventListener('keydown', (e) => {
   if (e.key !== '?') return;
-  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen) return;
+  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen || jumpNavOpen) return;
   const active = document.activeElement;
   const tag = active && active.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
   e.preventDefault();
   openShortcuts();
+});
+
+// Jump-to-section nav: this page is 25+ real sections long and the header
+// isn't sticky, so this is the one way back to a specific section without
+// scrolling blind. Built from the real on-page section titles at load
+// time, no separate list to keep in sync by hand as sections get added.
+let jumpNavOpen = false;
+let jumpNavLastFocusedEl = null;
+
+function collectJumpSections() {
+  const usedIds = new Set();
+  return Array.from(document.querySelectorAll('main > section')).map((section) => {
+    if (section.hidden) return null;
+    const titleEl = section.querySelector('h2.section-title, summary.section-title');
+    const label = titleEl && titleEl.textContent.trim();
+    if (!label) return null;
+    if (!section.id) {
+      let slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'section';
+      let candidate = 'jump-' + slug;
+      let n = 2;
+      while (usedIds.has(candidate) || document.getElementById(candidate)) {
+        candidate = 'jump-' + slug + '-' + n;
+        n++;
+      }
+      section.id = candidate;
+    }
+    usedIds.add(section.id);
+    return { id: section.id, label };
+  }).filter(Boolean);
+}
+
+function renderJumpNavList() {
+  const sections = collectJumpSections();
+  document.getElementById('jumpNavList').innerHTML = sections.map(s => `
+    <a class="jump-nav-link" href="#${s.id}" data-jump-target="${s.id}">${escapeHtml(s.label)}</a>
+  `).join('');
+}
+
+function getJumpNavFocusable() {
+  return Array.from(document.getElementById('jumpNavModal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function openJumpNav() {
+  if (jumpNavOpen) return;
+  jumpNavOpen = true;
+  jumpNavLastFocusedEl = document.activeElement;
+  renderJumpNavList();
+  document.getElementById('jumpNavOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('jumpNavClose').focus();
+}
+
+function closeJumpNav() {
+  if (!jumpNavOpen) return;
+  jumpNavOpen = false;
+  document.getElementById('jumpNavOverlay').hidden = true;
+  unlockBodyScroll();
+  if (jumpNavLastFocusedEl && typeof jumpNavLastFocusedEl.focus === 'function') jumpNavLastFocusedEl.focus();
+  jumpNavLastFocusedEl = null;
+}
+
+document.getElementById('jumpNavBtn').addEventListener('click', openJumpNav);
+document.getElementById('jumpNavClose').addEventListener('click', closeJumpNav);
+document.getElementById('jumpNavOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'jumpNavOverlay') closeJumpNav();
+});
+document.getElementById('jumpNavList').addEventListener('click', (e) => {
+  const link = e.target.closest('.jump-nav-link');
+  if (!link) return;
+  e.preventDefault();
+  const target = document.getElementById(link.dataset.jumpTarget);
+  closeJumpNav();
+  if (target) {
+    // The scroll-lock release above needs a frame to settle, starting the
+    // smooth scroll before that clobbers it.
+    requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!jumpNavOpen) return;
+  if (e.key === 'Escape') {
+    closeJumpNav();
+    return;
+  }
+  if (e.key === 'Tab') {
+    const focusable = getJumpNavFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 });
 
 function wireChipGroup(containerId, dataAttr, setter) {
