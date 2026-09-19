@@ -824,6 +824,7 @@ section { margin-bottom: 36px; }
 }
 .changelog-files { font-family: 'JetBrains Mono', monospace; }
 .changelog-generated-note { margin-top: 10px; }
+.timeline-title-reset { color: #E0A030; font-style: italic; }
 
 /* Release card */
 .release-card {

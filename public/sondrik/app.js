@@ -1005,14 +1005,15 @@
     const html = '<ol class="timeline changelog-list" aria-label="Real git commit history of the data files above, most recent first">' +
       entries.map(e => {
         const files = (e.files || []).map(f => FILE_LABEL[f] || f);
-        return '<li class="timeline-item changelog-item">' +
+        return '<li class="timeline-item changelog-item' + (e.historyReset ? ' changelog-item-reset' : '') + '">' +
           '<div class="timeline-meta">' +
           '<span class="timeline-badge changelog-hash font-mono" title="' + escapeHtml(e.fullHash || e.hash) + '">' +
           escapeHtml(e.hash) + '</span>' +
           '<span class="timeline-date font-mono">' + fmtDate(e.date) + '</span>' +
           '<span class="changelog-author font-mono">' + escapeHtml(e.author) + '</span>' +
           '</div>' +
-          '<div class="timeline-title">' + escapeHtml(e.subject) + '</div>' +
+          '<div class="timeline-title' + (e.historyReset ? ' timeline-title-reset' : '') + '">' +
+          (e.historyReset ? '&#9888; ' : '') + escapeHtml(e.subject) + '</div>' +
           (files.length ? '<div class="timeline-detail changelog-files">Touched: ' + escapeHtml(files.join(', ')) + '</div>' : '') +
           '</li>';
       }).join('') + '</ol>' +
