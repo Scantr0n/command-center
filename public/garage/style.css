@@ -988,6 +988,13 @@ footer.page-foot {
   line-height: 1.5;
 }
 .field-value.empty { color: var(--dim); font-style: italic; }
+.offer-reply-text {
+  color: var(--sub);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+}
 
 .modal-payout-table { width: 100%; border-collapse: collapse; }
 .modal-payout-table td { padding: 4px 0; font-size: 0.82rem; }

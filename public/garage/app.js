@@ -1781,6 +1781,24 @@ function offerTier(pct) {
   return 'decline';
 }
 
+// A copy-paste reply matching the ladder verdict above, same "Copy" pattern
+// as the buyer message templates below: the guide already computes the
+// right counter number, this is the last step from "what to do" to an
+// actual message sent, so a real offer doesn't still need composing from
+// scratch once the math's done.
+function offerReplyText(tier, itemTitle, offer, counterAmount) {
+  const item = itemTitle || 'this item';
+  const offerFmt = formatUsd(offer);
+  if (tier === 'accept') {
+    return `Thanks for the offer on ${item}! ${offerFmt} works for me, go ahead and send it through and I'll get it packed up.`;
+  }
+  if (tier === 'decline') {
+    return `Thanks for the offer on ${item}, I appreciate it, but ${offerFmt} is a bit further off than I can go on this one.`;
+  }
+  const counterFmt = formatUsd(counterAmount);
+  return `Thanks for the offer on ${item}! I can't quite do ${offerFmt}, but I could do ${counterFmt} if that works for you?`;
+}
+
 function renderOfferGuide() {
   const result = document.getElementById('offerResult');
   const asking = offerGuideAskingPrice();
@@ -1838,6 +1856,17 @@ function renderOfferGuide() {
   rows.push(fieldRow('Suggested action', escapeHtml(actionText)));
   if (counterAmount != null) rows.push(fieldRow('Suggested counter', formatUsd(counterAmount)));
 
+  const replyText = offerReplyText(tier, l && l.title, offer, counterAmount);
+  rows.push(`
+    <div class="field-row">
+      <div class="field-label font-mono">Suggested reply</div>
+      <div class="field-value">
+        <p class="offer-reply-text">${escapeHtml(replyText)}</p>
+        <button type="button" class="print-btn font-mono offer-reply-copy" data-reply="${escapeHtml(replyText)}">Copy reply</button>
+      </div>
+    </div>
+  `);
+
   if (l && l.costBasis != null) {
     const checkAmount = counterAmount != null ? counterAmount : offer;
     const net = estimateNetPayout(offerPlatform, checkAmount, l.category);
@@ -1858,6 +1887,15 @@ function wireOfferGuide() {
   document.getElementById('offerCustomPriceInput').addEventListener('input', renderOfferGuide);
   document.getElementById('offerAmountInput').addEventListener('input', renderOfferGuide);
   renderOfferItemChips([]);
+  document.getElementById('offerResult').addEventListener('click', e => {
+    const btn = e.target.closest('.offer-reply-copy');
+    if (!btn) return;
+    const original = btn.textContent;
+    copyText(btn.getAttribute('data-reply'))
+      .then(() => { btn.textContent = 'Copied'; })
+      .catch(() => { btn.textContent = "Couldn't copy"; })
+      .finally(() => { setTimeout(() => { btn.textContent = original; }, 1800); });
+  });
 }
 
 // Buyer message templates: canned replies for the handful of buyer
