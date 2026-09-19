@@ -290,28 +290,35 @@ function main() {
   });
 
   // changelog.json is generated, not hand-edited (see changelog.js), so it
-  // can't have the typo-style errors above, only one real failure mode: it
-  // silently falls behind after someone commits a real edit to one of the
-  // hand-edited files above without re-running the generator. Comparing its
-  // recorded latest commit against this repo's actual latest commit for
-  // those same files is the only way to catch that drift; git itself is the
-  // source of truth here, same as changelog.js.
+  // can't have the typo-style errors above, only a drift failure mode: it
+  // silently falls behind, or ends up with wrong/missing entries, after
+  // someone runs the generator against an incomplete local clone (a
+  // 2026-09-19 incident: a shallow clone's changelog.json was missing 4
+  // real commits and had credited a CGT commit that never touched any
+  // Sondrik data file). Comparing the full recorded commit list against
+  // this repo's actual commit list for those same files, not just the
+  // latest hash, is what catches a corrupted middle of the list, not only
+  // a stale head; git itself is the source of truth here, same as
+  // changelog.js.
   try {
-    const latestRealHash = execFileSync('git', [
-      'log', '-1', '--format=%H', '--',
+    const realHashesRaw = execFileSync('git', [
+      'log', '--format=%H', '--',
       'releases.json', 'downloads.json', 'leads.json', 'channels.json', 'goals.json'
     ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
+    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     let changelogData = null;
     try {
       changelogData = loadJson('changelog.json');
     } catch (e) {
       warnings.push('changelog.json is missing or unreadable (' + e.message + '), run node public/sondrik/data/changelog.js');
     }
-    if (changelogData && latestRealHash) {
-      const recordedHash = (changelogData.entries && changelogData.entries[0] && changelogData.entries[0].fullHash) || null;
-      if (recordedHash !== latestRealHash) {
-        warnings.push('changelog.json is stale (its latest recorded commit does not match this repo\'s actual latest commit ' +
-          'touching these data files), run node public/sondrik/data/changelog.js to refresh it');
+    if (changelogData) {
+      const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+      if (recordedHashes.join(',') !== realHashes.join(',')) {
+        warnings.push('changelog.json does not match this repo\'s actual commit history for these data files ' +
+          '(' + recordedHashes.length + ' entr' + (recordedHashes.length === 1 ? 'y' : 'ies') + ' recorded vs ' +
+          realHashes.length + ' real commit' + (realHashes.length === 1 ? '' : 's') + '), run ' +
+          'node public/sondrik/data/changelog.js to refresh it');
       }
     }
   } catch (e) {
