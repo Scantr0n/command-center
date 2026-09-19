@@ -599,6 +599,7 @@ header.page-head .sub {
 }
 .changelog-author { flex-shrink: 0; color: var(--sub); }
 .changelog-subject { color: var(--ink); }
+.changelog-subject-reset { color: #E0A030; font-style: italic; }
 .changelog-files { color: var(--dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
 .changelog-generated-note { margin-top: 4px; margin-bottom: 36px; }
 
@@ -1367,6 +1368,7 @@ footer.page-foot {
   .changelog-row { border-color: #ddd; }
   .changelog-date, .changelog-author, .changelog-files { color: #444; }
   .changelog-subject { color: #111; }
+  .changelog-subject-reset { color: #654600; font-style: italic; }
   .changelog-hash { border-color: #999; background: none !important; color: #111 !important; }
   .changelog-generated-note { color: #555; }
 
