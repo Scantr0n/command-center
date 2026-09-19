@@ -775,6 +775,48 @@ header.page-head .sub {
   flex-shrink: 0;
 }
 
+/* Equity curve: real live.account.equityCurve readings only (see
+   renderEquityCurve in app.js), hidden entirely until at least 2 real points
+   exist. Reuses the same green/red status colors as .pl-good/.pl-bad just
+   below rather than introducing new hues, since it is the same "up vs down"
+   status this page already colors everywhere else. */
+.equity-curve-wrap {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 32px;
+}
+.equity-curve-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.equity-curve-svg {
+  display: block;
+  width: 100%;
+  height: 90px;
+}
+.equity-curve-line {
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.equity-curve-fill { stroke: none; }
+.equity-curve-up .equity-curve-line { stroke: #3DDC84; }
+.equity-curve-up .equity-curve-fill { fill: rgba(61, 220, 132, 0.12); }
+.equity-curve-down .equity-curve-line { stroke: #E05050; }
+.equity-curve-down .equity-curve-fill { fill: rgba(224, 80, 80, 0.12); }
+.equity-curve-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--sub);
+  margin-top: 8px;
+}
+
 /* Positions table */
 .pl-good { color: #3DDC84; }
 .pl-bad { color: #E05050; }
@@ -1223,11 +1265,14 @@ footer.page-foot {
   .callout strong, .offline-banner strong, .lastknown-banner strong { color: #111; }
 
   .conn-strip, .stat-tile, .ps-mode, .ps-meter, .arch-card, .lineage-card,
-  .event-item, .empty-panel, .pos-table-wrap, .changelog-item {
+  .event-item, .empty-panel, .pos-table-wrap, .changelog-item, .equity-curve-wrap {
     background: none;
     border: 1px solid #ccc;
   }
   .conn-latency-spark, .meter-spark, .history-tick.placeholder { display: none; }
+  .equity-curve-line { stroke: #111 !important; }
+  .equity-curve-fill { fill: #ccc !important; }
+  .equity-curve-range { color: #333; }
   .history-tick.up { background: #333; }
   .history-tick.down { background: #ccc; border: 1px solid #999; }
 

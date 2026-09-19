@@ -1052,11 +1052,72 @@ function computeExposure(acct, positions) {
   return { totalInvested, pctDeployed };
 }
 
+// server.js's /equity-history proxy (see mapEquityCurve's own comment there)
+// forwards the raw real equity readings its drawdown calculation already
+// consumes, previously discarded after producing just the two percentages
+// under Position sizing. This renders that real series as an actual trend,
+// same live-proxy-only rule as the rest of the Account section: never
+// populated from the static fallback. No axis labels, same minimal-chrome
+// convention as this page's other sparklines (renderLatencySparkline,
+// renderMeterSparkline), just wider and taller since here the chart is the
+// section's own content rather than a companion to a single number. The x
+// axis is reading order, not elapsed time: the daemon's real payload has no
+// verified timestamp field per point (only .v, see mapEquityCurve), so
+// labeling this as time-spaced would be a claim this page can't back up.
+const EQUITY_CHART_W = 600;
+const EQUITY_CHART_H = 90;
+const EQUITY_CHART_PAD = 4;
+
+function renderEquityCurve(equityCurve) {
+  const wrap = document.getElementById('equityCurveWrap');
+  const chart = document.getElementById('equityCurveChart');
+  if (!wrap || !chart) return;
+  const values = (Array.isArray(equityCurve) ? equityCurve : []).filter(v => typeof v === 'number' && Number.isFinite(v));
+  if (values.length < 2) {
+    wrap.hidden = true;
+    chart.innerHTML = '';
+    return;
+  }
+  wrap.hidden = false;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  const innerW = EQUITY_CHART_W - EQUITY_CHART_PAD * 2;
+  const innerH = EQUITY_CHART_H - EQUITY_CHART_PAD * 2;
+  const floorY = EQUITY_CHART_H - EQUITY_CHART_PAD;
+  const points = values.map((v, i) => {
+    const x = EQUITY_CHART_PAD + (i / (values.length - 1)) * innerW;
+    const y = EQUITY_CHART_PAD + (range === 0 ? innerH / 2 : innerH - ((v - min) / range) * innerH);
+    return [x, y];
+  });
+  const linePath = points.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const areaPath = points[0][0].toFixed(1) + ',' + floorY.toFixed(1) + ' ' + linePath + ' ' +
+    points[points.length - 1][0].toFixed(1) + ',' + floorY.toFixed(1);
+  // Same status-color reuse as pl-good/pl-bad on the Positions table below:
+  // green if the series ended at or above where it started, red otherwise.
+  const rising = values[values.length - 1] >= values[0];
+  const toneClass = rising ? 'equity-curve-up' : 'equity-curve-down';
+  const title = 'Equity, last ' + values.length + ' real readings: ' + (fmtDollar(min) || min) + ' to ' + (fmtDollar(max) || max);
+  chart.innerHTML = `
+    <svg class="equity-curve-svg ${toneClass}" viewBox="0 0 ${EQUITY_CHART_W} ${EQUITY_CHART_H}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
+      <title>${escapeHtml(title)}</title>
+      <polygon points="${areaPath}" class="equity-curve-fill" />
+      <polyline points="${linePath}" class="equity-curve-line" fill="none" vector-effect="non-scaling-stroke" />
+    </svg>
+    <div class="equity-curve-range font-mono">
+      <span>${escapeHtml(fmtDollar(min) || '-')}</span>
+      <span>${values.length} readings</span>
+      <span>${escapeHtml(fmtDollar(max) || '-')}</span>
+    </div>
+  `;
+}
+
 function renderAccount(data) {
   const row = document.getElementById('accountRow');
   const acct = data.live && data.live.account;
   if (!acct) {
     row.innerHTML = statTile('awaiting connection', 'Equity', null, true);
+    renderEquityCurve(null);
     return;
   }
   // dayChangeDollar is explicitly null (server.js) whenever the feed hasn't
@@ -1085,6 +1146,7 @@ function renderAccount(data) {
       totalInvested == null
     )
   ].join('');
+  renderEquityCurve(acct.equityCurve);
 }
 
 // Position table follows the same convention every real trading-dashboard

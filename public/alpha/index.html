@@ -133,6 +133,7 @@
           <tr><th>live.debatePanel</th><td>Unlike every other object under <code>live</code>, this one is never <code>null</code> or missing: the debate panel is a named architecture feature that is real but not yet active (pending an API key), so its state is always known, just not yet "on". <code>active</code> is required, <code>true</code>/<code>false</code>. <code>blockedOn</code> is a short string naming what it's waiting on (currently <code>"API key"</code>), or <code>null</code> once <code>active</code> is <code>true</code>.</td></tr>
           <tr><th>live.genealogy.*</th><td>Current generation, count of active lineages, and last breeding event, or <code>null</code> until known. <code>live.genealogy.lineages[]</code> is the wall itself, one card per lineage (<code>id</code> required, plus optional <code>label</code>, <code>generation</code>, <code>agentCount</code>, <code>status</code> of <code>"active"</code> or <code>"retired"</code>, and a last-event stamp). Starts empty, honestly, same as every other array on this page; the aggregate counts above still show on their own once a feed knows only the totals, not yet the per-lineage detail.</td></tr>
           <tr><th>live.account</th><td>Equity, cash, buying power, and day change, or <code>null</code>. Only ever populated by the live daemon proxy in <code>server.js</code>, never hand-edited into the static fallback (its own validator forbids balance/equity-like keys there on purpose).</td></tr>
+          <tr><th>live.account.equityCurve</th><td>Real equity readings, oldest first, plain numbers with no timestamps. Forwarded straight from Alpha's own <code>/equity-history</code> endpoint, the same real feed <code>server.js</code> already used to compute the drawdown percentages above; only the already-trusted <code>.v</code> field is read from each point, capped to the most recent 200. Same live-proxy-only rule as the rest of <code>live.account</code>. Drives the equity curve chart under Account; hidden entirely with fewer than 2 points, same honest-empty-state rule as everything else on this page. No time axis: this page has never verified a timestamp field on these points, so the chart shows reading order, not elapsed time.</td></tr>
           <tr><th>live.positions[]</th><td>Real open positions (symbol, side, qty, entry/current price, market value, unrealized P&amp;L), or an empty array. Same rule as <code>live.account</code>: live-proxy only.</td></tr>
           <tr><th>events[]</th><td>Append-only activity log: kill-switch triggers, regime changes, connection state changes. Each entry needs <code>at</code> (ISO datetime), <code>type</code>, and <code>label</code>; <code>detail</code> and <code>tone</code> (<code>"neutral"</code>, <code>"good"</code>, or <code>"alert"</code>) are optional. Starts empty, honestly, since this sandbox has no real history to seed it with.</td></tr>
           <tr><th>changelog.json</th><td>Generated, never hand-edit. Run
@@ -213,6 +214,10 @@
   <section>
     <h2 class="section-title">Account</h2>
     <div class="stat-row" id="accountRow"></div>
+    <div class="equity-curve-wrap" id="equityCurveWrap" hidden>
+      <div class="equity-curve-label font-mono">EQUITY CURVE</div>
+      <div id="equityCurveChart"></div>
+    </div>
   </section>
 
   <section>

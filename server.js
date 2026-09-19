@@ -298,6 +298,22 @@ function mapAccount(rawAccount) {
   };
 }
 
+// The daemon's /equity-history is already fetched for computeDrawdowns above,
+// which only ever reads point.v, then the rest of each point was discarded.
+// This maps the same already-trusted field into a plain number series so the
+// page can show a real equity trend instead of just today's single derived
+// drawdown percentage. Defensive and capped like every other real-feed mapper
+// here; no timestamp field is read, since only .v is a field this codebase
+// has ever actually verified against the daemon's real response.
+const EQUITY_CURVE_POINT_CAP = 200;
+function mapEquityCurve(history) {
+  if (!Array.isArray(history)) return [];
+  return history
+    .map(p => Number(p && p.v))
+    .filter(v => Number.isFinite(v))
+    .slice(-EQUITY_CURVE_POINT_CAP);
+}
+
 // Turns the daemon's real evolution-history entries into the honest
 // activity-log shape the Alpha page already renders. Only ever built from
 // fields the daemon actually returned, never invented.
@@ -346,6 +362,12 @@ app.get('/api/alpha/live', async (req, res) => {
     const drawdowns = computeDrawdowns(equity.history);
     const now = new Date().toISOString();
 
+    // Same live-proxy-only rule as the rest of mapAccount's output (see its
+    // own comment): only ever attached once a real account object exists,
+    // never hand-edited into the static fallback.
+    const account = mapAccount(state.account);
+    if (account) account.equityCurve = mapEquityCurve(equity.history);
+
     res.json({
       system: fallback.system,
       connection: {
@@ -370,7 +392,7 @@ app.get('/api/alpha/live', async (req, res) => {
           active: !!debates.enabled,
           blockedOn: debates.enabled ? null : 'API key'
         },
-        account: mapAccount(state.account),
+        account,
         positions: mapPositions(state.positions),
         genealogy: {
           generation: null,
