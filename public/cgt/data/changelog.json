@@ -1,13 +1,14 @@
 {
-  "generatedAt": "2026-09-19T13:32:23.368Z",
+  "generatedAt": "2026-09-19T17:33:52.451Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "29f438d",
-      "fullHash": "29f438dc8936aa8ebbec649567bdbd1beccc6890",
-      "date": "2026-09-18",
+      "hash": "cb46952",
+      "fullHash": "cb46952a177cd93345e239859068ae9a6e182c27",
+      "date": "2026-09-19",
       "author": "Claude",
-      "subject": "CGT: give the card, candidate, and submission rows a real accessible name",
+      "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
+      "historyReset": true,
       "files": [
         "candidates.json",
         "cards.json",
