@@ -71,6 +71,7 @@
         backup file keeps the full <code>prospects.json</code> and <code>stages.json</code> structure exactly as
         loaded, so a bad edit can be diffed against or restored from a known-good copy. This is a local download
         only, nothing is uploaded anywhere.</p>
+      <div class="table-wrap">
       <table class="schema-table">
         <tbody>
           <tr><th>id</th><td>Unique slug, e.g. <code>"company-person-name"</code></td></tr>
@@ -85,6 +86,7 @@
           <tr><th>stageHistory</th><td>Array of <code>{ "date": "YYYY-MM-DD", "stage": "outreach-sent" }</code>, oldest first, logged each time the prospect actually moves to a new stage. This is how real time-in-stage and pipeline velocity get tracked instead of only knowing the current stage. The last entry's <code>stage</code> should match the prospect's current <code>stage</code>, the validator warns if they drift apart. Leave it as <code>[]</code> until you start logging moves going forward, do not backfill guessed dates for past moves.</td></tr>
         </tbody>
       </table>
+      </div>
       <pre class="schema-example font-mono">{
   "id": "example-company-jane-doe",
   "name": "Jane Doe",

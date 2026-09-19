@@ -207,7 +207,8 @@ header.page-head .sub {
 .table-wrap {
   overflow-x: auto;
 }
-#platformOutreachSection .schema-table th {
+#platformOutreachSection .schema-table th,
+.schema-help-body .schema-table th {
   white-space: normal;
 }
 #platformOutreachSection .schema-table td:first-child {
