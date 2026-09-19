@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T08:32:52.926Z",
+  "generatedAt": "2026-09-19T12:07:50.037Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "b88d922",
-      "fullHash": "b88d92217efff47183f56af2832b66f47ec350a9",
+      "hash": "89ac3fe",
+      "fullHash": "89ac3feaf8d7ca86e6bd798afd37813a56297d63",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Garage: add a Data changelog section with real git provenance",
+      "subject": "Garage: track per-listing eBay return policy, flag the return-policy bug's exact shape again",
       "files": [
         "prospects.json",
         "stages.json"
