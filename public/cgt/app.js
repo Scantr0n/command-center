@@ -3116,14 +3116,24 @@ function buildSubmissionReturnReminders() {
     const { estReturnDate, estReturnIsPublished, graderStats, publishedDays } = estimatedReturnFor(s, turnaroundByGrader);
     if (!estReturnDate) return null;
     const title = s.description || 'Untitled submission';
-    const date = estReturnDate < today ? today : estReturnDate;
+    // A stale estimate (submission running longer than its published/average
+    // turnaround) still gets a reminder, pinned to today rather than a date
+    // that's already passed, but the title needs to say so: without this,
+    // "Expect back from PSA: ..." on today's date reads as a same-day
+    // arrival, not the "this is now overdue" flag the on-screen submissions
+    // feed already shows via its own "past PSA avg" badge (renderSubmissions
+    // above).
+    const isOverdue = estReturnDate < today;
+    const date = isOverdue ? today : estReturnDate;
     const basis = estReturnIsPublished
       ? `${s.gradingCompany}'s own published estimate (about ${publishedDays} business days for this service level, not a guarantee)`
       : `${s.gradingCompany}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee`;
     return {
       id: s.id,
       date,
-      summary: `Expect back from ${s.gradingCompany || 'grader'}: ${title}`,
+      summary: isOverdue
+        ? `Overdue: was expected back from ${s.gradingCompany || 'grader'}, ${title}`
+        : `Expect back from ${s.gradingCompany || 'grader'}: ${title}`,
       description: `Estimated return around ${estReturnDate}, based on ${basis}. Command Center CGT.`
     };
   }).filter(Boolean);
