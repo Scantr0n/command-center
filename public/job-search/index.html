@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#08090A">
+<meta name="color-scheme" content="dark">
+<title>Job Search / Command Center</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" id="pageFavicon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/job-search/style.css">
+</head>
+<body>
+<a href="#mainContent" class="skip-link font-mono">Skip to main content</a>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">JOB SEARCH</h1>
+      <p class="sub font-mono">Manual LinkedIn saved-jobs workflow, Jack Scanlon</p>
+      <p class="sub last-updated font-mono">Source: Trackers/Job_Search_Tracker.md</p>
+    </div>
+    <div class="page-head-actions">
+      <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
+      <button type="button" id="shortcutsBtn" class="print-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
+      <a href="/" class="back-link">&larr; Command Center</a>
+    </div>
+  </header>
+
+  <main id="mainContent">
+  <div class="offline-banner" id="offlineBanner" role="status" aria-atomic="true" hidden>
+    <strong>This device is offline.</strong> Showing the last cached snapshot of this data, it may not reflect the latest hand-edit.
+  </div>
+
+  <div class="callout">
+    <strong>Read-only reference, not a live tracker.</strong> There is no live backend connected here. Everything
+    on this page is transcribed by hand from
+    <code>Trackers/Job_Search_Tracker.md</code> (the real source of truth for this workflow) and is either a real
+    logged fact with a date, or an honest empty state, never a filled-in guess. This page does not apply to
+    anything, save anything, or contact anyone.
+  </div>
+
+  <div class="callout callout-scope">
+    <strong>Scope note.</strong> This hub transcribes the applications table, standing criteria, dealbreaker
+    checklist, the most recent "Next up" section, and only the newest (2026-09-14) daily digest run. The tracker's
+    full session log goes back to 2026-08-10 with a dated entry for nearly every day since, all of that older
+    history still lives only in the source file, it has not been individually transcribed here. See "Older digest
+    runs" near the bottom of this page for why, and open the tracker file directly for the full history.
+  </div>
+
+  <section id="snapshotSection" class="snapshot-section">
+    <h2 class="section-title">At a glance</h2>
+    <div id="snapshotStrip"></div>
+  </section>
+
+  <section id="applicationsSection">
+    <h2 class="section-title">Applications submitted</h2>
+    <div id="applicationsTableWrap"></div>
+    <div id="applicationsAsides"></div>
+  </section>
+
+  <section id="criteriaSection">
+    <h2 class="section-title">Standing criteria</h2>
+    <ul class="criteria-list" id="criteriaList"></ul>
+  </section>
+
+  <section id="dealbreakerSection">
+    <h2 class="section-title">Dealbreaker checklist</h2>
+    <p class="dealbreaker-intro" id="dealbreakerIntro"></p>
+    <ol class="dealbreaker-list" id="dealbreakerList"></ol>
+  </section>
+
+  <section id="nextUpSection">
+    <h2 class="section-title" id="nextUpTitle">Next up / current focus</h2>
+    <p class="section-note" id="nextUpIntro"></p>
+    <p class="section-note" id="nextUpCostNote"></p>
+    <div class="lead-grid" id="nextUpGrid"></div>
+    <p class="section-note" id="nextUpOlderNote"></p>
+  </section>
+
+  <section id="digestSection">
+    <h2 class="section-title" id="digestTitle">Latest digest run</h2>
+    <p class="section-note" id="digestSummary"></p>
+    <div class="lead-grid" id="digestGrid"></div>
+    <p class="section-note" id="digestRelocationNote"></p>
+    <details class="schema-help">
+      <summary>Excluded this run + sourcing notes</summary>
+      <div class="schema-help-body">
+        <p id="digestExcludedNote"></p>
+        <p id="digestSourcingNote"></p>
+      </div>
+    </details>
+  </section>
+
+  <section id="olderRunsSection">
+    <h2 class="section-title">Older digest runs</h2>
+    <div class="empty-state">
+      Every daily digest run before 2026-09-14 (back to 2026-08-27, plus the original 2026-08-10/11/12
+      verification sweep and application round) is real and logged, but deliberately not individually
+      transcribed onto this page yet. That is a real, dense session log spanning weeks, digitizing all of it
+      was out of scope for this first pass. Open
+      <code>Trackers/Job_Search_Tracker.md</code> directly to read every past run in full.
+    </div>
+  </section>
+
+  <details class="schema-help">
+    <summary>How this hub is kept up to date (until a backend is wired in)</summary>
+    <div class="schema-help-body">
+      <p>This hub has no live backend and no quick-log form. The real source of truth is
+        <code>Trackers/Job_Search_Tracker.md</code>. To refresh this page after that file changes, hand-edit the
+        matching JSON file under <code>public/job-search/data/</code>, transcribe faithfully (do not paraphrase pay
+        figures or dates, do not invent a status the tracker doesn't state), then run
+        <code>node public/job-search/data/validate.js</code>.</p>
+      <div class="schema-table-wrap">
+      <table class="schema-table">
+        <tbody>
+          <tr><th>applications.json</th><td>The real "Applications submitted" table plus the dropped/skipped
+            notes and the last-known saved count. Append a new row only once Jack has actually applied, with the
+            real applied date.</td></tr>
+          <tr><th>criteria.json</th><td>The standing criteria and the 9-item dealbreaker checklist. Only edit
+            these when the real criteria in the tracker actually change.</td></tr>
+          <tr><th>next-up.json</th><td>The tracker's "Next up (as of ...)" section. Replace this whole file's
+            contents, including <code>asOfDate</code>, whenever the tracker gets a newer "Next up" entry, don't
+            just append to the old one.</td></tr>
+          <tr><th>digest-latest.json</th><td>Only the single newest daily digest run. When a newer run is added
+            to the tracker's session log, replace this file's contents entirely (move the old run's real content
+            into the tracker file's own history, which already has it) rather than trying to keep multiple runs
+            here.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </details>
+
+  </main>
+
+  <footer class="page-foot font-mono">
+    Data source: <code>/job-search/data/applications.json</code>, <code>/job-search/data/criteria.json</code>,
+    <code>/job-search/data/next-up.json</code>, and <code>/job-search/data/digest-latest.json</code>, hand-transcribed
+    from <code>Trackers/Job_Search_Tracker.md</code>. Run
+    <code>node public/job-search/data/validate.js</code> after any edit.
+  </footer>
+</div>
+
+<div class="modal-overlay" id="shortcutsOverlay" hidden>
+  <div class="modal" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+    <button class="modal-close" id="shortcutsClose" aria-label="Close">&times;</button>
+    <h3 id="shortcutsTitle" class="font-display">Keyboard shortcuts</h3>
+    <div class="shortcuts-list" id="shortcutsList"></div>
+  </div>
+</div>
+
+<script src="/job-search/app.js"></script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

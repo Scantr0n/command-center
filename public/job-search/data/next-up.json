@@ -1,0 +1,68 @@
+{
+  "asOfDate": "2026-08-22",
+  "intro": "Nothing urgent. But the daily digest has piled up verified leads for well over a week straight with none converted into a save or an application, worth a review pass whenever there's time, not a today-or-else thing.",
+  "costOfWaitingNote": "One real cost of waiting already showed up: Earnin Brand Marketing Intern ($32-50/hr, remote, 15-20 hrs/wk) got flagged by the digest as \"the best-shaped role seen in weeks,\" then was pulled by the employer before anyone acted on it. Two standouts landed that day, worth moving on before the same thing happens to them:",
+  "standouts": [
+    {
+      "name": "Think Academy US, Remote Marketing Intern (Mandarin Required)",
+      "pay": "$20-25/hr",
+      "hours": "20-30 hrs/wk",
+      "remote": "Fully remote, CPT/OPT accepted",
+      "detail": "The first genuine remote Mandarin-required match the digest has found in 5 runs of trying, and Mandarin fluency is exactly Jack's real edge. Content creation, not sales.",
+      "caveat": "Duration/end date unstated. One snippet mentions San Jose CA with remote options, confirm true-remote before applying.",
+      "sourceUrl": "https://job-boards.greenhouse.io/thinkacademyus/jobs/7823067003",
+      "sourceLabel": "Apply"
+    },
+    {
+      "name": "Jane Addams Peace Association, Social Media & Marketing Coordinator",
+      "pay": "$20/hr",
+      "hours": "20 hrs/month (roughly 5 hrs/wk)",
+      "remote": "Remote",
+      "detail": "Well under his ≤15/wk preference, right in his sweet spot.",
+      "caveat": null,
+      "sourceUrl": null,
+      "sourceLabel": null
+    },
+    {
+      "name": "HumanSignal Marketing Intern",
+      "pay": "$20-25/hr",
+      "hours": "15-25 hrs/wk",
+      "remote": "Remote, US-timezones",
+      "detail": null,
+      "caveat": "Duration/season still unconfirmed after 3 digest runs, worth asking about before applying.",
+      "sourceUrl": null,
+      "sourceLabel": null
+    },
+    {
+      "name": "Golden Pet Brands Digital Acquisition Marketing Intern",
+      "pay": "$17-20/hr",
+      "hours": "25-29 hrs/wk, Sept 14-Dec 11",
+      "remote": "Remote US",
+      "detail": null,
+      "caveat": "Hours are above his stated ≤15/wk preference, flag that before applying.",
+      "sourceUrl": null,
+      "sourceLabel": null
+    },
+    {
+      "name": "Curb Creations Social Media Marketing Specialist",
+      "pay": "$20-22/hr",
+      "hours": "20 hrs/wk",
+      "remote": "In-office, Buffalo MN (~35 mi from St. Cloud)",
+      "detail": "Outside the strict local radius but the best-paying local find in months. Apply by emailing dave@curbcreations.net.",
+      "caveat": null,
+      "sourceUrl": "mailto:dave@curbcreations.net",
+      "sourceLabel": "Email to apply"
+    },
+    {
+      "name": "Mood Fabrics Marketing Internship",
+      "pay": "$18-22/hr",
+      "hours": "2 days/wk",
+      "remote": "Remote/hybrid",
+      "detail": "New that run.",
+      "caveat": "Company is NYC/Lodi NJ so the hybrid half is a real risk, no season stated, verify before counting on it.",
+      "sourceUrl": null,
+      "sourceLabel": null
+    }
+  ],
+  "olderLeadsNote": "Older still-open leads worth a second look: AccuWeather (pay still unstated after 18+ digest runs), ACLU (its July 15 priority deadline has passed, and it now also requires formal coursework/academic credit tie-in), Retensa, PhotoShelter, HealthSource Chiropractic of St. Cloud, Grands at Mulligans (Sartell)."
+}

@@ -1,0 +1,24 @@
+{
+  "standingCriteria": [
+    "Location: remote is a hard filter, no exceptions, including hybrid. OR local to St. Cloud/Collegeville MN.",
+    "Duration: needs to fit around one semester. A posting tagged \"Internship\" is not automatically semester-length, check for hidden 12/18/24-month commitments (see dealbreaker checklist).",
+    "Hours: internship/part-time/full-time are all technically fine, but he strongly prefers ≤~15 hrs/week. Confirmed full-time (~40 hrs/wk) is a hard no as of 2026-08-11 (\"if its 40hr a week i cant do that\"), don't apply to those even if otherwise a great fit.",
+    "Pay matters, best pay prioritized. Any real pay structure (hourly, monthly stipend) is fine, just needs to be a real, stated number.",
+    "Excludes pure BD/sales roles, even when blended into a \"marketing\" title (cold-call quotas, outbound-outreach-heavy duties).",
+    "Skill fit: content creation, social media, brand marketing, Chinese/overseas social media (Weibo, KOL/creator outreach, this is his real JCM International experience and a strong differentiator)."
+  ],
+  "dealbreakers": {
+    "intro": "Learned the hard way across two full verification passes (2026-08-11/12). Open the full posting body and, if the body is silent on something, check the actual application form before trusting a platform tag:",
+    "items": [
+      "Region-locked \"remote.\" \"Remote\" can mean remote-within-one-country-only (\"work from anywhere in India,\" \"PAN India,\" tied to one city with no \"worldwide\" language).",
+      "Ambiguous or absent pay. \"Unpaid / Paid\" both listed, or no figure anywhere in the body.",
+      "Fixed live-meeting hours in the wrong timezone. Convert to Central before judging fit.",
+      "\"Remote\" tag contradicted by the body (says On-site/Hybrid instead).",
+      "\"Internship\" tag can also lie, on hours AND duration. Confirmed real case (90 Seconds, 2026-08-12): posting said nothing about hours or duration, tagged \"Internship,\" but the application form itself asked for a 12/18/24-month commitment. If the body is silent, don't assume semester-length or part-time, flag as unconfirmed.",
+      "BD/sales role wearing a marketing title. Cold-call quotas, outbound quota language.",
+      "Eligibility mismatches. Graduates-only (excludes him, still enrolled), \"based in [country]\" residency requirements, required fluency in a language he doesn't speak (he has English native, Mandarin/Japanese conversational, not French/German/etc. at professional level).",
+      "Closed or expired applications, even if the search result looked current.",
+      "Recruiter-agency postings speaking \"on behalf of our client\" with no named employer, especially if the same template is reused across multiple listings, low-trust pattern."
+    ]
+  }
+}

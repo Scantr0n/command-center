@@ -1,0 +1,23 @@
+{
+  "applications": [
+    { "num": 1, "role": "Influencer Marketing Intern", "company": "Vocalbeats", "location": "US (Remote)", "pay": "$860-890/mo", "appliedDate": "2026-08-11" },
+    { "num": 2, "role": "Growth Marketing SEO & Content Intern", "company": "Blueprint", "location": "NY (Remote)", "pay": "$20/hr", "appliedDate": "2026-08-11" },
+    { "num": 3, "role": "Marketing Intern", "company": "Millee", "location": "LA (Remote)", "pay": "$20/hr", "appliedDate": "2026-08-11" },
+    { "num": 4, "role": "Brand Marketing & Instagram Intern", "company": "paperplane", "location": "Goa, India (Remote)", "pay": "\"Good stipend,\" no figure", "appliedDate": "2026-08-11" },
+    { "num": 5, "role": "Content Writer", "company": "GiftsBazaar.in", "location": "India (Remote)", "pay": "\"Paid,\" no figure", "appliedDate": "2026-08-11" },
+    { "num": 6, "role": "Creator Marketing Intern (Monstercat)", "company": "Create Music Group", "location": "BC, Canada (Remote)", "pay": "$22 CAD/hr", "appliedDate": "2026-08-12" }
+  ],
+  "dropped": [
+    { "company": "BRUNA (Austria)", "reason": "Didn't feel like a fit despite no dealbreaker found. Dropped after verification passed, by Jack's own judgment." }
+  ],
+  "skipped": [
+    { "company": "My DTC Guy", "reason": "Real logistics conflict, not a fit-quality issue: 40 hrs/wk full-time." },
+    { "company": "Dayforce Canada", "reason": "Real logistics conflict, not a fit-quality issue: 37.5-40 hrs/wk full-time." },
+    { "company": "90 Seconds UK", "reason": "Turned out to be a 12/18/24-month commitment on the actual application, not semester-length." }
+  ],
+  "savedCount": {
+    "count": 0,
+    "asOfDate": "2026-08-12",
+    "note": "Saved list is empty as of 2026-08-12, everything either applied to, dropped, or found to have a dealbreaker. This has not been explicitly reconfirmed since that date in the source tracker, so treat this as the last-known figure, not necessarily the current one."
+  }
+}

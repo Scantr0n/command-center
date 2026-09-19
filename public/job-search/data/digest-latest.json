@@ -1,0 +1,30 @@
+{
+  "runDate": "2026-09-14",
+  "fullyVerifiedCount": 12,
+  "totalItemsCount": 15,
+  "bestOverallFit": {
+    "name": "Analyst, Digital Marketing & Measurement, Ovative Group",
+    "location": "Minneapolis MN / Chicago",
+    "pay": "$60,000-$66,000 base + 10% bonus",
+    "detail": "Explicitly entry level with no prior professional experience required, posted 4 days ago, US work auth required / no sponsorship.",
+    "sourceUrl": "https://builtin.com/job/analyst-digital-marketing-measurement/10545644"
+  },
+  "otherVerifiedByPay": [
+    { "name": "ClaimSorted Founding Community & Marketing Manager", "location": "NYC hybrid", "pay": "$100-160k", "detail": "Tagged entry level but body asks for program-scaling + B2B event experience, treat as a stretch.", "sourceUrl": null },
+    { "name": "Saks Coordinator Growth Marketing - Paid Social", "location": "NYC", "pay": "$61-79k", "detail": "Entry level.", "sourceUrl": null },
+    { "name": "Envision Horizons Marketing Specialist", "location": "Remote US", "pay": "$60-70k", "detail": "1-4 yrs.", "sourceUrl": null },
+    { "name": "Alphabe Insight Promotional Marketing Specialist", "location": "NYC", "pay": "$59-68k", "detail": null, "sourceUrl": null },
+    { "name": "Silvur Marketing Assistant", "location": "Remote US", "pay": "$50-62k", "detail": "0-3 yrs, requires hands-on AI tool experience.", "sourceUrl": null },
+    { "name": "Alphabe Insight Marketing Strategy Coordinator", "location": "Cincinnati OH", "pay": "$51-57k", "detail": null, "sourceUrl": null },
+    { "name": "Valley Natural Foods Co-op Marketing Engagement Specialist", "location": "Burnsville MN", "pay": "$25-27/hr FT", "detail": null, "sourceUrl": null },
+    { "name": "Brookfield Properties Marketing Coordinator", "location": "Chicago", "pay": "$24-33.65/hr + 10% bonus", "detail": null, "sourceUrl": null }
+  ],
+  "verifiedPayUndisclosed": [
+    { "name": "Capacity Sports Group Social Media & Content Coordinator", "location": "Downingtown PA", "detail": "0-3 yrs, posted today.", "sourceUrl": null },
+    { "name": "Pacagen Marketing Associate", "location": "NYC", "detail": "Influencer partnerships + paid social.", "sourceUrl": null },
+    { "name": "Doximity Marketing Coordinator", "location": "SF or remote US", "detail": null, "sourceUrl": null }
+  ],
+  "relocationSponsorshipNote": "Zero verified relocation/visa-sponsorship roles for a fifth run running. Only posting found offering relocation assistance was Applied Materials Product Marketing II New College Grad ($88-121k, Gloucester MA) which requires a Master's or Doctorate in Mechanical/Electrical Engineering or Materials Science.",
+  "excludedNote": "Excluded after reading full bodies: Zwift Junior Sports Marketing Coordinator (London, GBP 43-49k, near-perfect entry-level sports fit but inactive, posted 7 months ago); HungryPanda Marketing Specialist Mandarin Speaking (Southampton UK) removed Sep 2; Celsys Global Marketing/Localization (Tokyo) expired plus JLPT N2 and current Japan residence required; Airbnb Market Associate Japan Mandarin-Speaking removed June 2025; EFG Graduate Programme Singapore removed May 2026; Sony European Graduate UK and Checkout.com Marketing Graduate Programme both 404.",
+  "sourcingNotes": "TeamWork Online search-result links were almost entirely stale that day, Mascot Sports, Gotham FC, Tampa Bay Rays, Cleveland Browns, USA Wrestling, IMG and Crimson Brand Partners all returned \"closed to new applications\"; only its sorted-by-recent index page yielded a live role. Built In remains by far the best source (builtin.com/jobs/marketing/entry-level plus the NYC and Chicago city variants each return real posted-date and disclosed-salary rows, and individual pages carry a reliable removed-on timestamp). allowed_domains confirmed mandatory a fifth run running. SportsTechJobs produced nothing entry-level-relevant that day (its recent feed was sales/data-science/ops)."
+}
