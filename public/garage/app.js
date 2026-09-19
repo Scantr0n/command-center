@@ -784,7 +784,7 @@ function relistGuidanceText(l, days) {
 // this, finding *which* items were at risk of a double sale meant scanning
 // the whole listings table by eye for the sold-elsewhere badge styling.
 function buildAtRiskListings(listings) {
-  return listings.filter(l => (l.soldOn || []).length > 0 && remainingPlatforms(l).length > 0);
+  return listings.filter(l => l.status === 'live' && (l.soldOn || []).length > 0 && remainingPlatforms(l).length > 0);
 }
 
 function renderDelistList(listings) {
