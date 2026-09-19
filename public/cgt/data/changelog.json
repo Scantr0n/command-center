@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-09-19T20:50:39.977Z",
+  "generatedAt": "2026-09-19T21:39:02.100Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "f8eecb8",
-      "fullHash": "f8eecb87233cf9339fbaf01c7844b377826699a3",
+      "hash": "37140fc",
+      "fullHash": "37140fc9ec69773ad2fe5c3335bd61fd877a2d3b",
       "date": "2026-09-19",
       "author": "Claude",
       "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",

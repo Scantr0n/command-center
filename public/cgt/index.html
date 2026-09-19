@@ -637,6 +637,16 @@
     <div class="breakdown-grid" id="breakdownGrid"></div>
   </section>
 
+  <section id="valueTimelineSection">
+    <h2 class="section-title">Portfolio value over time</h2>
+    <p class="section-subtitle">Real total value of the current (unsold, priced) collection, reconstructed from
+      every card's own <code class="inline-code">datePriced</code> and <code class="inline-code">priceHistory</code>
+      dates, not a fabricated trend line. Needs at least two distinct real pricing dates across the collection
+      before there is anything to plot; until then this says so honestly instead of drawing a flat or single-point
+      line.</p>
+    <div id="valueTimelineChart"></div>
+  </section>
+
   <section id="moversSection" hidden>
     <h2 class="section-title">Biggest movers</h2>
     <p class="section-subtitle">Real cards that have actually been re-priced, ranked by how much the researched

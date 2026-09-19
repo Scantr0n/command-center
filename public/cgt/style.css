@@ -406,6 +406,27 @@ header.page-head .sub {
   white-space: nowrap;
 }
 
+/* Portfolio value over time: one hand-rolled inline SVG line chart, styled to
+   match the purple breakdown-bar-fill accent already used elsewhere on this
+   page rather than introducing a second accent color for one chart. */
+.timeline-svg {
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  display: block;
+  margin-bottom: 10px;
+}
+.timeline-area { fill: rgba(155,140,255,0.14); stroke: none; }
+.timeline-line { fill: none; stroke: rgba(155,140,255,0.9); stroke-width: 2; }
+.timeline-dot { fill: var(--void); stroke: rgba(155,140,255,0.9); stroke-width: 2; }
+.timeline-dot:hover { fill: rgba(155,140,255,0.9); }
+.timeline-endpoints {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--sub);
+}
+
 /* Biggest movers leaderboard: two breakdown-card-style panels, but rows are
    clickable (jump to the card's modal) and colored by gain/loss like the
    stat-tile positive/negative tiles, rather than a bar chart. */
@@ -1331,6 +1352,11 @@ textarea.np-input { resize: vertical; }
   .breakdown-label, .breakdown-value { color: #111 !important; }
   .breakdown-bar-track { background: #eee; }
   .breakdown-bar-fill { background: #888 !important; }
+
+  .timeline-area { fill: rgba(0,0,0,0.06) !important; }
+  .timeline-line { stroke: #444 !important; }
+  .timeline-dot { fill: #fff !important; stroke: #444 !important; }
+  .timeline-endpoints { color: #333 !important; }
 
   .movers-card { background: none; border: 1px solid #ccc; }
   .movers-empty { color: #333 !important; }
