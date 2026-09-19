@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-19T00:22:10.498Z",
+  "generatedAt": "2026-09-19T04:18:09.334Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
@@ -13,65 +13,15 @@
       ]
     },
     {
-      "hash": "ad97c08",
-      "fullHash": "ad97c089f056f3253b00b27a97a9a57bf012bb38",
+      "hash": "5f09aa5",
+      "fullHash": "5f09aa5bc5942084a8901ddb18f9d3a05520e5c8",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Sondrik: revert fabricated lead-sent and download-count claims",
+      "subject": "CGT: add an attention bar summarizing all five flagged-data panels",
       "files": [
+        "channels.json",
         "downloads.json",
-        "leads.json"
-      ]
-    },
-    {
-      "hash": "7ea242b",
-      "fullHash": "7ea242be8202c65892ec76791f1e6c563cc8e71e",
-      "date": "2026-09-17",
-      "author": "Jack Scanlon",
-      "subject": "Sondrik: fix stale lead status, log fresh download count",
-      "files": [
-        "downloads.json",
-        "leads.json"
-      ]
-    },
-    {
-      "hash": "c39e8bb",
-      "fullHash": "c39e8bb31ecfc2a7c50bfce9d5f0a6317b5d31af",
-      "date": "2026-09-13",
-      "author": "Claude",
-      "subject": "Add real-target goal tracking to Sondrik hub",
-      "files": [
-        "goals.json"
-      ]
-    },
-    {
-      "hash": "a8dacd5",
-      "fullHash": "a8dacd56c6ba82689dda8c89d28802312b372807",
-      "date": "2026-09-13",
-      "author": "Claude",
-      "subject": "Fix Sondrik lead count attributing to wrong channel",
-      "files": [
-        "leads.json"
-      ]
-    },
-    {
-      "hash": "131c697",
-      "fullHash": "131c6975ded6d20306ca22bccc62d1fceb72c3ef",
-      "date": "2026-09-13",
-      "author": "Claude",
-      "subject": "Add channel coverage section to Sondrik hub",
-      "files": [
-        "channels.json"
-      ]
-    },
-    {
-      "hash": "e8c72ad",
-      "fullHash": "e8c72ad193fc8d7f2218ddd39cdca9471735f082",
-      "date": "2026-09-12",
-      "author": "Claude",
-      "subject": "Add Sondrik product/traction hub",
-      "files": [
-        "downloads.json",
+        "goals.json",
         "leads.json",
         "releases.json"
       ]
