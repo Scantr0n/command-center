@@ -418,7 +418,7 @@
       </div>
       <div id="chatMessages" class="flex-1 overflow-y-auto px-6 py-4 space-y-3 text-sm" role="log" aria-live="polite"></div>
       <div class="px-6 py-4 border-t hairline flex gap-2">
-        <input id="chatInput" type="text" placeholder="Ask about this project..."
+        <input id="chatInput" type="text" placeholder="Ask about this project..." maxlength="4000"
           class="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none border hairline"
           style="background: var(--panelLight); color: var(--ink)">
         <button id="sendChat" class="font-medium text-sm px-4 py-2 rounded-lg" style="background: var(--ink); color: var(--void)">Send</button>
@@ -1728,11 +1728,25 @@ function removeTypingIndicator() {
   if (el) el.remove();
 }
 
+// Mirrors server.js's own MAX_CHAT_MESSAGES exactly: the server rejects any
+// request once messages.length exceeds this, so a real long conversation
+// would otherwise keep letting the user type and hit Send only to get the
+// same generic "Error reaching the assistant" back forever, with no way to
+// tell that limit (rather than a real network/API failure) is why. Checked
+// client-side first so that state is explained instead of silently retried.
+const MAX_CHAT_MESSAGES = 40;
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const sendBtn = document.getElementById('sendChat');
   const text = input.value.trim();
   if (!text || !activeCluster) return;
+  if (chatHistory.length >= MAX_CHAT_MESSAGES) {
+    appendMessage('assistant', 'This conversation has reached its length limit. Close and reopen this project to start a new one.');
+    input.disabled = true;
+    sendBtn.disabled = true;
+    return;
+  }
   const clusterId = activeCluster.id;
   const sessionId = chatSessionId;
   input.value = '';
