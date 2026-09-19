@@ -7,5 +7,8 @@
   "summary": "Artifact + workflow tracking food/macros and weight. College move-in disrupted consistency temporarily. Missed weigh-ins or heavier eating around that period isn't real backsliding, just the transition.",
   "status": "active",
   "sessionTitle": "Macro and weight tracker",
-  "relatedTo": ["lifting-tracker"]
+  "relatedTo": ["lifting-tracker"],
+  "relationReasons": {
+    "lifting-tracker": "Each logged workout relays over from the Lifting Tracker."
+  }
 }

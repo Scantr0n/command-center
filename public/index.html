@@ -45,6 +45,8 @@
   .node-glow { opacity: 0.4; transition: opacity 0.18s ease; }
   .node-glow-active { animation: pulseGlow 2.8s ease-in-out infinite; }
   @keyframes pulseGlow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+  .graph-orbit-ring { animation: orbitSpin 90s linear infinite; }
+  @keyframes orbitSpin { to { transform: rotate(360deg); } }
   .spoke-line { opacity: 0.5; }
   /* Traveling-dash flow, active-status spokes only: reuses the same real
      status field .node-glow-active already keys off, never a decorative
@@ -178,6 +180,7 @@
     .spoke-live { animation: none; }
     .spoke-badge { transition: none !important; }
     .graph-node:hover, .cluster-card:hover { transform: none; }
+    .graph-orbit-ring { animation: none; }
   }
 
   /* Below ~768px, shrinking the 900x900 viewBox to fit the screen makes node
@@ -346,7 +349,10 @@
 
     <div id="graphView" style="position: relative;">
       <div id="graphScroll" class="flex items-center justify-center py-4">
-        <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;"><g id="graphContent"></g></svg>
+        <svg id="graphSvg" viewBox="0 0 900 900" width="900" height="900" class="w-full" style="max-width: 760px; height: auto;">
+          <defs id="graphDefs"></defs>
+          <g id="graphContent"></g>
+        </svg>
         <div id="graphSkeleton" class="flex items-center justify-center" style="position: absolute; inset: 0;">
           <div style="width: 130px; height: 130px; border-radius: 999px; border: 1.5px solid var(--hairlineHover); background: var(--panel); display: flex; align-items: center; justify-content: center;" class="skeleton-pulse">
             <span class="text-[10px] font-mono" style="color: var(--faint)">LOADING</span>
@@ -764,7 +770,52 @@ function nodeRadius(priority) {
   return priority === 'top' ? 34 : priority === 'low' ? 22 : 28;
 }
 
+// One radial gradient per category, defined once and referenced by every
+// matching node's glow halo via url(#glow-<slug>) — real bloom falloff
+// (solid at center, fading to transparent) instead of a flat translucent
+// circle, part of the move toward the orbital/tactical-HUD look Jack
+// pointed at (refs 3/5). Regenerating on every renderGraph() call is
+// idempotent (same ids, same values) and cheap at 9 entries.
+function categorySlug(cat) { return (cat || 'uncategorized').toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+
+function ensureGraphDefs() {
+  const defs = document.getElementById('graphDefs');
+  if (!defs) return;
+  defs.innerHTML = Object.entries(CATEGORY_COLOR).map(([cat, color]) => {
+    const slug = categorySlug(cat);
+    return `
+      <radialGradient id="glow-${slug}">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.85" />
+        <stop offset="60%" stop-color="${color}" stop-opacity="0.28" />
+        <stop offset="100%" stop-color="${color}" stop-opacity="0" />
+      </radialGradient>
+    `;
+  }).join('');
+}
+
+// Real collision check for a relation curve, not a guessed constant: samples
+// the actual quadratic bezier and measures clearance against every OTHER
+// node's real circle (never the curve's own two endpoints, which the curve
+// legitimately starts/ends inside of — that's fine, each node's own opaque
+// fill covers that on its own). Used by renderGraph to grow the bulge only
+// as far as a given curve actually needs, instead of one fixed number that
+// would either cut it close for a crowded pair or over-bulge an isolated one.
+function curveMinClearance(p0, p1, p2, otherNodes) {
+  let min = Infinity;
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
+    const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+    otherNodes.forEach(n => {
+      const clearance = Math.hypot(x - n.x, y - n.y) - n.radius;
+      if (clearance < min) min = clearance;
+    });
+  }
+  return min;
+}
+
 function renderGraph() {
+  ensureGraphDefs();
   const svg = d3.select('#graphSvg');
   const cx = 450, cy = 450, hubR = 65;
   const groups = groupByCategory(clusters);
@@ -833,17 +884,61 @@ function renderGraph() {
     spokesHtml += `<line class="spoke-line${liveSpoke}" data-id="${escapeHtml(c.id)}" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5" />`;
 
     // Real cross-project relationships only (e.g. Lifting Tracker relays into
-    // Macro Tracker), not decorative, only drawn when a cluster's own data
-    // actually declares a relatedTo link.
+    // Macro Tracker), not decorative. A relation only renders when BOTH (1)
+    // the cluster's own data declares a relatedTo link AND (2) a real,
+    // specific relationReasons[otherId] string explains what the link
+    // actually is. No reason means no line: this is the direct fix for
+    // Jack's "what does this line even mean" complaint (the drift-studio/
+    // nigeria line was removed from the data entirely for exactly this
+    // reason, it represented a decision Jack was weighing, not a real
+    // relationship between the two projects). The reason renders as a
+    // native <title> hover tooltip on the path itself, so any future
+    // relation is self-explanatory without needing this comment re-read.
     (c.relatedTo || []).forEach(otherId => {
       const pairKey = [c.id, otherId].sort().join('|');
       if (seenPairs.has(pairKey)) return;
-      seenPairs.add(pairKey);
       const other = simNodes.find(n => n.id === otherId);
       if (!other) return;
-      const midX = (nx + other.x) / 2 + (ny - other.y) * 0.12;
-      const midY = (ny + other.y) / 2 + (other.x - nx) * 0.12;
-      relationsHtml += `<path d="M${nx.toFixed(1)},${ny.toFixed(1)} Q${midX.toFixed(1)},${midY.toFixed(1)} ${other.x.toFixed(1)},${other.y.toFixed(1)}" fill="none" stroke="var(--sub)" stroke-width="1" stroke-dasharray="1,4" opacity="0.5" />`;
+      const realReason = (c.relationReasons && c.relationReasons[otherId])
+        || (other.relationReasons && other.relationReasons[c.id]);
+      if (!realReason) return;
+      seenPairs.add(pairKey);
+      // Bulge magnitude: the old fixed-12%-of-endpoint-distance formula
+      // shrinks to near-zero for two nodes that end up close together after
+      // the force simulation, leaving an almost-straight line with no real
+      // clearance from whatever else sits between them — that, combined
+      // with the node fill being translucent (fixed below), is what made
+      // lines visibly cut through unrelated circles. Enforcing a minimum
+      // pixel bulge, and always bowing away from the hub (toward open
+      // canvas) rather than in whichever perpendicular direction the raw
+      // coordinates happened to produce, gives every relation curve real
+      // clearance regardless of how close its two endpoints are.
+      const dist = Math.hypot(other.x - nx, other.y - ny);
+      const perpX = (ny - other.y) / (dist || 1);
+      const perpY = (other.x - nx) / (dist || 1);
+      const midRawX = (nx + other.x) / 2, midRawY = (ny + other.y) / 2;
+      // Flip the perpendicular so it points away from the hub center,
+      // consistently bowing outward into open space instead of back toward
+      // the dense middle of the canvas.
+      const outwardSign = ((midRawX - cx) * perpX + (midRawY - cy) * perpY) >= 0 ? 1 : -1;
+      const p0 = { x: nx, y: ny }, p2 = { x: other.x, y: other.y };
+      const others = simNodes.filter(n => n.id !== c.id && n.id !== other.id)
+        .map(n => ({ x: n.x, y: n.y, radius: n.radius }));
+      // Start at the same minimum as before and grow in real steps, checking
+      // the actual curve against every other node's real circle each time,
+      // until it clears by a comfortable margin or a sane cap is hit (a
+      // relation between two nodes boxed in on all sides has to stop
+      // growing somewhere rather than loop forever).
+      let bulge = Math.max(dist * 0.16, 34);
+      const MARGIN = 10, MAX_BULGE = 260, STEP = 20;
+      while (bulge <= MAX_BULGE) {
+        const p1 = { x: midRawX + perpX * bulge * outwardSign, y: midRawY + perpY * bulge * outwardSign };
+        if (curveMinClearance(p0, p1, p2, others) >= MARGIN) break;
+        bulge += STEP;
+      }
+      const midX = midRawX + perpX * bulge * outwardSign;
+      const midY = midRawY + perpY * bulge * outwardSign;
+      relationsHtml += `<path class="relation-line" d="M${nx.toFixed(1)},${ny.toFixed(1)} Q${midX.toFixed(1)},${midY.toFixed(1)} ${other.x.toFixed(1)},${other.y.toFixed(1)}" fill="none" stroke="var(--sub)" stroke-width="1" stroke-dasharray="1,4" opacity="0.5"><title>${escapeHtml(c.name)} ↔ ${escapeHtml(other.name)}: ${escapeHtml(realReason)}</title></path>`;
     });
 
     const r = c.radius;
@@ -880,8 +975,9 @@ function renderGraph() {
     nodesHtml += `
       <g class="graph-node" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(nodeLabel)}">
         <title>${escapeHtml(nodeLabel)}</title>
-        <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 6}" fill="${color}" opacity="0.16" />
-        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}20" stroke="${color}" stroke-width="1.5" ${stale ? 'stroke-dasharray="4,3"' : ''} />
+        <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 16}" fill="url(#glow-${categorySlug(c.category)})" />
+        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="var(--void)" stroke="${color}" stroke-width="1.5" ${stale ? 'stroke-dasharray="4,3"' : ''} />
+        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}" opacity="0.14" />
         <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${sColor}" stroke="var(--void)" stroke-width="1.5" opacity="${stale ? 0.45 : 1}" />
         ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
         <text x="${nx.toFixed(1)}" y="${(ny + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${escapeHtml(truncateLabel(nodeLabelWord(c.name), 9))}</text>
@@ -890,7 +986,26 @@ function renderGraph() {
     `;
   });
 
+  // Four corner brackets + a slow-rotating dashed ring around the hub, the
+  // one concrete "tactical HUD" framing element pulled directly from the
+  // Sept 19 reference set (ref5's bracket-cornered panels, ref3's orbital
+  // rings) rather than reskinning the whole canvas at once. Pure CSS
+  // rotation on the ring, respects prefers-reduced-motion via the existing
+  // .graph-orbit-ring rule below.
+  const bracketR = hubR + 16, bracketLen = 12;
+  const bracketHtml = [45, 135, 225, 315].map(deg => {
+    const rad = deg * Math.PI / 180;
+    const px = cx + bracketR * Math.cos(rad), py = cy + bracketR * Math.sin(rad);
+    // Each bracket is an "L" whose two arms point back toward the hub center,
+    // giving the corner-of-a-viewfinder look rather than a plain diamond.
+    const inX = cx + (bracketR - bracketLen) * Math.cos(rad), inY = cy + (bracketR - bracketLen) * Math.sin(rad);
+    const tangX = -Math.sin(rad), tangY = Math.cos(rad);
+    return `<path d="M${(px + tangX * bracketLen).toFixed(1)},${(py + tangY * bracketLen).toFixed(1)} L${px.toFixed(1)},${py.toFixed(1)} L${inX.toFixed(1)},${inY.toFixed(1)}" fill="none" stroke="var(--hairlineHover)" stroke-width="1.5" opacity="0.6" />`;
+  }).join('');
+
   const hubHtml = `
+    <circle cx="${cx}" cy="${cy}" r="${hubR + 24}" fill="none" stroke="var(--hairline)" stroke-width="1" stroke-dasharray="1,7" class="graph-orbit-ring" style="transform-origin: ${cx}px ${cy}px" />
+    ${bracketHtml}
     <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="var(--panel)" stroke="var(--hairlineHover)" stroke-width="1.5" class="hub-node" />
     <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">COMMAND</text>
     <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">CENTER</text>
@@ -1379,13 +1494,24 @@ function openModal(id, opts = {}) {
   // is invisible in Grid view (the persisted default for anyone who has ever
   // switched to it), so a real, validated relationship could otherwise never
   // surface at all for that user. Surfaces it here too, as clickable chips
-  // that jump straight to the related project's own modal.
+  // that jump straight to the related project's own modal. Same real-reason
+  // requirement as the graph's connector line (see renderGraph): a relation
+  // with no relationReasons entry doesn't render here either, so the two
+  // views can never disagree about which relations are real.
   const relatedRow = document.getElementById('relatedRow');
   const relatedIds = activeCluster.relatedTo || [];
-  const relatedClusters = relatedIds.map(id => clusters.find(c => c.id === id)).filter(Boolean);
+  const relatedClusters = relatedIds
+    .map(id => clusters.find(c => c.id === id))
+    .filter(Boolean)
+    .map(c => ({
+      cluster: c,
+      reason: (activeCluster.relationReasons && activeCluster.relationReasons[c.id])
+        || (c.relationReasons && c.relationReasons[activeCluster.id])
+    }))
+    .filter(r => r.reason);
   if (relatedClusters.length) {
-    document.getElementById('relatedChips').innerHTML = relatedClusters.map(c => `
-      <button type="button" class="tag-chip" data-related-id="${escapeHtml(c.id)}" style="background:${categoryColor(c.category)}1F; color:${categoryColor(c.category)}; cursor: pointer; border: none;">${escapeHtml(c.name)}</button>
+    document.getElementById('relatedChips').innerHTML = relatedClusters.map(({ cluster: c, reason }) => `
+      <button type="button" class="tag-chip" data-related-id="${escapeHtml(c.id)}" title="${escapeHtml(reason)}" style="background:${categoryColor(c.category)}1F; color:${categoryColor(c.category)}; cursor: pointer; border: none;">${escapeHtml(c.name)}</button>
     `).join('');
     document.querySelectorAll('#relatedChips [data-related-id]').forEach(el => {
       el.addEventListener('click', () => openModal(el.dataset.relatedId));

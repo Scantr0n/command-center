@@ -7,5 +7,8 @@
   "summary": "Google Calendar is the single source of truth. Cleanup finished 9/7: duplicate Home calendar deleted, iCloud calendar sync turned off, Google set as default.",
   "status": "done",
   "sessionTitle": null,
-  "relatedTo": ["things-to-do"]
+  "relatedTo": ["things-to-do"],
+  "relationReasons": {
+    "things-to-do": "Both use Google Calendar as their single shared data source."
+  }
 }

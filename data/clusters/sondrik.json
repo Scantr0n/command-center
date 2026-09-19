@@ -8,6 +8,9 @@
   "status": "active",
   "sessionTitle": "Sondrik",
   "relatedTo": ["csm"],
+  "relationReasons": {
+    "csm": "The n8n/Airtable outreach pipeline built for CSM is meant to extend to Sondrik; that side isn't built yet."
+  },
   "link": "/sondrik/",
   "linkLabel": "Open Sondrik hub"
 }
