@@ -1,9 +1,15 @@
 require('dotenv').config({ quiet: true });
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
+// Every hub's app.js/style.css is hand-written, uncompressed text (up to
+// ~175KB for the largest ones) and /api/clusters is JSON, both of which gzip
+// down hard. Applied before express.static/json so it covers the static
+// files and every API response the same way.
+app.use(compression());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
