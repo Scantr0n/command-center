@@ -74,8 +74,17 @@ function readToggles() {
   }
 }
 
+// Plain writeFileSync isn't atomic: a process killed mid-write (or a full
+// disk) can leave toggles.json truncated, which readToggles above then
+// treats as "corrupted" and silently discards, losing every toggle Jack had
+// actually set. Writing to a temp file in the same directory and renaming
+// over the real path avoids that window: the rename is atomic on the same
+// filesystem, so readers only ever see the old complete file or the new
+// complete file, never a partial one.
 function writeToggles(toggles) {
-  fs.writeFileSync(TOGGLES_FILE, JSON.stringify(toggles, null, 2));
+  const tmpFile = `${TOGGLES_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(tmpFile, JSON.stringify(toggles, null, 2));
+  fs.renameSync(tmpFile, TOGGLES_FILE);
 }
 
 app.get('/api/clusters', async (req, res) => {
