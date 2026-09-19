@@ -155,6 +155,18 @@ function formatAbsolute(iso) {
   });
 }
 
+// changelog.json's entries carry date-only strings (git log --date=short,
+// "2026-09-18"), never a full timestamp, so this formats those specifically
+// rather than reusing formatAbsolute above, which assumes a real datetime
+// and would otherwise render a date-only string at midnight UTC, silently
+// shifting it a day in a timezone behind UTC.
+function fmtDate(dateOnly) {
+  if (!dateOnly) return null;
+  const d = new Date(dateOnly + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return String(dateOnly);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 // Data-freshness convention: green under a minute, amber under 15 minutes,
 // past that a live reading is old enough to call out rather than trust.
 function freshnessClass(iso) {
@@ -1326,6 +1338,65 @@ function renderEventLog(data) {
   log.innerHTML = sorted.map(eventItem).join('');
 }
 
+// Renders changelog.json, a file no one hand-edits: it's regenerated from
+// this repo's real git history of status.json by
+// public/alpha/data/changelog.js, same pattern already proven at
+// public/sondrik/data/changelog.js and public/csm/data/changelog.js, so
+// every hash, author, and date here is independently checkable against the
+// repo instead of resting on a hand-typed claim. Missing entirely (never
+// generated yet, or a fresh clone before anyone ran it) is an honest empty
+// state, not an error.
+function renderChangelog(data) {
+  const section = document.getElementById('changelogSection');
+  if (!section) return;
+  const entries = (data && Array.isArray(data.entries)) ? data.entries : [];
+  if (!entries.length) {
+    section.innerHTML = `
+      <div class="empty-panel">
+        <div class="empty-panel-title font-mono">NO CHANGELOG GENERATED YET</div>
+        <div class="empty-panel-sub">
+          Run <code>node public/alpha/data/changelog.js</code> to build one from this repo's git history of
+          status.json.
+        </div>
+      </div>
+    `;
+    return;
+  }
+  const items = entries.map(e => `
+    <li class="changelog-item">
+      <div class="changelog-meta">
+        <span class="changelog-hash font-mono" title="${escapeHtml(e.fullHash || e.hash)}">${escapeHtml(e.hash)}</span>
+        <span class="changelog-date font-mono">${escapeHtml(fmtDate(e.date) || 'unknown date')}</span>
+        <span class="changelog-author font-mono">${escapeHtml(e.author || 'unknown author')}</span>
+      </div>
+      <div class="changelog-title">${escapeHtml(e.subject || '(no commit message)')}</div>
+    </li>
+  `).join('');
+  const generatedNote = data.generatedAt
+    ? 'Generated ' + escapeHtml(fmtDate((data.generatedAt || '').slice(0, 10)) || 'at an unknown time') + '.'
+    : '';
+  section.innerHTML = `
+    <ol class="changelog-list" aria-label="Real git commit history of status.json, most recent first">${items}</ol>
+    <p class="changelog-generated-note font-mono">${generatedNote}</p>
+  `;
+}
+
+async function loadChangelog() {
+  try {
+    const res = await fetch('/alpha/data/changelog.json?t=' + Date.now());
+    if (!res.ok) {
+      // A fresh clone before anyone has ever run changelog.js means the
+      // file just doesn't exist yet, an honest empty state, not a page
+      // error worth surfacing as one.
+      renderChangelog({ entries: [] });
+      return;
+    }
+    renderChangelog(await res.json());
+  } catch (e) {
+    renderChangelog({ entries: [] });
+  }
+}
+
 // This page depends on a few browser features to work fully (localStorage
 // for the connectivity/regime/last-known caches, the Notification API for
 // critical alerts, a service worker for offline caching), and any one of
@@ -2114,4 +2185,8 @@ renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory
 // the diagnostics call above: market open/closed has no dependency on
 // /api/alpha/live succeeding at all, so it shouldn't wait on it.
 renderMarketStatus();
+// changelog.json only changes when someone manually reruns changelog.js and
+// redeploys, never on Alpha's own 30s poll cadence, so it's fetched once
+// here rather than joining the loadStatus() interval below.
+loadChangelog();
 loadStatus();

@@ -21,6 +21,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const DATA_DIR = __dirname;
 const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
@@ -294,6 +295,42 @@ function main() {
         }
       });
     }
+  }
+
+  // changelog.json is generated, not hand-edited (see changelog.js), so it
+  // can't have the typo-style errors above, only a drift failure mode: it
+  // silently falls behind, or ends up with wrong/missing entries, after
+  // someone runs the generator against an incomplete local clone. Same
+  // pattern already proven at public/sondrik/data/validate.js and
+  // public/csm/data/validate.js: comparing the full recorded commit list
+  // against this repo's actual commit list for status.json, not just the
+  // latest hash, catches a corrupted middle of the list too, not only a
+  // stale head; git itself is the source of truth here, same as
+  // changelog.js.
+  try {
+    const realHashesRaw = execFileSync('git', [
+      'log', '--format=%H', '--', 'status.json'
+    ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
+    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
+    let changelogData = null;
+    try {
+      changelogData = loadJson('changelog.json');
+    } catch (e) {
+      warnings.push('changelog.json is missing or unreadable (' + e.message + '), run node public/alpha/data/changelog.js');
+    }
+    if (changelogData) {
+      const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+      if (recordedHashes.join(',') !== realHashes.join(',')) {
+        warnings.push('changelog.json does not match this repo\'s actual commit history for status.json ' +
+          '(' + recordedHashes.length + ' entr' + (recordedHashes.length === 1 ? 'y' : 'ies') + ' recorded vs ' +
+          realHashes.length + ' real commit' + (realHashes.length === 1 ? '' : 's') + '), run ' +
+          'node public/alpha/data/changelog.js to refresh it');
+      }
+    }
+  } catch (e) {
+    // Not a git checkout, or git isn't on PATH: can't check changelog
+    // freshness, but that's an environment gap, not a data error, so this
+    // stays silent rather than adding a warning no one can act on.
   }
 
   if (warnings.length) {

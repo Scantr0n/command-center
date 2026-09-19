@@ -389,6 +389,14 @@ header.page-head .sub {
 }
 .section-toolbar .section-title { margin: 0; }
 
+.section-note {
+  font-size: 0.78rem;
+  color: var(--dim);
+  margin: -8px 0 14px;
+  max-width: 72ch;
+  overflow-wrap: anywhere;
+}
+
 /* Connection strip */
 .conn-strip {
   display: flex;
@@ -976,6 +984,55 @@ header.page-head .sub {
   margin-top: 2px;
 }
 
+/* Data changelog */
+.changelog-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.changelog-item {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.changelog-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.changelog-hash {
+  font-size: 0.7rem;
+  color: var(--accent);
+  background: rgba(91,140,255,0.1);
+  border: 1px solid rgba(91,140,255,0.3);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.changelog-date {
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+.changelog-author {
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+.changelog-title {
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.changelog-generated-note {
+  font-size: 0.72rem;
+  color: var(--dim);
+  margin: 0;
+}
+
 /* Kill switch engaged is the one state on this page Jack would want to see
    even from across the room, current or last known (see computeHeadline's
    own comment in app.js), but the headline pill it drives lives only in the
@@ -1156,7 +1213,7 @@ footer.page-foot {
   .callout strong, .offline-banner strong, .lastknown-banner strong { color: #111; }
 
   .conn-strip, .stat-tile, .ps-mode, .ps-meter, .arch-card, .lineage-card,
-  .event-item, .empty-panel, .pos-table-wrap {
+  .event-item, .empty-panel, .pos-table-wrap, .changelog-item {
     background: none;
     border: 1px solid #ccc;
   }
@@ -1168,11 +1225,12 @@ footer.page-foot {
   .ps-mode-value, .ps-field-label, .ps-mode-sub, .meter-value,
   .arch-card-title, .arch-card-note, .lineage-label, .lineage-meta,
   .event-label, .event-detail, .empty-panel-title, .empty-panel-sub,
-  .pos-symbol, .pos-num, .conn-label, .conn-sub {
+  .pos-symbol, .pos-num, .conn-label, .conn-sub, .changelog-title {
     color: #111 !important;
   }
   .stat-tile-value.awaiting, .ps-mode-value.awaiting, .meter-value.awaiting,
-  .conn-history-source, .regime-history-source, .lastknown-tag {
+  .conn-history-source, .regime-history-source, .lastknown-tag,
+  .changelog-hash, .changelog-date, .changelog-author, .changelog-generated-note {
     color: #555 !important;
   }
 
