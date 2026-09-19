@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-19T08:32:52.963Z",
+  "generatedAt": "2026-09-19T10:50:53.151Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
     {
@@ -13,11 +13,11 @@
       ]
     },
     {
-      "hash": "b88d922",
-      "fullHash": "b88d92217efff47183f56af2832b66f47ec350a9",
+      "hash": "b7cfebe",
+      "fullHash": "b7cfebec9719848f435f78b448e2889b1afb8110",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Garage: add a Data changelog section with real git provenance",
+      "subject": "CSM/CGT/Garage: restore keyboard focus ring on clickable rows and cards",
       "files": [
         "activity.json",
         "disputes.json",
