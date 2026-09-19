@@ -203,7 +203,12 @@ function escapeHtml(str) {
 // confusing "$-1.95" instead of "-$1.95", so the sign goes before the symbol.
 function formatUsd(n) {
   const sign = n < 0 ? '-' : '';
-  return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const abs = Math.abs(n);
+  // toLocaleString drops trailing zero cents on its own (42.80 -> "42.8"),
+  // which reads as a formatting bug next to "71.94" in the same table, so
+  // force 2 decimals whenever the amount isn't a whole dollar.
+  const hasCents = Math.round(abs * 100) % 100 !== 0;
+  return sign + '$' + abs.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 });
 }
 
 // Also captures the real server "Last-Modified" header, which express.static
