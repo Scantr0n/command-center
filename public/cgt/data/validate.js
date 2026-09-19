@@ -26,6 +26,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { validateCards, validateSubmissions, validateCandidates } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
@@ -91,7 +92,45 @@ function main() {
   const submissionsOk = checkFile('submissions.json', submissionsData.submissions || [], validateSubmissions);
   const candidatesOk = checkFile('candidates.json', candidatesData.candidates || [], validateCandidates);
 
+  checkChangelogFreshness();
+
   process.exit(cardsOk && submissionsOk && candidatesOk ? 0 : 1);
+}
+
+// changelog.json is generated, not hand-edited (see changelog.js), so it
+// can't have the typo-style errors above, only a drift failure mode: it
+// silently falls behind the real commit history, or (as found 2026-09-19)
+// keeps entries from before a history rewrite that are no longer reachable
+// from any branch. Comparing the full recorded commit list against this
+// repo's actual commit list for these same files, not just the latest
+// hash, is what catches a corrupted middle of the list, not only a stale
+// head; git itself is the source of truth here, same as changelog.js.
+function checkChangelogFreshness() {
+  try {
+    const realHashesRaw = execFileSync('git', [
+      'log', '--format=%H', '--',
+      'cards.json', 'submissions.json', 'candidates.json'
+    ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
+    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
+    let changelogData = null;
+    try {
+      changelogData = loadJson('changelog.json');
+    } catch (e) {
+      console.warn('changelog.json is missing or unreadable (' + e.message + '), run node public/cgt/data/changelog.js');
+      return;
+    }
+    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+    if (recordedHashes.join(',') !== realHashes.join(',')) {
+      console.warn('changelog.json does not match this repo\'s actual commit history for these data files ' +
+        '(' + recordedHashes.length + ' entr' + (recordedHashes.length === 1 ? 'y' : 'ies') + ' recorded vs ' +
+        realHashes.length + ' real commit' + (realHashes.length === 1 ? '' : 's') + '), run ' +
+        'node public/cgt/data/changelog.js to refresh it');
+    }
+  } catch (e) {
+    // Not a git checkout, or git isn't on PATH: can't check changelog
+    // freshness, but that's an environment gap, not a data error, so this
+    // stays silent rather than adding a warning no one can act on.
+  }
 }
 
 main();

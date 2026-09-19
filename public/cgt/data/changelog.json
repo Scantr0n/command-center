@@ -1,24 +1,13 @@
 {
-  "generatedAt": "2026-09-18T16:37:58.256Z",
+  "generatedAt": "2026-09-19T05:32:32.036Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "788e530",
-      "fullHash": "788e530906f52fbfa16a1c7c0a41e1b34241732f",
-      "date": "2026-09-17",
-      "author": "Jack Scanlon",
-      "subject": "CGT: split raw candidates out of cards.json into candidates.json",
-      "files": [
-        "candidates.json",
-        "cards.json"
-      ]
-    },
-    {
-      "hash": "9333b54",
-      "fullHash": "9333b5409bfebc411196b6d7d5235ae8774a15e0",
-      "date": "2026-09-17",
+      "hash": "f6a48d1",
+      "fullHash": "f6a48d15823e4715005757036c5a7766330ffafe",
+      "date": "2026-09-18",
       "author": "Claude",
-      "subject": "CGT: add hover tooltip for truncated Value breakdown labels",
+      "subject": "Alpha: add real trend sparklines for current drawdown and robustness score",
       "files": [
         "candidates.json",
         "cards.json",
