@@ -3794,16 +3794,27 @@ function resizeImageForDraft(file) {
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const scale = Math.min(1, PHOTO_DRAFT_MAX_DIMENSION / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      resolve({ mediaType: 'image/jpeg', dataBase64: dataUrl.split(',')[1] });
+      // Uncaught here (a hardened browser handing back a null 2d context, a
+      // corrupt image decoding enough to fire onload but not enough to draw)
+      // previously left the Promise this executor returns never settling,
+      // since a throw inside a DOM event handler doesn't reject it on its
+      // own. That hung the caller's Promise.all(files.map(...)) forever on
+      // one bad photo, stuck on "Reading photos..." with no error shown.
+      try {
+        const scale = Math.min(1, PHOTO_DRAFT_MAX_DIMENSION / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not get a 2d canvas context for ' + file.name);
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve({ mediaType: 'image/jpeg', dataBase64: dataUrl.split(',')[1] });
+      } catch (err) {
+        reject(new Error('Could not process ' + file.name + ': ' + err.message));
+      }
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read ' + file.name + ' as an image')); };
     img.src = url;
