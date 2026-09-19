@@ -127,7 +127,7 @@
     background: rgba(255,255,255,0.03);
   }
   #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed { opacity: 0.16; }
+  .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed, .attn-pill.dimmed, .attn-card.dimmed { opacity: 0.16; }
   /* A dimmed node's own spoke line back to the hub was previously left out of
      this rule entirely (it's a sibling <line>, not a child of .graph-node),
      so filtering to one category still left every other category's spokes
@@ -1156,7 +1156,7 @@ function applyFilters() {
     el.classList.toggle('dimmed', anyFilterActive && !(matchesSearch && matchesCategory));
   });
 
-  document.querySelectorAll('.graph-node, .cluster-card, .activity-row').forEach(el => {
+  document.querySelectorAll('.graph-node, .cluster-card, .activity-row, .attn-pill, .attn-card').forEach(el => {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
     if (!c) return;
