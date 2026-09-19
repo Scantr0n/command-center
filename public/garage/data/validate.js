@@ -86,6 +86,22 @@ function isDateOrNull(v) {
   return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
 }
 
+// Every real free-text field this tracker renders is written without em
+// dashes, so a hand-typed or pasted-in field that has one reads as coming
+// from somewhere else rather than Jack's own voice. Same emDashFields
+// helper public/sondrik/data/validate.js already uses for this reason.
+// Warning-level only: an em dash never breaks anything rendered, this is a
+// style nudge, not a data error.
+function emDashFields(obj, fields) {
+  const hits = [];
+  if (!obj) return hits;
+  fields.forEach(f => {
+    const v = obj[f];
+    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+  });
+  return hits;
+}
+
 function main() {
   const errors = [];
   const warnings = [];
@@ -212,6 +228,9 @@ function main() {
         }
       });
     }
+
+    emDashFields(l, ['title', 'location']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
   // Mirrors the "Possible duplicates" panel in app.js: the same physical item
@@ -264,6 +283,9 @@ function main() {
     if (!isDateOrNull(e.date)) {
       errors.push(where + ': "date" is not a YYYY-MM-DD date or null: ' + JSON.stringify(e.date));
     }
+
+    emDashFields(e, ['title']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
   const sales = salesData.sales || [];
@@ -323,6 +345,9 @@ function main() {
           '" does not have "' + s.platform + '" in its "soldOn" array yet');
       }
     }
+
+    emDashFields(s, ['title']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
   const expenses = expensesData.expenses || [];
@@ -376,6 +401,9 @@ function main() {
     } else if (e.amount == null && e.category && e.category !== 'mileage') {
       warnings.push(where + ': expense has no "amount" logged yet');
     }
+
+    emDashFields(e, ['description']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
   const disputes = disputesData.disputes || [];
@@ -435,6 +463,9 @@ function main() {
     if (d.notes !== null && d.notes !== undefined && typeof d.notes !== 'string') {
       errors.push(where + ': "notes" must be a string or null');
     }
+
+    emDashFields(d, ['title', 'outcome', 'notes']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
   // Every soldOn entry should have a matching sale logged, since a platform

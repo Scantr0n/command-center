@@ -42,6 +42,22 @@ function isDateOrNull(v) {
   return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
 }
 
+// Every real free-text field on this board is written without em dashes, so
+// a hand-typed or pasted-in field that has one reads as coming from
+// somewhere else rather than Jack's own voice. Same emDashFields helper
+// public/sondrik/data/validate.js already uses for this reason. Warning-
+// level only: an em dash never breaks anything rendered, this is a style
+// nudge, not a data error.
+function emDashFields(obj, fields) {
+  const hits = [];
+  if (!obj) return hits;
+  fields.forEach(f => {
+    const v = obj[f];
+    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+  });
+  return hits;
+}
+
 function main() {
   const errors = [];
   const warnings = [];
@@ -333,6 +349,19 @@ function main() {
           '" but the prospect\'s current stage is "' + p.stage + '". Add the missing move or fix the mismatch.');
       }
     }
+
+    emDashFields(p, ['name', 'company', 'verifiedHook', 'nextAction']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this board never uses one, check for a paste-in'));
+    emDashFields(p.contactChannel, ['detail']).forEach(f =>
+      warnings.push(where + ': contactChannel.' + f + ' contains an em dash, this board never uses one, check for a paste-in'));
+    (p.outreachLog || []).forEach((entry, logIdx) => {
+      emDashFields(entry, ['note']).forEach(f =>
+        warnings.push(where + '.outreachLog[' + logIdx + ']: "' + f + '" contains an em dash, this board never uses one, check for a paste-in'));
+    });
+    (p.contentIdeas || []).forEach((entry, ideaIdx) => {
+      emDashFields(entry, ['idea']).forEach(f =>
+        warnings.push(where + '.contentIdeas[' + ideaIdx + ']: "' + f + '" contains an em dash, this board never uses one, check for a paste-in'));
+    });
   });
 
   // Grouping logic itself lives in validate-core.js, shared with app.js's own

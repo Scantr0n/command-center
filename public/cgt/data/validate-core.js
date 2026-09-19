@@ -22,6 +22,25 @@
   const SUBMISSION_STATUSES = ['submitted', 'in-queue', 'grading', 'shipped-back', 'returned'];
   const CANDIDATE_DECISIONS = ['submit', 'hold', 'sell-raw', 'pass'];
 
+  // Every real free-text field this tracker renders is written without em
+  // dashes, so a hand-typed or pasted-in field that has one reads as coming
+  // from somewhere else rather than Jack's own voice. Same emDashFields
+  // helper public/sondrik/data/validate.js already uses for this reason,
+  // shared here so both the CLI validator and the browser-side CSV import
+  // tool (public/cgt/import.js) catch it the same way, same "one copy of
+  // the rules, never drift apart" reasoning as the rest of this file.
+  // Warning-level only: an em dash never breaks anything rendered, this is
+  // a style nudge, not a data error.
+  function emDashFields(obj, fields) {
+    const hits = [];
+    if (!obj) return hits;
+    fields.forEach(f => {
+      const v = obj[f];
+      if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+    });
+    return hits;
+  }
+
   // The shape regex alone accepts any two digits for month/day, including
   // "2026-13-45" or a real-looking but impossible "2026-02-30", so this
   // cross-checks the parsed date's own year/month/day against what was
@@ -234,6 +253,9 @@
         warnings.push(where + ': "backlogBatch" ("' + c.backlogBatch + '") does not start with a YYYY-MM-DD date. ' +
           'The batch filter sorts by this label as a plain string, so it needs an ISO-date prefix to sort newest-first.');
       }
+
+      emDashFields(c, ['cardName', 'storageLocation', 'compNote', 'backlogBatch']).forEach(f =>
+        warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
     });
 
     findDuplicateGroups(cards).forEach(({ cards: group }) => {
@@ -367,6 +389,9 @@
       if (s.status && s.status !== 'returned' && !s.submittedDate) {
         warnings.push(where + ': has no "submittedDate", so days-in-queue can\'t be shown for it.');
       }
+
+      emDashFields(s, ['description']).forEach(f =>
+        warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
     });
 
     return { errors, warnings };
@@ -461,6 +486,9 @@
         warnings.push(where + ': decision is "submit" but no "decisionNote" logging the real submissions.json id ' +
           'it turned into once shipped. Not required, just makes it easier to trace later.');
       }
+
+      emDashFields(c, ['cardName', 'rawValueNote', 'gradedValueNote', 'decisionNote']).forEach(f =>
+        warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
     });
 
     return { errors, warnings };
@@ -468,6 +496,6 @@
 
   return {
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findGradeLadderInversions,
-    isDateOrNull, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES, CANDIDATE_DECISIONS
+    isDateOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES, CANDIDATE_DECISIONS
   };
 });

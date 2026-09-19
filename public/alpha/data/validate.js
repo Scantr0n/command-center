@@ -40,6 +40,22 @@ function isIsoDatetimeOrNull(v) {
   return v === null || v === undefined || (typeof v === 'string' && ISO_DATETIME_RE.test(v));
 }
 
+// Every real free-text field this page renders is written without em
+// dashes, so a hand-typed or pasted-in field that has one reads as coming
+// from somewhere else rather than this product's own voice. Same
+// emDashFields helper public/sondrik/data/validate.js already uses for this
+// reason. Warning-level only: an em dash never breaks anything rendered,
+// this is a style nudge, not a data error.
+function emDashFields(obj, fields) {
+  const hits = [];
+  if (!obj) return hits;
+  fields.forEach(f => {
+    const v = obj[f];
+    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+  });
+  return hits;
+}
+
 // live.asOf and system.lastVerifiedAt drive every staleness signal this page
 // shows (freshnessClass's live/stale/down thresholds, the "last verified"
 // architecture trust label), so a mistyped year would otherwise silently
@@ -179,6 +195,9 @@ function main() {
         if (l.lastEventNote != null && typeof l.lastEventNote !== 'string') {
           errors.push(where + '.lastEventNote: must be a string if set');
         }
+
+        emDashFields(l, ['label', 'lastEventNote']).forEach(f =>
+          warnings.push(where + '.' + f + ' contains an em dash, this page never uses one, check for a paste-in'));
       });
     }
   }
@@ -255,7 +274,19 @@ function main() {
 
   if (!Array.isArray(data.system && data.system.features)) {
     errors.push('system.features: missing or not an array');
+  } else {
+    data.system.features.forEach((f, i) => {
+      emDashFields(f, ['label', 'note']).forEach(field =>
+        warnings.push('system.features[' + i + '].' + field + ' contains an em dash, this page never uses one, check for a paste-in'));
+    });
   }
+
+  emDashFields(live, ['regime']).forEach(f =>
+    warnings.push('live.' + f + ' contains an em dash, this page never uses one, check for a paste-in'));
+  emDashFields(live.positionSizing, ['activeMode']).forEach(f =>
+    warnings.push('live.positionSizing.' + f + ' contains an em dash, this page never uses one, check for a paste-in'));
+  emDashFields(live.debatePanel, ['blockedOn']).forEach(f =>
+    warnings.push('live.debatePanel.' + f + ' contains an em dash, this page never uses one, check for a paste-in'));
 
   // system.* is hand-maintained architectural fact (agent count, feature
   // list), not a live reading, so it has no natural freshness signal of its
@@ -293,6 +324,9 @@ function main() {
         if (evt.tone != null && !['neutral', 'good', 'alert'].includes(evt.tone)) {
           errors.push(where + '.tone: must be "neutral", "good", or "alert" if set');
         }
+
+        emDashFields(evt, ['label', 'detail']).forEach(f =>
+          warnings.push(where + '.' + f + ' contains an em dash, this page never uses one, check for a paste-in'));
       });
     }
   }

@@ -44,6 +44,24 @@ function isDateOrNull(v) {
 // would silently read as freshly updated instead of the typo it actually
 // is. Same isFutureDate check public/sondrik/data/validate.js already runs
 // on its own dated fields, for the same reason.
+// Every real string this dashboard renders (project names, summaries, link
+// labels, and the chat assistant's own replies per server.js's system
+// prompt) is written without em dashes, so a hand-typed field that has one
+// reads as a paste-in from somewhere else rather than Jack's own voice.
+// Same emDashFields helper public/sondrik/data/validate.js already uses for
+// this same reason, just not previously applied to this file. Warning-level
+// only: an em dash never breaks anything the dashboard renders, this is a
+// style nudge, not a data error.
+function emDashFields(obj, fields) {
+  const hits = [];
+  if (!obj) return hits;
+  fields.forEach(f => {
+    const v = obj[f];
+    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+  });
+  return hits;
+}
+
 function isFutureDate(v) {
   if (!v || !DATE_RE.test(v)) return false;
   const tomorrow = new Date();
@@ -122,6 +140,9 @@ function main() {
     if (c.relatedTo !== undefined && !Array.isArray(c.relatedTo)) {
       errors.push(where + ': "relatedTo" must be an array of cluster ids');
     }
+
+    emDashFields(c, ['name', 'summary', 'linkLabel']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this dashboard never uses one, check for a paste-in'));
   });
 
   // relatedTo ids are checked after every file has been read, since a
