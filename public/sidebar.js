@@ -108,6 +108,18 @@
       #ccSidebar { display: none !important; }
       body.cc-has-sidebar, body.cc-has-sidebar.cc-sidebar-expanded { padding-left: 0 !important; }
     }
+
+    /* Same precedent as every hub's own style.css (CGT/CSM/Garage/Sondrik,
+       and now Alpha): this rail's expand/collapse width transition and its
+       label/pin fade-ins still trigger vestibular discomfort for someone who
+       has set this preference, so cut them to near-instant, same as every
+       other transition on the page it's injected into. This file is loaded
+       on all five hub pages, so it was the one shared gap in that coverage. */
+    @media (prefers-reduced-motion: reduce) {
+      #ccSidebar, body.cc-has-sidebar, .cc-sb-label, .cc-sb-pin, .cc-sb-label-home {
+        transition-duration: 0.001ms !important;
+      }
+    }
   `;
 
   function currentPathIsHub(link) {
