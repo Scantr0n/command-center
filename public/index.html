@@ -924,6 +924,11 @@ function renderGraph() {
       const p0 = { x: nx, y: ny }, p2 = { x: other.x, y: other.y };
       const others = simNodes.filter(n => n.id !== c.id && n.id !== other.id)
         .map(n => ({ x: n.x, y: n.y, radius: n.radius }));
+      // The hub circle itself was never in this list, so a relation curve
+      // between two nodes on opposite sides of it (any future cross-category
+      // relation, none of today's happen to be) could bow straight through
+      // the "COMMAND CENTER" hub with no clearance check ever catching it.
+      others.push({ x: cx, y: cy, radius: hubR });
       // Start at the same minimum as before and grow in real steps, checking
       // the actual curve against every other node's real circle each time,
       // until it clears by a comfortable margin or a sane cap is hit (a
