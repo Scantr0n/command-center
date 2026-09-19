@@ -31,6 +31,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { findDuplicateListings, isSuspiciousEbayReturnPolicy } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
@@ -480,6 +481,8 @@ function main() {
       liveInstanceCount + ' live listing instance(s) (platforms minus soldOn, across status:"live" items)');
   }
 
+  checkChangelogFreshness(warnings);
+
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
     warnings.forEach(w => console.warn('  - ' + w));
@@ -495,6 +498,43 @@ function main() {
     events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
     disputes.length + ' dispute(s)).');
   process.exit(0);
+}
+
+// changelog.json is generated, not hand-edited (see changelog.js), so it
+// can't have the typo-style errors above, only a drift failure mode: it
+// silently falls behind the real commit history, or keeps entries from
+// before a history rewrite that are no longer reachable from any branch
+// (the exact shape found in CGT's and Sondrik's data on 2026-09-19).
+// Comparing the full recorded commit list against this repo's actual
+// commit list for these same files, not just the latest hash, is what
+// catches a corrupted middle of the list, not only a stale head; git
+// itself is the source of truth here, same as changelog.js.
+function checkChangelogFreshness(warnings) {
+  try {
+    const realHashesRaw = execFileSync('git', [
+      'log', '--format=%H', '--',
+      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json'
+    ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
+    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
+    let changelogData = null;
+    try {
+      changelogData = loadJson('changelog.json');
+    } catch (e) {
+      warnings.push('changelog.json is missing or unreadable (' + e.message + '), run node public/garage/data/changelog.js');
+      return;
+    }
+    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+    if (recordedHashes.join(',') !== realHashes.join(',')) {
+      warnings.push('changelog.json does not match this repo\'s actual commit history for these data files ' +
+        '(' + recordedHashes.length + ' entr' + (recordedHashes.length === 1 ? 'y' : 'ies') + ' recorded vs ' +
+        realHashes.length + ' real commit' + (realHashes.length === 1 ? '' : 's') + '), run ' +
+        'node public/garage/data/changelog.js to refresh it');
+    }
+  } catch (e) {
+    // Not a git checkout, or git isn't on PATH: can't check changelog
+    // freshness, but that's an environment gap, not a data error, so this
+    // stays silent rather than adding a warning no one can act on.
+  }
 }
 
 main();

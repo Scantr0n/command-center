@@ -1,23 +1,23 @@
 {
-  "generatedAt": "2026-09-18T18:53:46.892Z",
+  "generatedAt": "2026-09-19T06:47:33.807Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "fb89c3e",
-      "fullHash": "fb89c3e11e2ca68ef4e67b6eb223a66fcd76d75f",
+      "hash": "89ac3fe",
+      "fullHash": "89ac3feaf8d7ca86e6bd798afd37813a56297d63",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Garage: fix eBay fee math undercharging the shoes category rate",
+      "subject": "Garage: track per-listing eBay return policy, flag the return-policy bug's exact shape again",
       "files": [
         "listings.json"
       ]
     },
     {
-      "hash": "e2cf969",
-      "fullHash": "e2cf96916732436b7197888eced1700d86d5c142",
+      "hash": "5f1cd58",
+      "fullHash": "5f1cd581f8eb9072c0dd4c6017f9053638d553b0",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "CGT: add optional per-card photo URL field",
+      "subject": "Alpha: surface the new drawdown/robustness trend samples in browser diagnostics",
       "files": [
         "activity.json",
         "disputes.json",
