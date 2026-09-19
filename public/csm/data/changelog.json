@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-18T16:05:20.893Z",
+  "generatedAt": "2026-09-19T00:09:00.838Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "9897e08",
-      "fullHash": "9897e084eb23827919030005b8d442462007602f",
-      "date": "2026-09-17",
+      "hash": "8b04367",
+      "fullHash": "8b043670497db15043d871435450ca4176bfe99a",
+      "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Precache CSM and Garage validate-core.js, bump service worker cache",
+      "subject": "Sondrik: add draft autosave/recovery to the five quick-log forms",
       "files": [
         "prospects.json",
         "stages.json"
