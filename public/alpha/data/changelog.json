@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T11:51:55.616Z",
+  "generatedAt": "2026-09-19T12:32:28.485Z",
   "generatedFrom": "git log over public/alpha/data/{status.json}, run node public/alpha/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "f84a640",
-      "fullHash": "f84a640d5a822befc465c9dcea8bf548338a547b",
+      "hash": "ae2eabf",
+      "fullHash": "ae2eabfe3a41ab79c919de22c79eb077ce6b6419",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "CGT: compute the footer's real-vs-placeholder data status from live counts",
+      "subject": "CSM: fix aria-allowed-attr violation on sortable list table headers",
       "files": [
         "status.json"
       ]

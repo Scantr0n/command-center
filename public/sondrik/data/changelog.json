@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T12:17:35.848Z",
+  "generatedAt": "2026-09-19T12:32:28.524Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "1826017",
-      "fullHash": "18260177a4060e7c31d70a8be0e974518d8dce2e",
+      "hash": "ae2eabf",
+      "fullHash": "ae2eabfe3a41ab79c919de22c79eb077ce6b6419",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Alpha: warn on a future asOf/lastVerifiedAt timestamp in validate.js",
+      "subject": "CSM: fix aria-allowed-attr violation on sortable list table headers",
       "files": [
         "channels.json",
         "downloads.json",
