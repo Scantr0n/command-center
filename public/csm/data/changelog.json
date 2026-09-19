@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-19T00:09:00.838Z",
+  "generatedAt": "2026-09-19T08:02:52.395Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "8b04367",
-      "fullHash": "8b043670497db15043d871435450ca4176bfe99a",
+      "hash": "2e2f55d",
+      "fullHash": "2e2f55dd1be165c5e891e792584160058439ea0d",
       "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Sondrik: add draft autosave/recovery to the five quick-log forms",
+      "subject": "Sondrik: add a read-only preview of the actual drafted outreach text",
       "files": [
         "prospects.json",
         "stages.json"
