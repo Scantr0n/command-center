@@ -3761,6 +3761,281 @@ function wireQuickLogDisputeTool() {
   });
 }
 
+// AI photo-to-listing drafter. Two-stage flow: stage 1 (draft) sends real
+// item photos to /api/garage/draft-listing and shows every field with its
+// confidence and reasoning, purely informational, nothing saved. Stage 2
+// (finalize) only appears once a draft exists, asks for the handful of
+// fields the drafter can't know on its own (a unique id, which platforms
+// this is actually headed to, status) and then runs the exact same
+// generate-JSON-only, save-nothing flow as wireQuickLogTool above. The rich
+// fields the AI drafts (category, condition notes, description, shipping
+// dimensions, comps) have no dedicated column in listings.json, so they get
+// folded into the free-text notes field rather than silently dropped.
+const CONFIDENCE_BADGE_CLASS = { high: 'badge-fresh', medium: 'badge-due', low: 'badge-decline' };
+const MAX_PHOTO_DRAFT_IMAGES = 8;
+const PHOTO_DRAFT_MAX_DIMENSION = 1568; // Claude's own documented sweet spot for image input
+
+function slugifyForListingId(title) {
+  return (title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'item';
+}
+
+// Downscales client-side before the photo ever leaves the browser: a raw
+// phone photo can run 3-4000px on the long edge, well past what the model
+// actually uses (it downsamples internally anyway), so sending it full-size
+// only costs upload time and server body-size headroom for no real gain in
+// what the model can see.
+function resizeImageForDraft(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, PHOTO_DRAFT_MAX_DIMENSION / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve({ mediaType: 'image/jpeg', dataBase64: dataUrl.split(',')[1] });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read ' + file.name + ' as an image')); };
+    img.src = url;
+  });
+}
+
+function confidenceBadgeHtml(confidence) {
+  const cls = CONFIDENCE_BADGE_CLASS[confidence] || 'badge-hold';
+  return `<span class="badge ${cls}">${escapeHtml(confidence || 'unknown')} confidence</span>`;
+}
+
+// One editable field block: label, confidence badge, an input the human can
+// correct pre-filled with the AI's own value, and its reasoning underneath so
+// the "why" is never hidden behind the value. multiline picks a textarea for
+// the longer prose fields (description, condition notes) over a single-line
+// input.
+function photoDraftFieldHtml(key, label, field, multiline) {
+  if (!field) return '';
+  const value = field.value == null ? '' : String(field.value);
+  const inputTag = multiline
+    ? `<textarea class="quick-log-input photo-draft-field-input" id="pdField_${key}" rows="3">${escapeHtml(value)}</textarea>`
+    : `<input class="quick-log-input photo-draft-field-input" id="pdField_${key}" type="text" value="${escapeHtml(value)}">`;
+  return `
+    <div class="photo-draft-field">
+      <div class="photo-draft-field-head">
+        <label class="quick-log-label" for="pdField_${key}">${escapeHtml(label)}</label>
+        ${confidenceBadgeHtml(field.confidence)}
+      </div>
+      ${inputTag}
+      ${field.reasoning ? `<p class="photo-draft-reasoning">${escapeHtml(field.reasoning)}</p>` : ''}
+    </div>`;
+}
+
+function photoDraftCompsHtml(priceField) {
+  const comps = (priceField && priceField.comps) || [];
+  if (!comps.length) return '';
+  return `
+    <div class="photo-draft-comps">
+      <p class="quick-log-label">Real comps used</p>
+      <ul class="photo-draft-comps-list">
+        ${comps.map(c => `
+          <li>
+            ${c.url ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.title || 'Untitled comp')}</a>` : escapeHtml(c.title || 'Untitled comp')}
+            &mdash; ${c.price != null ? formatUsd(c.price) : 'price unknown'}${c.platform ? ', ' + escapeHtml(c.platform) : ''}${c.condition ? ', ' + escapeHtml(c.condition) : ''}
+          </li>
+        `).join('')}
+      </ul>
+    </div>`;
+}
+
+function wirePhotoDraftTool() {
+  const photoInput = document.getElementById('pdPhotoInput');
+  if (!photoInput) return;
+  const thumbsBox = document.getElementById('pdThumbs');
+  const notesInput = document.getElementById('pdNotes');
+  const draftBtn = document.getElementById('pdDraftBtn');
+  const warningsBox = document.getElementById('pdWarnings');
+  const resultsBox = document.getElementById('pdResults');
+  const actionsRow = document.getElementById('pdActionsRow');
+  const generateBtn = document.getElementById('pdGenerateBtn');
+  const output = document.getElementById('pdOutput');
+  const copyBtn = document.getElementById('pdCopyBtn');
+
+  let stagedImages = []; // [{mediaType, dataBase64, name}]
+  let lastDraft = null;
+
+  photoInput.addEventListener('change', async () => {
+    const files = Array.from(photoInput.files || []).slice(0, MAX_PHOTO_DRAFT_IMAGES);
+    warningsBox.textContent = '';
+    if (photoInput.files.length > MAX_PHOTO_DRAFT_IMAGES) {
+      warningsBox.textContent = `Only the first ${MAX_PHOTO_DRAFT_IMAGES} photos were kept, that's the max per draft.`;
+    }
+    thumbsBox.innerHTML = '<p class="photo-draft-loading">Reading photos...</p>';
+    try {
+      const resized = await Promise.all(files.map(f => resizeImageForDraft(f)));
+      stagedImages = resized.map((r, i) => ({ ...r, name: files[i].name }));
+      thumbsBox.innerHTML = stagedImages.map((img, i) =>
+        `<img class="photo-draft-thumb" src="data:${img.mediaType};base64,${img.dataBase64}" alt="${escapeHtml(img.name)}" title="${escapeHtml(img.name)}">`
+      ).join('');
+    } catch (err) {
+      warningsBox.textContent = err.message;
+      thumbsBox.innerHTML = '';
+      stagedImages = [];
+    }
+  });
+
+  draftBtn.addEventListener('click', async () => {
+    if (!stagedImages.length) {
+      warningsBox.textContent = 'Add at least one photo first.';
+      return;
+    }
+    warningsBox.textContent = '';
+    resultsBox.hidden = true;
+    actionsRow.hidden = true;
+    output.hidden = true;
+    copyBtn.hidden = true;
+    const originalLabel = draftBtn.textContent;
+    draftBtn.textContent = 'Drafting... (real comp search, can take up to 2 minutes)';
+    draftBtn.disabled = true;
+    try {
+      const r = await fetch('/api/garage/draft-listing', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          images: stagedImages.map(({ mediaType, dataBase64 }) => ({ mediaType, dataBase64 })),
+          notes: notesInput.value.trim() || undefined
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error((data && data.error && (data.error.message || data.error)) || 'Draft request failed');
+      lastDraft = data.draft;
+      renderPhotoDraftResults(lastDraft);
+      resultsBox.hidden = false;
+      actionsRow.hidden = false;
+    } catch (err) {
+      warningsBox.textContent = 'Could not draft a listing: ' + err.message;
+    } finally {
+      draftBtn.textContent = originalLabel;
+      draftBtn.disabled = false;
+    }
+  });
+
+  function renderPhotoDraftResults(draft) {
+    const flags = draft.flagsForReview || [];
+    resultsBox.innerHTML = `
+      ${flags.length ? `<div class="callout photo-draft-flags"><strong>Flagged for review:</strong> ${flags.map(f => escapeHtml(f)).join(' &middot; ')}</div>` : ''}
+      ${photoDraftFieldHtml('itemSummary', 'Item summary', draft.itemSummary, false)}
+      <div class="photo-draft-field-row">
+        ${photoDraftFieldHtml('brand', 'Brand', draft.brand, false)}
+        ${photoDraftFieldHtml('exactModelOrVariant', 'Exact model / variant', draft.exactModelOrVariant, false)}
+        ${photoDraftFieldHtml('size', 'Size', draft.size, false)}
+        ${photoDraftFieldHtml('color', 'Color', draft.color, false)}
+      </div>
+      ${photoDraftFieldHtml('title', 'Title', draft.title, false)}
+      ${photoDraftFieldHtml('category', 'Category', draft.category, false)}
+      ${photoDraftFieldHtml('conditionNotes', 'Condition notes', draft.conditionNotes, true)}
+      ${photoDraftFieldHtml('description', 'Description', draft.description, true)}
+      ${photoDraftFieldHtml('suggestedPrice', 'Suggested price (USD)', draft.suggestedPrice, false)}
+      ${photoDraftCompsHtml(draft.suggestedPrice)}
+      ${photoDraftFieldHtml('shippingDimensions', 'Shipping dimensions & weight', draft.shippingDimensions, false)}
+      <div class="photo-draft-finalize">
+        <h3 class="quick-log-title font-mono">Finalize for listings.json</h3>
+        <label class="quick-log-label" for="pdId">Id (unique slug)</label>
+        <input class="quick-log-input" type="text" id="pdId" value="${escapeHtml(slugifyForListingId(draft.title && draft.title.value))}">
+        <label class="quick-log-label" id="pdPlatformsLabel">Platforms (at least one, where this is actually headed)</label>
+        <div class="quick-log-checkbox-row" role="group" aria-labelledby="pdPlatformsLabel">
+          <label class="quick-log-checkbox"><input type="checkbox" class="pd-platform" value="ebay"> eBay</label>
+          <label class="quick-log-checkbox"><input type="checkbox" class="pd-platform" value="vinted"> Vinted</label>
+          <label class="quick-log-checkbox"><input type="checkbox" class="pd-platform" value="poshmark"> Poshmark</label>
+          <label class="quick-log-checkbox"><input type="checkbox" class="pd-platform" value="depop"> Depop</label>
+        </div>
+        <label class="quick-log-label" for="pdCostBasis">Cost basis, USD (optional)</label>
+        <input class="quick-log-input" type="number" id="pdCostBasis" min="0" step="0.01">
+        <label class="quick-log-label" for="pdLocation">Storage location (optional)</label>
+        <input class="quick-log-input" type="text" id="pdLocation" placeholder="e.g. Bin 3">
+      </div>
+    `;
+  }
+
+  generateBtn.addEventListener('click', () => {
+    if (!lastDraft) return;
+    const readField = key => {
+      const el = document.getElementById('pdField_' + key);
+      return el ? el.value.trim() : '';
+    };
+    const id = document.getElementById('pdId').value.trim();
+    const platforms = Array.from(document.querySelectorAll('.pd-platform:checked')).map(el => el.value);
+    const costBasis = readOptionalNonNegativeInput(document.getElementById('pdCostBasis'));
+    const location = document.getElementById('pdLocation').value.trim() || null;
+    const title = readField('title');
+    const priceRaw = readField('suggestedPrice');
+    const price = priceRaw === '' ? null : Number(priceRaw);
+
+    const blockers = [];
+    if (!id) blockers.push('An id is required.');
+    else if (listings.some(l => l.id === id)) blockers.push('"' + id + '" is already used by another listing, ids must be unique.');
+    if (!title) blockers.push('A title is required.');
+    if (!platforms.length) blockers.push('Select at least one platform this is actually headed to.');
+    if (priceRaw !== '' && (Number.isNaN(price) || price < 0)) blockers.push('Suggested price must be a number 0 or more, or cleared.');
+    if (costBasis === undefined) blockers.push('Enter a valid cost basis of $0 or more, or leave it blank.');
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    // No dedicated columns exist in listings.json for category/condition/
+    // description/shipping (see the schema-help table above), so the rest of
+    // what the AI drafted rides along in notes rather than getting silently
+    // dropped once this becomes a real listings.json entry; still fully
+    // human-editable right in the output textarea before it's pasted anywhere.
+    const noteParts = [
+      readField('brand') && `Brand: ${readField('brand')}`,
+      readField('exactModelOrVariant') && `Model/variant: ${readField('exactModelOrVariant')}`,
+      readField('size') && `Size: ${readField('size')}`,
+      readField('color') && `Color: ${readField('color')}`,
+      readField('category') && `Category: ${readField('category')}`,
+      readField('conditionNotes') && `Condition: ${readField('conditionNotes')}`,
+      readField('description') && `Description: ${readField('description')}`,
+      readField('shippingDimensions') && `Shipping: ${readField('shippingDimensions')}`
+    ].filter(Boolean);
+
+    const candidate = {
+      id,
+      title,
+      price: price == null || Number.isNaN(price) ? null : price,
+      costBasis: costBasis === undefined ? null : costBasis,
+      platforms,
+      soldOn: [],
+      listingUrls: platforms.reduce((o, p) => { o[p] = null; return o; }, {}),
+      status: 'draft',
+      datePublished: null,
+      notes: noteParts.length ? noteParts.join(' | ') : null,
+      location
+    };
+
+    output.value = JSON.stringify(candidate, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { warningsBox.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 wireCalc();
 wireBreakEven();
 wireBundle();
@@ -3773,6 +4048,7 @@ wireQuickLogTool();
 wireQuickLogSaleTool();
 wireQuickLogExpenseTool();
 wireQuickLogDisputeTool();
+wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
 

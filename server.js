@@ -10,7 +10,11 @@ const app = express();
 // down hard. Applied before express.static/json so it covers the static
 // files and every API response the same way.
 app.use(compression());
-app.use(express.json());
+// Default express.json() cap (100kb) is fine for every route except the
+// Garage photo-to-listing drafter, which posts a handful of base64-encoded
+// item photos in one request; raised once globally rather than per-route
+// since no other endpoint here accepts a body anywhere near this size.
+app.use(express.json({ limit: '30mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -221,6 +225,118 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json({ error: data });
     res.json({ text: data.content[0].text });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Real box/weight combos Jack actually uses (see the Shipping cost reference
+// section of the Garage page for the platform-level box-type guidance this
+// sits alongside), fed into the drafter's shipping-dimensions prompt below so
+// a garment-type guess grounds itself in what he really has on hand rather
+// than inventing a box size from nothing. Deliberately narrow: only the
+// combos actually confirmed, everything else the model estimates and must
+// flag low-confidence per the prompt's own instructions.
+const KNOWN_PACKAGING = [
+  'CD: 7x9x1in, ~6oz, plain envelope/mailer',
+  'DVD: 7x9x1in, ~8oz (thick/double-disc case needs extra depth, check it fits before assuming the standard depth)',
+  'Beanie Baby: 5x5x5in box, ~8-12oz'
+];
+
+// Garage's whole data model runs on one convention, documented right on the
+// page: every tool here (the Quick Log form, the price calculators) drafts
+// JSON or numbers for Jack to review and hand-paste into listings.json, none
+// of them write a file or publish anything themselves. This endpoint is the
+// AI version of that same pattern: it looks at real item photos and drafts a
+// listing, but the human-review step is load-bearing, not optional, so it
+// returns a draft object with a confidence + reasoning per field rather than
+// a finished listing. Condition notes, exact model/variant, and shipping
+// dimensions are named explicitly as the fields most likely to be wrong from
+// photos alone, since those are the ones that actually cost real money or a
+// return if a guess ships as fact.
+const DRAFT_LISTING_SCHEMA_HINT = `Respond with ONLY a single JSON object, no markdown fences, no commentary before or after. Shape:
+{
+  "itemSummary": {"value": string, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "brand": {"value": string|null, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "exactModelOrVariant": {"value": string|null, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "size": {"value": string|null, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "color": {"value": string|null, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "title": {"value": string, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "category": {"value": string, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "conditionNotes": {"value": string, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "description": {"value": string, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "suggestedPrice": {"value": number|null, "confidence": "high"|"medium"|"low", "reasoning": string, "comps": [{"title": string, "price": number, "platform": string, "condition": string, "url": string|null}]},
+  "shippingDimensions": {"value": string|null, "confidence": "high"|"medium"|"low", "reasoning": string},
+  "flagsForReview": [string]
+}
+Every "value" must come only from what is actually visible in the photos or found via real web search, never invented. If something can't be determined, use null (or an honest low-confidence guess with reasoning explaining the uncertainty) rather than a confident-sounding fabrication. "comps" must be real listings found via web search, each with a real price and platform, empty array if search found nothing usable. flagsForReview lists anything a human must double-check before this goes live, always include an entry for exactModelOrVariant, conditionNotes, and shippingDimensions if their confidence is not "high".`;
+
+app.post('/api/garage/draft-listing', async (req, res) => {
+  try {
+    const { images, notes } = req.body;
+    if (!Array.isArray(images) || !images.length) {
+      return res.status(400).json({ error: 'At least one image is required' });
+    }
+    if (images.length > 8) {
+      return res.status(400).json({ error: 'Max 8 images per draft' });
+    }
+    const ALLOWED_MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    for (const img of images) {
+      if (!img || !ALLOWED_MEDIA_TYPES.has(img.mediaType) || typeof img.dataBase64 !== 'string' || !img.dataBase64) {
+        return res.status(400).json({ error: 'Each image needs a supported mediaType and dataBase64' });
+      }
+    }
+
+    const systemPrompt = `Never use em dashes (—) anywhere in your response, under any circumstances. Use periods, commas, or semicolons instead.\n\nYou are drafting a resale listing for Jack from real photos of a real item, for his Command Center Garage hub (multi-platform: eBay, Vinted, Poshmark, Depop). This is a draft for human review, not a publish, so be honest about uncertainty rather than confident.\n\nReal packaging Jack already has on hand, use these when the item actually matches one, otherwise estimate a reasonable box/mailer size and weight for the item type and mark it lower confidence:\n${KNOWN_PACKAGING.map(p => '- ' + p).join('\n')}\n\nUse the web_search tool to find 2-3 real comparable sold or actively listed items (same brand, same or very similar model, similar condition) to ground suggestedPrice in real market data, not a guess. Cite the real title, price, platform, and condition of each comp you actually used.\n\n${DRAFT_LISTING_SCHEMA_HINT}`;
+
+    const userContent = images.map(img => ({
+      type: 'image',
+      source: { type: 'base64', media_type: img.mediaType, data: img.dataBase64 }
+    }));
+    userContent.push({
+      type: 'text',
+      text: notes && notes.trim()
+        ? `Real notes from Jack about this item: ${notes.trim()}\n\nDraft the listing per your instructions.`
+        : 'Draft the listing per your instructions.'
+    });
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 4000,
+        system: systemPrompt,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+        messages: [{ role: 'user', content: userContent }]
+      }),
+      // Comp research via live web search plus a multi-image vision read
+      // legitimately runs longer than the plain per-cluster chat above (25s),
+      // give it real room before the request just hangs in the UI.
+      signal: AbortSignal.timeout(120000)
+    });
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: data });
+
+    // With web_search enabled, content is a mix of server_tool_use /
+    // web_search_tool_result / text blocks; the actual drafted JSON is in the
+    // last text block, never content[0] (same extraction issue the Alpha
+    // proxy above doesn't have to deal with, this is the first endpoint here
+    // that turns on a server tool).
+    const textBlocks = (data.content || []).filter(b => b.type === 'text');
+    const lastText = textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
+    let draft;
+    try {
+      const jsonMatch = lastText.match(/\{[\s\S]*\}/);
+      draft = JSON.parse(jsonMatch ? jsonMatch[0] : lastText);
+    } catch (parseErr) {
+      return res.status(502).json({ error: 'Model did not return parseable JSON', raw: lastText });
+    }
+    res.json({ draft });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -168,6 +168,39 @@
     </div>
   </details>
 
+  <details class="schema-help" id="photoDraftTool">
+    <summary>Draft a listing from photos (AI, human review required before it goes anywhere)</summary>
+    <div class="schema-help-body">
+      <p>Upload real photos of an unlisted item (the same ones already taken for eBay/Marketplace) and Claude
+        drafts a title, category, condition notes, description, a comp-researched suggested price, and shipping
+        dimensions. Every field comes back with a confidence level and its reasoning, nothing here is saved,
+        posted, or added to <code>listings.json</code> automatically. Review and edit each field below, then
+        <strong>Generate JSON</strong> builds the same pasteable snippet the Quick Log tool above does. Exact
+        model/variant, condition notes, and shipping dimensions are the fields most likely to need a real
+        correction, check those first.</p>
+
+      <div class="photo-draft-grid">
+        <div class="photo-draft-input-col">
+          <label class="quick-log-label" for="pdPhotoInput">Item photos</label>
+          <input class="quick-log-input" type="file" id="pdPhotoInput" accept="image/*" multiple>
+          <div class="photo-draft-thumbs" id="pdThumbs"></div>
+          <label class="quick-log-label" for="pdNotes">Anything you already know (optional, helps the draft)</label>
+          <input class="quick-log-input" type="text" id="pdNotes" placeholder="e.g. thrifted, no tags, small stain on left sleeve">
+          <button type="button" class="print-btn quick-log-generate" id="pdDraftBtn">Draft listing</button>
+          <div class="quick-log-warnings" id="pdWarnings" role="alert"></div>
+        </div>
+      </div>
+
+      <div id="pdResults" class="photo-draft-results" hidden></div>
+
+      <div class="photo-draft-actions" id="pdActionsRow" hidden>
+        <button type="button" class="print-btn quick-log-generate" id="pdGenerateBtn">Generate JSON</button>
+      </div>
+      <textarea class="quick-log-output" id="pdOutput" readonly rows="12" hidden aria-label="Generated draft listing JSON, ready to paste into the listings array"></textarea>
+      <button type="button" class="print-btn quick-log-copy" id="pdCopyBtn" hidden>Copy JSON</button>
+    </div>
+  </details>
+
   <section>
     <h2 class="section-title">Summary</h2>
     <div class="stat-row" id="statRow"></div>
