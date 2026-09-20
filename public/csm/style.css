@@ -1326,6 +1326,16 @@ footer.page-foot {
   }
   .callout strong { color: #111; }
 
+  /* .offline-banner is worth keeping on paper (unlike .attention-bar, hidden
+     above): if the page was printed while genuinely offline, that is real
+     context about how stale the printed data might be. But its two colors
+     (#E8C088, #F2D9B0) were tuned for the dark theme and are both far too
+     light for white paper, confirmed via a real print render: 1.70:1 and
+     1.30:1 against white, both effectively invisible rather than just under
+     WCAG AA. */
+  .offline-banner { color: #6B4A00; }
+  .offline-banner strong { color: #4A3300; }
+
   .board-toolbar { margin-bottom: 10px; }
   .stats-bar, .stats-bar strong { color: #333; }
 
@@ -1423,4 +1433,12 @@ footer.page-foot {
   .snapshot-tag-stale { color: #8B1F1F; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
+  /* Same leak, same reuse of the changelog's #654600 amber substitute:
+     .data-freshness-stale sets color directly on the footer's own child
+     span, so footer.page-foot's color above never reaches it, it's an
+     inherited-vs-direct conflict, not a specificity one. Not stale on the
+     data as of this fix, but the underlying "hand-edited X days ago" text
+     ages every day this page isn't touched, so it silently would have been
+     as soon as it crossed the real 14-day threshold. */
+  .data-freshness-stale { color: #654600; }
 }
