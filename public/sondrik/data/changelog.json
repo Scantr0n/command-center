@@ -1,18 +1,84 @@
 {
-  "generatedAt": "2026-09-20T04:33:56.734Z",
+  "generatedAt": "2026-09-20T04:48:33.564Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "8ce3820",
-      "fullHash": "8ce38204e43a2031b5d3031ad39e1bb2deadacd9",
-      "date": "2026-09-19",
+      "hash": "2e2f55d",
+      "fullHash": "2e2f55dd1be165c5e891e792584160058439ea0d",
+      "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
-      "historyReset": true,
+      "subject": "Sondrik: add a read-only preview of the actual drafted outreach text",
+      "historyReset": false,
       "files": [
-        "channels.json",
+        "leads.json"
+      ]
+    },
+    {
+      "hash": "ad97c08",
+      "fullHash": "ad97c089f056f3253b00b27a97a9a57bf012bb38",
+      "date": "2026-09-18",
+      "author": "Claude",
+      "subject": "Sondrik: revert fabricated lead-sent and download-count claims",
+      "historyReset": false,
+      "files": [
         "downloads.json",
-        "goals.json",
+        "leads.json"
+      ]
+    },
+    {
+      "hash": "7ea242b",
+      "fullHash": "7ea242be8202c65892ec76791f1e6c563cc8e71e",
+      "date": "2026-09-17",
+      "author": "Jack Scanlon",
+      "subject": "Sondrik: fix stale lead status, log fresh download count",
+      "historyReset": false,
+      "files": [
+        "downloads.json",
+        "leads.json"
+      ]
+    },
+    {
+      "hash": "c39e8bb",
+      "fullHash": "c39e8bb31ecfc2a7c50bfce9d5f0a6317b5d31af",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Add real-target goal tracking to Sondrik hub",
+      "historyReset": false,
+      "files": [
+        "goals.json"
+      ]
+    },
+    {
+      "hash": "a8dacd5",
+      "fullHash": "a8dacd56c6ba82689dda8c89d28802312b372807",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Fix Sondrik lead count attributing to wrong channel",
+      "historyReset": false,
+      "files": [
+        "leads.json"
+      ]
+    },
+    {
+      "hash": "131c697",
+      "fullHash": "131c6975ded6d20306ca22bccc62d1fceb72c3ef",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Add channel coverage section to Sondrik hub",
+      "historyReset": false,
+      "files": [
+        "channels.json"
+      ]
+    },
+    {
+      "hash": "e8c72ad",
+      "fullHash": "e8c72ad193fc8d7f2218ddd39cdca9471735f082",
+      "date": "2026-09-12",
+      "author": "Claude",
+      "subject": "Add Sondrik product/traction hub",
+      "historyReset": false,
+      "files": [
+        "downloads.json",
         "leads.json",
         "releases.json"
       ]

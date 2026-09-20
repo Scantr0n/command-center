@@ -1,21 +1,117 @@
 {
-  "generatedAt": "2026-09-20T04:33:56.643Z",
+  "generatedAt": "2026-09-20T04:48:33.366Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "8ce3820",
-      "fullHash": "8ce38204e43a2031b5d3031ad39e1bb2deadacd9",
-      "date": "2026-09-19",
+      "hash": "89ac3fe",
+      "fullHash": "89ac3feaf8d7ca86e6bd798afd37813a56297d63",
+      "date": "2026-09-18",
       "author": "Claude",
-      "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
-      "historyReset": true,
+      "subject": "Garage: track per-listing eBay return policy, flag the return-policy bug's exact shape again",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
+    {
+      "hash": "fb89c3e",
+      "fullHash": "fb89c3e11e2ca68ef4e67b6eb223a66fcd76d75f",
+      "date": "2026-09-18",
+      "author": "Claude",
+      "subject": "Garage: fix eBay fee math undercharging the shoes category rate",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
+    {
+      "hash": "87205e2",
+      "fullHash": "87205e2c4c4587ad300fd4c462141cdc99e95d7e",
+      "date": "2026-09-17",
+      "author": "Claude",
+      "subject": "Garage: add a returns/disputes log, tied to the real per-platform response clocks",
+      "historyReset": false,
+      "files": [
+        "disputes.json"
+      ]
+    },
+    {
+      "hash": "cf87f2c",
+      "fullHash": "cf87f2c941a79496ef454e3b993315be97c3bb63",
+      "date": "2026-09-15",
+      "author": "Claude",
+      "subject": "Garage: add physical storage location field to listings",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
+    {
+      "hash": "18b1cfa",
+      "fullHash": "18b1cfa5a233ea12a5adc9e10af2c5793c594ac2",
+      "date": "2026-09-14",
+      "author": "Claude",
+      "subject": "Garage: add a real business expense log for Schedule C record-keeping",
+      "historyReset": false,
+      "files": [
+        "expenses.json"
+      ]
+    },
+    {
+      "hash": "4ffef23",
+      "fullHash": "4ffef23dbd34d8c7166955370e64ec192021b252",
+      "date": "2026-09-14",
+      "author": "Claude",
+      "subject": "Add real per-platform listing URL links to Garage",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
+    {
+      "hash": "c6093e9",
+      "fullHash": "c6093e9106b41aaefdb097e1501c0b1f67b30a01",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Add real cost basis / profit tracking to Garage",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
+    {
+      "hash": "43cd02a",
+      "fullHash": "43cd02a29c24e2d34578f50efb6235244bf6763f",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Add a real sales log to Garage, separate from the soldOn delist flag",
+      "historyReset": false,
+      "files": [
+        "sales.json"
+      ]
+    },
+    {
+      "hash": "f079570",
+      "fullHash": "f079570cc3c57405c19a91724536e269bbb6dcd6",
+      "date": "2026-09-12",
+      "author": "Claude",
+      "subject": "Add per-platform sold-elsewhere tracking to catch overselling risk",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
+    {
+      "hash": "ebe44d4",
+      "fullHash": "ebe44d4eec7944d4042c64c458398e0c385e3b5c",
+      "date": "2026-09-12",
+      "author": "Claude",
+      "subject": "Add The Garage reselling hub, real UI and data model",
+      "historyReset": false,
       "files": [
         "activity.json",
-        "disputes.json",
-        "expenses.json",
         "listings.json",
-        "pipeline.json",
-        "sales.json"
+        "pipeline.json"
       ]
     }
   ]
