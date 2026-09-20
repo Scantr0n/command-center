@@ -599,6 +599,45 @@ header.page-head .sub {
   border-color: rgba(224,80,80,0.5);
 }
 
+/* Both strips above are built as real <button> elements, not plain <span>s
+   with a title attribute: a native title tooltip has no keyboard or touch
+   equivalent at all, so every one of these per-check/per-day readings was
+   unreachable without a mouse. Reset to look identical to the old span, the
+   button semantics plus focus-visible ring are the only real change. */
+.history-tick, .daily-uptime-bar {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.history-tick:focus-visible, .daily-uptime-bar:focus-visible {
+  outline: 1.5px solid var(--hairlineHover);
+  outline-offset: 2px;
+}
+
+/* Tap/keyboard fallback tooltip for the tick/bar buttons above, same
+   dismissible/hoverable/persistent pattern as the main dashboard's
+   #graphTooltip (WCAG 1.4.13). */
+#tickTooltip {
+  position: fixed;
+  z-index: 60;
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--hairlineHover);
+  background: var(--panel);
+  color: var(--ink);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  pointer-events: none;
+}
+#tickTooltip[hidden] { display: none; }
+
 /* Recent incidents: a readable list built from the same connection.history
    entries as the tick strip above, grouped into start/end/duration windows
    (see computeIncidents in app.js). The tick strip answers "what's the
