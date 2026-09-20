@@ -41,22 +41,71 @@ function readLocalClusters() {
   return { clusters, brokenFiles };
 }
 
+// Real measured cost of the old version: every single /api/clusters call
+// (including the client's own 30s poll, so up to twice a minute for as long
+// as a dashboard tab stays open) re-ran listSnapshots() plus a
+// files.list+files.get pair per matching cluster, every one a real Google
+// API round-trip. Profiled this page's own real network timing tonight:
+// /api/clusters took ~110ms against ~6-7ms for every static asset, by far
+// the single biggest contributor to load time. Worse, with Drive currently
+// failing auth (confirmed in this server's own logs: "invalid_grant" on
+// every request), that was a real failed round-trip being retried on every
+// single request, forever, not just an unnecessary success case. Caching
+// the Drive-derived data with a short TTL throttles that to at most once
+// per window regardless of how often the client polls, while still keeping
+// cross-machine sync reasonably fresh; a real auth failure gets retried at
+// the same throttled cadence instead of hammering it every request.
+let driveCache = null; // { driveNames: Set<string>, snapshots: Map<string, object> }, only set on a real success
+let driveCacheError = null; // the most recent failure, if the last attempt failed
+let driveLastAttemptAt = 0; // tracked separately from success/failure so BOTH get throttled the same way
+const DRIVE_CACHE_TTL_MS = 60 * 1000;
+
+async function getDriveCache() {
+  const now = Date.now();
+  if (now - driveLastAttemptAt < DRIVE_CACHE_TTL_MS) {
+    // Re-throwing a cached failure (rather than only caching successes) is
+    // the real fix: an auth error like invalid_grant fails before any real
+    // data is fetched, so caching success alone would still retry the
+    // doomed call on every single request, exactly the behavior this exists
+    // to throttle.
+    if (driveCacheError) throw driveCacheError;
+    if (driveCache) return driveCache;
+  }
+  driveLastAttemptAt = now;
+  try {
+    const driveFiles = await listSnapshots();
+    const driveNames = new Set(driveFiles.map(f => f.name.replace(/\.json$/, '')));
+    const snapshots = new Map();
+    await Promise.all([...driveNames].map(async id => {
+      try {
+        const snap = await readSnapshot(id);
+        if (snap) snapshots.set(id, snap);
+      } catch {
+        // One cluster's snapshot failing to read shouldn't drop every other
+        // real Drive-synced cluster back to local-only for this whole cycle.
+      }
+    }));
+    driveCache = { driveNames, snapshots };
+    driveCacheError = null;
+    return driveCache;
+  } catch (err) {
+    driveCache = null;
+    driveCacheError = err;
+    throw err;
+  }
+}
+
 // Merges in live Drive snapshots where they exist, falls back to local-only
 // silently if Drive is unreachable (auth not set up yet, network down, etc.)
 async function readClusters() {
   const { clusters: localClusters, brokenFiles } = readLocalClusters();
   try {
-    const driveFiles = await listSnapshots();
-    const driveNames = new Set(driveFiles.map(f => f.name.replace(/\.json$/, '')));
-    const merged = await Promise.all(localClusters.map(async c => {
+    const { driveNames, snapshots } = await getDriveCache();
+    const merged = localClusters.map(c => {
       if (!driveNames.has(c.id)) return c;
-      try {
-        const snapshot = await readSnapshot(c.id);
-        return snapshot ? { ...c, ...snapshot, fromDrive: true } : c;
-      } catch {
-        return c;
-      }
-    }));
+      const snapshot = snapshots.get(c.id);
+      return snapshot ? { ...c, ...snapshot, fromDrive: true } : c;
+    });
     return { clusters: merged, brokenFiles };
   } catch (err) {
     console.log('Drive unavailable, using local snapshots only:', err.message);
