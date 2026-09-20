@@ -1291,6 +1291,18 @@ footer.page-foot {
    Interactive-only controls (search, chips, links, the schema editor
    help, the modal) are dropped since they do nothing on paper. */
 @media print {
+  /* Real bug already found and fixed on Command Center's main dashboard,
+     CGT, and Alpha tonight, same root cause here: this block resets body's
+     own color but never redefines --ink/--sub/--dim themselves, so any
+     element setting color: var(--ink/--sub/--dim) directly (confirmed real
+     case: .section-title on every section heading, table header cells
+     using --ink) keeps its dark-mode value, under WCAG AA on white, in the
+     --ink case actually near-invisible (light gray text on white). */
+  :root {
+    --void: #ffffff; --panel: #ffffff; --panelLight: #ffffff;
+    --hairline: #cccccc; --hairlineHover: #999999;
+    --ink: #111111; --sub: #444444; --dim: #666666;
+  }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
