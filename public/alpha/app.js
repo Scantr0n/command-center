@@ -1252,17 +1252,32 @@ function renderPositions(data) {
 // trust signal: when this description was last actually checked against
 // Alpha's real code, shown the same way every other timestamp on this
 // page is (relative text, exact time on hover).
+// A trust signal that never calls itself out as aging defeats its own
+// purpose: the whole reason lastVerifiedAt exists is so a reader isn't
+// silently trusting a description that quietly drifted out of date months
+// ago (see the comment above). 90 days is a quarter, a reasonable cadence
+// for rechecking hand-maintained facts about code that isn't otherwise
+// changing every day; past that, the same "Live/Stale" freshness-indicator
+// convention this page already uses everywhere else (see freshnessClass
+// above) applies here too, just on a much longer timescale.
+const ARCH_VERIFIED_STALE_DAYS = 90;
+
 function renderArchitectureVerifiedMeta(data) {
   const meta = document.getElementById('archVerifiedMeta');
   if (!meta) return;
   const verifiedAt = data.system && data.system.lastVerifiedAt;
+  meta.classList.remove('warn');
   if (!verifiedAt) {
     meta.textContent = '';
     meta.title = '';
     return;
   }
-  meta.textContent = 'Verified ' + (timeAgo(verifiedAt) || 'earlier');
-  meta.title = 'Description last confirmed against Alpha\'s real code at ' + formatAbsolute(verifiedAt);
+  const days = (Date.now() - new Date(verifiedAt).getTime()) / 86400000;
+  const isStale = Number.isFinite(days) && days > ARCH_VERIFIED_STALE_DAYS;
+  meta.textContent = 'Verified ' + (timeAgo(verifiedAt) || 'earlier') + (isStale ? ', due for a recheck' : '');
+  if (isStale) meta.classList.add('warn');
+  meta.title = 'Description last confirmed against Alpha\'s real code at ' + formatAbsolute(verifiedAt) +
+    (isStale ? `. That's over ${ARCH_VERIFIED_STALE_DAYS} days ago, past due for rechecking against Alpha's actual code.` : '');
 }
 
 function renderArchitecture(data) {

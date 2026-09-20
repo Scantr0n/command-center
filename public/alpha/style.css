@@ -377,6 +377,10 @@ header.page-head .sub {
   color: var(--dim);
   margin-left: 8px;
 }
+/* Same amber used everywhere else on this page for "stale, not wrong" (see
+   .conn-dot.stale), applied to the Architecture section's hand-maintained
+   lastVerifiedAt trust signal once it's gone past due for a recheck. */
+.section-title-meta.warn { color: #E0A030; }
 
 /* Same "h2 + Export CSV" toolbar row as the other hubs' own .section-toolbar,
    for a section whose h2 needs an action button inline instead of standing
@@ -1309,6 +1313,11 @@ footer.page-foot {
      each sets its own explicit color, which wins over an inherited value
      regardless of the parent's !important. Neither was covered here before. */
   .pl-good, .pl-bad { color: #111 !important; }
+  /* .section-title-meta.warn sets its own explicit hex (see the definition
+     above), same bypass-the-:root-reset bug already fixed elsewhere in this
+     block, so it needs the same explicit print-safe override rather than
+     relying on the --dim reset above it. */
+  .section-title-meta.warn { color: #111 !important; }
   .stat-tile-value.awaiting, .ps-mode-value.awaiting, .meter-value.awaiting,
   .conn-history-source, .regime-history-source, .lastknown-tag,
   .changelog-hash, .changelog-date, .changelog-author, .changelog-generated-note {
