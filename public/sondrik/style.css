@@ -1256,6 +1256,17 @@ footer.page-foot {
    Interactive-only controls (print button, back link, schema help) are
    dropped since they do nothing on paper. */
 @media print {
+  /* Real bug already found and fixed on 4 other hubs tonight, same root
+     cause here: this block resets body's own color but never redefines
+     --ink/--sub/--dim themselves, so any element setting color: var(--sub)
+     or var(--dim) directly (confirmed real case: .sub, the header subtitle;
+     bare <code> elements throughout the schema-help text) keeps its
+     dark-mode value, under WCAG AA on white. */
+  :root {
+    --void: #ffffff; --panel: #ffffff; --panelLight: #ffffff;
+    --hairline: #cccccc; --hairlineHover: #999999;
+    --ink: #111111; --sub: #444444; --dim: #666666;
+  }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
