@@ -1179,6 +1179,27 @@
           href: '#tractionSection'
         });
       }
+
+      // Same real data-quality gap validate.js already warns on (a
+      // cumulative GitHub release download count that reads lower than the
+      // check before it almost always means a transposed digit or the wrong
+      // number pasted in, not a real drop), but that check previously only
+      // ever ran from the command line. This is the exact number the
+      // snapshot strip and Traction section currently show as fact, so a
+      // regression here is urgent rather than a background nit, same
+      // reasoning as the changelog-drift item above.
+      const regressions = checks.filter((c, idx) => idx > 0 && c.count < checks[idx - 1].count);
+      if (regressions.length > 0) {
+        steps.push({
+          urgent: true,
+          text: (regressions.length === 1
+            ? 'The ' + fmtDate(regressions[0].date) + ' check (' + regressions[0].count + ')'
+            : regressions.length + ' checks') +
+            ' logged a lower ' + (metric.label || 'download') + ' count than the check before it, a real ' +
+            'cumulative count should not go down, check for a typo.',
+          href: '#tractionSection'
+        });
+      }
     }
 
     const channels = (channelsData && channelsData.channels) || [];
