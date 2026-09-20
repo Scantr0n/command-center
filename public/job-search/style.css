@@ -489,6 +489,16 @@ footer.page-foot code { overflow-wrap: anywhere; }
 
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
+  /* Real bug already found and fixed on 5 other hubs tonight, same root
+     cause here: this block resets body's own color but never redefines
+     --ink/--sub/--dim/--accent themselves. Confirmed real cases: .sub (the
+     header subtitle), .num-col (--dim), .dealbreaker-num (--accent), and a
+     bare <strong> using --ink directly (near-invisible, 1.08:1). */
+  :root {
+    --void: #ffffff; --panel: #ffffff; --panelLight: #ffffff;
+    --hairline: #cccccc; --hairlineHover: #999999;
+    --ink: #111111; --sub: #444444; --dim: #666666; --accent: #2E6A96;
+  }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
   .print-btn, .back-link, .schema-help, .modal-overlay, .offline-banner {
@@ -496,6 +506,12 @@ footer.page-foot code { overflow-wrap: anywhere; }
   }
   .callout { border-color: #bbb; background: none; color: #333; }
   .callout strong { color: #111; }
+  /* .callout-warning strong (the "automation currently paused" notice, a
+     real amber #E0A030 added tonight) has the same specificity as the rule
+     above and, measured directly, kept winning over it despite appearing
+     earlier in source order — same real ambiguity hit on CGT's card-table
+     header fix tonight, forced the same way rather than left unresolved. */
+  .callout-warning strong { color: #111 !important; }
   .snapshot-chip, .lead-card, .criteria-item, .dealbreaker-item, .sub-list-item, .data-table-wrap {
     background: none;
     border: 1px solid #ccc;
