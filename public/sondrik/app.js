@@ -773,12 +773,19 @@
         const totalDays = daysBetween(g.setDate, g.targetDate);
         const elapsedDays = daysBetween(g.setDate, todayIso());
         if (totalDays > 0 && elapsedDays > 0) {
-          const expectedPct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
+          // Once the target date itself has passed, elapsedDays can run past
+          // totalDays (e.g. a goal set 50 days ago against a 31-day window),
+          // which used to print a self-contradictory "50 of 31 days elapsed"
+          // in the tooltip even though expectedPct below was already clamped
+          // to 100%. Clamping the displayed elapsed figure the same way keeps
+          // the two numbers in the tooltip consistent with each other.
+          const clampedElapsedDays = Math.min(elapsedDays, totalDays);
+          const expectedPct = Math.round((clampedElapsedDays / totalDays) * 100);
           const diff = pct - expectedPct;
           const tier = diff <= -10 ? 'behind' : diff >= 10 ? 'ahead' : 'on';
           const label = tier === 'behind' ? 'BEHIND PACE' : tier === 'ahead' ? 'AHEAD OF PACE' : 'ON PACE';
           paceStatusHtml = '<div class="goal-pace-status goal-pace-status-' + tier + ' font-mono" ' +
-            'title="Based on ' + elapsedDays + ' of ' + totalDays + ' days elapsed, expected roughly ' + expectedPct + '% by now">' +
+            'title="Based on ' + clampedElapsedDays + ' of ' + totalDays + ' days elapsed, expected roughly ' + expectedPct + '% by now">' +
             label + ' (EXPECTED ~' + expectedPct + '%)</div>';
         }
       }

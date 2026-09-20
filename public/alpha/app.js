@@ -871,6 +871,103 @@ function renderIncidents(data, clientHistory) {
   list.innerHTML = recent.map(incidentItem).join('');
 }
 
+// Statuspage/UptimeRobot-style daily uptime bars: the tick strip above
+// answers "what happened in the last HISTORY_TICK_LIMIT checks" (a window of
+// minutes at this page's 30s poll cadence), a different question from "how
+// has this actually held up over the long run", which real status pages
+// answer with one bar per calendar day, colored by that day's real uptime
+// percentage (confirmed by reviewing Statuspage's own 90-day uptime
+// showcase and UptimeRobot's public status pages, both of which pair a
+// per-day bar row with a windowed percentage and date range the same way
+// this does). Built only from the same real connection.history entries the
+// tick strip and incident list already use, bucketed by this browser's
+// local calendar day since that's the day Jack himself experienced it; a
+// day with zero recorded checks is simply absent rather than shown as 0%,
+// since "no check ever ran" is a different, unknown state from "a check ran
+// and failed".
+const DAILY_UPTIME_DAY_LIMIT = 90;
+
+function dayKeyLocal(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function computeDailyUptimeBuckets(history) {
+  if (!Array.isArray(history) || !history.length) return [];
+  const byDay = new Map();
+  for (const entry of history) {
+    if (!entry || !entry.at) continue;
+    const key = dayKeyLocal(entry.at);
+    if (!key) continue;
+    const bucket = byDay.get(key) || { dateKey: key, total: 0, up: 0 };
+    bucket.total += 1;
+    if (entry.connected) bucket.up += 1;
+    byDay.set(key, bucket);
+  }
+  const days = [...byDay.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  return days.slice(-DAILY_UPTIME_DAY_LIMIT).map(d => ({ ...d, pct: (d.up / d.total) * 100 }));
+}
+
+// 'full' (every check that day connected), 'degraded' (some but not all),
+// 'down' (every check that day failed): the same three-tier read real
+// status pages give a day, and the same "pattern as well as color" guard the
+// per-check tick strip above already follows (see its own comment), so this
+// isn't distinguishable by hue alone either.
+function dailyUptimeClass(pct) {
+  if (pct >= 99.9) return 'full';
+  if (pct > 0) return 'degraded';
+  return 'down';
+}
+
+function dailyUptimeBarItem(bucket) {
+  const label = new Date(bucket.dateKey + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const pctText = Number.isInteger(bucket.pct) ? String(bucket.pct) : bucket.pct.toFixed(1);
+  const title = `${label}: ${pctText}% up (${bucket.up}/${bucket.total} check${bucket.total === 1 ? '' : 's'})`;
+  return `<span class="daily-uptime-bar ${dailyUptimeClass(bucket.pct)}" title="${escapeHtml(title)}"></span>`;
+}
+
+function renderDailyUptime(data, clientHistory) {
+  const strip = document.getElementById('dailyUptimeStrip');
+  if (!strip) return;
+  const summary = document.getElementById('dailyUptimeSummary');
+  const range = document.getElementById('dailyUptimeRange');
+  const source = document.getElementById('dailyUptimeSource');
+  const serverHistory = (data.connection && Array.isArray(data.connection.history)) ? data.connection.history : [];
+  const history = effectiveConnHistory(data, clientHistory);
+  if (source) source.textContent = (!serverHistory.length && history.length) ? '(recorded by this browser only)' : '';
+
+  const buckets = computeDailyUptimeBuckets(history);
+  if (!buckets.length) {
+    strip.innerHTML = `<span class="conn-history-empty">No connectivity checks recorded yet.</span>`;
+    if (summary) summary.textContent = '';
+    if (range) range.textContent = '';
+    return;
+  }
+
+  strip.innerHTML = buckets.map(dailyUptimeBarItem).join('');
+
+  // Overall percentage across the covered days: real per-day up/total counts
+  // summed first and divided once, never averaged day-to-day, same
+  // all-or-nothing-on-real-numbers rule computeExposure/renderPositions'
+  // totals row already follow, so a day with far fewer checks doesn't carry
+  // the same weight as one with far more.
+  const totalUp = buckets.reduce((s, b) => s + b.up, 0);
+  const totalChecks = buckets.reduce((s, b) => s + b.total, 0);
+  const overallPct = (totalUp / totalChecks) * 100;
+  const overallText = Number.isInteger(overallPct) ? String(overallPct) : overallPct.toFixed(1);
+  if (summary) summary.textContent = `· ${overallText}% up (last ${buckets.length} day${buckets.length === 1 ? '' : 's'} with data)`;
+  if (range) {
+    const fmtDay = k => new Date(k + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    range.textContent = buckets.length > 1
+      ? `Covers ${fmtDay(buckets[0].dateKey)} to ${fmtDay(buckets[buckets.length - 1].dateKey)}`
+      : `Single day of data, ${fmtDay(buckets[0].dateKey)}`;
+  }
+}
+
 function statTile(value, label, sub, awaiting) {
   return `
     <div class="stat-tile">
@@ -1840,6 +1937,7 @@ async function loadStatus() {
     updateLastKnownTags(lastKnown);
     const connCls = renderConnection(data, clientConnHistory, clientLatencyHistory);
     renderConnectionHistory(data, clientConnHistory);
+    renderDailyUptime(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
     renderRegimeHistory(clientRegimeHistory);
     // Kill switch engaged outranks plain connection freshness for the one
@@ -1894,6 +1992,7 @@ window.addEventListener('storage', (e) => {
   const robustnessHistory = loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY);
   renderConnection(lastRawData, connHistory, latencyHistory);
   renderConnectionHistory(lastRawData, connHistory);
+  renderDailyUptime(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
   renderRegimeHistory(regimeHistory);
   // Keeps the drawdown/robustness sparklines in agreement across open tabs
