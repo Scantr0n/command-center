@@ -354,14 +354,28 @@
     .tag-chip { background: none !important; color: #111 !important; border: 1px solid #999 !important; }
     .status-dot, .activity-row > span.rounded-full { display: none !important; }
     #statsRow, #statsRow * { color: #111 !important; }
-    /* Same fix as the toggle ON indicator (3DDC84) below, extended to the two
-       other inline status colors renderGrid prints on a card: the stale-date
-       amber (E0A030) and the failed-reliability red-orange (E0725A). Both
-       wash out badly against this stylesheet's white background, same as the
-       green did before this rule existed. */
-    .cluster-card span[style*="3DDC84"], .cluster-card span[style*="E0A030"], .cluster-card span[style*="E0725A"] {
-      color: #111 !important;
-    }
+    /* Every one of the 9 category colors and 5 status colors was checked for
+       real WCAG contrast against this stylesheet's white background: every
+       single one fails 4.5:1, several fail even the 3:1 large-text minimum
+       (e.g. #3DDC84 measures 1.78:1 on white). The category label renderGrid
+       prints at the top of each card (added by the Sept 19 redesign) uses
+       exactly these colors as small 10px text with no class of its own to
+       hook, and was never covered by the old fix here, which only patched
+       three specific hex values by hand as they were noticed. That approach
+       already proved fragile (this is the second real gap found in it
+       tonight), so this forces every real text color inside a card to a
+       print-safe near-black instead of hand-maintaining a color allowlist
+       that silently rots as new colored elements get added. Background
+       swatches (the small category/status dots) are untouched on purpose,
+       small solid color blocks don't have the same text-contrast problem
+       and stay useful for at-a-glance scanning on the printed page. */
+    .cluster-card, .cluster-card * { color: #111 !important; }
+    /* The reliability bar's track is a barely-visible 8%-white overlay on
+       the dark UI background, meant to recede behind its colored fill; on
+       white paper that same rgba(255,255,255,0.08) is functionally
+       invisible, leaving only a stray colored sliver with no visible track
+       to show it as a proportion of. */
+    .cluster-card [style*="rgba(255,255,255,0.08)"] { background: #ddd !important; }
   }
 </style>
 </head>
