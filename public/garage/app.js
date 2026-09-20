@@ -2804,6 +2804,26 @@ function wireListingEditForm(l) {
         'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing.');
     }
 
+    // Same double-sale gap buildAtRiskListings/"Needs delisting elsewhere" is
+    // meant to catch, but that safeguard only scans status === 'live'
+    // listings, so a listing moving straight to sold (via this form or a
+    // Kanban drop, which reuses this same generate handler) drops out of it
+    // the instant status flips, even if it's still genuinely live elsewhere
+    // with nothing in soldOn for those platforms. Advisory, not a blocker:
+    // a real single-item sale where soldOn/platforms just haven't been
+    // trimmed yet is a legitimate case this shouldn't trap.
+    if (status === 'sold' && platforms.length > 1) {
+      const stillUncovered = platforms.filter(p => !(l.soldOn || []).includes(p));
+      if (stillUncovered.length > 0) {
+        advisory.push('Marking this Sold, but it\'s still checked on ' +
+          stillUncovered.map(p => PLATFORM_LABELS[p]).join(', ') + ' with no soldOn entry logged for ' +
+          (stillUncovered.length > 1 ? 'those platforms' : 'that platform') + '. Once status is Sold this drops out of ' +
+          'the "Needs delisting elsewhere" safeguard, so mark it sold-on or delist it on ' +
+          (stillUncovered.length > 1 ? 'those platforms' : 'that platform') + ' first, or this isn\'t really a clean ' +
+          'single-item sold record yet.');
+      }
+    }
+
     if (blockers.length) {
       warningsEl.innerHTML = blockers.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
       outputEl.textContent = '';
