@@ -6,6 +6,26 @@ const fs = require('fs');
 const { execFileSync } = require('child_process');
 
 const app = express();
+// This binds to all interfaces (no host passed to app.listen below), so it's
+// reachable from any device on Jack's LAN, not just this Mac, meaning these
+// headers matter beyond a purely local threat model. `X-Powered-By: Express`
+// gave away the framework to anything on the network for free; the other
+// three are the standard low-risk OWASP baseline (nosniff blocks a browser
+// from re-interpreting a response's declared content-type, DENY blocks this
+// dashboard from being framed by another site for clickjacking, and the
+// referrer policy keeps full URLs, which can carry a cluster id or query
+// string, from leaking to an external site's server logs on outbound links).
+// No Content-Security-Policy here: every hub inlines scripts and pulls
+// Google Fonts plus the D3 CDN, so a real CSP needs to be worked out against
+// every page's actual sources rather than guessed at and risking a silent
+// breakage across all 7 hubs.
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 // Every hub's app.js/style.css is hand-written, uncompressed text (up to
 // ~175KB for the largest ones) and /api/clusters is JSON, both of which gzip
 // down hard. Applied before express.static/json so it covers the static
