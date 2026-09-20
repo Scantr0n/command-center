@@ -361,7 +361,7 @@ async function loadData() {
     listings = listingsData.listings || [];
     renderStats(listings, stages, sales, expenses, supplies, acquisitions);
     renderDelistList(listings);
-    renderDataQuality(listings);
+    renderDataQuality(listings, acquisitions);
     renderDuplicates(listings);
     applyFiltersAndRender();
     renderCoverage(listings);
@@ -885,13 +885,34 @@ function renderDelistList(listings) {
 // activity.json), so a future relist can't repeat it unnoticed. Same "Needs
 // backfill" pattern as the CSM/CGT hubs' own data-quality panels, hidden
 // entirely when nothing is flagged rather than showing an empty box.
-function buildDataQualityFlags(listings) {
+// Only ever a same-source suggestion, the first acquisition that both links
+// this listing id and has enough logged to compute a real per-item cost
+// (pricePaid and itemCount together, see acquisitionPerItemCost), never a
+// guess made up from nothing. A listing fed by more than one acquisition
+// (e.g. re-sourced after damage) just surfaces whichever comes first, the
+// real "which acquisition" call is left to a human copying the number in.
+function suggestedCostBasisFromAcquisitions(listingId, acquisitions) {
+  for (const a of (acquisitions || [])) {
+    if ((a.listingIds || []).includes(listingId)) {
+      const cost = acquisitionPerItemCost(a);
+      if (cost != null) return cost;
+    }
+  }
+  return null;
+}
+
+function buildDataQualityFlags(listings, acquisitions) {
   return listings
     .filter(l => l.status === 'live')
     .map(l => {
       const reasons = [];
       if (!l.datePublished) reasons.push('NO DATE PUBLISHED LOGGED (BLOCKS RELIST GUIDANCE)');
-      if (l.costBasis == null) reasons.push('NO COST BASIS LOGGED (BLOCKS PROFIT CALC)');
+      if (l.costBasis == null) {
+        const suggested = suggestedCostBasisFromAcquisitions(l.id, acquisitions);
+        reasons.push(suggested != null
+          ? 'NO COST BASIS LOGGED, BUT ' + formatUsd(suggested) + ' IS AVAILABLE FROM A LOGGED ACQUISITION, COPY IT IN'
+          : 'NO COST BASIS LOGGED (BLOCKS PROFIT CALC)');
+      }
       if (!l.location) reasons.push('NO STORAGE LOCATION LOGGED (SLOWS FULFILLMENT ON SALE)');
       if ((l.platforms || []).includes('ebay')) {
         if (!l.ebayReturnPolicy) {
@@ -917,10 +938,10 @@ function buildDataQualityFlags(listings) {
     .filter(x => x.reasons.length > 0);
 }
 
-function renderDataQuality(listings) {
+function renderDataQuality(listings, acquisitions) {
   const section = document.getElementById('dataQualitySection');
   const list = document.getElementById('dataQualityList');
-  const flagged = buildDataQualityFlags(listings);
+  const flagged = buildDataQualityFlags(listings, acquisitions);
 
   if (!flagged.length) {
     section.hidden = true;
