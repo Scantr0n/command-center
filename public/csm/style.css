@@ -1326,6 +1326,16 @@ footer.page-foot {
   }
   .callout strong { color: #111; }
 
+  /* .offline-banner is worth keeping on paper (unlike .attention-bar, hidden
+     above): if the page was printed while genuinely offline, that is real
+     context about how stale the printed data might be. But its two colors
+     (#E8C088, #F2D9B0) were tuned for the dark theme and are both far too
+     light for white paper, confirmed via a real print render: 1.70:1 and
+     1.30:1 against white, both effectively invisible rather than just under
+     WCAG AA. */
+  .offline-banner { color: #6B4A00; }
+  .offline-banner strong { color: #4A3300; }
+
   .board-toolbar { margin-bottom: 10px; }
   .stats-bar, .stats-bar strong { color: #333; }
 
@@ -1365,6 +1375,18 @@ footer.page-foot {
   .nudge-action { color: #444; }
   .nudge-action-missing { color: #111; }
   .nudge-touch-count { color: #666; }
+  /* The plain .nudge-when rule two lines up never actually covers an
+     overdue/today row: .nudge-overdue .nudge-when and .nudge-today
+     .nudge-when (style.css, outside this block) are two classes deep, more
+     specific than a single-class selector, so they win regardless of this
+     block's cascade order. Confirmed via a real print render: overdue/today
+     nudges printed in the dark-theme #E5484D/#E0A030, 3.94:1 and 2.19:1
+     against white, both under WCAG AA. Same dark-red substitute reused
+     below for .snapshot-tag-stale, which leaked the same #E5484D for the
+     same reason (a plain-text span with no lower-specificity print rule to
+     lose to at all). */
+  .nudge-overdue .nudge-when { color: #8B1F1F; }
+  .nudge-today .nudge-when { color: #654600; }
 
   .data-quality-list { background: none; border-color: #bbb; }
   .data-quality-row { border-color: #ddd; }
@@ -1402,6 +1424,21 @@ footer.page-foot {
   .channel-eff-count { color: #444; }
   .channel-eff-rate { color: #666; }
   .channel-eff-track { background: #eee; border: 1px solid #ccc; }
+  /* Social reach by platform reuses .channel-eff-rate for its "due for
+     refresh" text, but that inner span sets its own color directly
+     (.snapshot-tag-stale, style.css), which always wins over the parent's
+     inherited color no matter how the parent is themed. Same dark-red
+     substitute as the nudge queue fix above, same real bug: #E5484D print
+     text on white, 3.94:1, under WCAG AA. */
+  .snapshot-tag-stale { color: #8B1F1F; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
+  /* Same leak, same reuse of the changelog's #654600 amber substitute:
+     .data-freshness-stale sets color directly on the footer's own child
+     span, so footer.page-foot's color above never reaches it, it's an
+     inherited-vs-direct conflict, not a specificity one. Not stale on the
+     data as of this fix, but the underlying "hand-edited X days ago" text
+     ages every day this page isn't touched, so it silently would have been
+     as soon as it crossed the real 14-day threshold. */
+  .data-freshness-stale { color: #654600; }
 }
