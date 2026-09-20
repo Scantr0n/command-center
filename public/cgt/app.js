@@ -1267,8 +1267,8 @@ function anyCandidateFilterActive() {
     || activeCandidateStatus !== 'all';
 }
 
-function candidateFacetCount(dimension, value) {
-  return buildRankedCandidates().filter(({ c, math }) => {
+function candidateFacetCount(dimension, value, ranked) {
+  return ranked.filter(({ c, math }) => {
     const verdictKey = math ? math.verdict : 'needs-data';
     if (!matchesCandidateSearchTerm(c, candidateSearchTerm)) return false;
     if (dimension !== 'sport' && !matchesCandidateSportValue(c, activeCandidateSport)) return false;
@@ -1287,7 +1287,14 @@ const CANDIDATE_FACET_DIMENSIONS = [
   ['candidateStatusFilter', 'data-cand-status', 'status']
 ];
 
-function updateCandidateChipCounts() {
+// Takes the already-built ranked list rather than rebuilding it per chip:
+// buildRankedCandidates() maps every candidate through computeGradingMath()
+// and sorts the result, so calling it once here and reusing it across all
+// 12 real filter chips (4 sport + 5 verdict + 3 status) avoids redoing that
+// same map+sort 12 extra times on every single render (a keystroke in the
+// search box, a chip click, a candidate edit save), against the real 86-row
+// candidates.json this runs on.
+function updateCandidateChipCounts(ranked) {
   CANDIDATE_FACET_DIMENSIONS.forEach(([containerId, dataAttr, dimension]) => {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -1295,7 +1302,7 @@ function updateCandidateChipCounts() {
       const countEl = chip.querySelector('.chip-count');
       if (!countEl) return;
       const value = chip.getAttribute(dataAttr);
-      const count = candidateFacetCount(dimension, value);
+      const count = candidateFacetCount(dimension, value, ranked);
       countEl.textContent = ' ' + count;
       chip.classList.toggle('chip-zero', count === 0 && chip.getAttribute('aria-pressed') !== 'true');
     });
@@ -1306,7 +1313,7 @@ function renderCandidates() {
   syncUrl();
   const el = document.getElementById('candidatesFeed');
   const ranked = buildRankedCandidates();
-  updateCandidateChipCounts();
+  updateCandidateChipCounts(ranked);
   document.getElementById('candidatesClearFiltersBtn').hidden = !anyCandidateFilterActive();
 
   // rawCandidatesData is only ever null when loadCandidates' own fetch/parse
