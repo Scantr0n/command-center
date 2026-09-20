@@ -1351,6 +1351,7 @@ textarea.np-input { resize: vertical; }
   body.insurance-print-mode header.page-head,
   body.insurance-print-mode main > section,
   body.insurance-print-mode .callout,
+  body.insurance-print-mode .attention-bar,
   body.insurance-print-mode footer.page-foot {
     display: none !important;
   }
