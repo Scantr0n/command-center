@@ -107,6 +107,13 @@ function main() {
 // head; git itself is the source of truth here, same as changelog.js.
 function checkChangelogFreshness() {
   try {
+    // A shallow clone's `git log` for these files only ever sees the commits
+    // fetched, which is not the same thing as "these files have no earlier
+    // history": comparing that truncated list against a changelog.json
+    // generated from a real full clone reports a "drift" that isn't real
+    // (this bit CGT and Sondrik for real on 2026-09-19). Skipped the same as
+    // "not a git checkout" below, an environment gap, not a data error.
+    if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: DATA_DIR, encoding: 'utf8' }).trim() === 'true') return;
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
       'cards.json', 'submissions.json', 'candidates.json'
