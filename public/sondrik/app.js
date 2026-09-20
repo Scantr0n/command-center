@@ -274,10 +274,21 @@
     const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     if (checks.length > 0) {
       const latest = checks[checks.length - 1];
+      let meta = latest.date ? 'as of ' + fmtDate(latest.date) : 'no date logged';
+      // A second, glance-level delta distinct from Traction's own "vs first
+      // check ever" framing (see deltaHtml in renderTraction): that one is a
+      // since-baseline figure that gets less useful for a quick read as more
+      // checks pile up, this is always the most recent real movement, so a
+      // visitor gets a sense of current momentum without scrolling down.
+      if (checks.length > 1 && latest.date) {
+        const prev = checks[checks.length - 2];
+        const delta = latest.count - prev.count;
+        meta += ' (' + (delta >= 0 ? '+' : '') + delta + ' vs ' + fmtDate(prev.date) + ')';
+      }
       chips.push({
         number: String(latest.count),
         label: metric.label || 'downloads',
-        meta: latest.date ? 'as of ' + fmtDate(latest.date) : 'no date logged'
+        meta: meta
       });
     } else {
       chips.push({ number: '0', label: metric.label || 'downloads', meta: 'no checks logged yet' });
