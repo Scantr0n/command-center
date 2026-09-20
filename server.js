@@ -616,6 +616,14 @@ app.get('/api/alpha/live', async (req, res) => {
 app.get('/api/sondrik/changelog-status', (req, res) => {
   const dataDir = path.join(__dirname, 'public', 'sondrik', 'data');
   try {
+    // A shallow clone's `git log` for these files only ever sees the commits
+    // fetched, not the real full history, which would report drift that
+    // isn't real (the same bug fixed in changelog.js and validate.js after
+    // it collapsed real changelog entries on 2026-09-19). Treated as
+    // "unavailable" below, same as no git checkout at all.
+    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() === 'true') {
+      throw new Error('shallow clone');
+    }
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
       'releases.json', 'downloads.json', 'leads.json', 'channels.json', 'goals.json'
