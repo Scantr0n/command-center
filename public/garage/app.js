@@ -3718,14 +3718,22 @@ function initPhotoAudit() {
     const runId = ++auditRunId;
     const files = Array.from(input.files || []);
     grid.querySelectorAll('.photo-audit-card img').forEach(img => URL.revokeObjectURL(img.src));
-    grid.innerHTML = '';
+    // One hidden placeholder slot per file, in file order, so each photo's
+    // card can be swapped into its own stable position as it resolves. The
+    // old version rebuilt grid.innerHTML from the full results array on
+    // every single onload/onerror, re-creating every already-rendered
+    // <img> each time, an O(n^2) cost for a real n-photo batch (the actual
+    // 48-photo Depop audit this mirrors runs ~48x48 card-renders instead of
+    // 48). A [hidden] slot is display:none by default, so it takes no space
+    // in the grid until swapped for its real card, same as the old
+    // behavior's compacted list of only-resolved-so-far cards.
+    grid.innerHTML = files.map((_, i) => `<div class="photo-audit-card-slot" id="paCard${i}" hidden></div>`).join('');
     summary.textContent = '';
     if (!files.length) return;
 
     let loaded = 0;
     let landscapeFlagged = 0;
     let smallFlagged = 0;
-    const results = new Array(files.length);
 
     files.forEach((file, i) => {
       const url = URL.createObjectURL(file);
@@ -3742,58 +3750,63 @@ function initPhotoAudit() {
         const isSmall = Math.max(img.naturalWidth, img.naturalHeight) < 500;
         if (isLandscape) landscapeFlagged++;
         if (isSmall) smallFlagged++;
-        results[i] = { file, url, w: img.naturalWidth, h: img.naturalHeight, isLandscape, isSmall, failed: false };
-        renderPhotoAuditResults(results, loaded, files.length, landscapeFlagged, smallFlagged);
+        swapPhotoAuditCard(i, { file, url, w: img.naturalWidth, h: img.naturalHeight, isLandscape, isSmall, failed: false });
+        renderPhotoAuditSummary(loaded, files.length, landscapeFlagged, smallFlagged);
       };
       img.onerror = () => {
         // Unlike the onload path above, a failed card never gets an <img>
-        // tag (renderPhotoAuditResults only shows a "couldn't read image"
-        // badge for it), so the re-selection cleanup at the top of this
-        // handler, which only revokes URLs still attached to a rendered
-        // <img>, never reaches this one. Revoked right here instead, same
-        // as resizeImageForDraft's own onerror does for the identical
-        // failure case, so a batch with an unreadable file (HEIC, a
-        // non-image dropped in by mistake) doesn't leak its blob for the
-        // rest of the page session.
+        // tag (photoAuditCardHtml only shows a "couldn't read image" badge
+        // for it), so the re-selection cleanup at the top of this handler,
+        // which only revokes URLs still attached to a rendered <img>, never
+        // reaches this one. Revoked right here instead, same as
+        // resizeImageForDraft's own onerror does for the identical failure
+        // case, so a batch with an unreadable file (HEIC, a non-image
+        // dropped in by mistake) doesn't leak its blob for the rest of the
+        // page session.
         URL.revokeObjectURL(url);
         if (runId !== auditRunId) return;
         loaded++;
-        results[i] = { file, failed: true };
-        renderPhotoAuditResults(results, loaded, files.length, landscapeFlagged, smallFlagged);
+        swapPhotoAuditCard(i, { file, failed: true });
+        renderPhotoAuditSummary(loaded, files.length, landscapeFlagged, smallFlagged);
       };
       img.src = url;
     });
   });
 }
 
-function renderPhotoAuditResults(results, loaded, total, landscapeFlagged, smallFlagged) {
-  const grid = document.getElementById('photoAuditGrid');
+function photoAuditCardHtml(r) {
+  if (r.failed) {
+    return `<div class="photo-audit-card"><div class="photo-audit-meta"><span class="photo-audit-name">${escapeHtml(r.file.name)}</span><span class="badge badge-due">couldn't read image</span></div></div>`;
+  }
+  const badges = [
+    r.isLandscape ? '<span class="badge badge-due">check orientation</span>' : '',
+    r.isSmall ? '<span class="badge badge-due">under 500px min</span>' : ''
+  ].join('');
+  return `
+    <a class="photo-audit-card${(r.isLandscape || r.isSmall) ? ' photo-audit-flagged' : ''}" href="${r.url}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(r.file.name)} full-size">
+      <img src="${r.url}" alt="${escapeHtml(r.file.name)}" loading="lazy">
+      <div class="photo-audit-meta">
+        <span class="photo-audit-name">${escapeHtml(r.file.name)}</span>
+        <span class="photo-audit-dims">${r.w}&times;${r.h}${badges}</span>
+      </div>
+    </a>
+  `;
+}
+
+// Replaces just the one resolved photo's placeholder slot in place, instead
+// of rebuilding every other already-resolved card's DOM on each callback.
+function swapPhotoAuditCard(i, r) {
+  const slot = document.getElementById('paCard' + i);
+  if (slot) slot.outerHTML = photoAuditCardHtml(r);
+}
+
+function renderPhotoAuditSummary(loaded, total, landscapeFlagged, smallFlagged) {
   const summary = document.getElementById('photoAuditSummary');
   summary.textContent = loaded < total
     ? `Checking ${loaded}/${total} photo(s)...`
     : `${total} photo(s) checked, ${landscapeFlagged} flagged for possible sideways/landscape orientation, ` +
       `${smallFlagged} under eBay's documented 500px minimum on the longest side. ` +
       `Click any photo to open it full-size for the visual review pass, an automated flag alone caught nothing in the real audit.`;
-
-  grid.innerHTML = results.map(r => {
-    if (!r) return '';
-    if (r.failed) {
-      return `<div class="photo-audit-card"><div class="photo-audit-meta"><span class="photo-audit-name">${escapeHtml(r.file.name)}</span><span class="badge badge-due">couldn't read image</span></div></div>`;
-    }
-    const badges = [
-      r.isLandscape ? '<span class="badge badge-due">check orientation</span>' : '',
-      r.isSmall ? '<span class="badge badge-due">under 500px min</span>' : ''
-    ].join('');
-    return `
-      <a class="photo-audit-card${(r.isLandscape || r.isSmall) ? ' photo-audit-flagged' : ''}" href="${r.url}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(r.file.name)} full-size">
-        <img src="${r.url}" alt="${escapeHtml(r.file.name)}" loading="lazy">
-        <div class="photo-audit-meta">
-          <span class="photo-audit-name">${escapeHtml(r.file.name)}</span>
-          <span class="photo-audit-dims">${r.w}&times;${r.h}${badges}</span>
-        </div>
-      </a>
-    `;
-  }).join('');
 }
 
 // Shared client-side draft-autosave for the four quick-log forms below: none
