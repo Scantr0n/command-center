@@ -508,6 +508,7 @@
         </div>
         <div id="reliabilityRow" class="hidden mt-3 flex items-center gap-2">
           <span class="text-xs font-mono" style="color: var(--sub)">Recent runs:</span>
+          <span id="reliabilityBar"></span>
           <span id="reliabilityText" class="text-xs font-mono" style="color: var(--faint)"></span>
         </div>
         <a id="linkRow" class="hidden mt-3 text-xs font-mono px-3 py-1.5 rounded border hairline items-center gap-1.5 w-fit" style="color: var(--ink)">
@@ -1786,6 +1787,17 @@ function openModal(id, opts = {}) {
     const text = document.getElementById('reliabilityText');
     text.textContent = `${r.recentSuccessRate || 'unknown'}${failed ? ', last run failed' : ''}${paused ? ', currently paused' : ''}${r.lastRunAt ? ` (last: ${r.lastRunAt})` : ''}`;
     text.style.color = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
+    // Same real percentage-width bar Grid's own reliability parse uses
+    // (reliabilityBarHtml), so the modal and Grid never disagree about how
+    // this same field is visualized. Bar only, no text/title duplicate here
+    // since the adjacent #reliabilityText already spells out the detail.
+    const barColor = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
+    const m = /(\d+)\s*\/\s*(\d+)/.exec(r.recentSuccessRate || '');
+    document.getElementById('reliabilityBar').innerHTML = (m && parseInt(m[2], 10)) ? `
+      <span style="width: 34px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden; vertical-align: middle;">
+        <span style="display:block; height:100%; width:${Math.round((parseInt(m[1], 10) / parseInt(m[2], 10)) * 100)}%; background:${barColor}; border-radius:2px;"></span>
+      </span>
+    ` : '';
   } else {
     reliabilityRow.classList.add('hidden');
     reliabilityRow.classList.remove('flex');
