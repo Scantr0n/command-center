@@ -3326,6 +3326,10 @@
           'as-of date. Every social number on this board must be labeled with when it was actually pulled, ' +
           'never shown as if live.');
       }
+      if (!snap.platform && (snap.followers != null || snap.engagementRate != null || snap.asOfDate)) {
+        warnings.push('Social numbers or an as-of date are logged but the platform is not. Go back and fill in ' +
+          'which platform this snapshot is for, these numbers cannot be attributed to anything without it.');
+      }
     });
     if (p.category) {
       const norm = p.category.trim().toLowerCase();
@@ -3358,6 +3362,20 @@
     const id = npUniqueId(baseId);
     const isDuplicateId = id !== baseId;
 
+    const socialPlatform = npVal('npSocialPlatform');
+    const socialFollowers = npVal('npSocialFollowers');
+    const socialEngagementRate = npVal('npSocialEngagementRate');
+    const socialAsOfDate = npVal('npSocialAsOfDate');
+    // Build the snapshot whenever ANY of the four fields has a real value, not
+    // only when platform does: platform is the only one of the four marked
+    // optional in its label, so leaving it blank is easy, and previously this
+    // silently dropped real followers/engagement/as-of-date data with no
+    // warning. validate.js's socialSnapshots checks never require platform
+    // (only snap.platform || 'a platform' / 'platform not logged' fallbacks),
+    // so a null platform is a legitimate shape here too.
+    const hasSocialSnapshot = socialPlatform || socialFollowers != null ||
+      socialEngagementRate != null || socialAsOfDate;
+
     const p = {
       id,
       name: name || 'UNNAMED, fill this in',
@@ -3372,11 +3390,11 @@
       nextAction: npVal('npNextAction'),
       nudgeSchedule: { doNotNudgeBefore: npVal('npDoNotNudgeBefore'), nudgePoint: npVal('npNudgePoint') },
       replyStatus: npVal('npReplyStatus'),
-      socialSnapshots: npVal('npSocialPlatform') ? [{
-        platform: npVal('npSocialPlatform'),
-        followers: npVal('npSocialFollowers') != null ? Number(npVal('npSocialFollowers')) : null,
-        engagementRate: npVal('npSocialEngagementRate') != null ? Number(npVal('npSocialEngagementRate')) : null,
-        asOfDate: npVal('npSocialAsOfDate')
+      socialSnapshots: hasSocialSnapshot ? [{
+        platform: socialPlatform,
+        followers: socialFollowers != null ? Number(socialFollowers) : null,
+        engagementRate: socialEngagementRate != null ? Number(socialEngagementRate) : null,
+        asOfDate: socialAsOfDate
       }] : [],
       contentIdeas: [],
       stageHistory: stageEnteredDate ? [{ date: stageEnteredDate, stage }] : [],
