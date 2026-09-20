@@ -114,6 +114,22 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  // goals.json's setDate/targetDate are hand-typed, and daysBetween below has
+  // no guard of its own: a malformed string (a non-zero-padded "2026-9-5")
+  // makes it return NaN, and every renderGoals() call site compares that
+  // against 0 with < or >, both of which are always false for NaN, so a goal
+  // with a bad date used to silently fall through to the wrong branch (e.g.
+  // "ON THE TARGET DATE" or a skipped pace block) instead of erroring. Same
+  // shape+rollover check CSM's app.js already uses for the identical reason.
+  function isValidDateStr(iso) {
+    if (typeof iso !== 'string' || !DATE_RE.test(iso)) return false;
+    const [y, m, d] = iso.split('-').map(Number);
+    const parsed = new Date(y, m - 1, d);
+    return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
+  }
+
   // An empty state that just says "add one to whatever.json" is a dead end,
   // the quick-log tool that builds that exact JSON already exists further
   // up the page but stays collapsed and easy to miss. This turns each empty
@@ -739,7 +755,7 @@
         let text = 'GOAL MET';
         if (reachedDate) {
           text += ', REACHED ' + fmtDate(reachedDate).toUpperCase();
-          if (g.targetDate) {
+          if (g.targetDate && isValidDateStr(g.targetDate)) {
             const diffDays = daysBetween(reachedDate, g.targetDate);
             if (diffDays > 0) text += ' (' + diffDays + (diffDays === 1 ? ' DAY' : ' DAYS') + ' AHEAD OF THE ' + fmtDate(g.targetDate).toUpperCase() + ' TARGET DATE)';
             else if (diffDays < 0) text += ' (' + (-diffDays) + (diffDays === -1 ? ' DAY' : ' DAYS') + ' AFTER THE ' + fmtDate(g.targetDate).toUpperCase() + ' TARGET DATE)';
@@ -752,7 +768,7 @@
       }
 
       let paceHtml = '';
-      if (!achieved && g.targetDate) {
+      if (!achieved && g.targetDate && isValidDateStr(g.targetDate)) {
         const daysLeft = daysBetween(todayIso(), g.targetDate);
         if (daysLeft < 0) {
           paceHtml = '<div class="goal-pace goal-pace-overdue font-mono">TARGET DATE PASSED, ' + fmtDate(g.targetDate).toUpperCase() + '</div>';
@@ -769,7 +785,7 @@
       // (current, not just currentCount defaulting to 0) so an unlogged
       // metric never reads as "behind pace" when it might just be untracked.
       let paceStatusHtml = '';
-      if (!achieved && current && g.setDate && g.targetDate) {
+      if (!achieved && current && g.setDate && g.targetDate && isValidDateStr(g.setDate) && isValidDateStr(g.targetDate)) {
         const totalDays = daysBetween(g.setDate, g.targetDate);
         const elapsedDays = daysBetween(g.setDate, todayIso());
         if (totalDays > 0 && elapsedDays > 0) {
