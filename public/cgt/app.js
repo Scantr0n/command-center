@@ -393,10 +393,14 @@ const POP_REPORT_LOOKUP = {
   CGC: { url: 'https://www.cgccards.com/population-report/', text: 'Browse CGC population report' }
 };
 
-function popReportLink(c) {
-  const entry = c.gradingCompany && POP_REPORT_LOOKUP[c.gradingCompany];
+function popReportLinkForCompany(company) {
+  const entry = company && POP_REPORT_LOOKUP[company];
   if (!entry) return null;
   return { url: entry.url, text: entry.text, note: entry.note ? BECKETT_SITE_STATUS_NOTE : null };
+}
+
+function popReportLink(c) {
+  return popReportLinkForCompany(c.gradingCompany);
 }
 
 // A real, stable eBay search URL pattern (the _nkw keyword param has worked
@@ -412,6 +416,17 @@ function compSearchLink(c) {
   const parts = [c.year, c.cardName, c.gradingCompany, c.grade != null ? 'grade ' + c.grade : null].filter(Boolean);
   const url = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(parts.join(' ')) + '&LH_Sold=1&LH_Complete=1';
   return { url, text: 'Search eBay sold comps for this card' };
+}
+
+// Same real, stable eBay search pattern as compSearchLink above, but for a
+// raw/ungraded candidate rather than an already-graded card: appends "raw"
+// and excludes the four graders' names so slab listings don't crowd out the
+// actual raw comps that rawValue research needs.
+function rawCompSearchLink(c) {
+  if (!c.cardName) return null;
+  const parts = [c.year, c.cardName, 'raw'].filter(Boolean);
+  const url = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(parts.join(' ') + ' -PSA -BGS -SGC -CGC') + '&LH_Sold=1&LH_Complete=1';
+  return { url, text: 'Search eBay sold comps for the raw card' };
 }
 
 function isStale(c) {
@@ -1392,10 +1407,32 @@ function openCandidateModal(id) {
   body += field('Raw value (ungraded)', c.rawValue != null ? formatUsd(c.rawValue) : null, c.rawValue == null);
   body += field('Raw value basis', c.rawValueBasis === 'recent-sale' ? 'Recent sale' : c.rawValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.rawValueBasis);
   body += field('Raw value note', c.rawValueNote, !c.rawValueNote);
+  const rawComp = rawCompSearchLink(c);
+  if (rawComp) {
+    body += `<div class="field-row">
+      <a href="${escapeHtml(rawComp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(rawComp.text)} &rarr;</a>
+      <div class="field-note">Opens an eBay sold-listings search for the raw/ungraded card, for researching <code class="inline-code">rawValue</code>. eBay now requires you to be signed in to see sold results.</div>
+    </div>`;
+  }
   body += field('Estimated grading cost', c.estimatedGradingCost != null ? formatUsd(c.estimatedGradingCost) : null, c.estimatedGradingCost == null);
   body += field('Shipping cost', c.shippingCost != null ? formatUsd(c.shippingCost) : null, c.shippingCost == null);
+  const targetPop = popReportLinkForCompany(c.targetGradingCompany);
+  if (targetPop) {
+    body += `<div class="field-row">
+      <a href="${escapeHtml(targetPop.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(targetPop.text)} &rarr;</a>
+      <div class="field-note">How many copies ${escapeHtml(c.targetGradingCompany)} has graded at each grade so far, real context for what this card might realistically come back at, separate from the sold-comp search below.</div>
+      ${targetPop.note ? `<div class="field-note">${escapeHtml(targetPop.note)}</div>` : ''}
+    </div>`;
+  }
   body += field('Expected grade', c.expectedGrade, !c.expectedGrade);
   body += field('Expected graded value', c.expectedGradedValue != null ? formatUsd(c.expectedGradedValue) : null, c.expectedGradedValue == null);
+  const gradedComp = compSearchLink({ cardName: c.cardName, year: c.year, gradingCompany: c.targetGradingCompany, grade: c.expectedGrade });
+  if (gradedComp) {
+    body += `<div class="field-row">
+      <a href="${escapeHtml(gradedComp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(gradedComp.text)} &rarr;</a>
+      <div class="field-note">Opens an eBay sold-listings search for ${escapeHtml(c.targetGradingCompany)}${c.expectedGrade ? ' grade ' + escapeHtml(c.expectedGrade) : ''} comps, for researching <code class="inline-code">expectedGradedValue</code>. eBay now requires you to be signed in to see sold results.</div>
+    </div>`;
+  }
   body += field('Graded value basis', c.gradedValueBasis === 'recent-sale' ? 'Recent sale' : c.gradedValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.gradedValueBasis);
   body += field('Graded value note', c.gradedValueNote, !c.gradedValueNote);
   if (math) {
