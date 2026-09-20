@@ -13,7 +13,8 @@
       "datePublished": null,
       "notes": null,
       "location": null,
-      "ebayReturnPolicy": "No Return Accepted"
+      "ebayReturnPolicy": "No Return Accepted",
+      "itemSpecifics": { "brand": null, "size": null, "color": "Black", "condition": null }
     },
     {
       "id": "white-boots",
@@ -28,7 +29,8 @@
       "datePublished": null,
       "notes": null,
       "location": null,
-      "ebayReturnPolicy": "No Return Accepted"
+      "ebayReturnPolicy": "No Return Accepted",
+      "itemSpecifics": { "brand": null, "size": null, "color": "White", "condition": null }
     },
     {
       "id": "softball-swing-analyzer",
@@ -42,7 +44,8 @@
       "datePublished": null,
       "notes": null,
       "location": null,
-      "ebayReturnPolicy": "No Return Accepted"
+      "ebayReturnPolicy": "No Return Accepted",
+      "itemSpecifics": { "brand": null, "size": null, "color": null, "condition": null }
     }
   ]
 }

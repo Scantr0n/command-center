@@ -872,6 +872,12 @@ function buildDataQualityFlags(listings) {
         } else if (GarageValidateCore.isSuspiciousEbayReturnPolicy(l.ebayReturnPolicy)) {
           reasons.push('EBAY RETURN POLICY "' + l.ebayReturnPolicy.toUpperCase() + '" LOOKS INHERITED FROM AN UNRELATED TEMPLATE, CONFIRM IT');
         }
+        const missingSpecifics = GarageValidateCore.missingItemSpecifics(l);
+        if (missingSpecifics.length) {
+          reasons.push('MISSING EBAY ITEM SPECIFICS: ' +
+            missingSpecifics.map(f => GarageValidateCore.ITEM_SPECIFIC_LABELS[f].toUpperCase()).join(', ') +
+            ' (CASSINI EXCLUDES THIS LISTING FROM FILTERED SEARCH RESULTS ON THESE)');
+        }
       }
       const missingUrlPlatforms = (l.platforms || []).filter(p =>
         !(l.soldOn || []).includes(p) && !(l.listingUrls && l.listingUrls[p])
@@ -2839,6 +2845,14 @@ function listingEditFormHtml(l) {
     leFieldRow('leDatePublished', 'Date published', l.datePublished, 'date') +
     leFieldRow('leLocation', 'Storage location', l.location) +
     leFieldRow('leEbayReturnPolicy', 'eBay return policy (the real policy set on the eBay listing, if any)', l.ebayReturnPolicy) +
+    '<div class="form-row-split">' +
+    leInputInner('leBrand', 'Brand (eBay search filter)', l.itemSpecifics && l.itemSpecifics.brand) +
+    leInputInner('leCondition', 'Condition (eBay search filter)', l.itemSpecifics && l.itemSpecifics.condition) +
+    '</div>' +
+    '<div class="form-row-split">' +
+    leInputInner('leSize', 'Size (shoes only, eBay search filter)', l.itemSpecifics && l.itemSpecifics.size) +
+    leInputInner('leColor', 'Color (shoes only, eBay search filter)', l.itemSpecifics && l.itemSpecifics.color) +
+    '</div>' +
     leFieldRow('leNotes', 'Notes', l.notes, 'textarea') +
     '</div>' +
     '<button type="button" id="leGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
@@ -2879,6 +2893,12 @@ function wireListingEditForm(l) {
     const location = leVal('leLocation');
     const ebayReturnPolicy = leVal('leEbayReturnPolicy');
     const notes = leVal('leNotes');
+    const itemSpecifics = {
+      brand: leVal('leBrand'),
+      size: leVal('leSize'),
+      color: leVal('leColor'),
+      condition: leVal('leCondition')
+    };
 
     const blockers = [];
     const advisory = [];
@@ -2915,6 +2935,13 @@ function wireListingEditForm(l) {
     if (platforms.includes('ebay') && ebayReturnPolicy && GarageValidateCore.isSuspiciousEbayReturnPolicy(ebayReturnPolicy)) {
       advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
         'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing.');
+    }
+    if (platforms.includes('ebay')) {
+      const missingSpecifics = GarageValidateCore.missingItemSpecifics(Object.assign({}, l, { platforms, itemSpecifics }));
+      if (missingSpecifics.length) {
+        advisory.push('Missing "' + missingSpecifics.join('", "') + '" in item specifics. eBay\'s Cassini search ' +
+          'excludes this listing entirely from a buyer\'s filtered results on those fields, not just ranks it lower.');
+      }
     }
 
     // Same double-sale gap buildAtRiskListings/"Needs delisting elsewhere" is
@@ -2954,7 +2981,8 @@ function wireListingEditForm(l) {
       datePublished,
       location,
       ebayReturnPolicy,
-      notes
+      notes,
+      itemSpecifics
     });
 
     warningsEl.innerHTML = advisory.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
@@ -3127,6 +3155,15 @@ function openModal(id) {
         ? escapeHtml(l.ebayReturnPolicy) + ' <span class="badge badge-hold" title="Mentions parts/accessories/auto, the same wrong-template pattern as the real bug already caught once">check this</span>'
         : escapeHtml(l.ebayReturnPolicy);
     rows.push(fieldRow('eBay return policy', returnPolicyHtml, !l.ebayReturnPolicy || suspicious));
+
+    const specifics = l.itemSpecifics || {};
+    const missingSpecifics = GarageValidateCore.missingItemSpecifics(l);
+    const specHtml = ['brand', 'size', 'color', 'condition'].map(f => {
+      const val = specifics[f];
+      return escapeHtml(GarageValidateCore.ITEM_SPECIFIC_LABELS[f]) + ': ' +
+        (val ? escapeHtml(val) : '<span class="cell-value empty">not logged</span>');
+    }).join(' &middot; ');
+    rows.push(fieldRow('Item specifics (eBay search filters)', specHtml, missingSpecifics.length > 0));
   }
 
   const compsHtml = l.title
@@ -3227,7 +3264,8 @@ function csvField(v) {
 const CSV_COLUMNS = [
   ['title', 'Item'], ['price', 'Price'], ['costBasis', 'Cost basis'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
   ['status', 'Status'], ['datePublished', 'Published'], ['daysListed', 'Days listed'],
-  ['relistGuidance', 'Relist guidance'], ['location', 'Location'], ['ebayReturnPolicy', 'eBay return policy'], ['notes', 'Notes']
+  ['relistGuidance', 'Relist guidance'], ['location', 'Location'], ['ebayReturnPolicy', 'eBay return policy'],
+  ['brand', 'Brand'], ['size', 'Size'], ['color', 'Color'], ['condition', 'Condition'], ['notes', 'Notes']
 ];
 
 // Exports exactly what the table currently shows (same search, platform
@@ -3238,12 +3276,17 @@ const CSV_COLUMNS = [
 document.getElementById('csvBtn').addEventListener('click', () => {
   const rows = sortRows(listings.filter(matchesFilters)).map(l => {
     const days = daysSincePublished(l.datePublished);
+    const specifics = l.itemSpecifics || {};
     return {
       ...l,
       platforms: (l.platforms || []).map(p => PLATFORM_LABELS[p] || p).join('; '),
       soldOn: (l.soldOn || []).map(p => PLATFORM_LABELS[p] || p).join('; '),
       daysListed: days != null ? days : '',
-      relistGuidance: relistGuidanceText(l, days)
+      relistGuidance: relistGuidanceText(l, days),
+      brand: specifics.brand || '',
+      size: specifics.size || '',
+      color: specifics.color || '',
+      condition: specifics.condition || ''
     };
   });
   const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
@@ -3684,6 +3727,12 @@ function wireQuickLogTool() {
     const location = document.getElementById('nlLocation').value.trim() || null;
     const ebayReturnPolicy = document.getElementById('nlEbayReturnPolicy').value.trim() || null;
     const notes = document.getElementById('nlNotes').value.trim() || null;
+    const itemSpecifics = {
+      brand: document.getElementById('nlBrand').value.trim() || null,
+      size: document.getElementById('nlSize').value.trim() || null,
+      color: document.getElementById('nlColor').value.trim() || null,
+      condition: document.getElementById('nlCondition').value.trim() || null
+    };
 
     const blockers = [];
     const advisory = [];
@@ -3713,6 +3762,13 @@ function wireQuickLogTool() {
       advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
         'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing before publishing.');
     }
+    if (platforms.includes('ebay')) {
+      const missingSpecifics = GarageValidateCore.missingItemSpecifics({ category, itemSpecifics });
+      if (missingSpecifics.length) {
+        advisory.push('Missing "' + missingSpecifics.join('", "') + '" in item specifics. eBay\'s Cassini search ' +
+          'excludes this listing entirely from a buyer\'s filtered results on those fields, not just ranks it lower.');
+      }
+    }
 
     if (blockers.length) {
       warningsBox.textContent = blockers.join(' ');
@@ -3734,7 +3790,8 @@ function wireQuickLogTool() {
       datePublished,
       notes,
       location,
-      ebayReturnPolicy
+      ebayReturnPolicy,
+      itemSpecifics
     };
 
     warningsBox.textContent = advisory.join(' ');

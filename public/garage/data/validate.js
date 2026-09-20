@@ -27,7 +27,11 @@
  * should, and a resolvedDate can't fall before its own openedDate. Every
  * supplies.json entry needs a real name and a real category; a logged
  * "qtyOnHand" with no "reorderThreshold" set can't ever trigger a low-stock
- * warning on the page, so that gap is flagged here too.
+ * warning on the page, so that gap is flagged here too. Every live eBay
+ * listing is checked for "itemSpecifics" (brand, condition, and for the
+ * "shoes" category also size and color): eBay's Cassini search excludes a
+ * listing entirely from a buyer's filtered results once one of those
+ * filters is applied and the field is missing, not just ranks it lower.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -35,7 +39,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findDuplicateListings, isSuspiciousEbayReturnPolicy } = require('./validate-core.js');
+const { findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -57,6 +61,7 @@ const LISTING_CATEGORIES = ['shoes'];
 const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
 const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
+const ITEM_SPECIFIC_KEYS = ['brand', 'size', 'color', 'condition'];
 // Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
 // Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
 // announced 2026-07-13 (irs.gov/newsroom: "IRS sets 2026 business standard
@@ -213,6 +218,20 @@ function main() {
     if (l.ebayReturnPolicy !== null && l.ebayReturnPolicy !== undefined && typeof l.ebayReturnPolicy !== 'string') {
       errors.push(where + ': "ebayReturnPolicy" must be a string (the real policy name set on the eBay listing) or null');
     }
+
+    if (l.itemSpecifics !== undefined && l.itemSpecifics !== null) {
+      if (typeof l.itemSpecifics !== 'object' || Array.isArray(l.itemSpecifics)) {
+        errors.push(where + ': "itemSpecifics" must be an object keyed by brand/size/color/condition, or omitted');
+      } else {
+        Object.keys(l.itemSpecifics).forEach(k => {
+          if (!ITEM_SPECIFIC_KEYS.includes(k)) {
+            errors.push(where + ': itemSpecifics key "' + k + '" is not one of ' + ITEM_SPECIFIC_KEYS.join(', '));
+          } else if (l.itemSpecifics[k] !== null && typeof l.itemSpecifics[k] !== 'string') {
+            errors.push(where + ': itemSpecifics.' + k + ' must be a string or null');
+          }
+        });
+      }
+    }
     if (l.status === 'live' && Array.isArray(l.platforms) && l.platforms.includes('ebay')) {
       if (!l.ebayReturnPolicy) {
         warnings.push(where + ': live on eBay with no "ebayReturnPolicy" logged, confirm the real listing isn\'t ' +
@@ -221,6 +240,12 @@ function main() {
         warnings.push(where + ': "ebayReturnPolicy" is "' + l.ebayReturnPolicy + '", which mentions parts/' +
           'accessories/auto, the same wrong-template pattern as the real bug already caught once. Confirm this ' +
           'listing\'s actual eBay return policy and fix it if it really did inherit that template again.');
+      }
+      const missingSpecifics = missingItemSpecifics(l);
+      if (missingSpecifics.length) {
+        warnings.push(where + ': live on eBay with no "' + missingSpecifics.join('", "') + '" logged in ' +
+          '"itemSpecifics". eBay\'s Cassini search excludes a listing entirely from a buyer\'s filtered results ' +
+          'once that filter is applied and the field is missing, not just ranks it lower.');
       }
     }
 
@@ -236,6 +261,8 @@ function main() {
 
     emDashFields(l, ['title', 'location']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
+    emDashFields(l.itemSpecifics, ITEM_SPECIFIC_KEYS).forEach(f =>
+      warnings.push(where + ': itemSpecifics.' + f + ' contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
   // Mirrors the "Possible duplicates" panel in app.js: the same physical item
