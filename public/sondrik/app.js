@@ -1076,6 +1076,25 @@
     }
 
     const leads = (leadsData && leadsData.leads) || [];
+
+    // Same "no real date logged" gap as undatedReleases above, for the other
+    // record type that carries a real date field: a lead with loggedDate
+    // null already renders under the Timeline's "no date on record" list,
+    // but that section is easy to miss, and nothing previously surfaced it
+    // as an actual next action the way an undated release already did.
+    const undatedLeads = leads.filter(l => !l.loggedDate);
+    if (undatedLeads.length > 0) {
+      steps.push({
+        urgent: false,
+        text: 'Log the real date ' +
+          (undatedLeads.length === 1
+            ? (undatedLeads[0].sourceDetail || undatedLeads[0].source || 'this lead') + ' actually came in'
+            : undatedLeads.length + ' leads actually came in') +
+          ', no date is on record.',
+        href: '#leadsSection'
+      });
+    }
+
     leads.forEach(l => {
       const o = l.outreach || {};
       if (!o.sent && o.approvalStatus === 'awaiting-approval') {
