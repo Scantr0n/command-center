@@ -1048,8 +1048,24 @@
   // approvals. Before this split, a stale download check or a missed
   // bugfix check-in only ever showed up if you scrolled down to Next
   // steps; a backgrounded tab gave no glance signal for either.
-  function computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData) {
+  function computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData, changelogStatusData) {
     const steps = [];
+
+    // The one validate.js warning most directly tied to the real 2026-09-17
+    // trust incident this changelog section exists to guard against, and
+    // previously the one warning with no on-page signal at all: Jack would
+    // only find out the changelog had drifted by running the CLI validator
+    // himself. Urgent, since a drifted changelog is actively showing
+    // something untrustworthy, not just an unfilled field.
+    if (changelogStatusData && changelogStatusData.drifted) {
+      steps.push({
+        urgent: true,
+        text: 'The data changelog is out of sync with real git history (' + changelogStatusData.recordedCount +
+          ' recorded vs ' + changelogStatusData.realCount + ' real commits), run ' +
+          'node public/sondrik/data/changelog.js to refresh it.',
+        href: '#changelogSection'
+      });
+    }
 
     const releases = (releasesData && releasesData.releases) || [];
     const undatedReleases = releases.filter(r => !r.date);
@@ -1987,14 +2003,30 @@
   // server.js's readLocalClusters skips one broken cluster file instead of
   // taking the whole dashboard down. Promise.all would fail all four
   // sections over a single JSON typo in, say, leads.json alone.
+  // A real drift here (changelog.json out of sync with this repo's actual
+  // git history) can only be detected by running git itself, which the
+  // browser can't do, so this hits a small server-side API instead of a
+  // static data file. Best-effort like the rest of this load: a failure
+  // (offline, old server without the route yet) just means the check
+  // silently doesn't run, not a page error, same as changelog.json's own
+  // "not generated yet" handling below.
+  function loadChangelogStatus() {
+    return fetch('/api/sondrik/changelog-status').then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
   Promise.allSettled([
     loadDataFile('releases'),
     loadDataFile('downloads'),
     loadDataFile('leads'),
     loadDataFile('channels'),
     loadDataFile('goals'),
-    loadDataFile('changelog')
-  ]).then(([releasesResult, downloadsResult, leadsResult, channelsResult, goalsResult, changelogResult]) => {
+    loadDataFile('changelog'),
+    loadChangelogStatus()
+  ]).then(([releasesResult, downloadsResult, leadsResult, channelsResult, goalsResult, changelogResult, changelogStatusResult]) => {
+    const changelogStatusData = changelogStatusResult.status === 'fulfilled' ? changelogStatusResult.value : null;
     const releasesData = releasesResult.status === 'fulfilled' ? releasesResult.value : null;
     const downloadsData = downloadsResult.status === 'fulfilled' ? downloadsResult.value : null;
     const leadsData = leadsResult.status === 'fulfilled' ? leadsResult.value : null;
@@ -2092,7 +2124,7 @@
     }
 
     if (releasesData || downloadsData || leadsData || goalsData || channelsData) {
-      const steps = computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData);
+      const steps = computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData, changelogStatusData);
       renderNextSteps(steps);
       renderAttentionPill(steps);
     } else {

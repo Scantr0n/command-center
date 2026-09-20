@@ -3,6 +3,7 @@ const express = require('express');
 const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 
 const app = express();
 // Every hub's app.js/style.css is hand-written, uncompressed text (up to
@@ -547,6 +548,37 @@ app.get('/api/alpha/live', async (req, res) => {
     // Daemon not reachable (not running, different machine, etc). Fall back
     // to the same honest static placeholder the page has always shown.
     res.json(fallback);
+  }
+});
+
+// validate.js's own changelog-drift check (comparing changelog.json's
+// recorded commit hashes against this repo's real git log for the same
+// files) only ever runs from the command line, so a real drift went
+// unnoticed on the live page multiple times tonight until someone happened
+// to run the CLI validator. git log is the one part of this check that
+// genuinely can't run in the browser, so it's exposed here as a small,
+// read-only, best-effort API instead: a real drift becomes a real Next
+// Steps item on the page itself, not something only the CLI ever surfaces.
+app.get('/api/sondrik/changelog-status', (req, res) => {
+  const dataDir = path.join(__dirname, 'public', 'sondrik', 'data');
+  try {
+    const realHashesRaw = execFileSync('git', [
+      'log', '--format=%H', '--',
+      'releases.json', 'downloads.json', 'leads.json', 'channels.json', 'goals.json'
+    ], { cwd: dataDir, encoding: 'utf8' }).trim();
+    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
+    const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
+    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+    res.json({
+      drifted: recordedHashes.join(',') !== realHashes.join(','),
+      recordedCount: recordedHashes.length,
+      realCount: realHashes.length
+    });
+  } catch (err) {
+    // Not a git checkout, git isn't on PATH, or changelog.json is missing:
+    // an environment gap, not a real drift, so this stays a quiet false
+    // rather than a page warning no one can act on.
+    res.json({ drifted: false, unavailable: true });
   }
 });
 
