@@ -370,6 +370,8 @@
     <code>/sondrik/data/goals.json</code>, edited by hand until a real backend is wired in. Run
     <code>node public/sondrik/data/validate.js</code> after any edit, then
     <code>node public/sondrik/data/changelog.js</code> to refresh the data changelog from git.
+    Run <code>node --test public/sondrik/data/validate-core.test.js</code> after changing the duplicate-lead
+    logic itself, it guards the exact check that flags a real contact possibly logged twice.
   </footer>
 </div>
 

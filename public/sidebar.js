@@ -18,6 +18,21 @@
   const PIN_STORAGE_KEY = 'cc-sidebar-pinned';
   const BREAKPOINT = 860; // below this, the rail is hidden entirely, same call as yesterday's mobile category-row fix: don't eat mobile width for a nav a phone user can already get via the back-link.
 
+  // localStorage itself can throw on access, not just return corrupt JSON
+  // (Safari's "Block All Cookies", locked-down browser policies), and unlike
+  // every other localStorage touchpoint in this codebase (Sondrik's own
+  // safeStorageGet/Set, guarded reads in Garage/CSM), this file's init() ran
+  // a bare `localStorage.getItem` as its first real statement, with no
+  // fallback. Since this script injects the one nav shared across every hub
+  // page, that uncaught throw silently killed the sidebar everywhere, not
+  // just degraded one feature on one page.
+  function safeStorageGet(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+  function safeStorageSet(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* ignore */ }
+  }
+
   function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -146,7 +161,7 @@
     styleEl.textContent = STYLE;
     document.head.appendChild(styleEl);
 
-    const expanded = localStorage.getItem(STORAGE_KEY) === '1';
+    const expanded = safeStorageGet(STORAGE_KEY) === '1';
     const nav = document.createElement('nav');
     nav.id = 'ccSidebar';
     nav.setAttribute('aria-label', 'Hub navigation');
@@ -191,7 +206,7 @@
     document.getElementById('ccSidebarToggle').addEventListener('click', () => {
       const nowExpanded = nav.classList.toggle('expanded');
       document.body.classList.toggle('cc-sidebar-expanded', nowExpanded);
-      localStorage.setItem(STORAGE_KEY, nowExpanded ? '1' : '0');
+      safeStorageSet(STORAGE_KEY, nowExpanded ? '1' : '0');
       const btn = document.getElementById('ccSidebarToggle');
       btn.setAttribute('aria-pressed', String(nowExpanded));
       btn.setAttribute('aria-label', (nowExpanded ? 'Collapse' : 'Expand') + ' sidebar');
@@ -211,12 +226,12 @@
   }
 
   function getPinned() {
-    try { return new Set(JSON.parse(localStorage.getItem(PIN_STORAGE_KEY) || '[]')); }
+    try { return new Set(JSON.parse(safeStorageGet(PIN_STORAGE_KEY) || '[]')); }
     catch { return new Set(); }
   }
 
   function setPinned(pinnedSet) {
-    localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify([...pinnedSet]));
+    safeStorageSet(PIN_STORAGE_KEY, JSON.stringify([...pinnedSet]));
   }
 
   // Pinned hubs sort to their own group above the rest, same pattern the

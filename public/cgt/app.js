@@ -315,6 +315,14 @@ function todayIso() {
 // a "days in queue" figure himself.
 function addDaysIso(isoDate, days) {
   const d = new Date(isoDate + 'T00:00:00');
+  // Unlike daysSince right below, this had no guard at all: a malformed
+  // isoDate (a hand-edit that skipped validate-core's own isDateOrNull, e.g.
+  // "2026-13-40") produces an Invalid Date, and every field pulled off it
+  // below is NaN, silently returning the literal string "NaN-NaN-NaN"
+  // instead of erroring. That string is truthy, so estimatedReturnFor's own
+  // `estReturnDate ?` checks never catch it, and it was reaching both the
+  // on-page "est. back ~" line and the exported .ics reminder's description.
+  if (Number.isNaN(d.getTime())) return null;
   d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
@@ -530,7 +538,7 @@ async function loadCards() {
     rawCardsData = data;
     const backupBtn = document.getElementById('backupBtn');
     backupBtn.disabled = false;
-    backupBtn.title = '';
+    backupBtn.title = (rawSubmissionsData && rawCandidatesData) ? '' : 'Some data failed to load, backup will only include what actually loaded';
     renderStats();
     renderCandidates();
     renderSubmissions();
@@ -558,8 +566,14 @@ async function loadCards() {
     errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load cards.json: " + e.message;
     const backupBtn = document.getElementById('backupBtn');
-    backupBtn.disabled = true;
-    backupBtn.title = "Can't back up, cards.json failed to load (see below)";
+    // cards.json failing doesn't mean submissions.json/candidates.json did:
+    // loadSubmissions/loadCandidates above already ran and set their own raw
+    // data independently, so a backup covering just those two real loaded
+    // files is still worth offering rather than blocking on cards.json alone.
+    backupBtn.disabled = !rawSubmissionsData && !rawCandidatesData;
+    backupBtn.title = backupBtn.disabled
+      ? "Can't back up, no data loaded (see errors below)"
+      : "Can't back up cards.json (see below), backup will only include submissions/candidates data";
   }
 }
 
@@ -3255,7 +3269,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // Local download only, nothing is sent anywhere. Same approach as CSM's
 // own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawCardsData) return;
+  if (!rawCardsData && !rawSubmissionsData && !rawCandidatesData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center CGT inventory (/cgt), local download only',

@@ -1551,16 +1551,22 @@ let beIncludeDepopBoost = false;
 let beEbayShoesCategory = false;
 
 // eBay's per-order fee is a step function of price ($0.30 at/under $10, else
-// $0.40), so solve assuming the higher step first; if that price doesn't
-// actually clear $10 the assumption was wrong, so re-solve with the lower
-// step instead. category "shoes" uses the 14.9% Clothing, Shoes &
-// Accessories rate instead of the 13.6% standard rate, same distinction
-// estimateNetPayout() draws for real listings.
+// $0.40), so solve assuming the lower step first; the lower step is always
+// the cheaper of the two prices that clear targetNet, so it's the true
+// minimum whenever it actually lands at/under $10. Only fall back to the
+// higher step when the lower step's own price would cross $10 (which
+// invalidates the $0.30 assumption it was solved under). Trying the higher
+// step first, as an earlier version of this did, missed that a price just
+// under $10 can clear the same target net as a price just over $10 (the fee
+// jump absorbs the gap), and returned the more expensive one every time.
+// category "shoes" uses the 14.9% Clothing, Shoes & Accessories rate instead
+// of the 13.6% standard rate, same distinction estimateNetPayout() draws for
+// real listings.
 function ebayMinPriceForNet(targetNet, category) {
   const feeRate = category === 'shoes' ? 0.149 : 0.136;
-  const highStep = (targetNet + 0.40) / (1 - feeRate);
-  if (highStep > 10) return highStep;
-  return (targetNet + 0.30) / (1 - feeRate);
+  const lowStep = (targetNet + 0.30) / (1 - feeRate);
+  if (lowStep <= 10) return lowStep;
+  return (targetNet + 0.40) / (1 - feeRate);
 }
 
 function depopMinPriceForNet(targetNet, applyBoost) {
@@ -2556,10 +2562,20 @@ function renderAcquisitions(acquisitions, currentListings, sales) {
     const key = a.source || 'other';
     if (!bySource[key]) bySource[key] = { spend: 0, revenue: 0 };
     bySource[key].spend += a.pricePaid || 0;
-    const listingIds = a.listingIds || [];
-    sales.forEach(sale => {
-      if (listingIds.includes(sale.listingId)) bySource[key].revenue += sale.salePrice || 0;
-    });
+  });
+  // One pass over sales, not one pass per acquisition: a listing fed by more
+  // than one acquisition record (re-sourced after damage, same real case
+  // suggestedCostBasisFromAcquisitions above already documents) used to have
+  // its sale revenue added once per acquisition that links it, inflating
+  // realized revenue by however many times that listing id was re-logged.
+  // Same "first acquisition that links this listing wins" rule as cost basis
+  // above, so a sale's revenue and a listing's cost basis always agree on
+  // which channel gets credit.
+  sales.forEach(sale => {
+    const owner = acquisitions.find(a => (a.listingIds || []).includes(sale.listingId));
+    if (!owner) return;
+    const key = owner.source || 'other';
+    bySource[key].revenue += sale.salePrice || 0;
   });
   const totalSpend = acquisitions.reduce((s, a) => s + (a.pricePaid || 0), 0);
   const sourceParts = Object.keys(bySource).map(key => {
@@ -3451,7 +3467,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // diffed against or restored from a known-good copy. Local download only,
 // nothing is sent anywhere. Same approach as CSM's own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData) return;
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center Garage (/garage), local download only',
@@ -3461,7 +3477,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
     salesJson: rawSalesData,
     expensesJson: rawExpensesData,
     disputesJson: rawDisputesData,
-    suppliesJson: rawSuppliesData
+    suppliesJson: rawSuppliesData,
+    acquisitionsJson: rawAcquisitionsData
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

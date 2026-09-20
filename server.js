@@ -177,8 +177,24 @@ app.get('/api/clusters', async (req, res) => {
   }
 });
 
+// Every other mutating route in this file (chat, the Garage draft-listing
+// endpoint below) is behind createRateLimiter, but this one flips an
+// in-memory boolean and was never given a limiter of its own. The server
+// binds to all interfaces (see the header comment above), so anything on
+// Jack's LAN can otherwise fire unlimited requests at this route, each one
+// forcing Express to buffer and JSON-parse up to the 30mb limit raised
+// globally for the (unrelated) Garage photo drafter, before this route's own
+// validation ever runs. A generous limit since a real client only ever
+// fires this on an actual toggle click, never a tight loop.
+const TOGGLE_RATE_LIMIT = 30;
+const TOGGLE_RATE_WINDOW_MS = 60 * 1000;
+const isToggleRateLimited = createRateLimiter(TOGGLE_RATE_LIMIT, TOGGLE_RATE_WINDOW_MS);
+
 app.post('/api/toggles/:toggleId', async (req, res) => {
   try {
+    if (isToggleRateLimited(req.ip)) {
+      return res.status(429).json({ error: `Too many toggle requests, try again in a minute (limit is ${TOGGLE_RATE_LIMIT} per ${TOGGLE_RATE_WINDOW_MS / 1000}s).` });
+    }
     const { toggleId } = req.params;
     const { enabled } = req.body;
     if (typeof enabled !== 'boolean') {

@@ -211,7 +211,7 @@
   .relation-line { cursor: pointer; }
   /* SVG <title> gives desktop hover a real tooltip for free, but has no
      touch equivalent at all (confirmed: no tap-and-hold, no fallback,
-     nothing renders) — a real WCAG 1.4.13 gap on the exact feature this
+     nothing renders), a real WCAG 1.4.13 gap on the exact feature this
      redesign added today to explain what each relation line means. This
      is the tap/click fallback: dismissible (outside click, Escape, or the
      same line again), hoverable (it's a plain div, pointer events fine),
@@ -408,7 +408,7 @@
           <input id="searchInput" type="text" placeholder="Search projects..." aria-label="Search projects"
             class="search-input text-xs font-mono rounded-lg pl-7 pr-6 py-1.5 border hairline focus:outline-none w-[175px] sm:w-[190px]"
             style="background: var(--panelLight); color: var(--ink)">
-          <button id="searchClearBtn" type="button" aria-label="Clear search" tabindex="-1"
+          <button id="searchClearBtn" type="button" aria-label="Clear search"
             class="hidden absolute inset-y-0 right-1.5 flex items-center text-sm leading-none"
             style="color: var(--faint)">&times;</button>
           <kbd id="searchKbdHint" aria-hidden="true"
@@ -524,7 +524,7 @@
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
           <button id="copyLinkBtn" type="button" class="text-[10px] font-mono px-2.5 py-1 rounded border hairline" style="color: var(--sub)" aria-live="polite">Copy link</button>
-          <button id="closeModal" class="text-xl leading-none" style="color: var(--sub)">&times;</button>
+          <button id="closeModal" type="button" aria-label="Close" class="text-xl leading-none" style="color: var(--sub)">&times;</button>
         </div>
       </div>
       <div class="px-6 py-4 border-b hairline">
@@ -1020,7 +1020,7 @@ function nodeRadius(priority) {
 }
 
 // One radial gradient per category, defined once and referenced by every
-// matching node's glow halo via url(#glow-<slug>) — real bloom falloff
+// matching node's glow halo via url(#glow-<slug>), real bloom falloff
 // (solid at center, fading to transparent) instead of a flat translucent
 // circle, part of the move toward the orbital/tactical-HUD look Jack
 // pointed at (refs 3/5). Regenerating on every renderGraph() call is
@@ -1045,7 +1045,7 @@ function ensureGraphDefs() {
 // Real collision check for a relation curve, not a guessed constant: samples
 // the actual quadratic bezier and measures clearance against every OTHER
 // node's real circle (never the curve's own two endpoints, which the curve
-// legitimately starts/ends inside of — that's fine, each node's own opaque
+// legitimately starts/ends inside of, that's fine, each node's own opaque
 // fill covers that on its own). Used by renderGraph to grow the bulge only
 // as far as a given curve actually needs, instead of one fixed number that
 // would either cut it close for a crowded pair or over-bulge an isolated one.
@@ -1064,11 +1064,11 @@ function curveMinClearance(p0, p1, p2, otherNodes) {
 }
 
 // Touch/tap fallback for the relation-line reason (see the #graphTooltip CSS
-// comment for why this exists — SVG <title> has no touch equivalent at all).
+// comment for why this exists, SVG <title> has no touch equivalent at all).
 // A real tooltip element instead of relying on the browser's own hover
 // tooltip, positioned at the tap/click point, dismissed on outside click,
 // Escape, or tapping the same line again (WCAG 1.4.13: dismissible,
-// hoverable, persistent — not a hover timeout).
+// hoverable, persistent, not a hover timeout).
 function showRelationTooltip(text, x, y) {
   const el = document.getElementById('graphTooltip');
   el.textContent = text;
@@ -1194,7 +1194,7 @@ function renderGraph() {
       // Bulge magnitude: the old fixed-12%-of-endpoint-distance formula
       // shrinks to near-zero for two nodes that end up close together after
       // the force simulation, leaving an almost-straight line with no real
-      // clearance from whatever else sits between them — that, combined
+      // clearance from whatever else sits between them, that, combined
       // with the node fill being translucent (fixed below), is what made
       // lines visibly cut through unrelated circles. Enforcing a minimum
       // pixel bulge, and always bowing away from the hub (toward open
@@ -1675,7 +1675,7 @@ renderGridSkeleton();
 // Real reliability bar: parses the actual "X/Y succeeded" string already on
 // the cluster into a real percentage-width bar. Never fabricates one when
 // the field is missing or doesn't match that shape (falls back to the raw
-// text, same as the old plain-text treatment) — no invented sparkline, no
+// text, same as the old plain-text treatment), no invented sparkline, no
 // placeholder metric.
 function reliabilityBarHtml(c) {
   if (!c.reliability || !c.reliability.recentSuccessRate) return '';
@@ -1705,7 +1705,7 @@ function renderGrid() {
     const sColor = statusColor(c.status);
     const stale = isStale(c);
     const isTop = c.priority === 'top';
-    // Real cross-project link count, straight off relatedTo — see the
+    // Real cross-project link count, straight off relatedTo, see the
     // modal/graph relation-line comments for why an entry only counts when
     // a real relationReasons string backs it, same rule applied here.
     const relatedCount = (c.relatedTo || []).filter(id => {
@@ -1872,7 +1872,7 @@ function openModal(id, opts = {}) {
     const r = activeCluster.reliability;
     const failed = r.lastRunStatus === 'failed';
     // "paused" is a real, deliberate off state (someone turned the automation
-    // off on purpose), distinct from "failed" (it tried and broke) — conflating
+    // off on purpose), distinct from "failed" (it tried and broke), conflating
     // the two either alarms Jack over nothing or, worse, hides a real pause
     // under text that still reads as healthy. Amber, matching the app's other
     // stale/attention-needed indicators, not the failure red.
