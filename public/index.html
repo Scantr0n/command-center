@@ -1724,10 +1724,31 @@ function openModal(id, opts = {}) {
   }
 }
 
-function getModalFocusable() {
-  return Array.from(document.getElementById('modalOverlay').querySelectorAll(
+function getModalFocusable(containerId = 'modalOverlay') {
+  return Array.from(document.getElementById(containerId).querySelectorAll(
     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
   )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+// Shared by every aria-modal="true" overlay (project modal, palette,
+// shortcuts help): keeps Tab/Shift+Tab cycling inside the dialog instead of
+// escaping onto the dimmed page behind it, which the project modal already
+// did but the other two didn't, so Shift+Tab from their one real focusable
+// element could land on a live, backdrop-covered element while the dialog
+// still visually covered it, breaking the aria-modal contract they both
+// declare.
+function trapTabInside(containerId, event) {
+  const focusable = getModalFocusable(containerId);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function closeModalAndReturnFocus(opts = {}) {
@@ -2139,13 +2160,15 @@ document.addEventListener('keydown', (e) => {
       if (target) activatePaletteItem(target.id);
       return;
     }
+    if (e.key === 'Tab') { trapTabInside('paletteOverlay', e); return; }
     // Anything else (typing a search term, including "/") reaches paletteInput
     // normally instead of triggering the "/"-focuses-search shortcut below.
     return;
   }
 
   if (shortcutsOpen) {
-    if (e.key === 'Escape') { e.preventDefault(); closeShortcuts(); }
+    if (e.key === 'Escape') { e.preventDefault(); closeShortcuts(); return; }
+    if (e.key === 'Tab') { trapTabInside('shortcutsOverlay', e); }
     return;
   }
 
@@ -2154,17 +2177,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (modalOpen && e.key === 'Tab') {
-    const focusable = getModalFocusable();
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
+    trapTabInside('modalOverlay', e);
     return;
   }
   if (!modalOpen && e.key === '/' && document.activeElement.id !== 'searchInput' && document.activeElement.id !== 'chatInput') {
