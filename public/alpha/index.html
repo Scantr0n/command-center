@@ -122,7 +122,7 @@
           <tr><th>system.lastVerifiedAt</th><td>ISO datetime this architectural description was last actually confirmed to match Alpha's real code, or <code>null</code>. Unlike everything under <code>live</code>, these facts have no daemon to report their own freshness, so this is a hand-set trust signal instead: update it whenever the feature list or agent count is re-checked against reality, not on every unrelated edit to this file. Past 90 days old, the Architecture section heading flags it "due for a recheck" in amber, the same stale-but-not-wrong treatment this page already gives a live reading a few minutes old, just on a timescale that fits a fact that only changes when the code itself does.</td></tr>
           <tr><th>connection.connected</th><td><code>true</code> once a real feed exists and is currently reachable, otherwise <code>false</code>.</td></tr>
           <tr><th>connection.checkedAt</th><td>ISO datetime of the last time connectivity was actually checked, or <code>null</code>.</td></tr>
-          <tr><th>connection.history[]</th><td>Append-only log of past connectivity checks, oldest first, each a real result of an actual check, never backfilled or estimated. Each entry needs <code>at</code> (ISO datetime) and <code>connected</code> (<code>true</code>/<code>false</code>, never <code>null</code>, since a check that never resolved is not a result). Drives the strip of ticks under the connection status and the recent-incidents list beneath it (each incident there is just a run of consecutive "not connected" entries from this same array, grouped into a start time, end time, and duration; nothing estimated). Starts empty, honestly. The live route in <code>server.js</code> does not populate this yet (it always sends an empty array), so until a future session wires that up, this page instead keeps its own honest record of the checks it makes in this browser's <code>localStorage</code> and uses that instead, labeled "recorded by this browser only" so it's never mistaken for a server-side record shared across devices.</td></tr>
+          <tr><th>connection.history[]</th><td>Append-only log of past connectivity checks, oldest first, each a real result of an actual check, never backfilled or estimated. Each entry needs <code>at</code> (ISO datetime) and <code>connected</code> (<code>true</code>/<code>false</code>, never <code>null</code>, since a check that never resolved is not a result). Drives the strip of ticks under the connection status, the daily uptime bars beneath that (one bar per real calendar day, colored by that day's real up/down ratio), and the recent-incidents list beneath those (each incident there is just a run of consecutive "not connected" entries from this same array, grouped into a start time, end time, and duration; nothing estimated). Starts empty, honestly. The live route in <code>server.js</code> does not populate this yet (it always sends an empty array), so until a future session wires that up, this page instead keeps its own honest record of the checks it makes in this browser's <code>localStorage</code> and uses that instead, labeled "recorded by this browser only" so it's never mistaken for a server-side record shared across devices.</td></tr>
           <tr><th>live.asOf</th><td><strong>Required whenever any field below it is set.</strong> ISO datetime the live reading was actually taken at.</td></tr>
           <tr><th>live.regime</th><td>Current detected market regime label, or <code>null</code>. The server sends only this single current value, never a history; the "Regime history" section below builds its own log of real transitions this browser has actually observed (a new value that differs from the last one it saw), timestamped and kept in this browser's own <code>localStorage</code>, labeled "recorded by this browser only" for the same reason as the connectivity-check history above. Nothing estimated or backfilled, only real observed changes.</td></tr>
           <tr><th>live.killSwitch.engaged</th><td><code>true</code> / <code>false</code> / <code>null</code> if unknown.</td></tr>
@@ -183,6 +183,15 @@
       </div>
       <div class="conn-history-strip" id="connHistoryStrip"></div>
       <div class="conn-history-range font-mono" id="connHistoryRange"></div>
+    </div>
+    <div class="daily-uptime-wrap" id="dailyUptimeWrap">
+      <div class="conn-history-label font-mono">
+        DAILY UPTIME (LAST 90 DAYS WITH DATA)
+        <span id="dailyUptimeSummary" class="conn-uptime-summary"></span>
+        <span id="dailyUptimeSource" class="conn-history-source"></span>
+      </div>
+      <div class="daily-uptime-strip" id="dailyUptimeStrip"></div>
+      <div class="conn-history-range font-mono" id="dailyUptimeRange"></div>
     </div>
     <div class="incident-list-wrap">
       <div class="incident-list-label font-mono">RECENT INCIDENTS</div>

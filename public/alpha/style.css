@@ -555,6 +555,44 @@ header.page-head .sub {
   margin-top: 6px;
 }
 
+/* Daily uptime bars: one bar per real calendar day of connection.history,
+   the same Statuspage/UptimeRobot-style long-range companion to the
+   per-check tick strip above (see computeDailyUptimeBuckets in app.js).
+   Up/degraded/down told apart by shape as well as color, same reasoning and
+   same hatch-pattern treatment as .history-tick above. */
+.daily-uptime-wrap {
+  margin: -14px 0 28px;
+}
+.daily-uptime-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.daily-uptime-bar {
+  width: 5px;
+  height: 20px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  border: 1px solid var(--hairline);
+}
+.daily-uptime-bar.full {
+  background: #3DDC84;
+  border-color: rgba(61,220,132,0.4);
+}
+.daily-uptime-bar.degraded {
+  background: repeating-linear-gradient(
+    135deg, rgba(224,160,48,0.5), rgba(224,160,48,0.5) 2px, rgba(224,160,48,0.12) 2px, rgba(224,160,48,0.12) 4px
+  );
+  border-color: rgba(224,160,48,0.5);
+}
+.daily-uptime-bar.down {
+  background: repeating-linear-gradient(
+    135deg, rgba(224,80,80,0.5), rgba(224,80,80,0.5) 2px, rgba(224,80,80,0.12) 2px, rgba(224,80,80,0.12) 4px
+  );
+  border-color: rgba(224,80,80,0.5);
+}
+
 /* Recent incidents: a readable list built from the same connection.history
    entries as the tick strip above, grouped into start/end/duration windows
    (see computeIncidents in app.js). The tick strip answers "what's the
@@ -1300,6 +1338,8 @@ footer.page-foot {
   .equity-curve-range { color: #333; }
   .history-tick.up { background: #333; }
   .history-tick.down { background: #ccc; border: 1px solid #999; }
+  .daily-uptime-bar.full { background: #333; }
+  .daily-uptime-bar.degraded, .daily-uptime-bar.down { background: #ccc; border: 1px solid #999; }
 
   .stat-tile-value, .stat-tile-label, .stat-tile-sub,
   .ps-mode-value, .ps-field-label, .ps-mode-sub, .meter-value,
