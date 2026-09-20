@@ -25,12 +25,28 @@ function repoRoot() {
   return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
 }
 
+// A shallow clone's oldest fetched commit has no parent in `git log`,
+// exactly what a real repo-root/history-rewrite commit looks like to the
+// isHistoryReset check below. Without this guard, running this script from
+// a shallow clone (the default checkout in an automated sandbox) silently
+// misreports that boundary as a real history reset and throws away every
+// real entry before it. That already happened in practice, more than once,
+// before this check existed: this hub's changelog was collapsed to a single
+// fabricated "history reset" entry by a prior run.
+function assertNotShallow(root) {
+  const isShallow = execFileSync('git', ['-C', root, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() === 'true';
+  if (isShallow) {
+    throw new Error('Refusing to regenerate changelog.json from a shallow git clone (the oldest visible commit would be misread as a real history rewrite). Run `git fetch --unshallow` first, then re-run this script.');
+  }
+}
+
 function relPaths(root) {
   return TRACKED_FILES.map(f => path.relative(root, path.join(DATA_DIR, f)));
 }
 
 function run() {
   const root = repoRoot();
+  assertNotShallow(root);
   const paths = relPaths(root);
   const log = execFileSync('git', [
     '-C', root,
