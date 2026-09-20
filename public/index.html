@@ -31,18 +31,20 @@
   body { background: var(--void); }
   .hairline { border-color: var(--hairline) !important; }
   .hairline:hover { border-color: var(--hairlineHover) !important; }
-  /* Cards carry their own category color as a custom property so the
-     left accent stripe + hover glow below can reference it in one place,
-     rather than fighting the .hairline class's `border-color !important`
-     (which would otherwise win over a plain inline border-left-color). */
-  .cluster-card {
-    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease;
+  /* Cards carry their own accent color (category on grid cards, status on
+     attention cards) as a custom property so the left stripe + hover glow
+     below can reference it in one shared rule, rather than fighting the
+     .hairline class's `border-color !important` (which would otherwise win
+     over a plain inline border-left-color). */
+  .cluster-card, .attn-card {
     box-shadow: inset 3px 0 0 0 var(--cat, transparent);
+    transition: box-shadow 0.18s ease;
   }
-  .cluster-card:hover {
-    transform: translateY(-3px);
+  .cluster-card:hover, .attn-card:hover {
     box-shadow: inset 3px 0 0 0 var(--cat, transparent), 0 0 0 1px var(--cat, transparent), 0 14px 28px -12px var(--cat, transparent);
   }
+  .cluster-card { transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease; }
+  .cluster-card:hover { transform: translateY(-3px); }
   .status-dot { box-shadow: 0 0 8px currentColor; }
   .status-pulse { animation: statusPulse 2.4s ease-in-out infinite; }
   @keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -73,13 +75,14 @@
   .view-toggle-btn:not(.active) { background: transparent; color: var(--sub); }
   .attn-pill { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 4px 10px; border-radius: 999px; border-width: 1px; border-style: solid; background: rgba(255,255,255,0.03); cursor: pointer; display: inline-flex; align-items: center; transition: background 0.15s ease; }
   .attn-pill:hover { background: rgba(255,255,255,0.08); }
-  .attn-card { transition: border-color 0.15s ease, transform 0.15s ease; cursor: pointer; }
+  .attn-card { transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.18s ease; cursor: pointer; }
   .attn-card:hover { transform: translateX(2px); }
   .cluster-card:focus-visible, .attn-card:focus-visible, .activity-row:focus-visible {
     outline: 1.5px solid var(--hairlineHover);
     outline-offset: 2px;
   }
-  .activity-row { border-radius: 6px; }
+  .activity-row { border-radius: 6px; transition: background 0.12s ease; }
+  .activity-row:hover { background: rgba(255,255,255,0.035); }
   .tag-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: 0.3px; }
   .related-chip-wrap { display: inline-flex; align-items: stretch; border-radius: 5px; overflow: hidden; }
   .related-chip-wrap .tag-chip { border-radius: 5px 0 0 5px; }
@@ -469,8 +472,11 @@
     <div id="gridSkeleton" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-hidden="true"></div>
 
     <div class="mt-10 pt-6 border-t hairline">
-      <h2 class="text-xs font-mono tracking-wide mb-3" style="color: var(--faint)">RECENT ACTIVITY, ACROSS ALL PROJECTS</h2>
-      <div id="activityFeed" class="flex flex-col gap-1.5"></div>
+      <h2 class="text-xs font-mono tracking-wide mb-3 flex items-center gap-2" style="color: var(--faint)">
+        <span aria-hidden="true" style="width:3px; height:11px; background:var(--hairlineHover); border-radius:1px; display:inline-block"></span>
+        RECENT ACTIVITY, ACROSS ALL PROJECTS
+      </h2>
+      <div id="activityFeed" class="flex flex-col gap-0.5"></div>
     </div>
     </main>
   </div>
@@ -742,9 +748,9 @@ function renderActivityFeed() {
   feed.innerHTML = shown.map(c => {
     const color = categoryColor(c.category);
     return `
-      <div class="activity-row flex items-center gap-3 py-1.5 cursor-pointer" data-id="${escapeHtml(c.id)}">
+      <div class="activity-row flex items-center gap-3 py-1.5 px-2 -mx-2 cursor-pointer" data-id="${escapeHtml(c.id)}">
         <span class="text-[10px] font-mono flex-shrink-0" style="color: var(--faint); width: 92px">${relativeTime(c.lastUpdate)}</span>
-        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background: ${color}"></span>
+        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background: ${color}; box-shadow: 0 0 5px ${color}"></span>
         <span class="text-xs font-medium flex-shrink-0" style="color: var(--ink)">${escapeHtml(c.name)}</span>
         <span class="text-xs truncate" style="color: var(--sub)">${escapeHtml(c.summary)}</span>
       </div>
@@ -866,7 +872,10 @@ function renderAttention() {
   }
 
   compact.innerHTML = `
-    <span class="text-[10px] font-mono tracking-wide mr-1" style="color:var(--faint)">NEEDS ATTENTION</span>
+    <span class="text-[10px] font-mono tracking-wide mr-1 flex items-center gap-2" style="color:var(--faint)">
+      <span aria-hidden="true" style="width:3px; height:11px; background:${statusColor('broken')}; border-radius:1px; display:inline-block"></span>
+      NEEDS ATTENTION
+    </span>
     ${flagged.map(c => `
       <button class="attn-pill" data-id="${escapeHtml(c.id)}" style="border-color:${statusColor(c.status)}66; color:${statusColor(c.status)}">
         <span class="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style="background:${statusColor(c.status)}"></span>${escapeHtml(c.name)}
@@ -874,13 +883,13 @@ function renderAttention() {
     `).join('')}
   `;
   cards.innerHTML = flagged.map(c => `
-    <div class="attn-card flex items-center gap-3 rounded-lg px-4 py-3 border" data-id="${escapeHtml(c.id)}" style="border-color:${statusColor(c.status)}40; background: rgba(255,255,255,0.02)">
+    <div class="attn-card cursor-pointer flex items-center gap-3 rounded-lg px-4 py-3 border hairline" data-id="${escapeHtml(c.id)}" style="background: var(--panel); --cat: ${statusColor(c.status)};">
       <div class="w-2 h-2 rounded-full flex-shrink-0 status-dot" style="background:${statusColor(c.status)}; color:${statusColor(c.status)}"></div>
       <div class="min-w-0 flex-1">
         <div class="font-display font-700 text-sm" style="color: var(--ink)">${escapeHtml(c.name)}</div>
         <div class="text-xs truncate" style="color: var(--sub)">${escapeHtml(c.summary)}</div>
       </div>
-      <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
+      <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${escapeHtml(c.status.toUpperCase())}</span>
     </div>
   `).join('');
 
@@ -1382,7 +1391,7 @@ function renderCategoryFilter() {
     const cat = g.category;
     const color = categoryColor(cat);
     const active = activeCategory === cat;
-    return `<button type="button" class="tag-chip cat-filter-chip" data-category="${escapeHtml(cat)}" aria-pressed="${active}" style="background:${color}1F; color:${color}; ${active ? `outline: 1.5px solid ${color};` : ''}">${escapeHtml(cat.toUpperCase())} (${g.items.length})</button>`;
+    return `<button type="button" class="tag-chip cat-filter-chip inline-flex items-center gap-1.5" data-category="${escapeHtml(cat)}" aria-pressed="${active}" style="background:${color}1F; color:${color}; ${active ? `outline: 1.5px solid ${color};` : ''}"><span class="w-1.5 h-1.5 rounded-full inline-block" style="background:${color}"></span>${escapeHtml(cat.toUpperCase())} (${g.items.length})</button>`;
   }).join('');
   row.querySelectorAll('.cat-filter-chip').forEach(el => {
     el.addEventListener('click', () => toggleCategoryFilter(el));
