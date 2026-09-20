@@ -2346,6 +2346,20 @@
     return 7;
   }
 
+  // Real B2B cold-outreach cadence practice spaces follow-ups in business
+  // days, not calendar days, since a nudge that lands on a Saturday or
+  // Sunday sits at the bottom of a Monday-morning inbox and reads as
+  // low-effort. A plain +N-days offset from a Thursday or Friday touch
+  // lands squarely on a weekend, so the suggestion below rolls forward to
+  // the next Monday instead of proposing a weekend send.
+  function rollToWeekdayIso(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    const day = d.getDay();
+    if (day === 6) d.setDate(d.getDate() + 2);
+    else if (day === 0) d.setDate(d.getDate() + 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   // The two fields this project has found most predictive of a real reply
   // (see the contact-channel callout in index.html). Warn right where
   // outreach is actually about to be logged as sent, not only after the
@@ -2572,6 +2586,7 @@
       if (doNotNudgeBefore && isValidDateStr(doNotNudgeBefore) && doNotNudgeBefore > suggestedDate) {
         suggestedDate = doNotNudgeBefore;
       }
+      suggestedDate = rollToWeekdayIso(suggestedDate);
       suggestDateInput.value = suggestedDate;
       suggestActionInput.value = nextTouchNumber > COLD_TOUCH_THRESHOLD
         ? 'Reconsider hook/channel before touch #' + nextTouchNumber + ', ' + thisTouchNumber + ' touches with no reply so far'
