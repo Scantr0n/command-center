@@ -2,6 +2,7 @@ let listings = [];
 let salesLog = [];
 let expensesLog = [];
 let disputesLog = [];
+let suppliesLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 let sortKey = null;
@@ -13,6 +14,7 @@ let rawActivityData = null;
 let rawSalesData = null;
 let rawExpensesData = null;
 let rawDisputesData = null;
+let rawSuppliesData = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
@@ -67,6 +69,16 @@ const DISPUTE_STATUS_LABELS = {
   open: 'Open', 'resolved-seller': "Resolved, seller's favor",
   'resolved-buyer': "Resolved, buyer's favor", 'resolved-split': 'Resolved, split'
 };
+const SUPPLY_CATEGORY_LABELS = {
+  box: 'Box', mailer: 'Poly mailer', envelope: 'Envelope', tape: 'Tape', label: 'Label', other: 'Other'
+};
+
+// Only fires once both real numbers are on file, same "leave it honestly
+// unknown rather than guess" rule as every other computed field on this
+// page: a count with no reorder point set yet can't be judged low or not.
+function isSupplyLowStock(s) {
+  return s.qtyOnHand != null && s.reorderThreshold != null && s.qtyOnHand <= s.reorderThreshold;
+}
 
 // Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
 // Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
@@ -298,13 +310,14 @@ function renderChangelog(data) {
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
   loadChangelog();
-  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
     fetchJson('/garage/data/activity.json'),
     fetchJson('/garage/data/sales.json'),
     fetchJson('/garage/data/expenses.json'),
-    fetchJson('/garage/data/disputes.json')
+    fetchJson('/garage/data/disputes.json'),
+    fetchJson('/garage/data/supplies.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
@@ -312,27 +325,30 @@ async function loadData() {
   const salesData = salesResult.status === 'fulfilled' ? salesResult.value.data : null;
   const expensesData = expensesResult.status === 'fulfilled' ? expensesResult.value.data : null;
   const disputesData = disputesResult.status === 'fulfilled' ? disputesResult.value.data : null;
+  const suppliesData = suppliesResult.status === 'fulfilled' ? suppliesResult.value.data : null;
   rawListingsData = listingsData;
   rawPipelineData = pipelineData;
   rawActivityData = activityData;
   rawSalesData = salesData;
   rawExpensesData = expensesData;
   rawDisputesData = disputesData;
+  rawSuppliesData = suppliesData;
   const backupBtn = document.getElementById('backupBtn');
-  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData);
+  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
   const expenses = (expensesData && expensesData.expenses) || [];
   const disputes = (disputesData && disputesData.disputes) || [];
+  const supplies = (suppliesData && suppliesData.supplies) || [];
 
-  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult]
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult]
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value.lastModified));
 
   if (listingsData) {
     listings = listingsData.listings || [];
-    renderStats(listings, stages, sales, expenses);
+    renderStats(listings, stages, sales, expenses, supplies);
     renderDelistList(listings);
     renderDataQuality(listings);
     renderDuplicates(listings);
@@ -427,6 +443,18 @@ async function loadData() {
     document.getElementById('disputesTotals').innerHTML = '';
   }
 
+  if (suppliesData) {
+    suppliesLog = supplies;
+    renderSupplies(supplies);
+  } else {
+    suppliesLog = [];
+    document.getElementById('suppliesTableBody').innerHTML = '';
+    const suppliesEmpty = document.getElementById('suppliesTableEmpty');
+    suppliesEmpty.hidden = false;
+    suppliesEmpty.setAttribute('role', 'alert');
+    suppliesEmpty.textContent = "Couldn't load supplies data: " + suppliesResult.reason.message;
+  }
+
   initTableScrollShadows();
 }
 
@@ -460,9 +488,10 @@ function bestCaseTotalPayout(live) {
   }, 0);
 }
 
-function renderStats(listings, stages, sales, expenses) {
+function renderStats(listings, stages, sales, expenses, supplies) {
   sales = sales || [];
   expenses = expenses || [];
+  supplies = supplies || [];
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
   const platformCounts = {};
@@ -493,6 +522,8 @@ function renderStats(listings, stages, sales, expenses) {
   // real $0 logged so far if none exist yet, never estimated.
   const netIncomeTracked = salesWithCost.length > 0;
   const netIncome = realizedProfit - totalExpenses;
+  const suppliesCounted = supplies.filter(s => s.qtyOnHand != null && s.reorderThreshold != null);
+  const lowStockCount = suppliesCounted.filter(isSupplyLowStock).length;
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -509,7 +540,8 @@ function renderStats(listings, stages, sales, expenses) {
     { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have at least one logged` : 'No sale has a cost basis or shipping cost logged yet' },
     { value: expenses.length, label: 'Business expenses logged', sub: expenses.length ? null : 'None yet' },
     { value: formatUsd(totalExpenses), label: 'Real business expenses', sub: uncomputedExpenseCount ? `${uncomputedExpenseCount} of ${expenses.length} not counted yet, missing amount or a usable mileage rate` : (expenses.length ? 'For Schedule C, not tax advice' : 'No expenses logged yet') },
-    { value: netIncomeTracked ? formatUsd(netIncome) : 'not tracked yet', label: 'Net business income', sub: netIncomeTracked ? (expenses.length ? 'Realized profit minus real logged expenses' : 'Realized profit minus $0, no expenses logged yet') : 'Needs at least one sale with cost basis or shipping logged', warn: netIncomeTracked && netIncome < 0 }
+    { value: netIncomeTracked ? formatUsd(netIncome) : 'not tracked yet', label: 'Net business income', sub: netIncomeTracked ? (expenses.length ? 'Realized profit minus real logged expenses' : 'Realized profit minus $0, no expenses logged yet') : 'Needs at least one sale with cost basis or shipping logged', warn: netIncomeTracked && netIncome < 0 },
+    { value: lowStockCount, label: 'Supplies low on stock', sub: supplies.length ? `${suppliesCounted.length}/${supplies.length} have both a count and a reorder point logged` : 'No supplies logged yet', warn: lowStockCount > 0 }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -2358,6 +2390,44 @@ function renderDisputes(disputes) {
     </p>`;
 }
 
+function supplyStatusCell(s) {
+  if (s.qtyOnHand == null) return '<span class="cell-value empty">not counted yet</span>';
+  if (s.reorderThreshold == null) return '<span class="cell-value empty">no reorder point set</span>';
+  return isSupplyLowStock(s)
+    ? '<span class="badge badge-due">Low stock, reorder</span>'
+    : '<span class="badge badge-fresh">In stock</span>';
+}
+
+// Sorted low-stock-first (nulls, i.e. not yet judgeable, sort last) so the
+// one thing that actually needs action surfaces at the top of the table
+// rather than wherever it happens to sit in supplies.json.
+function renderSupplies(supplies) {
+  const tbody = document.getElementById('suppliesTableBody');
+  const empty = document.getElementById('suppliesTableEmpty');
+
+  if (!supplies.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No supplies logged yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...supplies].sort((a, b) => Number(isSupplyLowStock(b)) - Number(isSupplyLowStock(a)));
+
+  tbody.innerHTML = sorted.map(s => `
+    <tr>
+      <td><div class="cell-card-name">${escapeHtml(s.name || 'Untitled supply')}</div></td>
+      <td class="cell-muted">${s.category ? escapeHtml(SUPPLY_CATEGORY_LABELS[s.category] || s.category) : ''}</td>
+      <td class="cell-value${s.qtyOnHand == null ? ' empty' : ''}">${s.qtyOnHand != null ? s.qtyOnHand : 'not logged'}</td>
+      <td class="cell-value${s.reorderThreshold == null ? ' empty' : ''}">${s.reorderThreshold != null ? s.reorderThreshold : 'not set'}</td>
+      <td>${supplyStatusCell(s)}</td>
+      <td class="cell-muted">${s.lastRestocked ? escapeHtml(s.lastRestocked) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-muted">${s.notes ? escapeHtml(s.notes) : ''}</td>
+    </tr>
+  `).join('');
+}
+
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchTerm = e.target.value;
   applyFiltersAndRender();
@@ -3197,7 +3267,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // diffed against or restored from a known-good copy. Local download only,
 // nothing is sent anywhere. Same approach as CSM's own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData) return;
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center Garage (/garage), local download only',
@@ -3206,7 +3276,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
     activityJson: rawActivityData,
     salesJson: rawSalesData,
     expensesJson: rawExpensesData,
-    disputesJson: rawDisputesData
+    disputesJson: rawDisputesData,
+    suppliesJson: rawSuppliesData
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -3313,6 +3384,31 @@ document.getElementById('disputesCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'garage-disputes-' + todayDateStr() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const SUPPLIES_CSV_COLUMNS = [
+  ['name', 'Supply'], ['category', 'Category'], ['qtyOnHand', 'Qty on hand'],
+  ['reorderThreshold', 'Reorder at'], ['lastRestocked', 'Last restocked'], ['notes', 'Notes']
+];
+
+// Exports every real logged supply, in the same low-stock-first order as
+// the on-page table.
+document.getElementById('suppliesCsvBtn').addEventListener('click', () => {
+  const rows = [...suppliesLog]
+    .sort((a, b) => Number(isSupplyLowStock(b)) - Number(isSupplyLowStock(a)))
+    .map(s => ({ ...s, category: SUPPLY_CATEGORY_LABELS[s.category] || s.category || '' }));
+  const header = SUPPLIES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(s => SUPPLIES_CSV_COLUMNS.map(([key]) => csvField(s[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-supplies-' + todayDateStr() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -3937,6 +4033,86 @@ function wireQuickLogDisputeTool() {
   });
 }
 
+// Same quick-log convention as the sale/expense/dispute tools above, for
+// supplies.json. qtyOnHand and reorderThreshold are whole-number counts, not
+// dollar amounts, so they get their own non-negative-integer check rather
+// than reusing readOptionalNonNegativeInput (which allows a fraction like
+// "2.5 boxes", not a real count).
+function readOptionalNonNegativeInteger(el) {
+  const raw = el.value.trim();
+  if (raw === '') return null;
+  const n = Number(raw);
+  return Number.isNaN(n) || n < 0 || !Number.isInteger(n) ? undefined : n;
+}
+
+function wireQuickLogSupplyTool() {
+  const form = document.getElementById('quickSupplyForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('nsuWarnings');
+  const output = document.getElementById('nsuOutput');
+  const copyBtn = document.getElementById('nsuCopyBtn');
+  const live = document.getElementById('quickLogSupplyLive');
+  const draftGuard = attachDraftGuard(form, 'garage-nsu-draft-v1', {
+    bannerId: 'nsuDraftBanner', timeId: 'nsuDraftBannerTime', discardId: 'nsuDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('nsuId').value.trim();
+    const name = document.getElementById('nsuName').value.trim();
+    const category = document.getElementById('nsuCategory').value;
+    const qtyOnHand = readOptionalNonNegativeInteger(document.getElementById('nsuQty'));
+    const reorderThreshold = readOptionalNonNegativeInteger(document.getElementById('nsuThreshold'));
+    const lastRestocked = document.getElementById('nsuRestocked').value || null;
+    const notes = document.getElementById('nsuNotes').value.trim() || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (suppliesLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another supply, ids must be unique.');
+    }
+    if (!name) blockers.push('A name is required.');
+    if (!category) blockers.push('Select a category.');
+    if (qtyOnHand === undefined) blockers.push('Enter a valid whole-number quantity of 0 or more, or leave it blank.');
+    if (reorderThreshold === undefined) blockers.push('Enter a valid whole-number reorder point of 0 or more, or leave it blank.');
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const supply = { id, name, category, qtyOnHand, reorderThreshold, lastRestocked, notes };
+
+    if (qtyOnHand == null) {
+      advisory.push('No quantity logged yet, low-stock check can\'t run until a real count is entered.');
+    } else if (reorderThreshold == null) {
+      advisory.push('Quantity logged but no reorder point set, low-stock check can\'t fire without both.');
+    } else if (isSupplyLowStock(supply)) {
+      advisory.push('Already at or below the reorder point, this will show as low stock right away.');
+    }
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(supply, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Supply JSON copied to clipboard.';
+      draftGuard.clearDraft();
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 // AI photo-to-listing drafter. Two-stage flow: stage 1 (draft) sends real
 // item photos to /api/garage/draft-listing and shows every field with its
 // confidence and reasoning, purely informational, nothing saved. Stage 2
@@ -4236,6 +4412,7 @@ wireQuickLogTool();
 wireQuickLogSaleTool();
 wireQuickLogExpenseTool();
 wireQuickLogDisputeTool();
+wireQuickLogSupplyTool();
 wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();

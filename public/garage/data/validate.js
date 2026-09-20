@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
  * Validates listings.json, pipeline.json, activity.json, sales.json,
- * expenses.json and disputes.json against the field rules documented in
- * public/garage/index.html.
+ * expenses.json, disputes.json, and supplies.json against the field rules
+ * documented in public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -24,7 +24,10 @@
  * since a mileage deduction with no rate to apply it against isn't a real
  * number yet. Every disputes.json entry needs a real type and status, an
  * "open" dispute shouldn't already carry a resolvedDate and a resolved one
- * should, and a resolvedDate can't fall before its own openedDate.
+ * should, and a resolvedDate can't fall before its own openedDate. Every
+ * supplies.json entry needs a real name and a real category; a logged
+ * "qtyOnHand" with no "reorderThreshold" set can't ever trigger a low-stock
+ * warning on the page, so that gap is flagged here too.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -53,6 +56,7 @@ const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptio
 const LISTING_CATEGORIES = ['shoes'];
 const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
+const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
 // Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
 // Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
 // announced 2026-07-13 (irs.gov/newsroom: "IRS sets 2026 business standard
@@ -106,7 +110,7 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData;
+  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
@@ -114,6 +118,7 @@ function main() {
     salesData = loadJson('sales.json');
     expensesData = loadJson('expenses.json');
     disputesData = loadJson('disputes.json');
+    suppliesData = loadJson('supplies.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -468,6 +473,58 @@ function main() {
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
+  const supplies = suppliesData.supplies || [];
+  const seenSupplyIds = new Set();
+
+  supplies.forEach((s, idx) => {
+    const where = 'supplies[' + idx + ']' + (s && s.id ? ' (' + s.id + ')' : '');
+
+    if (!s.id) errors.push(where + ': missing "id"');
+    else if (seenSupplyIds.has(s.id)) errors.push(where + ': duplicate id "' + s.id + '"');
+    else seenSupplyIds.add(s.id);
+
+    if (!s.name) errors.push(where + ': missing "name"');
+
+    if (!s.category) {
+      errors.push(where + ': missing "category"');
+    } else if (!SUPPLY_CATEGORIES.includes(s.category)) {
+      errors.push(where + ': category "' + s.category + '" is not one of ' + SUPPLY_CATEGORIES.join(', '));
+    }
+
+    if (s.qtyOnHand !== null && s.qtyOnHand !== undefined) {
+      if (typeof s.qtyOnHand !== 'number' || s.qtyOnHand < 0 || !Number.isInteger(s.qtyOnHand)) {
+        errors.push(where + ': "qtyOnHand" must be a non-negative integer or null');
+      }
+    }
+
+    if (s.reorderThreshold !== null && s.reorderThreshold !== undefined) {
+      if (typeof s.reorderThreshold !== 'number' || s.reorderThreshold < 0 || !Number.isInteger(s.reorderThreshold)) {
+        errors.push(where + ': "reorderThreshold" must be a non-negative integer or null');
+      }
+    }
+
+    if (!isDateOrNull(s.lastRestocked)) {
+      errors.push(where + ': "lastRestocked" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.lastRestocked));
+    }
+
+    if (s.notes !== null && s.notes !== undefined && typeof s.notes !== 'string') {
+      errors.push(where + ': "notes" must be a string or null');
+    }
+
+    // Mirrors the mileage-with-no-rate gap above: a real count with no real
+    // reorder point logged can never actually trip the low-stock badge the
+    // page computes from both fields together, so it's flagged the same way
+    // a mileage expense with no computable amount is.
+    if (s.qtyOnHand == null) {
+      warnings.push(where + ': no "qtyOnHand" logged yet, low-stock check can\'t run until a real count is entered');
+    } else if (s.reorderThreshold == null) {
+      warnings.push(where + ': "qtyOnHand" is logged but "reorderThreshold" is not, low-stock check can\'t fire without both');
+    }
+
+    emDashFields(s, ['name', 'notes']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
+  });
+
   // Every soldOn entry should have a matching sale logged, since a platform
   // only belongs in soldOn once something has actually sold there.
   listings.forEach(l => {
@@ -527,7 +584,7 @@ function main() {
 
   console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
     events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
-    disputes.length + ' dispute(s)).');
+    disputes.length + ' dispute(s), ' + supplies.length + ' suppl' + (supplies.length === 1 ? 'y' : 'ies') + ').');
   process.exit(0);
 }
 
@@ -551,7 +608,7 @@ function checkChangelogFreshness(warnings) {
     if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: DATA_DIR, encoding: 'utf8' }).trim() === 'true') return;
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
-      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json'
+      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json'
     ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
     const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     let changelogData = null;

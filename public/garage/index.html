@@ -810,6 +810,104 @@
     </details>
   </section>
 
+  <section id="suppliesSection">
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Shipping supplies inventory</h2>
+      <button type="button" id="suppliesCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
+    <div class="callout">
+      Real on-hand counts of the boxes, mailers, envelopes, tape, and labels the packaging rules above call for,
+      not connected to anything else, purely what's been hand-counted and logged in <code>supplies.json</code>.
+      Nothing here is estimated: a supply with no real <code>qtyOnHand</code> logged yet shows as such, and a
+      "Low stock" badge only ever appears once both a real count and a real reorder point are on file. Worth
+      building out before the 48 ready-to-post Depop drafts start shipping and burn through what's on hand faster
+      than the 3 items live right now.
+    </div>
+
+    <details class="schema-help" id="quickLogSupplyTool">
+      <summary>Quick log a supply (generates JSON to paste into supplies.json, saves nothing)</summary>
+      <div class="schema-help-body">
+        <p>Runs the same checks <code>node public/garage/data/validate.js</code> does on <code>supplies.json</code>
+          (a unique id, a real name and category, whole-number quantities), then builds the JSON object to paste
+          into the <code>supplies</code> array yourself. Fields:</p>
+        <table class="schema-table">
+          <tbody>
+            <tr><th>id</th><td>Unique slug, e.g. <code>"poly-mailer-10x13"</code></td></tr>
+            <tr><th>name</th><td>What it actually is, e.g. <code>"10x13 poly mailers"</code></td></tr>
+            <tr><th>category</th><td>One of: <code>box</code>, <code>mailer</code>, <code>envelope</code>,
+              <code>tape</code>, <code>label</code>, <code>other</code></td></tr>
+            <tr><th>qtyOnHand</th><td>Real whole-number count on hand right now, or <code>null</code> until
+              counted. Never estimated.</td></tr>
+            <tr><th>reorderThreshold</th><td>The real whole-number count at which it's time to reorder, or
+              <code>null</code> until you've decided one. Both this and <code>qtyOnHand</code> need to be real
+              numbers before the table below can flag anything as low stock.</td></tr>
+            <tr><th>lastRestocked</th><td>ISO date (<code>YYYY-MM-DD</code>) of the last real restock, or
+              <code>null</code> if not tracked yet</td></tr>
+            <tr><th>notes</th><td>Free text, e.g. which supplier or where it's stored, or <code>null</code></td></tr>
+          </tbody>
+        </table>
+        <p>This never writes a file or sends anything, it only puts text on your clipboard.</p>
+
+        <div id="nsuDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="nsuDraftBannerTime"></span>, this form is autosaved to
+            this browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="nsuDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
+
+        <div class="quick-log-grid">
+          <form class="quick-log-form" id="quickSupplyForm">
+            <h3 class="quick-log-title font-mono">New supply &rarr; supplies.json</h3>
+            <label class="quick-log-label" for="nsuId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="nsuId" placeholder="e.g. poly-mailer-10x13" required>
+            <label class="quick-log-label" for="nsuName">Name</label>
+            <input class="quick-log-input" type="text" id="nsuName" placeholder="What it actually is" required>
+            <label class="quick-log-label" for="nsuCategory">Category</label>
+            <select class="quick-log-input" id="nsuCategory" required>
+              <option value="" disabled selected>Select a category</option>
+              <option value="box">Box</option>
+              <option value="mailer">Poly mailer</option>
+              <option value="envelope">Envelope</option>
+              <option value="tape">Tape</option>
+              <option value="label">Label</option>
+              <option value="other">Other</option>
+            </select>
+            <label class="quick-log-label" for="nsuQty">Qty on hand (optional, whole number)</label>
+            <input class="quick-log-input" type="number" id="nsuQty" min="0" step="1">
+            <label class="quick-log-label" for="nsuThreshold">Reorder at (optional, whole number)</label>
+            <input class="quick-log-input" type="number" id="nsuThreshold" min="0" step="1">
+            <label class="quick-log-label" for="nsuRestocked">Last restocked (optional)</label>
+            <input class="quick-log-input" type="date" id="nsuRestocked">
+            <label class="quick-log-label" for="nsuNotes">Notes (optional)</label>
+            <input class="quick-log-input" type="text" id="nsuNotes">
+            <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+            <div class="quick-log-warnings" id="nsuWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="nsuOutput" readonly rows="9" hidden aria-label="Generated supply JSON, ready to paste into the supplies array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="nsuCopyBtn" hidden>Copy JSON</button>
+            <p class="quick-log-hint" id="quickLogSupplyLive" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <div class="table-wrap">
+      <table class="card-table" id="suppliesTable">
+        <thead>
+          <tr>
+            <th>Supply</th>
+            <th>Category</th>
+            <th>Qty on hand</th>
+            <th>Reorder at</th>
+            <th>Status</th>
+            <th>Last restocked</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="suppliesTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="suppliesTableEmpty" hidden></div>
+    </div>
+  </section>
+
   <section id="electronicsRulesSection">
     <details class="section-details" id="electronicsRulesDetails">
     <summary class="section-title">Electronics &amp; battery-item rules by platform</summary>
