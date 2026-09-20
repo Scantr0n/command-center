@@ -644,6 +644,40 @@ app.get('/api/sondrik/changelog-status', (req, res) => {
   }
 });
 
+// Same pattern as /api/sondrik/changelog-status just above: validate.js's own
+// changelog-drift check for status.json only ever ran from the command line,
+// so a real drift here would go unnoticed on the live page the same way it
+// did for Sondrik until someone happened to run the CLI validator. Exposed
+// read-only so the Data changelog section on the Alpha page itself can flag
+// a real drift instead of silently showing a changelog that's fallen behind.
+app.get('/api/alpha/changelog-status', (req, res) => {
+  const dataDir = path.join(__dirname, 'public', 'alpha', 'data');
+  try {
+    // Same shallow-clone guard as the Sondrik route: a shallow clone's
+    // `git log` for status.json only sees the commits actually fetched, not
+    // the real full history, which would report drift that isn't real.
+    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() === 'true') {
+      throw new Error('shallow clone');
+    }
+    const realHashesRaw = execFileSync('git', [
+      'log', '--format=%H', '--', 'status.json'
+    ], { cwd: dataDir, encoding: 'utf8' }).trim();
+    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
+    const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
+    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+    res.json({
+      drifted: recordedHashes.join(',') !== realHashes.join(','),
+      recordedCount: recordedHashes.length,
+      realCount: realHashes.length
+    });
+  } catch (err) {
+    // Not a git checkout, git isn't on PATH, or changelog.json is missing:
+    // an environment gap, not a real drift, so this stays a quiet false
+    // rather than a page warning no one can act on.
+    res.json({ drifted: false, unavailable: true });
+  }
+});
+
 const PORT = process.env.PORT || 4488;
 app.listen(PORT, () => {
   console.log(`Command Center running at http://localhost:${PORT}`);

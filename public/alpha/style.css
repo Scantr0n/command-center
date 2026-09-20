@@ -187,6 +187,12 @@ header.page-head .sub {
 .callout strong { color: var(--ink); }
 .callout-good { border-color: rgba(61,220,132,0.28); background: rgba(61,220,132,0.05); }
 .callout-good strong { color: #3DDC84; }
+/* Same amber used everywhere else on this page for "stale, not wrong" (see
+   .conn-dot.stale, .section-title-meta.warn). Used for the changelog drift
+   warning: a real mismatch between changelog.json and git history, not an
+   error in the page itself. */
+.callout-warn { border-color: rgba(224,160,48,0.32); background: rgba(224,160,48,0.06); margin-bottom: 14px; }
+.callout-warn strong { color: #E0A030; }
 
 /* Offline banner: distinct from the connection strip below, which reports
    whether Alpha itself is reachable. This reports whether Jack's own device

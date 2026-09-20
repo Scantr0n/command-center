@@ -1524,12 +1524,25 @@ function renderEventLog(data) {
 // repo instead of resting on a hand-typed claim. Missing entirely (never
 // generated yet, or a fresh clone before anyone ran it) is an honest empty
 // state, not an error.
-function renderChangelog(data) {
+function renderChangelog(data, driftStatus) {
   const section = document.getElementById('changelogSection');
   if (!section) return;
+  // Same drift check validate.js already runs from the command line
+  // (comparing changelog.json's recorded commit hashes for status.json
+  // against this repo's real git log), surfaced here so a real drift shows
+  // up on the live page itself instead of only when someone happens to run
+  // the CLI validator. "unavailable" (not a git checkout, shallow clone,
+  // etc) is an environment gap, not a data error, so it stays silent.
+  const driftWarning = (driftStatus && driftStatus.drifted)
+    ? `<div class="callout callout-warn">
+        <strong>Changelog is out of sync.</strong> changelog.json records ${driftStatus.recordedCount}
+        commit${driftStatus.recordedCount === 1 ? '' : 's'} for status.json, but this repo's real git history has
+        ${driftStatus.realCount}. Run <code>node public/alpha/data/changelog.js</code> to regenerate it.
+      </div>`
+    : '';
   const entries = (data && Array.isArray(data.entries)) ? data.entries : [];
   if (!entries.length) {
-    section.innerHTML = `
+    section.innerHTML = driftWarning + `
       <div class="empty-panel">
         <div class="empty-panel-title font-mono">NO CHANGELOG GENERATED YET</div>
         <div class="empty-panel-sub">
@@ -1553,25 +1566,33 @@ function renderChangelog(data) {
   const generatedNote = data.generatedAt
     ? 'Generated ' + escapeHtml(fmtDate((data.generatedAt || '').slice(0, 10)) || 'at an unknown time') + '.'
     : '';
-  section.innerHTML = `
+  section.innerHTML = driftWarning + `
     <ol class="changelog-list" aria-label="Real git commit history of status.json, most recent first">${items}</ol>
     <p class="changelog-generated-note font-mono">${generatedNote}</p>
   `;
 }
 
 async function loadChangelog() {
+  // The drift check is best-effort and independent of the changelog fetch
+  // itself (it can be unavailable, e.g. no git checkout, while the
+  // changelog still loads fine), so a failure here never blocks rendering
+  // the changelog entries.
+  const driftPromise = fetch('/api/alpha/changelog-status')
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
   try {
     const res = await fetch('/alpha/data/changelog.json?t=' + Date.now());
+    const driftStatus = await driftPromise;
     if (!res.ok) {
       // A fresh clone before anyone has ever run changelog.js means the
       // file just doesn't exist yet, an honest empty state, not a page
       // error worth surfacing as one.
-      renderChangelog({ entries: [] });
+      renderChangelog({ entries: [] }, driftStatus);
       return;
     }
-    renderChangelog(await res.json());
+    renderChangelog(await res.json(), driftStatus);
   } catch (e) {
-    renderChangelog({ entries: [] });
+    renderChangelog({ entries: [] }, await driftPromise);
   }
 }
 
