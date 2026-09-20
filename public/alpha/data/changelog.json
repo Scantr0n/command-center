@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-20T03:52:21.555Z",
+  "generatedAt": "2026-09-20T04:33:56.688Z",
   "generatedFrom": "git log over public/alpha/data/{status.json}, run node public/alpha/data/changelog.js to refresh",
   "entries": [
     {
@@ -14,8 +14,8 @@
       ]
     },
     {
-      "hash": "ba16c3c",
-      "fullHash": "ba16c3c787d1bf08bdb985782f261befcbb5dcbd",
+      "hash": "8ce3820",
+      "fullHash": "8ce38204e43a2031b5d3031ad39e1bb2deadacd9",
       "date": "2026-09-19",
       "author": "Claude",
       "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
