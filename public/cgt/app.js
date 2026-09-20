@@ -538,7 +538,7 @@ async function loadCards() {
     rawCardsData = data;
     const backupBtn = document.getElementById('backupBtn');
     backupBtn.disabled = false;
-    backupBtn.title = '';
+    backupBtn.title = (rawSubmissionsData && rawCandidatesData) ? '' : 'Some data failed to load, backup will only include what actually loaded';
     renderStats();
     renderCandidates();
     renderSubmissions();
@@ -566,8 +566,14 @@ async function loadCards() {
     errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load cards.json: " + e.message;
     const backupBtn = document.getElementById('backupBtn');
-    backupBtn.disabled = true;
-    backupBtn.title = "Can't back up, cards.json failed to load (see below)";
+    // cards.json failing doesn't mean submissions.json/candidates.json did:
+    // loadSubmissions/loadCandidates above already ran and set their own raw
+    // data independently, so a backup covering just those two real loaded
+    // files is still worth offering rather than blocking on cards.json alone.
+    backupBtn.disabled = !rawSubmissionsData && !rawCandidatesData;
+    backupBtn.title = backupBtn.disabled
+      ? "Can't back up, no data loaded (see errors below)"
+      : "Can't back up cards.json (see below), backup will only include submissions/candidates data";
   }
 }
 
@@ -3263,7 +3269,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // Local download only, nothing is sent anywhere. Same approach as CSM's
 // own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawCardsData) return;
+  if (!rawCardsData && !rawSubmissionsData && !rawCandidatesData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center CGT inventory (/cgt), local download only',
