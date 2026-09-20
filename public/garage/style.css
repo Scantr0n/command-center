@@ -1332,6 +1332,17 @@ textarea.np-input { resize: vertical; }
 
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
+  /* Real bug already found and fixed on Command Center's main dashboard,
+     CGT, Alpha, and CSM tonight, same root cause here: this block resets
+     body's own color but never redefines --ink/--sub/--dim/--accent
+     themselves. Confirmed real cases: .section-title (--sub), Kanban card
+     titles using --ink directly (near-invisible on white, 1.08:1), the
+     seasonal guide's current-month row highlight using --accent. */
+  :root {
+    --void: #ffffff; --panel: #ffffff; --panelLight: #ffffff;
+    --hairline: #cccccc; --hairlineHover: #999999;
+    --ink: #111111; --sub: #444444; --dim: #666666; --accent: #A85A2E;
+  }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
 
@@ -1343,7 +1354,7 @@ textarea.np-input { resize: vertical; }
      on paper. */
   .section-details > summary.section-title::before { display: none; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .jump-nav-fab, #calcSection, #photoAuditSection, #paceSection, #poshmarkShareSection {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .jump-nav-fab, #calcSection, #photoAuditSection, #paceSection, #poshmarkShareSection, .view-toggle-group {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
