@@ -1805,13 +1805,14 @@ function renderGradeLadderFlags() {
   });
 }
 
-// Same attention-bar convention as CSM's own renderAttentionBar: these five
-// panels (unpriced, data quality, stale pricing, duplicates, grade ladder)
-// each already hide themselves when nothing's flagged, but each one only
-// becomes visible by scrolling past every section above it, so a real flag
-// buried near the bottom of the page could go unnoticed for a long time.
-// This click-to-scroll summary surfaces all five up top instead, hidden
-// entirely (not an empty bar) when every one of them has nothing flagged.
+// Same attention-bar convention as CSM's own renderAttentionBar: these
+// panels (unpriced, data quality, stale pricing, duplicates, grade ladder,
+// candidates stuck without a verdict) each already hide themselves when
+// nothing's flagged, but each one only becomes visible by scrolling past
+// every section above it, so a real flag buried near the bottom of the page
+// could go unnoticed for a long time. This click-to-scroll summary surfaces
+// all of them up top instead, hidden entirely (not an empty bar) when every
+// one of them has nothing flagged.
 function renderAttentionBar() {
   const bar = document.getElementById('attentionBar');
   const realCards = cards.filter(c => !isExample(c));
@@ -1820,6 +1821,13 @@ function renderAttentionBar() {
   const stalePricingCount = buildStalePricingFlags().length;
   const duplicateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateGroups(realCards).length : 0;
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
+  // A candidate still being weighed (no decision logged yet) but missing
+  // expectedGradedValue/estimatedGradingCost can't get a real verdict out of
+  // computeGradingMath, so it sits stuck at "Needs more data" until that
+  // research gets filled in. That's easy to miss since the verdict chips
+  // just show it as one bucket among four rather than flagging it as a gap.
+  const openCandidates = candidates.filter(c => !isExampleCandidate(c) && !c.decision);
+  const candidatesNeedingDataCount = openCandidates.filter(c => !computeGradingMath(c)).length;
 
   const items = [];
   if (unpricedCount) {
@@ -1836,6 +1844,15 @@ function renderAttentionBar() {
   }
   if (gradeLadderCount) {
     items.push({ n: gradeLadderCount, target: 'gradeLadderSection', label: gradeLadderCount === 1 ? 'grade ladder inversion' : 'grade ladder inversions' });
+  }
+  if (candidatesNeedingDataCount) {
+    items.push({
+      n: candidatesNeedingDataCount,
+      target: 'candidatesSection',
+      label: candidatesNeedingDataCount === 1
+        ? 'open candidate has no verdict yet, needs graded-value research'
+        : 'open candidates have no verdict yet, need graded-value research'
+    });
   }
 
   if (!items.length) {
