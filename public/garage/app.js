@@ -3570,9 +3570,19 @@ function initPhotoAudit() {
         renderPhotoAuditResults(results, loaded, files.length, landscapeFlagged, smallFlagged);
       };
       img.onerror = () => {
-        if (runId !== auditRunId) { URL.revokeObjectURL(url); return; }
+        // Unlike the onload path above, a failed card never gets an <img>
+        // tag (renderPhotoAuditResults only shows a "couldn't read image"
+        // badge for it), so the re-selection cleanup at the top of this
+        // handler, which only revokes URLs still attached to a rendered
+        // <img>, never reaches this one. Revoked right here instead, same
+        // as resizeImageForDraft's own onerror does for the identical
+        // failure case, so a batch with an unreadable file (HEIC, a
+        // non-image dropped in by mistake) doesn't leak its blob for the
+        // rest of the page session.
+        URL.revokeObjectURL(url);
+        if (runId !== auditRunId) return;
         loaded++;
-        results[i] = { file, url, failed: true };
+        results[i] = { file, failed: true };
         renderPhotoAuditResults(results, loaded, files.length, landscapeFlagged, smallFlagged);
       };
       img.src = url;
