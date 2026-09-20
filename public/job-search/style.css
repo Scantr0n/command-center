@@ -518,7 +518,7 @@ footer.page-foot code { overflow-wrap: anywhere; }
   /* .callout-warning strong (the "automation currently paused" notice, a
      real amber #E0A030 added tonight) has the same specificity as the rule
      above and, measured directly, kept winning over it despite appearing
-     earlier in source order — same real ambiguity hit on CGT's card-table
+     earlier in source order, same real ambiguity hit on CGT's card-table
      header fix tonight, forced the same way rather than left unresolved. */
   .callout-warning strong { color: #111 !important; }
   .snapshot-chip, .lead-card, .criteria-item, .dealbreaker-item, .sub-list-item, .data-table-wrap {

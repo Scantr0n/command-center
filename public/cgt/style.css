@@ -429,7 +429,7 @@ header.page-head .sub {
 }
 
 /* Tap/click fallback for a timeline dot's per-point data (date, total, card
-   count) — the SVG <title> above gives desktop hover this for free, but has
+   count), the SVG <title> above gives desktop hover this for free, but has
    no touch equivalent at all and no keyboard focus path, so this real
    tooltip element (created on demand by app.js) is shown near the tap/click
    point instead. Dismissible (outside click, Escape, same dot again),
