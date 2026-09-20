@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T08:35:00.629Z",
+  "generatedAt": "2026-09-20T20:07:52.091Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "7c973a4",
+      "fullHash": "7c973a47601328c094e529b6376ac931551203ef",
+      "date": "2026-09-20",
+      "author": "Claude",
+      "subject": "CSM: fix low-contrast stage dot for Researched column",
+      "historyReset": false,
+      "files": [
+        "stages.json"
+      ]
+    },
     {
       "hash": "00f653c",
       "fullHash": "00f653c6921279cdabcf4ce9e603165d22754a25",
