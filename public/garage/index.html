@@ -1651,8 +1651,11 @@
       tab. Runs the same two-part check that caught the real Haggar corduroy pants bug in the 48-draft Depop
       audit: an automated flag on any photo whose raw pixel dimensions are wider than they are tall (a common
       sign a portrait product shot got saved sideways), plus a thumbnail grid laid out for the full visual
-      review pass that actually caught that bug, since the dimension check alone wouldn't have. Click any photo
-      to open it full-size. Re-run this before publishing the next batch out of the 48 ready-to-post drafts.
+      review pass that actually caught that bug, since the dimension check alone wouldn't have. Also flags any
+      photo under eBay's own documented 500px-minimum-on-the-longest-side requirement (see the Title &amp;
+      photo specs table below), the same class of silent-failure risk, a too-small photo that just looks fine
+      on screen. Click any photo to open it full-size. Re-run this before publishing the next batch out of the
+      48 ready-to-post drafts.
     </div>
     <label for="photoAuditInput" class="print-btn font-mono photo-audit-label">Choose photos to audit&hellip;</label>
     <input type="file" id="photoAuditInput" accept="image/*" multiple class="photo-audit-input" aria-label="Choose photos to audit">

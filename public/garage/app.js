@@ -3365,7 +3365,8 @@ function initPhotoAudit() {
     if (!files.length) return;
 
     let loaded = 0;
-    let flagged = 0;
+    let landscapeFlagged = 0;
+    let smallFlagged = 0;
     const results = new Array(files.length);
 
     files.forEach((file, i) => {
@@ -3375,27 +3376,35 @@ function initPhotoAudit() {
         if (runId !== auditRunId) { URL.revokeObjectURL(url); return; }
         loaded++;
         const isLandscape = img.naturalWidth > img.naturalHeight;
-        if (isLandscape) flagged++;
-        results[i] = { file, url, w: img.naturalWidth, h: img.naturalHeight, isLandscape, failed: false };
-        renderPhotoAuditResults(results, loaded, files.length, flagged);
+        // eBay's own documented minimum is 500px on the longest side (see the
+        // Title & photo specs table above), below that eBay itself will
+        // reject or downscale the listing photo at publish. A too-small
+        // image is the same class of silent-failure risk as the sideways
+        // check this tool already runs.
+        const isSmall = Math.max(img.naturalWidth, img.naturalHeight) < 500;
+        if (isLandscape) landscapeFlagged++;
+        if (isSmall) smallFlagged++;
+        results[i] = { file, url, w: img.naturalWidth, h: img.naturalHeight, isLandscape, isSmall, failed: false };
+        renderPhotoAuditResults(results, loaded, files.length, landscapeFlagged, smallFlagged);
       };
       img.onerror = () => {
         if (runId !== auditRunId) { URL.revokeObjectURL(url); return; }
         loaded++;
         results[i] = { file, url, failed: true };
-        renderPhotoAuditResults(results, loaded, files.length, flagged);
+        renderPhotoAuditResults(results, loaded, files.length, landscapeFlagged, smallFlagged);
       };
       img.src = url;
     });
   });
 }
 
-function renderPhotoAuditResults(results, loaded, total, flagged) {
+function renderPhotoAuditResults(results, loaded, total, landscapeFlagged, smallFlagged) {
   const grid = document.getElementById('photoAuditGrid');
   const summary = document.getElementById('photoAuditSummary');
   summary.textContent = loaded < total
     ? `Checking ${loaded}/${total} photo(s)...`
-    : `${total} photo(s) checked, ${flagged} flagged for possible sideways/landscape orientation. ` +
+    : `${total} photo(s) checked, ${landscapeFlagged} flagged for possible sideways/landscape orientation, ` +
+      `${smallFlagged} under eBay's documented 500px minimum on the longest side. ` +
       `Click any photo to open it full-size for the visual review pass, an automated flag alone caught nothing in the real audit.`;
 
   grid.innerHTML = results.map(r => {
@@ -3403,12 +3412,16 @@ function renderPhotoAuditResults(results, loaded, total, flagged) {
     if (r.failed) {
       return `<div class="photo-audit-card"><div class="photo-audit-meta"><span class="photo-audit-name">${escapeHtml(r.file.name)}</span><span class="badge badge-due">couldn't read image</span></div></div>`;
     }
+    const badges = [
+      r.isLandscape ? '<span class="badge badge-due">check orientation</span>' : '',
+      r.isSmall ? '<span class="badge badge-due">under 500px min</span>' : ''
+    ].join('');
     return `
-      <a class="photo-audit-card${r.isLandscape ? ' photo-audit-flagged' : ''}" href="${r.url}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(r.file.name)} full-size">
+      <a class="photo-audit-card${(r.isLandscape || r.isSmall) ? ' photo-audit-flagged' : ''}" href="${r.url}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(r.file.name)} full-size">
         <img src="${r.url}" alt="${escapeHtml(r.file.name)}" loading="lazy">
         <div class="photo-audit-meta">
           <span class="photo-audit-name">${escapeHtml(r.file.name)}</span>
-          <span class="photo-audit-dims">${r.w}&times;${r.h}${r.isLandscape ? ' <span class="badge badge-due">check orientation</span>' : ''}</span>
+          <span class="photo-audit-dims">${r.w}&times;${r.h}${badges}</span>
         </div>
       </a>
     `;
