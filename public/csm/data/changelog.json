@@ -1,70 +1,14 @@
 {
-  "generatedAt": "2026-09-20T04:48:33.266Z",
+  "generatedAt": "2026-09-20T08:02:44.145Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "00f653c",
-      "fullHash": "00f653c6921279cdabcf4ce9e603165d22754a25",
-      "date": "2026-09-16",
-      "author": "Claude",
-      "subject": "CSM: support multiple social platform snapshots per prospect",
-      "historyReset": false,
-      "files": [
-        "prospects.json"
-      ]
-    },
-    {
-      "hash": "517200d",
-      "fullHash": "517200d7a40c4455922aa98a52999c66e9aa3ebb",
-      "date": "2026-09-13",
-      "author": "Claude",
-      "subject": "Add outreach touch log to CSM pipeline",
-      "historyReset": false,
-      "files": [
-        "prospects.json"
-      ]
-    },
-    {
-      "hash": "1b41409",
-      "fullHash": "1b414090ee7b587dbc94fc3ec67ba2147b338f94",
-      "date": "2026-09-12",
-      "author": "Claude",
-      "subject": "Add nextAction field to CSM pipeline: a due date alone is not a plan",
-      "historyReset": false,
-      "files": [
-        "prospects.json"
-      ]
-    },
-    {
-      "hash": "0596d13",
-      "fullHash": "0596d13397850472e755769240d69f21f9837264",
-      "date": "2026-09-12",
-      "author": "Claude",
-      "subject": "Add stage history timeline to CSM pipeline for real velocity tracking",
-      "historyReset": false,
-      "files": [
-        "prospects.json"
-      ]
-    },
-    {
-      "hash": "885a762",
-      "fullHash": "885a762185bed780ee45018231c30f407a632bf2",
-      "date": "2026-09-12",
-      "author": "Claude",
-      "subject": "Add stalled-in-stage detection to CSM pipeline",
-      "historyReset": false,
-      "files": [
-        "prospects.json",
-        "stages.json"
-      ]
-    },
-    {
-      "hash": "c86ed1d",
-      "fullHash": "c86ed1de090c2567bdcab3011a3aec9d45c8c1e0",
-      "date": "2026-09-11",
-      "author": "Claude",
-      "subject": "Add CSM pipeline view: kanban board, nudge queue, prospect detail",
-      "historyReset": false,
+      "hash": "3ee6b7a",
+      "fullHash": "3ee6b7a4c6798b318dff1b0e8dd242341d30c068",
+      "date": "2026-09-19",
+      "author": "Jack Scanlon",
+      "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
+      "historyReset": true,
       "files": [
         "prospects.json",
         "stages.json"
