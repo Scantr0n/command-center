@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T17:38:13.715Z",
-  "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json}, run node public/garage/data/changelog.js to refresh",
+  "generatedAt": "2026-09-20T18:58:00.672Z",
+  "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json,acquisitions.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "92840a6",
+      "fullHash": "92840a6e843bfc9590676103bdb7cdd7267b8671",
+      "date": "2026-09-20",
+      "author": "Claude",
+      "subject": "Garage: add a real sourcing/acquisitions log, cost of goods by channel",
+      "historyReset": false,
+      "files": [
+        "acquisitions.json"
+      ]
+    },
     {
       "hash": "afcdd52",
       "fullHash": "afcdd52357387641e4918764a8c056b576244057",
