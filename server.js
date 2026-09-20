@@ -222,8 +222,23 @@ function validateChatMessages(messages) {
 // caller gets `limit` requests per `windowMs`, tracked by IP. A factory
 // rather than one hand-rolled Map per route, since the Garage photo-drafter
 // below needs the identical guard for its own real, billed call.
+//
+// A key's entry only ever gets filtered down, never deleted, on the request
+// path below, so an IP that calls once and never again (a different network,
+// IPv6 rotation, a one-off visitor) sits in requestLog forever: a real,
+// slow memory leak over the server's actual multi-month uptime. The sweep
+// below runs independently of any request, dropping any key whose entire
+// timestamp list has aged out of the window, so the map's real size tracks
+// active callers instead of every IP ever seen.
 function createRateLimiter(limit, windowMs) {
   const requestLog = new Map();
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamps] of requestLog) {
+      if (!timestamps.some(t => now - t < windowMs)) requestLog.delete(key);
+    }
+  }, windowMs);
+  sweep.unref();
   return function isRateLimited(key) {
     const now = Date.now();
     const timestamps = (requestLog.get(key) || []).filter(t => now - t < windowMs);
