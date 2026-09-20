@@ -356,33 +356,35 @@
         : '';
       const dateShown = badDate ? escapeHtml(p.nextNudgeDate) : (unqueued ? fmtDate(p.nudgeSchedule.nudgePoint) : fmtDate(p.nextNudgeDate));
       const unqueuedNote = badDate
-        ? '<div class="nudge-action nudge-action-missing">BAD DATE LOGGED &middot; nextNudgeDate "' +
-          escapeHtml(p.nextNudgeDate) + '" is not a valid YYYY-MM-DD date, fix it in the edit form</div>'
+        ? '<span class="nudge-action nudge-action-missing">BAD DATE LOGGED &middot; nextNudgeDate "' +
+          escapeHtml(p.nextNudgeDate) + '" is not a valid YYYY-MM-DD date, fix it in the edit form</span>'
         : (unqueued
-          ? '<div class="nudge-action nudge-action-missing">NOT ON THE QUEUE &middot; nudgeSchedule.nudgePoint ' +
-            'passed but nextNudgeDate was never set, log a real nextNudgeDate or this keeps going unseen</div>'
+          ? '<span class="nudge-action nudge-action-missing">NOT ON THE QUEUE &middot; nudgeSchedule.nudgePoint ' +
+            'passed but nextNudgeDate was never set, log a real nextNudgeDate or this keeps going unseen</span>'
           : '');
       const actionLine = p.nextAction
-        ? '<div class="nudge-action">' + escapeHtml(p.nextAction) + '</div>'
-        : (unqueued ? '' : '<div class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</div>');
+        ? '<span class="nudge-action">' + escapeHtml(p.nextAction) + '</span>'
+        : (unqueued ? '' : '<span class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</span>');
       const touchCount = (p.outreachLog || []).filter(e => e && e.date).length;
       const touchLine = touchCount > 0
         ? '<span class="nudge-touch-count font-mono">' + touchCount + ' touch' + (touchCount === 1 ? '' : 'es') +
           ' logged so far</span>'
         : '';
-      return '<div class="nudge-row nudge-' + urgency + (unqueued || badDate ? ' nudge-row-unqueued' : '') + '">' +
-        '<div class="nudge-top">' +
+      return '<button type="button" class="nudge-row nudge-' + urgency + (unqueued || badDate ? ' nudge-row-unqueued' : '') +
+        '" data-prospect-id="' + escapeHtml(p.id) + '">' +
+        '<span class="nudge-top">' +
         '<span class="nudge-urgency-dot"></span>' +
         '<strong>' + escapeHtml(p.name) + '</strong>' +
         '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
         '<span class="font-mono nudge-when">' +
         dateShown + ' (' + when + ')' + notBefore +
-        '</span></div>' +
+        '</span></span>' +
         unqueuedNote +
         actionLine +
         touchLine +
-        '</div>';
+        '</button>';
     }).join('');
+    wireRowsToModal(nudgeEl);
   }
 
   // One-glance digest above everything else on the page: pulls counts the
