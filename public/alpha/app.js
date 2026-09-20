@@ -745,6 +745,52 @@ function renderConnection(data, clientHistory, latencyHistory) {
   return cls;
 }
 
+// Tap/keyboard fallback for the per-check and per-day tick buttons below
+// (see #tickTooltip in style.css for why: a native title tooltip has no
+// touch equivalent and most browsers don't surface it on keyboard focus
+// either). Same dismissible/hoverable/persistent pattern as the main
+// dashboard's #graphTooltip.
+function showTickTooltip(text, x, y) {
+  const el = document.getElementById('tickTooltip');
+  if (!el) return;
+  el.textContent = text;
+  el.hidden = false;
+  const rect = el.getBoundingClientRect();
+  const left = Math.min(x + 10, window.innerWidth - rect.width - 12);
+  const top = Math.min(y + 14, window.innerHeight - rect.height - 12);
+  el.style.left = Math.max(12, left) + 'px';
+  el.style.top = Math.max(12, top) + 'px';
+  el.dataset.openFor = text;
+}
+function hideTickTooltip() {
+  const el = document.getElementById('tickTooltip');
+  if (!el) return;
+  el.hidden = true;
+  delete el.dataset.openFor;
+}
+// Wires click and keyboard-focus activation onto every tick/bar button in a
+// freshly re-rendered strip. Click handles touch (a tap fires both focus and
+// click; toggling on click alone avoids showing then instantly hiding it),
+// Enter/Space handles pure keyboard use where focus alone shouldn't pop a
+// tooltip a sighted mouse user didn't ask for.
+function wireTickTooltips(container) {
+  container.querySelectorAll('[data-tick-detail]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const text = btn.getAttribute('data-tick-detail');
+      const el = document.getElementById('tickTooltip');
+      const rect = btn.getBoundingClientRect();
+      if (el && !el.hidden && el.dataset.openFor === text) hideTickTooltip();
+      else showTickTooltip(text, rect.left, rect.bottom);
+    });
+  });
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-tick-detail]')) hideTickTooltip();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideTickTooltip();
+});
+
 // Uptime-strip pattern (Statuspage, UptimeRobot, etc): a compact row of
 // per-check ticks, oldest to newest, so a real history of connectivity
 // checks is visible at a glance next to the current state, not just the
@@ -778,8 +824,9 @@ function renderConnectionHistory(data, clientHistory) {
     const cls = entry.connected ? 'up' : 'down';
     const label = entry.connected ? 'Connected' : 'Not connected';
     const title = label + ' at ' + formatAbsolute(entry.at);
-    return `<span class="history-tick ${cls}" title="${escapeHtml(title)}"></span>`;
+    return `<button type="button" class="history-tick ${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-tick-detail="${escapeHtml(title)}"></button>`;
   }).join('');
+  wireTickTooltips(strip);
 
   // A per-check tick strip shows the shape of recent history but not its
   // overall rate, exactly what a single "X% uptime" summary communicates at
@@ -927,7 +974,7 @@ function dailyUptimeBarItem(bucket) {
   const label = new Date(bucket.dateKey + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const pctText = Number.isInteger(bucket.pct) ? String(bucket.pct) : bucket.pct.toFixed(1);
   const title = `${label}: ${pctText}% up (${bucket.up}/${bucket.total} check${bucket.total === 1 ? '' : 's'})`;
-  return `<span class="daily-uptime-bar ${dailyUptimeClass(bucket.pct)}" title="${escapeHtml(title)}"></span>`;
+  return `<button type="button" class="daily-uptime-bar ${dailyUptimeClass(bucket.pct)}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-tick-detail="${escapeHtml(title)}"></button>`;
 }
 
 function renderDailyUptime(data, clientHistory) {
@@ -949,6 +996,7 @@ function renderDailyUptime(data, clientHistory) {
   }
 
   strip.innerHTML = buckets.map(dailyUptimeBarItem).join('');
+  wireTickTooltips(strip);
 
   // Overall percentage across the covered days: real per-day up/total counts
   // summed first and divided once, never averaged day-to-day, same
@@ -1524,12 +1572,25 @@ function renderEventLog(data) {
 // repo instead of resting on a hand-typed claim. Missing entirely (never
 // generated yet, or a fresh clone before anyone ran it) is an honest empty
 // state, not an error.
-function renderChangelog(data) {
+function renderChangelog(data, driftStatus) {
   const section = document.getElementById('changelogSection');
   if (!section) return;
+  // Same drift check validate.js already runs from the command line
+  // (comparing changelog.json's recorded commit hashes for status.json
+  // against this repo's real git log), surfaced here so a real drift shows
+  // up on the live page itself instead of only when someone happens to run
+  // the CLI validator. "unavailable" (not a git checkout, shallow clone,
+  // etc) is an environment gap, not a data error, so it stays silent.
+  const driftWarning = (driftStatus && driftStatus.drifted)
+    ? `<div class="callout callout-warn">
+        <strong>Changelog is out of sync.</strong> changelog.json records ${driftStatus.recordedCount}
+        commit${driftStatus.recordedCount === 1 ? '' : 's'} for status.json, but this repo's real git history has
+        ${driftStatus.realCount}. Run <code>node public/alpha/data/changelog.js</code> to regenerate it.
+      </div>`
+    : '';
   const entries = (data && Array.isArray(data.entries)) ? data.entries : [];
   if (!entries.length) {
-    section.innerHTML = `
+    section.innerHTML = driftWarning + `
       <div class="empty-panel">
         <div class="empty-panel-title font-mono">NO CHANGELOG GENERATED YET</div>
         <div class="empty-panel-sub">
@@ -1553,25 +1614,33 @@ function renderChangelog(data) {
   const generatedNote = data.generatedAt
     ? 'Generated ' + escapeHtml(fmtDate((data.generatedAt || '').slice(0, 10)) || 'at an unknown time') + '.'
     : '';
-  section.innerHTML = `
+  section.innerHTML = driftWarning + `
     <ol class="changelog-list" aria-label="Real git commit history of status.json, most recent first">${items}</ol>
     <p class="changelog-generated-note font-mono">${generatedNote}</p>
   `;
 }
 
 async function loadChangelog() {
+  // The drift check is best-effort and independent of the changelog fetch
+  // itself (it can be unavailable, e.g. no git checkout, while the
+  // changelog still loads fine), so a failure here never blocks rendering
+  // the changelog entries.
+  const driftPromise = fetch('/api/alpha/changelog-status')
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
   try {
     const res = await fetch('/alpha/data/changelog.json?t=' + Date.now());
+    const driftStatus = await driftPromise;
     if (!res.ok) {
       // A fresh clone before anyone has ever run changelog.js means the
       // file just doesn't exist yet, an honest empty state, not a page
       // error worth surfacing as one.
-      renderChangelog({ entries: [] });
+      renderChangelog({ entries: [] }, driftStatus);
       return;
     }
-    renderChangelog(await res.json());
+    renderChangelog(await res.json(), driftStatus);
   } catch (e) {
-    renderChangelog({ entries: [] });
+    renderChangelog({ entries: [] }, await driftPromise);
   }
 }
 

@@ -50,5 +50,31 @@
     return typeof policy === 'string' && SUSPICIOUS_EBAY_RETURN_POLICY_RE.test(policy);
   }
 
-  return { findDuplicateListings, isSuspiciousEbayReturnPolicy };
+  // eBay's own item-specifics documentation: once a buyer applies a search
+  // filter (brand, size, condition, color, etc.), Cassini excludes a listing
+  // from that filtered result set entirely when the field is missing, it
+  // doesn't just rank it lower. "brand" and "condition" are treated as
+  // universal, real buyer filters on every category this store lists in
+  // (shoes and electronics alike); "size" and "color" only meaningfully
+  // apply to the "shoes" category (the same category classifier the eBay fee
+  // math already uses), so they're only required there, not on something
+  // like the swing analyzer.
+  const ITEM_SPECIFIC_LABELS = { brand: 'brand', size: 'size', color: 'color', condition: 'condition' };
+  function requiredItemSpecificFields(listing) {
+    const fields = ['brand', 'condition'];
+    if (listing && listing.category === 'shoes') fields.push('size', 'color');
+    return fields;
+  }
+  function missingItemSpecifics(listing) {
+    const specifics = (listing && listing.itemSpecifics) || {};
+    return requiredItemSpecificFields(listing).filter(f => !specifics[f]);
+  }
+
+  return {
+    findDuplicateListings,
+    isSuspiciousEbayReturnPolicy,
+    ITEM_SPECIFIC_LABELS,
+    requiredItemSpecificFields,
+    missingItemSpecifics
+  };
 });
