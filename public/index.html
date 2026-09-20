@@ -31,9 +31,21 @@
   body { background: var(--void); }
   .hairline { border-color: var(--hairline) !important; }
   .hairline:hover { border-color: var(--hairlineHover) !important; }
-  .cluster-card { transition: transform 0.15s ease, border-color 0.15s ease; }
-  .cluster-card:hover { transform: translateY(-3px); }
+  /* Cards carry their own category color as a custom property so the
+     left accent stripe + hover glow below can reference it in one place,
+     rather than fighting the .hairline class's `border-color !important`
+     (which would otherwise win over a plain inline border-left-color). */
+  .cluster-card {
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease;
+    box-shadow: inset 3px 0 0 0 var(--cat, transparent);
+  }
+  .cluster-card:hover {
+    transform: translateY(-3px);
+    box-shadow: inset 3px 0 0 0 var(--cat, transparent), 0 0 0 1px var(--cat, transparent), 0 14px 28px -12px var(--cat, transparent);
+  }
   .status-dot { box-shadow: 0 0 8px currentColor; }
+  .status-pulse { animation: statusPulse 2.4s ease-in-out infinite; }
+  @keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   #chatMessages::-webkit-scrollbar { width: 6px; }
   #chatMessages::-webkit-scrollbar-thumb { background: #23262b; border-radius: 3px; }
 
@@ -152,6 +164,23 @@
     display: flex; align-items: center; justify-content: center;
   }
   #statsRow { padding: 7px 14px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--panelLight); }
+
+  /* Four icon-badge tiles measure out wider than the old plain-number row
+     did, and at real phone widths that pushed the whole toolbar chip to
+     hug (and on some widths, nearly clear) the right edge with almost no
+     breathing room. Same horizontal-scroll-in-its-own-box treatment
+     #categoryFilterRow already uses below 640px, rather than letting the
+     tiles shrink illegibly or spill past the page. */
+  @media (max-width: 480px) {
+    #statsRow {
+      max-width: calc(100vw - 48px);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #statsRow::-webkit-scrollbar { display: none; }
+    .stat-tile { flex-shrink: 0; }
+  }
   .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed, .attn-pill.dimmed, .attn-card.dimmed { opacity: 0.16; }
   /* A dimmed node's own spoke line back to the hub was previously left out of
      this rule entirely (it's a sibling <line>, not a child of .graph-node),
@@ -228,6 +257,7 @@
     }
     .spoke-live { animation: none; }
     .spoke-badge { transition: none !important; }
+    .status-pulse { animation: none; opacity: 1; }
     .graph-node:hover, .cluster-card:hover { transform: none; }
     .graph-orbit-ring { animation: none; }
   }
@@ -407,13 +437,23 @@
             <span class="text-[10px] font-mono" style="color: var(--faint)">LOADING</span>
           </div>
         </div>
-        <div id="graphTooltip" role="status" hidden></div>
       </div>
       <button id="graphZoomResetBtn" type="button" aria-label="Reset graph zoom and pan"
         class="items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-lg border hairline"
         style="color: var(--sub); background: var(--panelLight)">Reset zoom</button>
       <span class="graph-scroll-hint" aria-hidden="true">&larr; scroll &rarr;</span>
     </div>
+
+    <!-- Lives outside #graphView deliberately (pre-existing bug found and
+         fixed here): this tooltip is the touch/keyboard fallback for BOTH
+         the graph's relation lines AND the modal's related-project chip
+         info buttons (see toggleRelationTooltip). Nested inside #graphView
+         it inherited that container's display:none whenever Grid is the
+         active view, so a chip's info button silently failed to show
+         anything for anyone using Grid, which is the persisted, daily-use
+         default. Fixed positioning means its layout never depended on this
+         parent anyway. -->
+    <div id="graphTooltip" role="status" hidden></div>
 
     <div id="gridToolbar" class="hidden items-center gap-2 mb-3">
       <span class="text-[10px] font-mono tracking-wide" style="color: var(--faint)">SORT</span>
@@ -1552,25 +1592,67 @@ function renderGridSkeleton() {
 }
 renderGridSkeleton();
 
+// Real reliability bar: parses the actual "X/Y succeeded" string already on
+// the cluster into a real percentage-width bar. Never fabricates one when
+// the field is missing or doesn't match that shape (falls back to the raw
+// text, same as the old plain-text treatment) — no invented sparkline, no
+// placeholder metric.
+function reliabilityBarHtml(c) {
+  if (!c.reliability || !c.reliability.recentSuccessRate) return '';
+  const r = c.reliability;
+  const failed = r.lastRunStatus === 'failed';
+  const paused = r.lastRunStatus === 'paused';
+  const barColor = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
+  const m = /(\d+)\s*\/\s*(\d+)/.exec(r.recentSuccessRate);
+  const title = `Recent scheduled-task runs: ${escapeHtml(r.recentSuccessRate)}${r.lastRunAt ? ` (last: ${escapeHtml(r.lastRunAt)})` : ''}`;
+  if (!m || !parseInt(m[2], 10)) {
+    return `<span class="text-[10px] font-mono" style="color: ${barColor}" title="${title}">${escapeHtml(r.recentSuccessRate)}</span>`;
+  }
+  const pct = Math.round((parseInt(m[1], 10) / parseInt(m[2], 10)) * 100);
+  return `
+    <div class="flex items-center gap-1.5" title="${title}">
+      <span style="width: 26px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden;">
+        <span style="display:block; height:100%; width:${pct}%; background:${barColor}; border-radius:2px;"></span>
+      </span>
+      <span class="text-[9.5px] font-mono" style="color: ${barColor}">${pct}%</span>
+    </div>`;
+}
+
 function renderGrid() {
   const grid = document.getElementById('clusterGrid');
   grid.innerHTML = sortForGrid(clusters).map(c => {
     const color = categoryColor(c.category);
+    const sColor = statusColor(c.status);
     const stale = isStale(c);
+    const isTop = c.priority === 'top';
+    // Real cross-project link count, straight off relatedTo — see the
+    // modal/graph relation-line comments for why an entry only counts when
+    // a real relationReasons string backs it, same rule applied here.
+    const relatedCount = (c.relatedTo || []).filter(id => {
+      const other = clusters.find(x => x.id === id);
+      return (c.relationReasons && c.relationReasons[id]) || (other && other.relationReasons && other.relationReasons[c.id]);
+    }).length;
+
     return `
-    <div class="cluster-card cursor-pointer rounded-xl p-5 border hairline" style="background: var(--panel)" data-id="${escapeHtml(c.id)}">
-      <div class="flex items-center justify-between mb-3">
-        <span class="tag-chip" style="background:${color}1F; color:${color}">${escapeHtml((c.category || 'Uncategorized').toUpperCase())}</span>
-        <div class="w-2.5 h-2.5 rounded-full status-dot" style="background: ${statusColor(c.status)}; color: ${statusColor(c.status)}"></div>
+    <div class="cluster-card cursor-pointer rounded-xl p-5 border hairline" style="background: var(--panel); --cat: ${color};${isTop ? ` outline: 1px dashed ${color}80; outline-offset: -1px;` : ''}" data-id="${escapeHtml(c.id)}">
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <span class="flex items-center gap-1.5 text-[10px] font-mono tracking-wide truncate" style="color: ${color}">
+          <span class="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style="background:${color}"></span>${escapeHtml((c.category || 'Uncategorized').toUpperCase())}
+        </span>
+        <span class="tag-chip flex items-center gap-1.5 flex-shrink-0" style="${pillStyle(c.status)}">
+          <span class="w-1.5 h-1.5 rounded-full inline-block${c.status === 'active' ? ' status-pulse' : ''}" style="background:${sColor}"></span>${escapeHtml(c.status.toUpperCase())}
+        </span>
       </div>
-      <h2 class="font-display font-700 text-base mb-1" style="color: var(--ink)">${escapeHtml(c.name)}${c.priority === 'top' ? ' <span style=\'font-size:9px;color:var(--faint);font-family:monospace;letter-spacing:0.5px;vertical-align:middle\'>&nbsp;TOP</span>' : ''}</h2>
-      <p class="text-xs leading-snug line-clamp-3" style="color: var(--sub)">${escapeHtml(c.summary)}</p>
-      <div class="mt-3 flex items-center justify-between gap-2">
-        <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
-        <span class="text-[10px] font-mono truncate" style="color: ${stale ? statusColor('stalled') : 'var(--faint)'}; font-weight: ${stale ? '600' : '400'}">${stale ? 'stale, ' : ''}${escapeHtml(relativeTime(c.lastUpdate))}</span>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          ${c.reliability ? `<span class="text-[10px] font-mono" style="color: ${c.reliability.lastRunStatus === 'failed' ? '#E0725A' : c.reliability.lastRunStatus === 'paused' ? '#E0A030' : 'var(--faint)'}" title="Recent scheduled-task runs">${escapeHtml(c.reliability.recentSuccessRate || '')}</span>` : ''}
-          ${c.toggleable ? `<span class="text-[10px] font-mono" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
+      <h2 class="font-display font-700 text-base mb-1 flex items-center gap-1.5 flex-wrap" style="color: var(--ink)">
+        <span>${escapeHtml(c.name)}</span>${isTop ? `<span class="text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style="color:${color}; background:${color}1F; letter-spacing:0.5px">TOP</span>` : ''}
+      </h2>
+      <p class="text-xs leading-relaxed line-clamp-3" style="color: var(--sub)">${escapeHtml(c.summary)}</p>
+      <div class="mt-4 pt-3 border-t hairline flex items-center justify-between gap-2">
+        <span class="text-[10px] font-mono truncate" style="color: ${stale ? statusColor('stalled') : 'var(--faint)'}; font-weight: ${stale ? '600' : '400'}">${stale ? '● stale, ' : ''}${escapeHtml(relativeTime(c.lastUpdate))}</span>
+        <div class="flex items-center gap-2.5 flex-shrink-0">
+          ${relatedCount ? `<span class="text-[10px] font-mono" style="color: var(--faint)" title="${relatedCount} related project${relatedCount === 1 ? '' : 's'}">⇄ ${relatedCount}</span>` : ''}
+          ${reliabilityBarHtml(c)}
+          ${c.toggleable ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}; background: ${c.enabled ? '#3DDC841F' : 'rgba(255,255,255,0.04)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
         </div>
       </div>
     </div>
