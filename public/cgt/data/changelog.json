@@ -1,18 +1,116 @@
 {
-  "generatedAt": "2026-09-20T05:33:39.293Z",
+  "generatedAt": "2026-09-20T06:51:37.332Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "d472e63",
-      "fullHash": "d472e63c0e37bd9178d187644b58b965dfd6b79b",
-      "date": "2026-09-19",
-      "author": "Claude",
-      "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
-      "historyReset": true,
+      "hash": "788e530",
+      "fullHash": "788e530906f52fbfa16a1c7c0a41e1b34241732f",
+      "date": "2026-09-17",
+      "author": "Jack Scanlon",
+      "subject": "CGT: split raw candidates out of cards.json into candidates.json",
+      "historyReset": false,
       "files": [
         "candidates.json",
-        "cards.json",
+        "cards.json"
+      ]
+    },
+    {
+      "hash": "7bd70b1",
+      "fullHash": "7bd70b17046d82f6f571daa2682e6bd150c6353c",
+      "date": "2026-09-14",
+      "author": "Jack Scanlon",
+      "subject": "CGT: add storageLocation/priceHistory to real cards for schema consistency",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
+    {
+      "hash": "60c3504",
+      "fullHash": "60c3504527fa1f6053d5cea8b1f168ced47eff30",
+      "date": "2026-09-14",
+      "author": "Jack Scanlon",
+      "subject": "Wire Alpha to its real daemon, import real CGT card inventory",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
+    {
+      "hash": "a6a7913",
+      "fullHash": "a6a7913eaef6f7a3cfbfc799303fc455dbf42f5e",
+      "date": "2026-09-14",
+      "author": "Claude",
+      "subject": "CGT: add a \"worth grading?\" calculator for raw-card candidates",
+      "historyReset": false,
+      "files": [
+        "candidates.json"
+      ]
+    },
+    {
+      "hash": "206cf6a",
+      "fullHash": "206cf6a97fd5b80fbd155dc34406875628713d3b",
+      "date": "2026-09-14",
+      "author": "Claude",
+      "subject": "Track re-priced card value history on CGT",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
+    {
+      "hash": "cc1ba93",
+      "fullHash": "cc1ba930e8796349f1b524aa22daa41ab4850ace",
+      "date": "2026-09-14",
+      "author": "Claude",
+      "subject": "Track grading fees paid per submission on CGT",
+      "historyReset": false,
+      "files": [
         "submissions.json"
+      ]
+    },
+    {
+      "hash": "10ea028",
+      "fullHash": "10ea02865761985b035dc635bfdb28a45b95cd0b",
+      "date": "2026-09-14",
+      "author": "Claude",
+      "subject": "Add grading submissions tracker to CGT",
+      "historyReset": false,
+      "files": [
+        "submissions.json"
+      ]
+    },
+    {
+      "hash": "7551f7a",
+      "fullHash": "7551f7af48835ca8199608f575ea5b770612b777",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Add storage location tracking to CGT",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
+    {
+      "hash": "76806b4",
+      "fullHash": "76806b4a6afbdb658d4cc4026b07e5b545c6055a",
+      "date": "2026-09-13",
+      "author": "Claude",
+      "subject": "Add cost basis / unrealized gain-loss tracking to CGT",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
+    {
+      "hash": "d8b889f",
+      "fullHash": "d8b889f7ec6b9ee89b4798b62c09d457a6676b38",
+      "date": "2026-09-12",
+      "author": "Claude",
+      "subject": "Add Card Grading Tracker (CGT) hub, real UI and data model, no inventory data yet",
+      "historyReset": false,
+      "files": [
+        "cards.json"
       ]
     }
   ]
