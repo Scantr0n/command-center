@@ -1,4 +1,12 @@
 (function () {
+  // Real loaded data, kept at module scope (same convention as the other 5
+  // hubs' rawXData variables) so the backup button below can bundle exactly
+  // what actually rendered, not force a redundant re-fetch on click.
+  let rawApplicationsData = null;
+  let rawCriteriaData = null;
+  let rawNextUpData = null;
+  let rawDigestData = null;
+
   const snapshotStrip = document.getElementById('snapshotStrip');
   const applicationsTableWrap = document.getElementById('applicationsTableWrap');
   const applicationsAsides = document.getElementById('applicationsAsides');
@@ -19,6 +27,31 @@
   const printBtn = document.getElementById('printBtn');
 
   printBtn.addEventListener('click', () => window.print());
+
+  // Same real local-download-only backup the other 5 hubs already have;
+  // this one just never got it when the hub shipped. Only bundles whatever
+  // actually loaded, real honest gaps stay gaps rather than getting padded
+  // with a fabricated empty section for a file that failed to fetch.
+  document.getElementById('backupBtn').addEventListener('click', () => {
+    if (!rawApplicationsData && !rawCriteriaData && !rawNextUpData && !rawDigestData) return;
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      source: 'Command Center Job Search hub (/job-search), local download only',
+      applicationsJson: rawApplicationsData,
+      criteriaJson: rawCriteriaData,
+      nextUpJson: rawNextUpData,
+      digestLatestJson: rawDigestData
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'job-search-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
 
   // div.textContent round-trips escape &amp;/&lt;/&gt; but not quotes, so a
   // hand-typed value with a " or ' could break out of an attribute. Same
@@ -207,6 +240,20 @@
     const criteriaData = criteriaResult.status === 'fulfilled' ? criteriaResult.value : null;
     const nextUpData = nextUpResult.status === 'fulfilled' ? nextUpResult.value : null;
     const digestData = digestResult.status === 'fulfilled' ? digestResult.value : null;
+    rawApplicationsData = applicationsData;
+    rawCriteriaData = criteriaData;
+    rawNextUpData = nextUpData;
+    rawDigestData = digestData;
+    const backupBtn = document.getElementById('backupBtn');
+    if (applicationsData || criteriaData || nextUpData || digestData) {
+      backupBtn.disabled = false;
+      backupBtn.title = (applicationsData && criteriaData && nextUpData && digestData)
+        ? ''
+        : 'Some data failed to load, backup will only include what actually loaded';
+    } else {
+      backupBtn.disabled = true;
+      backupBtn.title = "Can't back up, no data loaded (see errors below)";
+    }
 
     if (applicationsData || digestData) {
       renderSnapshot(applicationsData || {}, digestData);
