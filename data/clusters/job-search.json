@@ -3,8 +3,8 @@
   "name": "Job Search",
   "category": "School & Career",
   "priority": "normal",
-  "lastUpdate": "2026-09-07",
-  "summary": "Daily digest fires 8:01am, widened 9/7 to more region-specific job boards plus relocation-package as a major ranking factor. This is the one Jack wants a toggle for.",
+  "lastUpdate": "2026-09-19",
+  "summary": "Daily digest paused 9/15 after 5 straight zero-match runs. Jack is applying manually to saved Handshake jobs instead right now. Don't re-enable the digest without him asking.",
   "link": "/job-search/",
   "linkLabel": "Open job search hub",
   "status": "active",
@@ -12,7 +12,7 @@
   "toggleId": "daily-job-search-digest",
   "sessionTitle": null,
   "reliability": {
-    "lastRunStatus": "succeeded",
+    "lastRunStatus": "paused",
     "lastRunAt": "2026-09-14",
     "recentSuccessRate": "10/10 succeeded"
   }

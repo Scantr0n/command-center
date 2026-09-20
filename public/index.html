@@ -1491,7 +1491,7 @@ function renderGrid() {
         <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
         <span class="text-[10px] font-mono truncate" style="color: ${stale ? statusColor('stalled') : 'var(--faint)'}; font-weight: ${stale ? '600' : '400'}">${stale ? 'stale, ' : ''}${escapeHtml(relativeTime(c.lastUpdate))}</span>
         <div class="flex items-center gap-2 flex-shrink-0">
-          ${c.reliability ? `<span class="text-[10px] font-mono" style="color: ${c.reliability.lastRunStatus === 'failed' ? '#E0725A' : 'var(--faint)'}" title="Recent scheduled-task runs">${escapeHtml(c.reliability.recentSuccessRate || '')}</span>` : ''}
+          ${c.reliability ? `<span class="text-[10px] font-mono" style="color: ${c.reliability.lastRunStatus === 'failed' ? '#E0725A' : c.reliability.lastRunStatus === 'paused' ? '#E0A030' : 'var(--faint)'}" title="Recent scheduled-task runs">${escapeHtml(c.reliability.recentSuccessRate || '')}</span>` : ''}
           ${c.toggleable ? `<span class="text-[10px] font-mono" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
         </div>
       </div>
@@ -1608,9 +1608,15 @@ function openModal(id, opts = {}) {
     reliabilityRow.classList.add('flex');
     const r = activeCluster.reliability;
     const failed = r.lastRunStatus === 'failed';
+    // "paused" is a real, deliberate off state (someone turned the automation
+    // off on purpose), distinct from "failed" (it tried and broke) — conflating
+    // the two either alarms Jack over nothing or, worse, hides a real pause
+    // under text that still reads as healthy. Amber, matching the app's other
+    // stale/attention-needed indicators, not the failure red.
+    const paused = r.lastRunStatus === 'paused';
     const text = document.getElementById('reliabilityText');
-    text.textContent = `${r.recentSuccessRate || 'unknown'}${failed ? ', last run failed' : ''}${r.lastRunAt ? ` (last: ${r.lastRunAt})` : ''}`;
-    text.style.color = failed ? '#E0725A' : 'var(--faint)';
+    text.textContent = `${r.recentSuccessRate || 'unknown'}${failed ? ', last run failed' : ''}${paused ? ', currently paused' : ''}${r.lastRunAt ? ` (last: ${r.lastRunAt})` : ''}`;
+    text.style.color = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
   } else {
     reliabilityRow.classList.add('hidden');
     reliabilityRow.classList.remove('flex');
