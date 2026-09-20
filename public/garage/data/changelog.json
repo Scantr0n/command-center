@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T11:44:52.993Z",
+  "generatedAt": "2026-09-20T17:38:13.715Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "afcdd52",
+      "fullHash": "afcdd52357387641e4918764a8c056b576244057",
+      "date": "2026-09-20",
+      "author": "Claude",
+      "subject": "Garage: track eBay item specifics, flag ones Cassini needs for search filters",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
     {
       "hash": "565c67b",
       "fullHash": "565c67bab1c3c1246aec43ef2de8c268b54d0e79",
