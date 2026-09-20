@@ -154,7 +154,7 @@
     border: 1px solid var(--hairline);
     background: rgba(255,255,255,0.03);
   }
-  #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled, #backupBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Stat tiles: icon-badge + number pattern pulled from refs 1/7/8 (every
      reference dashboard opens with a row of these), replacing the old bare
@@ -331,7 +331,7 @@
     body { background: #fff; }
     .max-w-7xl { max-width: none; padding: 0.3in 0.4in; }
 
-    #searchWrap, #paletteBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner,
+    #searchWrap, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
     #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay {
       display: none !important;
@@ -413,6 +413,9 @@
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5" aria-pressed="true">Graph</button>
           <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5" aria-pressed="false">Grid</button>
         </div>
+        <button id="backupBtn" type="button" aria-label="Download a backup of all project data as JSON" disabled title="Loading data..."
+          class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
+          style="color: var(--sub); background: var(--panelLight)">Backup</button>
         <button id="printBtn" type="button" aria-label="Print a project status report"
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">Print</button>
@@ -755,6 +758,9 @@ async function loadClusters() {
       const order = { top: 0, normal: 1, low: 2 };
       return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
     });
+    const backupBtn = document.getElementById('backupBtn');
+    backupBtn.disabled = false;
+    backupBtn.title = 'Download a backup of all project data as JSON';
     renderStats();
     renderAttention();
     renderCategoryFilter();
@@ -1754,6 +1760,29 @@ document.getElementById('viewGridBtn').addEventListener('click', () => setView('
 // "force the printable layout, ignore the current on-screen view" pattern
 // as CSM/Garage/CGT/Sondrik's own print buttons.
 document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+// Same real local-download-only backup every sub-hub (Alpha/CGT/CSM/Garage/
+// Job Search/Sondrik) already has; the dashboard itself never got one.
+// Bundles exactly what's currently rendered (the same `clusters` array
+// loadClusters() just populated, toggle states and all), never a redundant
+// re-fetch, and stays disabled until a first real load actually lands.
+document.getElementById('backupBtn').addEventListener('click', () => {
+  if (!clusters.length) return;
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    source: 'Command Center dashboard (/), local download only',
+    clusters
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'command-center-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
 
 // Remember Graph vs Grid across reloads, same as a browser remembering a
 // list/gallery toggle, so switching to Grid does not silently reset itself
