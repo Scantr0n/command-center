@@ -1710,6 +1710,49 @@ function wireBundle() {
   renderBundle();
 }
 
+// Poshmark heavy-item shipping check: Poshmark's prepaid USPS Ground
+// Advantage label is a flat $6.49 buyer-paid rate only up to a 5 lb boxed
+// weight (current 2026 rate, see the bundle discount callout above); past
+// that the label steps up to $11.49 (5.1-10 lb) or $16.49 (10.1-15 lb) and
+// the seller absorbs the $5/$10 difference out of the sale. Boots are the
+// real risk case in this inventory, easy to misjudge without a scale.
+const POSHMARK_WEIGHT_TIERS = [
+  { max: 5, buyerRate: 6.49, sellerCost: 0 },
+  { max: 10, buyerRate: 6.49, sellerCost: 5, labelCost: 11.49 },
+  { max: 15, buyerRate: 6.49, sellerCost: 10, labelCost: 16.49 }
+];
+
+function renderPoshWeightCheck() {
+  const input = document.getElementById('poshWeightInput');
+  const result = document.getElementById('poshWeightResult');
+  const weight = readOptionalNonNegativeInput(input);
+  if (weight === undefined) {
+    result.textContent = 'Enter a valid boxed weight of 0 lb or more.';
+    return;
+  }
+  if (weight == null || weight === 0) {
+    result.textContent = 'Enter a boxed weight above to check.';
+    return;
+  }
+  const tier = POSHMARK_WEIGHT_TIERS.find(t => weight <= t.max);
+  if (!tier) {
+    result.textContent = `At ${weight} lb, this is past Poshmark's 15 lb flat-rate tiers entirely, check ` +
+      `Poshmark's current large-item shipping options before listing, this calculator doesn't cover it.`;
+    return;
+  }
+  result.textContent = tier.sellerCost === 0
+    ? `At ${weight} lb, this stays under the 5 lb flat-rate cutoff. The buyer pays the standard ` +
+      `$${tier.buyerRate.toFixed(2)} label, no shipping cost to you as the seller.`
+    : `At ${weight} lb, this bumps the label to $${tier.labelCost.toFixed(2)}. The buyer still covers the ` +
+      `first $${tier.buyerRate.toFixed(2)}, you absorb the $${tier.sellerCost.toFixed(2)} step-up out of the ` +
+      `sale, worth logging as a real shipping cost once this sells.`;
+}
+
+function wirePoshWeightCheck() {
+  document.getElementById('poshWeightInput').addEventListener('input', renderPoshWeightCheck);
+  renderPoshWeightCheck();
+}
+
 // Offer response guide: applies a real, documented counteroffer-ladder
 // framework (accept near-target, counter once on good-but-low, let a
 // borderline offer's answer depend on real listing age, decline a deep
@@ -4183,6 +4226,7 @@ function wirePhotoDraftTool() {
 wireCalc();
 wireBreakEven();
 wireBundle();
+wirePoshWeightCheck();
 wireOfferGuide();
 wireMessageTemplates();
 wireChecklist();

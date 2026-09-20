@@ -1003,7 +1003,10 @@
       estimated profit alongside the fee-only payout. Shipping only matters on a platform where the seller pays
       for it out of the sale, most resellers offer "free shipping" on eBay and Depop and eat that cost, while
       Poshmark and Vinted both charge the buyer a separate shipping fee on top of the price, so leave shipping
-      cost out for those if the buyer is really covering it. Both fields are optional and purely a scratch
+      cost out for those if the buyer is really covering it, with one real exception: Poshmark's prepaid label is
+      only flat-rate buyer-paid up to a 5 lb boxed weight, a boxed item over that bumps the label to $11.49 (5.1-10
+      lb) or $16.49 (10.1-15 lb) and the seller absorbs that $5 or $10 step-up out of the sale, worth entering here
+      as a real shipping cost for anything boots-weight or heavier. Both fields are optional and purely a scratch
       calculation, neither gets saved anywhere.
     </div>
     <div class="calc-row">
@@ -1170,9 +1173,11 @@
       Real per-platform bundle mechanics, sourced from each platform's own current seller documentation as of
       September 2026. <strong>Poshmark</strong>: a seller-set Bundle Discount, a percentage plus a minimum item
       count set once under Account &gt; My Seller Discount, applies automatically whenever a buyer checks out
-      2+ items from the same closet together; buyers also pay one flat $7.97 shipping charge per order either
-      way as of 2026, so bundling turns that fixed shipping cost into a per-item win for the buyer even before
-      any seller discount. <strong>Vinted</strong>: a Standard seller can set a closet-wide bundle discount that
+      2+ items from the same closet together; buyers also pay one flat $6.49 shipping charge per order for a
+      boxed weight up to 5 lb as of 2026, with the seller absorbing a $5 step-up ($11.49 total) for a 5.1-10 lb
+      package or a $10 step-up ($16.49 total) for a 10.1-15 lb one, so bundling turns that fixed shipping cost
+      into a per-item win for the buyer even before any seller discount, as long as the combined package stays
+      under 5 lb. <strong>Vinted</strong>: a Standard seller can set a closet-wide bundle discount that
       applies automatically on a 2+ item order, and the items ship on one combined postage label instead of
       separate ones, but Vinted charges the seller no fee at all, so a Vinted bundle discount is pure shipping
       convenience for the buyer, not a seller fee saving. <strong>eBay</strong>: nothing applies by itself, a
@@ -1221,6 +1226,32 @@
       </table>
       <div class="table-empty" id="bundleTableEmpty">Enter at least two item prices above to compare.</div>
     </div>
+  </section>
+
+  <section id="poshWeightSection">
+    <h2 class="section-title">Poshmark heavy-item shipping check</h2>
+    <div class="callout">
+      Poshmark's prepaid label is flat-rate buyer-paid only up to a 5 lb boxed weight (see the bundle discount
+      note above for the current tiers). Boots and other heavy items can tip past that without a scale handy,
+      enter the real boxed weight below (item, packaging, and all) to check whether a sale would land a
+      seller-absorbed step-up, worth logging as a real shipping cost on that sale if it does. Poshmark-only, the
+      other three platforms don't use this weight-tiered label.
+    </div>
+    <div class="calc-row">
+      <div class="calc-price-input-wrap">
+        <label for="poshWeightInput" class="calc-price-prefix font-mono">lb</label>
+        <input
+          type="number"
+          id="poshWeightInput"
+          class="calc-price-input font-mono"
+          min="0"
+          step="0.1"
+          inputmode="decimal"
+          placeholder="0.0"
+          aria-label="Actual boxed weight in pounds, item and packaging together">
+      </div>
+    </div>
+    <div class="callout" id="poshWeightResult" aria-live="polite">Enter a boxed weight above to check.</div>
   </section>
 
   <section id="offerGuideSection">
