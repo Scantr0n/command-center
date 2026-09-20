@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-09-19T20:50:40.179Z",
+  "generatedAt": "2026-09-20T00:20:18.236Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {
-      "hash": "f8eecb8",
-      "fullHash": "f8eecb87233cf9339fbaf01c7844b377826699a3",
+      "hash": "5c5ef07",
+      "fullHash": "5c5ef077189f4e0460041b75c6a7dbe467814f22",
       "date": "2026-09-19",
       "author": "Claude",
       "subject": "Repository history was reset here (single-commit rewrite); the real commit message for this change was not preserved",
