@@ -169,22 +169,36 @@ function validateChatMessages(messages) {
 // retry loop, a bug that re-fires sendChat, or a request bypassing the UI
 // entirely. A plain in-memory sliding window is enough here (single-process,
 // no separate rate-limit dependency needed for a personal dashboard): each
-// caller gets CHAT_RATE_LIMIT requests per CHAT_RATE_WINDOW_MS, tracked by IP.
+// caller gets `limit` requests per `windowMs`, tracked by IP. A factory
+// rather than one hand-rolled Map per route, since the Garage photo-drafter
+// below needs the identical guard for its own real, billed call.
+function createRateLimiter(limit, windowMs) {
+  const requestLog = new Map();
+  return function isRateLimited(key) {
+    const now = Date.now();
+    const timestamps = (requestLog.get(key) || []).filter(t => now - t < windowMs);
+    if (timestamps.length >= limit) {
+      requestLog.set(key, timestamps);
+      return true;
+    }
+    timestamps.push(now);
+    requestLog.set(key, timestamps);
+    return false;
+  };
+}
+
 const CHAT_RATE_LIMIT = 20;
 const CHAT_RATE_WINDOW_MS = 10 * 60 * 1000;
-const chatRequestLog = new Map();
+const isChatRateLimited = createRateLimiter(CHAT_RATE_LIMIT, CHAT_RATE_WINDOW_MS);
 
-function isChatRateLimited(key) {
-  const now = Date.now();
-  const timestamps = (chatRequestLog.get(key) || []).filter(t => now - t < CHAT_RATE_WINDOW_MS);
-  if (timestamps.length >= CHAT_RATE_LIMIT) {
-    chatRequestLog.set(key, timestamps);
-    return true;
-  }
-  timestamps.push(now);
-  chatRequestLog.set(key, timestamps);
-  return false;
-}
+// The photo drafter is a materially more expensive call than a chat message
+// (a multi-image vision read plus up to 5 live web searches per draft, a
+// 120s timeout vs chat's 25s), so it gets its own, tighter limit rather than
+// sharing the chat one, while still leaving real room for a genuine batch
+// photo session (drafting several real items back to back).
+const DRAFT_RATE_LIMIT = 8;
+const DRAFT_RATE_WINDOW_MS = 10 * 60 * 1000;
+const isDraftRateLimited = createRateLimiter(DRAFT_RATE_LIMIT, DRAFT_RATE_WINDOW_MS);
 
 app.post('/api/clusters/:id/chat', async (req, res) => {
   try {
@@ -273,6 +287,9 @@ Every "value" must come only from what is actually visible in the photos or foun
 
 app.post('/api/garage/draft-listing', async (req, res) => {
   try {
+    if (isDraftRateLimited(req.ip)) {
+      return res.status(429).json({ error: `Too many draft requests, try again in a few minutes (limit is ${DRAFT_RATE_LIMIT} per ${DRAFT_RATE_WINDOW_MS / 60000} minutes).` });
+    }
     const { images, notes } = req.body;
     if (!Array.isArray(images) || !images.length) {
       return res.status(400).json({ error: 'At least one image is required' });
