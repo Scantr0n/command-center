@@ -148,7 +148,11 @@
 
   function stallInfo(p, stageById) {
     const stageDef = stageById[p.stage];
-    if (!stageDef || stageDef.staleAfterDays == null || !p.stageEnteredDate) return null;
+    // isValidDateStr, not just a truthy check: an invalid stageEnteredDate
+    // (a non-zero-padded "2026-9-5", say) makes daysSince return NaN, and
+    // "NaN > staleAfterDays" is always false, so a genuinely stalled
+    // prospect would silently never get flagged instead of erroring loudly.
+    if (!stageDef || stageDef.staleAfterDays == null || !isValidDateStr(p.stageEnteredDate)) return null;
     const days = daysSince(p.stageEnteredDate);
     return { days, staleAfterDays: stageDef.staleAfterDays, isStale: days > stageDef.staleAfterDays };
   }
@@ -237,7 +241,7 @@
         // hand-typed formatting slip, see hasOutOfOrderDates), not a real
         // negative dwell time, so it's left blank rather than shown as-is.
         dwellText = dwellDays >= 0 ? dwellDays + 'd in stage' : '';
-      } else if (dwellStart) {
+      } else if (dwellStart && isValidDateStr(dwellStart)) {
         dwellText = daysSince(dwellStart) + 'd in stage so far';
       } else {
         dwellText = '';
@@ -1401,7 +1405,12 @@
   // Surfacing this on the card itself, not only inside the detail modal's
   // outreach log, makes that distinction visible at a glance on the board.
   function daysSinceLastTouch(p) {
-    const log = (p.outreachLog || []).filter(e => e && e.date);
+    // isValidDateStr, not just a truthy date: an invalid entry (bad
+    // hand-typed format) would otherwise make daysSince return NaN, and
+    // every caller here checks `!= null`, which NaN passes, so the card and
+    // list would render a literal "NaND SINCE LAST TOUCH" badge instead of
+    // just skipping the malformed entry.
+    const log = (p.outreachLog || []).filter(e => e && isValidDateStr(e.date));
     if (log.length === 0) return null;
     const lastDate = log.reduce((max, e) => (e.date > max ? e.date : max), log[0].date);
     return daysSince(lastDate);
@@ -1769,8 +1778,12 @@
     const stageDef = stageById[p.stage];
     const stall = stallInfo(p, stageById);
     lines.push('STAGE: ' + (stageDef ? stageDef.label : p.stage) +
-      (p.stageEnteredDate ? ' (entered ' + fmtDate(p.stageEnteredDate) + ', ' + daysSince(p.stageEnteredDate) + 'd in stage' +
-        (stall && stall.isStale ? ', STALLED past ' + stall.staleAfterDays + 'd threshold' : '') + ')' : ' (stage entered date not logged)'));
+      (p.stageEnteredDate
+        ? (isValidDateStr(p.stageEnteredDate)
+          ? ' (entered ' + fmtDate(p.stageEnteredDate) + ', ' + daysSince(p.stageEnteredDate) + 'd in stage' +
+            (stall && stall.isStale ? ', STALLED past ' + stall.staleAfterDays + 'd threshold' : '') + ')'
+          : ' (stage entered date "' + p.stageEnteredDate + '" does not parse, fix the format)')
+        : ' (stage entered date not logged)'));
     lines.push('CATEGORY: ' + (p.category || 'Not logged yet'));
     lines.push('VERIFIED HOOK: ' + (p.verifiedHook || 'Not logged yet, do not send until this is a real, checked reason.'));
     lines.push('');
@@ -2265,10 +2278,12 @@
     rows.push(fieldRow('Next action', p.nextAction ? escapeHtml(p.nextAction) : 'Not logged yet', !p.nextAction));
 
     const stallEntry = stallInfo(p, Object.fromEntries(allStages.map(s => [s.id, s])));
-    const stageText = p.stageEnteredDate
-      ? 'Entered ' + fmtDate(p.stageEnteredDate) + ' &middot; ' + daysSince(p.stageEnteredDate) + ' days in this stage' +
-        (stallEntry && stallEntry.isStale ? ' <span class="stalled-inline">(past the ' + stallEntry.staleAfterDays + '-day stall threshold)</span>' : '')
-      : 'Not logged yet';
+    const stageText = !p.stageEnteredDate
+      ? 'Not logged yet'
+      : !isValidDateStr(p.stageEnteredDate)
+        ? 'Date logged as "' + escapeHtml(p.stageEnteredDate) + '" does not parse, fix the format (expected YYYY-MM-DD)'
+        : 'Entered ' + fmtDate(p.stageEnteredDate) + ' &middot; ' + daysSince(p.stageEnteredDate) + ' days in this stage' +
+          (stallEntry && stallEntry.isStale ? ' <span class="stalled-inline">(past the ' + stallEntry.staleAfterDays + '-day stall threshold)</span>' : '');
     rows.push(fieldRow('Time in stage', stageText, !p.stageEnteredDate));
 
     const ns = p.nudgeSchedule || {};
