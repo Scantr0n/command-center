@@ -140,6 +140,18 @@
     background: rgba(255,255,255,0.03);
   }
   #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Stat tiles: icon-badge + number pattern pulled from refs 1/7/8 (every
+     reference dashboard opens with a row of these), replacing the old bare
+     numbers. A hairline divider between tiles (not individual card boxes)
+     keeps the header's existing density instead of ballooning its height. */
+  .stat-tile { padding-right: 14px; margin-right: 0; border-right: 1px solid var(--hairline); }
+  .stat-tile:last-child { border-right: none; padding-right: 0; }
+  .stat-badge {
+    width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #statsRow { padding: 7px 14px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--panelLight); }
   .graph-node.dimmed, .cluster-card.dimmed, .activity-row.dimmed, .attn-pill.dimmed, .attn-card.dimmed { opacity: 0.16; }
   /* A dimmed node's own spoke line back to the hub was previously left out of
      this rule entirely (it's a sibling <line>, not a child of .graph-node),
@@ -323,7 +335,7 @@
 <body class="min-h-screen font-sans" style="color: var(--ink)">
   <a href="#mainContent" class="skip-link font-mono">Skip to main content</a>
   <div class="max-w-7xl mx-auto px-6 py-10">
-    <header class="mb-7 flex flex-wrap items-end justify-between gap-4">
+    <header class="mb-7 pb-6 border-b hairline flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 class="font-display font-800 text-3xl" style="letter-spacing: -0.02em; color: var(--ink)">COMMAND CENTER</h1>
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
@@ -557,6 +569,17 @@ function pillStyle(status) {
   return `background: ${c}1F; color: ${c};`;
 }
 
+// Small inline-stroke icon set for the stat tiles, same restrained
+// geometric style throughout (2.2px stroke, rounded caps/joins), so the
+// header gets real iconography (refs 1/7/8 all open with icon-badge stats)
+// without pulling in an icon font or library for four glyphs.
+function statIcon(pathHtml, size = 13) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${pathHtml}</svg>`;
+}
+const ICON_GRID = '<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>';
+const ICON_ALERT = '<path d="M12 3.2 21.6 20H2.4L12 3.2Z"/><path d="M12 9.5v4.2"/><circle cx="12" cy="16.8" r="0.9" fill="currentColor" stroke="none"/>';
+const ICON_CLOCK = '<circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 2"/>';
+
 let lastClustersRaw = null;
 let lastFullRenderAt = 0;
 let deepLinkChecked = false;
@@ -713,15 +736,57 @@ function renderActivityFeed() {
 }
 
 function renderStats() {
+  const total = clusters.length;
   const active = clusters.filter(c => c.status === 'active').length;
   const attention = clusters.filter(c => c.status === 'stalled' || c.status === 'broken').length;
   const dated = clusters.filter(c => c.lastUpdate).map(c => c.lastUpdate).sort().reverse();
   const lastSync = dated[0] || 'n/a';
+  const attnColor = attention ? statusColor('broken') : 'var(--faint)';
+  const activeColor = statusColor('active');
+
+  // Real ratio (active / total), not a fabricated metric: the ring visual
+  // pulled from refs 4/6/8 (resource rings, score donut, health gauge) is
+  // only legitimate here because it renders an actual proportion already
+  // computed from real per-cluster status, same number the old plain-text
+  // "14 ACTIVE" showed, just given the gauge treatment those references use.
+  const ratio = total ? active / total : 0;
+  const ringR = 14, circ = 2 * Math.PI * ringR;
+  const dash = (circ * ratio).toFixed(1);
+
   document.getElementById('statsRow').innerHTML = `
-    <div><div class="font-display font-700 text-lg leading-none">${clusters.length}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">PROJECTS</div></div>
-    <div><div class="font-display font-700 text-lg leading-none" style="color:${statusColor('active')}">${active}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">ACTIVE</div></div>
-    <div><div class="font-display font-700 text-lg leading-none" style="color:${attention ? statusColor('broken') : 'var(--faint)'}">${attention}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">NEEDS ATTN</div></div>
-    <div><div class="font-display font-700 text-lg leading-none" style="color:var(--sub)">${escapeHtml(lastSync)}</div><div class="text-[10px] font-mono mt-1 tracking-wide" style="color:var(--faint)">LAST SYNC</div></div>
+    <div class="stat-tile flex items-center gap-2">
+      <span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--sub)">${statIcon(ICON_GRID)}</span>
+      <div class="text-left">
+        <div class="font-display font-700 text-lg leading-none" style="color: var(--ink)">${total}</div>
+        <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">PROJECTS</div>
+      </div>
+    </div>
+    <div class="stat-tile flex items-center gap-2">
+      <svg width="32" height="32" viewBox="0 0 32 32" class="flex-shrink-0" aria-hidden="true">
+        <circle cx="16" cy="16" r="${ringR}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="3"/>
+        <circle cx="16" cy="16" r="${ringR}" fill="none" stroke="${activeColor}" stroke-width="3" stroke-linecap="round"
+          stroke-dasharray="${dash} ${circ.toFixed(1)}" transform="rotate(-90 16 16)"/>
+        <text x="16" y="20" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="${activeColor}" font-weight="600">${active}</text>
+      </svg>
+      <div class="text-left">
+        <div class="text-[9.5px] font-mono tracking-wide" style="color:var(--faint)">ACTIVE</div>
+        <div class="text-[10px] font-mono" style="color: var(--sub)">${active}&#47;${total}</div>
+      </div>
+    </div>
+    <div class="stat-tile flex items-center gap-2">
+      <span class="stat-badge" style="background: ${attnColor}1F; color: ${attnColor}">${statIcon(ICON_ALERT)}</span>
+      <div class="text-left">
+        <div class="font-display font-700 text-lg leading-none" style="color: ${attnColor}">${attention}</div>
+        <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">NEEDS ATTN</div>
+      </div>
+    </div>
+    <div class="stat-tile flex items-center gap-2">
+      <span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--sub)">${statIcon(ICON_CLOCK)}</span>
+      <div class="text-left">
+        <div class="font-display font-700 text-sm leading-none" style="color:var(--sub)">${escapeHtml(lastSync)}</div>
+        <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">LAST SYNC</div>
+      </div>
+    </div>
   `;
 }
 
