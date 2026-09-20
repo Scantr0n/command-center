@@ -544,8 +544,21 @@ header.page-head .sub {
   padding: 10px 0;
   border-top: 1px solid var(--hairline);
   font-size: 0.82rem;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .activity-row:first-child { border-top: none; }
+.activity-row:hover, .activity-row:focus-visible {
+  background: rgba(255,255,255,0.03);
+}
+.activity-row:focus-visible { outline: 1px solid var(--dim); outline-offset: -1px; }
 .activity-date {
   color: var(--dim);
   font-size: 0.7rem;

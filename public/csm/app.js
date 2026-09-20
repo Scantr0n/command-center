@@ -747,19 +747,20 @@
         : ev.type === 'touch'
         ? '<span class="activity-tag activity-tag-touch">TOUCH</span>'
         : '<span class="activity-tag activity-tag-idea">IDEA</span>';
-      return '<div class="activity-row">' +
+      return '<button type="button" class="activity-row" data-prospect-id="' + escapeHtml(ev.prospect.id) + '">' +
         '<span class="activity-date font-mono">' + escapeHtml(fmtDate(ev.date)) + '</span>' +
         tag +
         '<span class="activity-who"><strong>' + escapeHtml(ev.prospect.name) + '</strong>' +
         (ev.prospect.company ? ' <span style="color:var(--sub)">' + escapeHtml(ev.prospect.company) + '</span>' : '') +
         '</span>' +
         '<span class="activity-label">' + escapeHtml(ev.label) + '</span>' +
-        '</div>';
+        '</button>';
     }).join('');
     activityFeedEl.innerHTML =
       '<div class="activity-list' + (needsToggle ? ' is-collapsed' : '') + '" id="activityList">' + rowsHtml + '</div>' +
       (needsToggle ? '<button type="button" class="activity-toggle font-mono" id="activityToggle" aria-expanded="false" aria-controls="activityList">Show all ' +
         events.length + '</button>' : '');
+    wireRowsToModal(activityFeedEl);
     const toggleBtn = document.getElementById('activityToggle');
     const listEl = document.getElementById('activityList');
     if (toggleBtn) {
