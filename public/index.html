@@ -2222,7 +2222,11 @@ function appendMessage(role, text) {
   div.className = role === 'user' ? 'text-right' : 'text-left';
   const span = document.createElement('span');
   span.className = 'inline-block px-3 py-2 rounded-lg max-w-[85%]';
-  span.style.cssText = role === 'user' ? 'background: var(--ink); color: var(--void);' : 'background: var(--panelLight); color: var(--ink);';
+  // Without this, a reply with real paragraph breaks or a numbered list
+  // (the model's own natural formatting for anything longer than one
+  // sentence) collapses into a single run-on line: textContent keeps the
+  // literal \n characters, but plain inline-block text ignores them.
+  span.style.cssText = (role === 'user' ? 'background: var(--ink); color: var(--void);' : 'background: var(--panelLight); color: var(--ink);') + ' white-space: pre-wrap;';
   span.textContent = text;
   div.appendChild(span);
   document.getElementById('chatMessages').appendChild(div);
