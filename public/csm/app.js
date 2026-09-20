@@ -3179,7 +3179,8 @@
       const company = values.company || null;
       const category = values.category || null;
       const verifiedHook = values.verifiedHook || null;
-      const baseId = npSlugify(name, company);
+      const slugResult = npSlugify(name, company);
+      const baseId = slugResult.id;
       let id = baseId;
       let n = 2;
       while (seenIdsThisBatch.has(id)) { id = baseId + '-' + n; n++; }
@@ -3190,6 +3191,11 @@
       if (isDuplicateId) {
         warnings.push('An id starting with "' + baseId + '" already exists, this one was suffixed to "' + id +
           '" to avoid a duplicate. Rename it to something more readable if you want.');
+      }
+      if (slugResult.collapsedFromRealInput) {
+        warnings.push('Name/company had no [a-z0-9] characters to build a real id from (e.g. a Chinese-only ' +
+          'name), so this defaulted to the generic id "' + id + '". Hand-edit the "id" field below to something ' +
+          'more readable (a romanized version of the name works well) before pasting this in.');
       }
       const nameKey = name.trim().toLowerCase() + '|' + (company || '').trim().toLowerCase();
       const existingMatch = allProspects.find(x => x.name &&
@@ -3263,11 +3269,17 @@
       .finally(() => { setTimeout(() => { npQuickCopyBtn.textContent = original; }, 1800); });
   });
 
+  // Strips to [a-z0-9] only, so a real name/company typed entirely in
+  // Chinese characters (this hub's whole subject is China social media
+  // prospects, a very real, expected case, not an edge case) strips to
+  // nothing and silently falls back to the generic "new-prospect" id with
+  // no indication anything unusual happened. Exposes whether that fallback
+  // was hit on real input (as opposed to no input at all) so the caller can
+  // warn about it, rather than baking the warning logic into this function.
   function npSlugify(name, company) {
     const base = [company, name].filter(Boolean).join('-');
-    return base.toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'new-prospect';
+    const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return { id: slug || 'new-prospect', collapsedFromRealInput: !slug && !!base };
   }
 
   function npUniqueId(baseId) {
@@ -3285,11 +3297,16 @@
   // Mirrors the key rules in data/validate.js so a prospect generated here
   // is warned about the same things the validator would catch, before it
   // ever gets hand-pasted into prospects.json.
-  function npBuildWarnings(p, isDuplicateId) {
+  function npBuildWarnings(p, isDuplicateId, collapsedFromRealInput) {
     const warnings = [];
     if (isDuplicateId) {
       warnings.push('An id starting with "' + p.id.replace(/-\d+$/, '') + '" already exists, this one was ' +
         'suffixed to "' + p.id + '" to avoid a duplicate. Rename it to something more readable if you want.');
+    }
+    if (collapsedFromRealInput) {
+      warnings.push('Name/company had no [a-z0-9] characters to build a real id from (e.g. a Chinese-only ' +
+        'name), so this defaulted to the generic id "' + p.id + '". Hand-edit the "id" field below to something ' +
+        'more readable (a romanized version of the name works well) before pasting this in.');
     }
     if (p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type)) {
       warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
@@ -3358,7 +3375,8 @@
     const company = npVal('npCompany');
     const stage = npStageSelect.value;
     const stageEnteredDate = npVal('npStageEnteredDate');
-    const baseId = npSlugify(name || 'new-prospect', company);
+    const slugResult = npSlugify(name || 'new-prospect', company);
+    const baseId = slugResult.id;
     const id = npUniqueId(baseId);
     const isDuplicateId = id !== baseId;
 
@@ -3401,7 +3419,7 @@
       outreachLog: npVal('npSendDate') ? [{ date: npVal('npSendDate'), type: 'initial-send' }] : [],
       notes: npVal('npNotes')
     };
-    return { p, isDuplicateId };
+    return { p, isDuplicateId, collapsedFromRealInput: slugResult.collapsedFromRealInput };
   }
 
   function npPopulateStageOptions() {
@@ -3492,8 +3510,8 @@
   function npModalEl() { return document.getElementById('npModal'); }
 
   npGenerateBtn.addEventListener('click', () => {
-    const { p, isDuplicateId } = npBuildProspect();
-    const warnings = npBuildWarnings(p, isDuplicateId);
+    const { p, isDuplicateId, collapsedFromRealInput } = npBuildProspect();
+    const warnings = npBuildWarnings(p, isDuplicateId, collapsedFromRealInput);
     npWarningsEl.innerHTML = warnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
     npOutputEl.textContent = JSON.stringify(p, null, 2) + ',';
     npResult.hidden = false;
