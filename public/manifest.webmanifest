@@ -43,6 +43,12 @@
       "short_name": "Alpha",
       "description": "Live trading daemon status",
       "url": "/alpha/"
+    },
+    {
+      "name": "Job Search",
+      "short_name": "Job Search",
+      "description": "Daily digest and application tracker",
+      "url": "/job-search/"
     }
   ]
 }
