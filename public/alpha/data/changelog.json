@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T00:32:07.540Z",
+  "generatedAt": "2026-09-20T03:50:18.862Z",
   "generatedFrom": "git log over public/alpha/data/{status.json}, run node public/alpha/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "d0368fc",
+      "fullHash": "d0368fc41d61f1b1d5ff7479c7b8f6e9a91be80b",
+      "date": "2026-09-19",
+      "author": "Jack Scanlon",
+      "subject": "Alpha: remove the Active lineages stat, it could never be real",
+      "historyReset": false,
+      "files": [
+        "status.json"
+      ]
+    },
     {
       "hash": "e40da37",
       "fullHash": "e40da37a11913960b02dac35904f6ac1329112e1",
