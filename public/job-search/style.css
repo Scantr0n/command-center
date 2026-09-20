@@ -313,7 +313,16 @@ section { margin-bottom: 36px; }
   width: fit-content;
 }
 .lead-meta-row { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.74rem; color: var(--sub); font-family: 'JetBrains Mono', monospace; }
-.lead-meta-row span { white-space: nowrap; }
+/* nowrap keeps a short value (e.g. "$20-22/hr") from ever breaking mid-word,
+   but this field is real Job Search tracker data, not a fixed-format label,
+   and at least one real lead's "remote" value is a genuinely long note
+   ("In-office, Buffalo MN (~35 mi from St. Cloud)") rather than a short
+   status word. Forcing that one to nowrap pushed the whole page 51px past
+   a 320px viewport instead of just wrapping onto its own line the way
+   .lead-detail's real prose already does below it. max-width keeps a long
+   value contained to the row's own width; short values are unaffected,
+   they're never close to wrapping regardless of this rule. */
+.lead-meta-row span { white-space: normal; max-width: 100%; }
 .lead-detail { font-size: 0.8rem; color: var(--sub); line-height: 1.55; }
 .lead-caveat {
   font-size: 0.76rem;
