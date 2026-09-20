@@ -211,7 +211,13 @@
 
   function renderDigest(data) {
     digestTitle.textContent = 'Latest digest run (' + (fmtDate(data.runDate) || data.runDate) + ')';
-    digestSummary.textContent = 'Fully verified (' + data.fullyVerifiedCount + '), ' + data.totalItemsCount + ' items total.';
+    // Same typeof guard renderSnapshot already applies to these two exact
+    // fields (see its own fullyVerifiedCount/totalItemsCount chips above):
+    // this file is hand-edited, so a missing or typo'd field should read as
+    // "N/A", never interpolate as the literal string "undefined"/"null".
+    const verifiedCount = typeof data.fullyVerifiedCount === 'number' ? data.fullyVerifiedCount : 'N/A';
+    const totalCount = typeof data.totalItemsCount === 'number' ? data.totalItemsCount : 'N/A';
+    digestSummary.textContent = 'Fully verified (' + verifiedCount + '), ' + totalCount + ' items total.';
 
     const cards = [];
     if (data.bestOverallFit) cards.push(leadCard(data.bestOverallFit, { best: true }));
