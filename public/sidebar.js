@@ -167,7 +167,25 @@
       <div class="cc-sb-divider"></div>
       <div id="ccSidebarHubs"></div>
     `;
-    document.body.prepend(nav);
+    // A plain prepend() put this nav ahead of every page's own skip-link
+    // (present on all 8 real pages, either as body's direct first child or,
+    // on CSM, wrapped in its own <nav>), silently making "Skip to main
+    // content" unreachable as the first Tab stop app-wide since this sidebar
+    // injects itself after the skip-link already exists in the parsed DOM.
+    // Walking up from the skip-link to whichever of its ancestors is body's
+    // direct child, then inserting right after that element, keeps the skip
+    // link the true first focusable element on every page while still
+    // falling back to a plain prepend if a page ever has no skip-link at all.
+    const skipLink = document.querySelector('.skip-link');
+    let skipLinkTopAncestor = skipLink;
+    while (skipLinkTopAncestor && skipLinkTopAncestor.parentElement !== document.body) {
+      skipLinkTopAncestor = skipLinkTopAncestor.parentElement;
+    }
+    if (skipLinkTopAncestor) {
+      skipLinkTopAncestor.insertAdjacentElement('afterend', nav);
+    } else {
+      document.body.prepend(nav);
+    }
     document.body.classList.add('cc-has-sidebar');
 
     document.getElementById('ccSidebarToggle').addEventListener('click', () => {
