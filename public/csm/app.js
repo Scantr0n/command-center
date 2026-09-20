@@ -1732,16 +1732,17 @@
 
   // Same real, documented per-platform contact mechanics as the "Platform
   // outreach reference" table in index.html (Xingtu, Pugongying, Weirenwu,
-  // Huahuo, WeChat's lack of one), condensed to the one line that matters for
-  // an outreach brief: where a real contact actually is, not just the
-  // platform's own marketplace. Keyed lowercase/trimmed so "Douyin" and
-  // "douyin " both match, same normalization findCasingDrift already uses.
+  // Huahuo, WeChat's lack of one, Magnetic Juxing), condensed to the one line
+  // that matters for an outreach brief: where a real contact actually is, not
+  // just the platform's own marketplace. Keyed lowercase/trimmed so "Douyin"
+  // and "douyin " both match, same normalization findCasingDrift already uses.
   const PLATFORM_TIPS = {
     douyin: 'Xingtu is a generic marketplace inbox that gets flooded. A named decision-maker, reached directly or via a listed business email, is still the higher-reply-rate path.',
     xiaohongshu: 'Pugongying only confirms the account already does paid work, it is not itself a contact. Look for a listed business email or named contact in the bio first.',
     weibo: 'Weirenwu is geared toward macro-influencer/celebrity deals. For a smaller or niche account, a personal contact or email in the bio is more realistic.',
     bilibili: 'Huahuo is mandatory for disclosure compliance, not itself a contact. The real contact is whoever runs the account or their listed agent.',
-    wechat: 'No centralized marketplace exists. Outreach is direct: a personal WeChat ID or a listed business-cooperation email on an Official Account profile. Named vs. generic matters most here.'
+    wechat: 'No centralized marketplace exists. Outreach is direct: a personal WeChat ID or a listed business-cooperation email on an Official Account profile. Named vs. generic matters most here.',
+    kuaishou: 'Magnetic Juxing is a generic marketplace inbox, same pattern as Xingtu on Douyin. A named decision-maker, reached directly or via a listed business email, is still the higher-reply-rate path.'
   };
   function platformTip(platform) {
     if (!platform) return null;
