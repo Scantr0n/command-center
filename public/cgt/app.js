@@ -998,6 +998,60 @@ function buildPortfolioValueTimeline() {
   });
 }
 
+// Each timeline dot's real per-point data (exact date, dollar total, card
+// count) lives in a native SVG <title>, which is hover-only: confirmed no
+// tap, no long-press, nothing renders on touch, and no keyboard focus path
+// either. This is the tap/click + keyboard fallback (same pattern as the
+// main dashboard's relation-line tooltip fix): a real tooltip element,
+// created on demand since this page's HTML has no static spot for one,
+// shown near the tap/click point and dismissed on outside click, Escape, or
+// activating the same dot again. The <title> stays for free desktop hover.
+function ensureTimelineTooltip() {
+  let el = document.getElementById('timelineTooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'timelineTooltip';
+    el.className = 'timeline-tooltip';
+    el.setAttribute('role', 'status');
+    el.hidden = true;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function showTimelineTooltip(text, x, y) {
+  const el = ensureTimelineTooltip();
+  el.textContent = text;
+  el.hidden = false;
+  // Clamp so it never renders off the right/bottom edge of the viewport.
+  const rect = el.getBoundingClientRect();
+  const left = Math.min(x + 10, window.innerWidth - rect.width - 12);
+  const top = Math.min(y + 14, window.innerHeight - rect.height - 12);
+  el.style.left = Math.max(12, left) + 'px';
+  el.style.top = Math.max(12, top) + 'px';
+  el.dataset.openFor = text;
+}
+function hideTimelineTooltip() {
+  const el = document.getElementById('timelineTooltip');
+  if (!el) return;
+  el.hidden = true;
+  delete el.dataset.openFor;
+}
+function toggleTimelineTooltip(dotEl, x, y) {
+  const el = ensureTimelineTooltip();
+  const text = dotEl.getAttribute('data-point');
+  if (!el.hidden && el.dataset.openFor === text) {
+    hideTimelineTooltip();
+  } else {
+    showTimelineTooltip(text, x, y);
+  }
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.timeline-dot')) hideTimelineTooltip();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideTimelineTooltip();
+});
+
 // Hand-rolled inline SVG line chart rather than pulling in a charting library
 // for one chart. Points are spaced evenly by index, not truly proportional to
 // the real calendar gaps between them, since those gaps are irregular and the
@@ -1025,7 +1079,10 @@ function renderPortfolioValueTimeline() {
   const pathD = series.map((p, i) => (i === 0 ? 'M' : 'L') + xFor(i).toFixed(1) + ',' + yFor(p.total).toFixed(1)).join(' ');
   const baseline = (height - padY).toFixed(1);
   const areaD = pathD + ` L${xFor(series.length - 1).toFixed(1)},${baseline} L${xFor(0).toFixed(1)},${baseline} Z`;
-  const dots = series.map((p, i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(p.total).toFixed(1)}" r="3.5" class="timeline-dot"><title>${escapeHtml(p.date)}: ${escapeHtml(formatUsd(p.total))} (${p.countedCards} card${p.countedCards === 1 ? '' : 's'})</title></circle>`).join('');
+  const dots = series.map((p, i) => {
+    const label = `${p.date}: ${formatUsd(p.total)} (${p.countedCards} card${p.countedCards === 1 ? '' : 's'})`;
+    return `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(p.total).toFixed(1)}" r="3.5" class="timeline-dot" tabindex="0" role="img" aria-label="${escapeHtml(label)}" data-point="${escapeHtml(label)}"><title>${escapeHtml(label)}</title></circle>`;
+  }).join('');
   const first = series[0], last = series[series.length - 1];
   el.innerHTML = `
     <svg viewBox="0 0 ${width} ${height}" class="timeline-svg" role="img" aria-label="Real portfolio total value from ${escapeHtml(first.date)} (${escapeHtml(formatUsd(first.total))}) to ${escapeHtml(last.date)} (${escapeHtml(formatUsd(last.total))}), ${series.length} real pricing dates">
@@ -1038,6 +1095,21 @@ function renderPortfolioValueTimeline() {
       <span>${escapeHtml(last.date)} &middot; ${escapeHtml(formatUsd(last.total))}</span>
     </div>
   `;
+  el.querySelectorAll('.timeline-dot').forEach(dot => {
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTimelineTooltip(dot, e.clientX, e.clientY);
+    });
+    dot.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const rect = dot.getBoundingClientRect();
+        toggleTimelineTooltip(dot, rect.left + rect.width / 2, rect.top);
+      } else if (e.key === 'Escape') {
+        hideTimelineTooltip();
+      }
+    });
+  });
 }
 
 // Pulls "what got priced when" out of every card's own datePriced/backlogBatch
