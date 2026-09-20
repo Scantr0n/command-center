@@ -1315,15 +1315,19 @@ function renderGenealogy(data) {
   const g = data.live.genealogy;
   const panel = document.getElementById('genealogyPanel');
   const lineages = (g && Array.isArray(g.lineages)) ? g.lineages : [];
-  const hasAggregate = g && (g.generation != null || g.activeLineages != null || g.lastBreedingEventAt != null);
+  const hasAggregate = g && (g.generation != null || g.lastBreedingEventAt != null);
   if (!hasAggregate && !lineages.length) return; // keep the built-in "awaiting live connection" empty state
 
   panel.classList.remove('empty-panel');
 
+  // No "Active lineages" tile: the daemon's real data has no
+  // parentage/lineage-grouping field, only per-agent strategy metadata, so
+  // that figure could only ever restate the total agent count already shown
+  // elsewhere on this page under a different label, not a genuinely
+  // distinct lineage count.
   const summaryHtml = hasAggregate ? `
     <div class="stat-row">
       ${statTile(g.generation != null ? escapeHtml(String(g.generation)) : 'awaiting connection', 'Generation', null, g.generation == null)}
-      ${statTile(g.activeLineages != null ? escapeHtml(String(g.activeLineages)) : 'awaiting connection', 'Active lineages', null, g.activeLineages == null)}
       ${statTile(g.lastBreedingEventAt ? escapeHtml(timeAgo(g.lastBreedingEventAt) || g.lastBreedingEventAt) : 'awaiting connection', 'Last breeding event', g.lastBreedingEventNote || null, !g.lastBreedingEventAt)}
     </div>
   ` : '';
@@ -1938,15 +1942,12 @@ function buildStatusSummary(data) {
     '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active) ? 'Active' : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
     '- Genealogy: ' + (() => {
       const g = live.genealogy || {};
-      if (g.generation == null && g.activeLineages == null && g.lastBreedingEventAt == null) return awaiting;
+      if (g.generation == null && g.lastBreedingEventAt == null) return awaiting;
       const gen = g.generation != null ? 'gen ' + g.generation : awaiting;
-      const lineageCount = g.activeLineages != null
-        ? g.activeLineages + ' active lineage' + (g.activeLineages === 1 ? '' : 's')
-        : awaiting;
       const lastEvent = g.lastBreedingEventAt
         ? 'last breeding event ' + (timeAgo(g.lastBreedingEventAt) || formatAbsolute(g.lastBreedingEventAt))
         : 'no breeding event recorded';
-      return gen + ', ' + lineageCount + ', ' + lastEvent;
+      return gen + ', ' + lastEvent;
     })(),
   ];
   return lines.join('\n');

@@ -101,7 +101,7 @@ function main() {
     live.regime != null ||
     (live.killSwitch && live.killSwitch.engaged != null) ||
     (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null || live.positionSizing.maxDrawdownPct != null || live.positionSizing.robustnessScore != null)) ||
-    (live.genealogy && (live.genealogy.generation != null || live.genealogy.activeLineages != null || live.genealogy.lastBreedingEventAt != null ||
+    (live.genealogy && (live.genealogy.generation != null || live.genealogy.lastBreedingEventAt != null ||
       (Array.isArray(live.genealogy.lineages) && live.genealogy.lineages.length > 0)));
 
   if (anyLiveValueSet && !live.asOf) {

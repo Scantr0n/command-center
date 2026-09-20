@@ -42,7 +42,6 @@
     "positions": [],
     "genealogy": {
       "generation": null,
-      "activeLineages": null,
       "lastBreedingEventAt": null,
       "lastBreedingEventNote": null,
       "lineages": []

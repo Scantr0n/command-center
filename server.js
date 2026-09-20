@@ -530,7 +530,12 @@ app.get('/api/alpha/live', async (req, res) => {
         positions: mapPositions(state.positions),
         genealogy: {
           generation: null,
-          activeLineages: latestEvo ? Object.keys(latestEvo.agents || {}).length : null,
+          // activeLineages was removed: the daemon's real /evolution-history
+          // response has no parentage/lineage-grouping field at all (checked
+          // directly), only per-agent strategy metadata, so this could only
+          // ever equal Object.keys(agents).length, i.e. the total agent
+          // count already shown elsewhere on this page under a different
+          // label, not a genuinely distinct lineage figure.
           lastBreedingEventAt: latestEvo ? latestEvo.timestamp : null,
           lastBreedingEventNote: latestEvo
             ? Object.entries(latestEvo.agents || {}).filter(([, a]) => a.switchedFrom).length + ' agent(s) switched strategy in the latest run'
