@@ -545,6 +545,12 @@
       <button type="button" class="chip" data-cand-verdict="not-worth" aria-pressed="false">Not worth it<span class="chip-count"></span></button>
       <button type="button" class="chip" data-cand-verdict="needs-data" aria-pressed="false">Needs more data<span class="chip-count"></span></button>
     </div>
+    <div class="filter-row" id="candidateStatusFilter" role="group" aria-label="Filter candidates by decision status">
+      <span class="filter-row-label font-mono">STATUS</span>
+      <button type="button" class="chip" data-cand-status="all" aria-pressed="true">All<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-status="open" aria-pressed="false">Still open<span class="chip-count"></span></button>
+      <button type="button" class="chip" data-cand-status="decided" aria-pressed="false">Already decided<span class="chip-count"></span></button>
+    </div>
     <div id="candidatesFilterStatus" class="sr-only" role="status" aria-live="polite"></div>
     <div class="candidates-feed" id="candidatesFeed"></div>
   </section>

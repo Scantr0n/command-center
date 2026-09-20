@@ -17,6 +17,7 @@ let sortDir = 'asc';
 let candidateSearchTerm = '';
 let activeCandidateSport = 'all';
 let activeCandidateVerdict = 'all';
+let activeCandidateStatus = 'all';
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "PSA hockey cards sorted by value") can be bookmarked
@@ -28,6 +29,7 @@ const VALID_GRADERS = ['PSA', 'BGS', 'SGC', 'CGC', 'HGA', 'KSA'];
 const VALID_SPORTS = ['hockey', 'baseball', 'football'];
 const VALID_OWNERSHIP = ['owned', 'sold'];
 const VALID_CANDIDATE_VERDICTS = ['worth-grading', 'marginal', 'not-worth', 'needs-data'];
+const VALID_CANDIDATE_STATUSES = ['open', 'decided'];
 
 function restoreStateFromUrl() {
   const params = new URLSearchParams(location.search);
@@ -45,6 +47,7 @@ function restoreStateFromUrl() {
   const candQ = params.get('candQ');
   const candSport = params.get('candSport');
   const candVerdict = params.get('candVerdict');
+  const candStatus = params.get('candStatus');
   if (q) searchTerm = q;
   if (sport && VALID_SPORTS.includes(sport)) activeSport = sport;
   if (basis && VALID_BASES.includes(basis)) activeBasis = basis;
@@ -63,6 +66,7 @@ function restoreStateFromUrl() {
   if (candQ) candidateSearchTerm = candQ;
   if (candSport && VALID_SPORTS.includes(candSport)) activeCandidateSport = candSport;
   if (candVerdict && VALID_CANDIDATE_VERDICTS.includes(candVerdict)) activeCandidateVerdict = candVerdict;
+  if (candStatus && VALID_CANDIDATE_STATUSES.includes(candStatus)) activeCandidateStatus = candStatus;
 }
 
 function setInitialChipState(containerId, dataAttr, value) {
@@ -87,6 +91,7 @@ function syncUrl() {
   if (candidateSearchTerm.trim()) params.set('candQ', candidateSearchTerm.trim());
   if (activeCandidateSport !== 'all') params.set('candSport', activeCandidateSport);
   if (activeCandidateVerdict !== 'all') params.set('candVerdict', activeCandidateVerdict);
+  if (activeCandidateStatus !== 'all') params.set('candStatus', activeCandidateStatus);
   const qs = params.toString();
   const url = location.pathname + (qs ? '?' + qs : '');
   history.replaceState(null, '', url);
@@ -1226,15 +1231,25 @@ function matchesCandidateSearchTerm(c, term) {
 }
 function matchesCandidateSportValue(c, sport) { return sport === 'all' || c.sport === sport; }
 function matchesCandidateVerdictValue(verdictKey, verdict) { return verdict === 'all' || verdictKey === verdict; }
+// "Decided" means a real decision has been logged (hold/sell-raw/submit/
+// pass), regardless of which one, since the point of this filter is telling
+// a candidate that's already been weighed apart from one that hasn't, not
+// distinguishing between the decisions themselves (the verdict chips above
+// already cover the worth-grading math independent of this).
+function matchesCandidateStatusValue(c, status) {
+  return status === 'all' || (status === 'open' ? !c.decision : !!c.decision);
+}
 
 function matchesCandidateFilters(c, verdictKey) {
   return matchesCandidateSearchTerm(c, candidateSearchTerm)
     && matchesCandidateSportValue(c, activeCandidateSport)
-    && matchesCandidateVerdictValue(verdictKey, activeCandidateVerdict);
+    && matchesCandidateVerdictValue(verdictKey, activeCandidateVerdict)
+    && matchesCandidateStatusValue(c, activeCandidateStatus);
 }
 
 function anyCandidateFilterActive() {
-  return candidateSearchTerm.trim() !== '' || activeCandidateSport !== 'all' || activeCandidateVerdict !== 'all';
+  return candidateSearchTerm.trim() !== '' || activeCandidateSport !== 'all' || activeCandidateVerdict !== 'all'
+    || activeCandidateStatus !== 'all';
 }
 
 function candidateFacetCount(dimension, value) {
@@ -1243,15 +1258,18 @@ function candidateFacetCount(dimension, value) {
     if (!matchesCandidateSearchTerm(c, candidateSearchTerm)) return false;
     if (dimension !== 'sport' && !matchesCandidateSportValue(c, activeCandidateSport)) return false;
     if (dimension !== 'verdict' && !matchesCandidateVerdictValue(verdictKey, activeCandidateVerdict)) return false;
+    if (dimension !== 'status' && !matchesCandidateStatusValue(c, activeCandidateStatus)) return false;
     if (dimension === 'sport') return matchesCandidateSportValue(c, value);
     if (dimension === 'verdict') return matchesCandidateVerdictValue(verdictKey, value);
+    if (dimension === 'status') return matchesCandidateStatusValue(c, value);
     return true;
   }).length;
 }
 
 const CANDIDATE_FACET_DIMENSIONS = [
   ['candidateSportFilter', 'data-cand-sport', 'sport'],
-  ['candidateVerdictFilter', 'data-cand-verdict', 'verdict']
+  ['candidateVerdictFilter', 'data-cand-verdict', 'verdict'],
+  ['candidateStatusFilter', 'data-cand-status', 'status']
 ];
 
 function updateCandidateChipCounts() {
@@ -1310,6 +1328,11 @@ function renderCandidates() {
     const verdictKey = math ? math.verdict : 'needs-data';
     const meta = CANDIDATE_VERDICT_META[verdictKey];
     const gainText = math ? formatSignedUsd(math.expectedGain) : 'n/a';
+    // A decided candidate (hold/sell-raw/submit/pass) previously rendered
+    // visually identical to a genuinely open one until its modal was opened;
+    // this badge is the same "already decided, not still being weighed"
+    // signal the STATUS filter chips above now let you filter by.
+    const decisionLabel = c.decision ? c.decision.replace('-', ' ') : null;
     const metaParts = [
       c.sport,
       c.targetGradingCompany,
@@ -1318,9 +1341,10 @@ function renderCandidates() {
       math ? 'costs ' + formatUsd(math.totalCost) : null
     ].filter(Boolean);
     return `
-      <div class="submission-row candidate-row" tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled candidate')}" data-id="${escapeHtml(c.id)}">
+      <div class="submission-row candidate-row" tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled candidate')}${decisionLabel ? ', decision: ' + escapeHtml(decisionLabel) : ''}" data-id="${escapeHtml(c.id)}">
         <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
+        ${decisionLabel ? `<span class="badge badge-decided">${escapeHtml(decisionLabel)}</span>` : ''}
         <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
       </div>
@@ -2977,6 +3001,7 @@ setInitialChipState('ownershipFilter', 'data-owned', activeOwnership);
 document.getElementById('candidateSearchInput').value = candidateSearchTerm;
 setInitialChipState('candidateSportFilter', 'data-cand-sport', activeCandidateSport);
 setInitialChipState('candidateVerdictFilter', 'data-cand-verdict', activeCandidateVerdict);
+setInitialChipState('candidateStatusFilter', 'data-cand-status', activeCandidateStatus);
 
 wireChipGroup('sportFilter', 'data-sport', (v) => { activeSport = v; });
 wireChipGroup('basisFilter', 'data-basis', (v) => { activeBasis = v; });
@@ -2984,6 +3009,7 @@ wireChipGroup('graderFilter', 'data-grader', (v) => { activeGrader = v; });
 wireChipGroup('ownershipFilter', 'data-owned', (v) => { activeOwnership = v; });
 wireChipGroup('candidateSportFilter', 'data-cand-sport', (v) => { activeCandidateSport = v; }, renderCandidates);
 wireChipGroup('candidateVerdictFilter', 'data-cand-verdict', (v) => { activeCandidateVerdict = v; }, renderCandidates);
+wireChipGroup('candidateStatusFilter', 'data-cand-status', (v) => { activeCandidateStatus = v; }, renderCandidates);
 document.getElementById('candidateSearchInput').addEventListener('input', (e) => {
   candidateSearchTerm = e.target.value;
   renderCandidates();
@@ -2992,9 +3018,11 @@ document.getElementById('candidatesClearFiltersBtn').addEventListener('click', (
   candidateSearchTerm = '';
   activeCandidateSport = 'all';
   activeCandidateVerdict = 'all';
+  activeCandidateStatus = 'all';
   document.getElementById('candidateSearchInput').value = '';
   setInitialChipState('candidateSportFilter', 'data-cand-sport', activeCandidateSport);
   setInitialChipState('candidateVerdictFilter', 'data-cand-verdict', activeCandidateVerdict);
+  setInitialChipState('candidateStatusFilter', 'data-cand-status', activeCandidateStatus);
   renderCandidates();
   document.getElementById('candidateSearchInput').focus();
 });

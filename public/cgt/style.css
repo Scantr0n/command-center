@@ -790,6 +790,7 @@ table.card-table {
 .badge-marginal { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
 .badge-notworth { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); }
 .badge-needsdata { background: rgba(255,255,255,0.03); color: var(--sub); }
+.badge-decided { background: rgba(255,255,255,0.03); color: var(--sub); text-transform: capitalize; }
 
 /* Compact up/down/flat marker next to a card's value once it has been
    re-priced at least once (see priceHistory in app.js). Same green/red as
