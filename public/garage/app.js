@@ -3991,7 +3991,7 @@ function photoDraftCompsHtml(priceField) {
         ${comps.map(c => `
           <li>
             ${c.url ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.title || 'Untitled comp')}</a>` : escapeHtml(c.title || 'Untitled comp')}
-            &mdash; ${c.price != null ? formatUsd(c.price) : 'price unknown'}${c.platform ? ', ' + escapeHtml(c.platform) : ''}${c.condition ? ', ' + escapeHtml(c.condition) : ''}
+            : ${c.price != null ? formatUsd(c.price) : 'price unknown'}${c.platform ? ', ' + escapeHtml(c.platform) : ''}${c.condition ? ', ' + escapeHtml(c.condition) : ''}
           </li>
         `).join('')}
       </ul>

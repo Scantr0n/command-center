@@ -55,7 +55,7 @@
     });
 
     chips.push({
-      number: typeof saved.count === 'number' ? saved.count : '—',
+      number: typeof saved.count === 'number' ? saved.count : 'N/A',
       label: 'Currently saved',
       meta: saved.asOfDate
         ? 'Last stated ' + fmtDate(saved.asOfDate) + ', not reconfirmed since'
@@ -65,7 +65,7 @@
     if (digestData && digestData.runDate) {
       chips.push({ number: fmtDate(digestData.runDate), label: 'Most recent digest run', meta: 'Automated daily digest' });
       chips.push({
-        number: typeof digestData.fullyVerifiedCount === 'number' ? digestData.fullyVerifiedCount : '—',
+        number: typeof digestData.fullyVerifiedCount === 'number' ? digestData.fullyVerifiedCount : 'N/A',
         label: 'Verified leads in latest run',
         meta: typeof digestData.totalItemsCount === 'number' ? (digestData.totalItemsCount + ' item(s) reviewed total') : null
       });
@@ -96,7 +96,7 @@
           '<td data-label="Company">' + escapeHtml(a.company) + '</td>' +
           '<td data-label="Location">' + escapeHtml(a.location) + '</td>' +
           '<td class="pay-col" data-label="Pay">' + escapeHtml(a.pay) + '</td>' +
-          '<td data-label="Applied">' + escapeHtml(fmtDate(a.appliedDate) || '—') + '</td>' +
+          '<td data-label="Applied">' + escapeHtml(fmtDate(a.appliedDate) || 'undated') + '</td>' +
           '</tr>'
         ).join('') +
         '</tbody></table></div>';
@@ -109,7 +109,7 @@
       asides.push(
         '<div class="sub-list-heading">Dropped after verification passed, by Jack’s own judgment</div>' +
         '<ul class="sub-list">' + dropped.map(d =>
-          '<li class="sub-list-item"><strong>' + escapeHtml(d.company) + '</strong> — ' + escapeHtml(d.reason) + '</li>'
+          '<li class="sub-list-item"><strong>' + escapeHtml(d.company) + '</strong>: ' + escapeHtml(d.reason) + '</li>'
         ).join('') + '</ul>'
       );
     }
@@ -117,7 +117,7 @@
       asides.push(
         '<div class="sub-list-heading">Skipped, real logistics conflict, not a fit-quality issue</div>' +
         '<ul class="sub-list">' + skipped.map(s =>
-          '<li class="sub-list-item"><strong>' + escapeHtml(s.company) + '</strong> — ' + escapeHtml(s.reason) + '</li>'
+          '<li class="sub-list-item"><strong>' + escapeHtml(s.company) + '</strong>: ' + escapeHtml(s.reason) + '</li>'
         ).join('') + '</ul>'
       );
     }
