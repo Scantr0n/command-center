@@ -1352,12 +1352,26 @@ footer.page-foot {
   }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
-  /* Two real hardcoded hexes, not --tokens, so the :root override above
-     doesn't reach them, and neither was ever covered by this block's
-     existing hand-patched list: the "read-only, on purpose" scope banner
-     (#F2B8B8 pink) and the current-regime label (#3DDC84 green). */
+  /* Real hardcoded hexes, not --tokens, so the :root override above doesn't
+     reach them, and none were covered by this block's existing hand-patched
+     list: the "read-only, on purpose" scope banner's bold lead-in (#F2B8B8
+     pink) and the current-regime label (#3DDC84 green). */
   .scope-banner strong { color: #111 !important; }
   .regime-history-current .regime-history-label-value { color: #111 !important; }
+  /* The scope banner's own body text (#E8A0A0, distinct from its <strong>
+     lead-in above) was still missed: on paper that renders this page's most
+     important sentence, "never start, stop, configure, or otherwise
+     influence it", at roughly 2:1 contrast on white, well under WCAG AA.
+     Same bug, same fix, one more hardcoded hex the :root reset can't touch. */
+  .scope-banner { color: #111 !important; }
+  /* Same root cause a third time: the "Ongoing" incident-duration label is
+     the one case in Recent incidents where a hardcoded hex (#E8A0A0, chosen
+     to match the rest of the page's alert-red convention) survives onto
+     paper as unreadable pink-on-white. The word "Ongoing" already carries
+     the meaning in print, same tradeoff already accepted for the regime
+     label above, so it's just forced dark and legible like everything else
+     here rather than trying to preserve the color coding on paper. */
+  .incident-ongoing .incident-duration { color: #111 !important; }
 
   .sticky-critical-bar, .refresh-btn, .back-link, .schema-help,
   .modal-overlay, .toast-container {
