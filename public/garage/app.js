@@ -2556,10 +2556,20 @@ function renderAcquisitions(acquisitions, currentListings, sales) {
     const key = a.source || 'other';
     if (!bySource[key]) bySource[key] = { spend: 0, revenue: 0 };
     bySource[key].spend += a.pricePaid || 0;
-    const listingIds = a.listingIds || [];
-    sales.forEach(sale => {
-      if (listingIds.includes(sale.listingId)) bySource[key].revenue += sale.salePrice || 0;
-    });
+  });
+  // One pass over sales, not one pass per acquisition: a listing fed by more
+  // than one acquisition record (re-sourced after damage, same real case
+  // suggestedCostBasisFromAcquisitions above already documents) used to have
+  // its sale revenue added once per acquisition that links it, inflating
+  // realized revenue by however many times that listing id was re-logged.
+  // Same "first acquisition that links this listing wins" rule as cost basis
+  // above, so a sale's revenue and a listing's cost basis always agree on
+  // which channel gets credit.
+  sales.forEach(sale => {
+    const owner = acquisitions.find(a => (a.listingIds || []).includes(sale.listingId));
+    if (!owner) return;
+    const key = owner.source || 'other';
+    bySource[key].revenue += sale.salePrice || 0;
   });
   const totalSpend = acquisitions.reduce((s, a) => s + (a.pricePaid || 0), 0);
   const sourceParts = Object.keys(bySource).map(key => {
