@@ -3461,7 +3461,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // diffed against or restored from a known-good copy. Local download only,
 // nothing is sent anywhere. Same approach as CSM's own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData) return;
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center Garage (/garage), local download only',
@@ -3471,7 +3471,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
     salesJson: rawSalesData,
     expensesJson: rawExpensesData,
     disputesJson: rawDisputesData,
-    suppliesJson: rawSuppliesData
+    suppliesJson: rawSuppliesData,
+    acquisitionsJson: rawAcquisitionsData
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
