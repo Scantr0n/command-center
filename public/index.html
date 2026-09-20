@@ -69,6 +69,19 @@
   }
   .activity-row { border-radius: 6px; }
   .tag-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: 0.3px; }
+  .related-chip-wrap { display: inline-flex; align-items: stretch; border-radius: 5px; overflow: hidden; }
+  .related-chip-wrap .tag-chip { border-radius: 5px 0 0 5px; }
+  .chip-info-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    width: 18px;
+    border: none;
+    border-radius: 0 5px 5px 0;
+    background: rgba(255,255,255,0.06);
+    color: var(--faint);
+    cursor: pointer;
+  }
+  .chip-info-btn:hover, .chip-info-btn:focus-visible { background: rgba(255,255,255,0.12); color: var(--ink); }
   .cat-filter-chip { cursor: pointer; transition: opacity 0.15s ease; border: none; }
   .cat-filter-chip:hover { opacity: 0.8; }
   .kbd-chip { font-family: 'JetBrains Mono', monospace; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--hairline); background: rgba(255,255,255,0.03); }
@@ -1653,11 +1666,37 @@ function openModal(id, opts = {}) {
     }))
     .filter(r => r.reason);
   if (relatedClusters.length) {
+    // Same touch/keyboard gap as the graph's own relation lines (see the
+    // #graphTooltip comment above renderGraph): the reason was only ever in
+    // a native title attribute, which needs mouse hover, on a button whose
+    // click is already spoken for (navigating to the related project). A
+    // separate small info control, reusing the same tooltip, keeps the
+    // primary tap-to-navigate action intact while making the reason
+    // reachable by tap or keyboard instead of only mouse hover.
     document.getElementById('relatedChips').innerHTML = relatedClusters.map(({ cluster: c, reason }) => `
-      <button type="button" class="tag-chip" data-related-id="${escapeHtml(c.id)}" title="${escapeHtml(reason)}" style="background:${categoryColor(c.category)}1F; color:${categoryColor(c.category)}; cursor: pointer; border: none;">${escapeHtml(c.name)}</button>
+      <span class="related-chip-wrap">
+        <button type="button" class="tag-chip" data-related-id="${escapeHtml(c.id)}" title="${escapeHtml(reason)}" style="background:${categoryColor(c.category)}1F; color:${categoryColor(c.category)}; cursor: pointer; border: none;">${escapeHtml(c.name)}</button>
+        <button type="button" class="chip-info-btn" data-reason="${escapeHtml(reason)}" aria-label="Why related to ${escapeHtml(c.name)}">?</button>
+      </span>
     `).join('');
     document.querySelectorAll('#relatedChips [data-related-id]').forEach(el => {
       el.addEventListener('click', () => openModal(el.dataset.relatedId));
+    });
+    document.querySelectorAll('#relatedChips .chip-info-btn').forEach(el => {
+      // A real <button>, so Enter/Space already trigger a native click with
+      // no extra keydown wiring needed (unlike the SVG relation-line paths
+      // above, which aren't natively keyboard-interactive). A
+      // keyboard-triggered click reports clientX/Y as 0 in most browsers,
+      // which would otherwise pin the tooltip to the corner instead of near
+      // the button, so fall back to the button's own position in that case.
+      el.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const rect = el.getBoundingClientRect();
+        const hasPointerCoords = event.clientX || event.clientY;
+        const x = hasPointerCoords ? event.clientX : rect.left + rect.width / 2;
+        const y = hasPointerCoords ? event.clientY : rect.top;
+        toggleRelationTooltip(el, x, y);
+      });
     });
     relatedRow.classList.remove('hidden');
     relatedRow.classList.add('flex');
