@@ -315,6 +315,14 @@ function todayIso() {
 // a "days in queue" figure himself.
 function addDaysIso(isoDate, days) {
   const d = new Date(isoDate + 'T00:00:00');
+  // Unlike daysSince right below, this had no guard at all: a malformed
+  // isoDate (a hand-edit that skipped validate-core's own isDateOrNull, e.g.
+  // "2026-13-40") produces an Invalid Date, and every field pulled off it
+  // below is NaN, silently returning the literal string "NaN-NaN-NaN"
+  // instead of erroring. That string is truthy, so estimatedReturnFor's own
+  // `estReturnDate ?` checks never catch it, and it was reaching both the
+  // on-page "est. back ~" line and the exported .ics reminder's description.
+  if (Number.isNaN(d.getTime())) return null;
   d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
