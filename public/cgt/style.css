@@ -1335,8 +1335,31 @@ textarea.np-input { resize: vertical; }
 
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
+  /* The rest of this block resets body's own color, plus hand-patches a
+     long list of specific classes (.stat-tile-value, .insurance-summary-*,
+     etc.) to an explicit #111/#333 with !important, but never redefines the
+     --sub/--dim custom properties themselves. Any element that sets
+     color: var(--sub) or var(--dim) directly (confirmed real case:
+     .section-title, every section heading on this page) bypasses body's
+     color entirely and keeps its dark-mode value, which measures well
+     under WCAG AA contrast against this stylesheet's white background.
+     Overriding the tokens at the root, same real fix already applied to
+     the main dashboard's own print stylesheet tonight, fixes every such
+     element at once instead of extending an already-long hand-patched list
+     one more class at a time. */
+  :root {
+    --void: #ffffff; --panel: #ffffff; --panelLight: #ffffff;
+    --hairline: #cccccc; --hairlineHover: #999999;
+    --ink: #111111; --sub: #444444; --dim: #666666;
+  }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
+
+  /* Real hardcoded hex (#E0A030), not a --token, so the :root override
+     above doesn't reach it: the amber "needs attention" count only gets
+     hidden in insurance-print-mode below, a normal print keeps it on the
+     page at its dark-mode brightness, well under WCAG AA on white. */
+  .attention-pill.attention-warn strong { color: #111 !important; }
 
   .print-btn, .back-link, .search-input, .filter-row, .schema-help, .section-details, .modal-overlay {
     display: none !important;
@@ -1420,7 +1443,7 @@ textarea.np-input { resize: vertical; }
 
   .table-wrap { background: none; border: 1px solid #ccc; }
   .table-wrap::before, .table-wrap::after { display: none !important; }
-  .card-table thead th { color: #333; border-color: #ccc; }
+  .card-table thead th { color: #333 !important; border-color: #ccc; }
   .card-table tbody tr:hover { background: none; }
   .card-table tbody tr + tr td { border-color: #ddd; }
   .cell-card-name, .cell-value { color: #111; }
