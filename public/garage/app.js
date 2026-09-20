@@ -3,6 +3,7 @@ let salesLog = [];
 let expensesLog = [];
 let disputesLog = [];
 let suppliesLog = [];
+let acquisitionsLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 let sortKey = null;
@@ -15,6 +16,7 @@ let rawSalesData = null;
 let rawExpensesData = null;
 let rawDisputesData = null;
 let rawSuppliesData = null;
+let rawAcquisitionsData = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
@@ -71,6 +73,11 @@ const DISPUTE_STATUS_LABELS = {
 };
 const SUPPLY_CATEGORY_LABELS = {
   box: 'Box', mailer: 'Poly mailer', envelope: 'Envelope', tape: 'Tape', label: 'Label', other: 'Other'
+};
+const ACQUISITION_SOURCE_LABELS = {
+  'thrift-store': 'Thrift store', 'estate-sale': 'Estate sale', 'garage-sale': 'Garage sale',
+  'wholesale-lot': 'Wholesale lot', 'online-marketplace': 'Online marketplace',
+  'personal-item': 'Personal item', other: 'Other'
 };
 
 // Only fires once both real numbers are on file, same "leave it honestly
@@ -310,14 +317,15 @@ function renderChangelog(data) {
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
   loadChangelog();
-  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
     fetchJson('/garage/data/activity.json'),
     fetchJson('/garage/data/sales.json'),
     fetchJson('/garage/data/expenses.json'),
     fetchJson('/garage/data/disputes.json'),
-    fetchJson('/garage/data/supplies.json')
+    fetchJson('/garage/data/supplies.json'),
+    fetchJson('/garage/data/acquisitions.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
@@ -326,6 +334,7 @@ async function loadData() {
   const expensesData = expensesResult.status === 'fulfilled' ? expensesResult.value.data : null;
   const disputesData = disputesResult.status === 'fulfilled' ? disputesResult.value.data : null;
   const suppliesData = suppliesResult.status === 'fulfilled' ? suppliesResult.value.data : null;
+  const acquisitionsData = acquisitionsResult.status === 'fulfilled' ? acquisitionsResult.value.data : null;
   rawListingsData = listingsData;
   rawPipelineData = pipelineData;
   rawActivityData = activityData;
@@ -333,22 +342,24 @@ async function loadData() {
   rawExpensesData = expensesData;
   rawDisputesData = disputesData;
   rawSuppliesData = suppliesData;
+  rawAcquisitionsData = acquisitionsData;
   const backupBtn = document.getElementById('backupBtn');
-  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData);
+  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
   const expenses = (expensesData && expensesData.expenses) || [];
   const disputes = (disputesData && disputesData.disputes) || [];
   const supplies = (suppliesData && suppliesData.supplies) || [];
+  const acquisitions = (acquisitionsData && acquisitionsData.acquisitions) || [];
 
-  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult]
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult]
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value.lastModified));
 
   if (listingsData) {
     listings = listingsData.listings || [];
-    renderStats(listings, stages, sales, expenses, supplies);
+    renderStats(listings, stages, sales, expenses, supplies, acquisitions);
     renderDelistList(listings);
     renderDataQuality(listings);
     renderDuplicates(listings);
@@ -455,6 +466,19 @@ async function loadData() {
     suppliesEmpty.textContent = "Couldn't load supplies data: " + suppliesResult.reason.message;
   }
 
+  if (acquisitionsData) {
+    acquisitionsLog = acquisitions;
+    renderAcquisitions(acquisitions, listings, salesLog);
+  } else {
+    acquisitionsLog = [];
+    document.getElementById('acquisitionsTableBody').innerHTML = '';
+    const acquisitionsEmpty = document.getElementById('acquisitionsTableEmpty');
+    acquisitionsEmpty.hidden = false;
+    acquisitionsEmpty.setAttribute('role', 'alert');
+    acquisitionsEmpty.textContent = "Couldn't load acquisitions data: " + acquisitionsResult.reason.message;
+    document.getElementById('acquisitionsTotals').innerHTML = '';
+  }
+
   initTableScrollShadows();
 }
 
@@ -488,10 +512,11 @@ function bestCaseTotalPayout(live) {
   }, 0);
 }
 
-function renderStats(listings, stages, sales, expenses, supplies) {
+function renderStats(listings, stages, sales, expenses, supplies, acquisitions) {
   sales = sales || [];
   expenses = expenses || [];
   supplies = supplies || [];
+  acquisitions = acquisitions || [];
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
   const platformCounts = {};
@@ -524,6 +549,7 @@ function renderStats(listings, stages, sales, expenses, supplies) {
   const netIncome = realizedProfit - totalExpenses;
   const suppliesCounted = supplies.filter(s => s.qtyOnHand != null && s.reorderThreshold != null);
   const lowStockCount = suppliesCounted.filter(isSupplyLowStock).length;
+  const totalSourcingSpend = acquisitions.reduce((s, a) => s + (a.pricePaid || 0), 0);
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -541,7 +567,8 @@ function renderStats(listings, stages, sales, expenses, supplies) {
     { value: expenses.length, label: 'Business expenses logged', sub: expenses.length ? null : 'None yet' },
     { value: formatUsd(totalExpenses), label: 'Real business expenses', sub: uncomputedExpenseCount ? `${uncomputedExpenseCount} of ${expenses.length} not counted yet, missing amount or a usable mileage rate` : (expenses.length ? 'For Schedule C, not tax advice' : 'No expenses logged yet') },
     { value: netIncomeTracked ? formatUsd(netIncome) : 'not tracked yet', label: 'Net business income', sub: netIncomeTracked ? (expenses.length ? 'Realized profit minus real logged expenses' : 'Realized profit minus $0, no expenses logged yet') : 'Needs at least one sale with cost basis or shipping logged', warn: netIncomeTracked && netIncome < 0 },
-    { value: lowStockCount, label: 'Supplies low on stock', sub: supplies.length ? `${suppliesCounted.length}/${supplies.length} have both a count and a reorder point logged` : 'No supplies logged yet', warn: lowStockCount > 0 }
+    { value: lowStockCount, label: 'Supplies low on stock', sub: supplies.length ? `${suppliesCounted.length}/${supplies.length} have both a count and a reorder point logged` : 'No supplies logged yet', warn: lowStockCount > 0 },
+    { value: acquisitions.length, label: 'Sourcing trips logged', sub: acquisitions.length ? formatUsd(totalSourcingSpend) + ' real total spent' : 'None yet' }
   ];
 
   document.getElementById('statRow').innerHTML = tiles.map(t => `
@@ -2434,6 +2461,99 @@ function renderSupplies(supplies) {
   `).join('');
 }
 
+// Needs both real numbers together, same "can't compute from half the
+// inputs" rule validate.js already enforces for this pair.
+function acquisitionPerItemCost(a) {
+  if (a.pricePaid == null || !a.itemCount) return null;
+  return a.pricePaid / a.itemCount;
+}
+
+// Real reseller-tooling pattern (per-item cost of goods, sourcing-channel
+// ROI): distinct from a listing's own costBasis, which is the allocated
+// cost of one item once it's split out of a lot, this is the real purchase
+// event that produced it, one row can be a single item or a whole trip that
+// yielded several. "Revenue realized" only ever counts a sale actually
+// logged in sales.json for one of this acquisition's linked listingIds,
+// never a live asking price, so a channel's real payoff can't be
+// overstated before anything has actually sold from it yet.
+function renderAcquisitions(acquisitions, currentListings, sales) {
+  const tbody = document.getElementById('acquisitionsTableBody');
+  const empty = document.getElementById('acquisitionsTableEmpty');
+  const totalsEl = document.getElementById('acquisitionsTotals');
+  sales = sales || [];
+
+  if (!acquisitions.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No sourcing/acquisitions logged yet.';
+    totalsEl.innerHTML = '';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...acquisitions].sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  });
+
+  tbody.innerHTML = sorted.map(a => {
+    const perItem = acquisitionPerItemCost(a);
+    const listingIds = a.listingIds || [];
+    const linkedHtml = listingIds.length
+      ? listingIds.map(id => {
+          const l = currentListings.find(x => x.id === id);
+          const label = l ? (l.title || id) : id + ' (not itemized yet)';
+          return `<button type="button" class="badge badge-link badge-button" data-listing-id="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
+        }).join(' ')
+      : '<span class="cell-value empty">not itemized yet</span>';
+    return `
+    <tr>
+      <td>
+        <div class="cell-card-name">${escapeHtml(ACQUISITION_SOURCE_LABELS[a.source] || a.source || 'Unknown source')}</div>
+        ${a.sourceName ? `<div class="cell-muted">${escapeHtml(a.sourceName)}</div>` : ''}
+      </td>
+      <td class="cell-muted">${a.date ? escapeHtml(a.date) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-value${a.pricePaid == null ? ' empty' : ''}">${a.pricePaid != null ? formatUsd(a.pricePaid) : 'not logged'}</td>
+      <td class="cell-value${a.itemCount == null ? ' empty' : ''}">${a.itemCount != null ? a.itemCount : 'not logged'}</td>
+      <td class="cell-value${perItem == null ? ' empty' : ''}">${perItem != null ? formatUsd(perItem) : 'needs paid + count'}</td>
+      <td class="cell-platforms">${linkedHtml}</td>
+      <td class="cell-muted">${a.notes ? escapeHtml(a.notes) : ''}</td>
+    </tr>
+  `;
+  }).join('');
+
+  tbody.querySelectorAll('[data-listing-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentListings.some(l => l.id === btn.dataset.listingId)) openModal(btn.dataset.listingId);
+    });
+  });
+
+  const bySource = {};
+  acquisitions.forEach(a => {
+    const key = a.source || 'other';
+    if (!bySource[key]) bySource[key] = { spend: 0, revenue: 0 };
+    bySource[key].spend += a.pricePaid || 0;
+    const listingIds = a.listingIds || [];
+    sales.forEach(sale => {
+      if (listingIds.includes(sale.listingId)) bySource[key].revenue += sale.salePrice || 0;
+    });
+  });
+  const totalSpend = acquisitions.reduce((s, a) => s + (a.pricePaid || 0), 0);
+  const sourceParts = Object.keys(bySource).map(key => {
+    const b = bySource[key];
+    const label = ACQUISITION_SOURCE_LABELS[key] || key;
+    return `${label}: ${formatUsd(b.spend)} spent${b.revenue ? ', ' + formatUsd(b.revenue) + ' realized so far' : ''}`;
+  }).join('; ');
+
+  totalsEl.innerHTML = `
+    <p class="pace-result-note">
+      <span class="pace-result-figure">${formatUsd(totalSpend)}</span> total real sourcing spend across
+      ${acquisitions.length} logged acquisition(s)${sourceParts ? ' (' + escapeHtml(sourceParts) + ')' : ''}.
+    </p>`;
+}
+
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchTerm = e.target.value;
   applyFiltersAndRender();
@@ -3458,6 +3578,41 @@ document.getElementById('suppliesCsvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+const ACQUISITIONS_CSV_COLUMNS = [
+  ['source', 'Source'], ['sourceName', 'Source name'], ['date', 'Acquired'], ['pricePaid', 'Paid'],
+  ['itemCount', 'Items'], ['perItemCost', 'Per-item cost'], ['listingIds', 'Linked listings'], ['notes', 'Notes']
+];
+
+// Exports every real logged acquisition, newest-first, same order as the
+// on-page table.
+document.getElementById('acquisitionsCsvBtn').addEventListener('click', () => {
+  const rows = [...acquisitionsLog]
+    .sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.localeCompare(a.date);
+    })
+    .map(a => ({
+      ...a,
+      source: ACQUISITION_SOURCE_LABELS[a.source] || a.source || '',
+      perItemCost: acquisitionPerItemCost(a),
+      listingIds: (a.listingIds || []).join('; ')
+    }));
+  const header = ACQUISITIONS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(a => ACQUISITIONS_CSV_COLUMNS.map(([key]) => csvField(a[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a2 = document.createElement('a');
+  a2.href = url;
+  a2.download = 'garage-acquisitions-' + todayDateStr() + '.csv';
+  document.body.appendChild(a2);
+  a2.click();
+  document.body.removeChild(a2);
+  URL.revokeObjectURL(url);
+});
+
 const disputesIcsBtn = document.getElementById('disputesIcsBtn');
 const DISPUTES_ICS_LABEL = disputesIcsBtn.textContent;
 disputesIcsBtn.addEventListener('click', () => {
@@ -4180,6 +4335,83 @@ function wireQuickLogSupplyTool() {
   });
 }
 
+// Same quick-log convention as the tools above, for acquisitions.json.
+// listingIds comes in as a comma-separated field (a lot can feed several
+// items) and gets split/trimmed into a real array; an id that doesn't match
+// anything currently in listings.json is only an advisory, not a blocker,
+// since a lot not itemized there yet is a real, expected state.
+function wireQuickLogAcquisitionTool() {
+  const form = document.getElementById('quickAcquisitionForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('naqWarnings');
+  const output = document.getElementById('naqOutput');
+  const copyBtn = document.getElementById('naqCopyBtn');
+  const live = document.getElementById('quickLogAcquisitionLive');
+  const draftGuard = attachDraftGuard(form, 'garage-naq-draft-v1', {
+    bannerId: 'naqDraftBanner', timeId: 'naqDraftBannerTime', discardId: 'naqDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('naqId').value.trim();
+    const source = document.getElementById('naqSource').value;
+    const sourceName = document.getElementById('naqSourceName').value.trim() || null;
+    const date = document.getElementById('naqDate').value || null;
+    const pricePaid = readOptionalNonNegativeInput(document.getElementById('naqPricePaid'));
+    const itemCount = readOptionalNonNegativeInteger(document.getElementById('naqItemCount'));
+    const listingIds = document.getElementById('naqListingIds').value
+      .split(',').map(s => s.trim()).filter(Boolean);
+    const notes = document.getElementById('naqNotes').value.trim() || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (acquisitionsLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another acquisition, ids must be unique.');
+    }
+    if (!source) blockers.push('Select a source.');
+    if (pricePaid === undefined) blockers.push('Enter a valid price paid of 0 or more, or leave it blank.');
+    if (itemCount === undefined) blockers.push('Enter a valid whole-number item count of 0 or more, or leave it blank.');
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    if (pricePaid != null && itemCount == null) {
+      advisory.push('Price paid is logged but item count is not, per-item cost can\'t be computed without both.');
+    } else if (pricePaid == null && itemCount != null) {
+      advisory.push('Item count is logged but price paid is not, per-item cost can\'t be computed without both.');
+    }
+    listingIds.forEach(lid => {
+      if (!listings.some(l => l.id === lid)) {
+        advisory.push('"' + lid + '" does not match any listing in listings.json yet, fine if it\'s not itemized there yet.');
+      }
+    });
+
+    const acquisition = { id, source, sourceName, date, pricePaid, itemCount, listingIds, notes };
+
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(acquisition, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Acquisition JSON copied to clipboard.';
+      draftGuard.clearDraft();
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 // AI photo-to-listing drafter. Two-stage flow: stage 1 (draft) sends real
 // item photos to /api/garage/draft-listing and shows every field with its
 // confidence and reasoning, purely informational, nothing saved. Stage 2
@@ -4480,6 +4712,7 @@ wireQuickLogSaleTool();
 wireQuickLogExpenseTool();
 wireQuickLogDisputeTool();
 wireQuickLogSupplyTool();
+wireQuickLogAcquisitionTool();
 wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();

@@ -1779,6 +1779,111 @@
   </section>
 
   <section>
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Sourcing / acquisitions log</h2>
+      <button type="button" id="acquisitionsCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
+    <div class="callout">
+      Where real inventory actually comes from, and what it actually cost to get it, separate from a listing's own
+      <code>costBasis</code> (which is the allocated cost for one item once it's split out of a lot). One row here
+      can be a single item or a whole thrift/estate-sale/wholesale trip that yielded several: log the real total
+      <code>pricePaid</code> and <code>itemCount</code> together and the per-item cost is computed, never guessed.
+      Link it to real listings once they're itemized in <code>listings.json</code>, a lot only partly itemized so
+      far is expected, not an error. This is a real reseller-tooling pattern (per-item cost of goods and
+      sourcing-channel ROI, the same thing tools like Flip's Reseller Profit Tracker track), not connected to
+      anything else on this page, nothing here is estimated.
+    </div>
+
+    <details class="schema-help" id="quickLogAcquisitionTool">
+      <summary>Quick log an acquisition (generates JSON to paste into acquisitions.json, saves nothing)</summary>
+      <div class="schema-help-body">
+        <p>Runs the same checks <code>node public/garage/data/validate.js</code> does on
+          <code>acquisitions.json</code> (a unique id, a real source), then builds the JSON object to paste into
+          the <code>acquisitions</code> array yourself. This never writes a file or sends anything, it only puts
+          text on your clipboard.</p>
+        <table class="schema-table">
+          <tbody>
+            <tr><th>id</th><td>Unique slug, e.g. <code>"goodwill-run-2026-09-20"</code></td></tr>
+            <tr><th>source</th><td>One of: <code>thrift-store</code>, <code>estate-sale</code>,
+              <code>garage-sale</code>, <code>wholesale-lot</code>, <code>online-marketplace</code>,
+              <code>personal-item</code>, <code>other</code></td></tr>
+            <tr><th>sourceName</th><td>Real place/seller name, e.g. <code>"Goodwill on Main St"</code>, or
+              <code>null</code></td></tr>
+            <tr><th>date</th><td>ISO date (<code>YYYY-MM-DD</code>) it was actually acquired, or <code>null</code></td></tr>
+            <tr><th>pricePaid</th><td>Real total paid for the whole lot/trip, or <code>null</code> until known.
+              Needs <code>itemCount</code> too before a per-item cost can be computed.</td></tr>
+            <tr><th>itemCount</th><td>Real whole number of resale items this actually yielded, or <code>null</code></td></tr>
+            <tr><th>listingIds</th><td>Ids from <code>listings.json</code> this fed, comma-separated, or leave
+              blank if not itemized there yet</td></tr>
+            <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
+          </tbody>
+        </table>
+
+        <div id="naqDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="naqDraftBannerTime"></span>, this form is autosaved to
+            this browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="naqDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
+
+        <div class="quick-log-grid">
+          <form class="quick-log-form" id="quickAcquisitionForm">
+            <h3 class="quick-log-title font-mono">New acquisition &rarr; acquisitions.json</h3>
+            <label class="quick-log-label" for="naqId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="naqId" placeholder="e.g. goodwill-run-2026-09-20" required>
+            <label class="quick-log-label" for="naqSource">Source</label>
+            <select class="quick-log-input" id="naqSource" required>
+              <option value="" disabled selected>Select a source</option>
+              <option value="thrift-store">Thrift store</option>
+              <option value="estate-sale">Estate sale</option>
+              <option value="garage-sale">Garage sale</option>
+              <option value="wholesale-lot">Wholesale lot</option>
+              <option value="online-marketplace">Online marketplace</option>
+              <option value="personal-item">Personal item</option>
+              <option value="other">Other</option>
+            </select>
+            <label class="quick-log-label" for="naqSourceName">Source name (optional)</label>
+            <input class="quick-log-input" type="text" id="naqSourceName" placeholder="Real place/seller name">
+            <label class="quick-log-label" for="naqDate">Date acquired (optional)</label>
+            <input class="quick-log-input" type="date" id="naqDate">
+            <label class="quick-log-label" for="naqPricePaid">Price paid, USD (optional, total for the lot)</label>
+            <input class="quick-log-input" type="number" id="naqPricePaid" min="0" step="0.01">
+            <label class="quick-log-label" for="naqItemCount">Item count (optional, whole number)</label>
+            <input class="quick-log-input" type="number" id="naqItemCount" min="0" step="1">
+            <label class="quick-log-label" for="naqListingIds">Linked listing ids (optional, comma-separated)</label>
+            <input class="quick-log-input" type="text" id="naqListingIds" placeholder="e.g. black-boots, white-boots">
+            <label class="quick-log-label" for="naqNotes">Notes (optional)</label>
+            <input class="quick-log-input" type="text" id="naqNotes">
+            <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+            <div class="quick-log-warnings" id="naqWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="naqOutput" readonly rows="10" hidden aria-label="Generated acquisition JSON, ready to paste into the acquisitions array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="naqCopyBtn" hidden>Copy JSON</button>
+            <p class="quick-log-hint" id="quickLogAcquisitionLive" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <div class="table-wrap">
+      <table class="card-table" id="acquisitionsTable">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Acquired</th>
+            <th>Paid</th>
+            <th>Items</th>
+            <th>Per-item cost</th>
+            <th>Linked listings</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="acquisitionsTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="acquisitionsTableEmpty" hidden></div>
+    </div>
+    <div id="acquisitionsTotals" class="pace-result"></div>
+  </section>
+
+  <section>
     <h2 class="section-title">Quality &amp; fixes log</h2>
     <div class="activity-list" id="activityList"></div>
   </section>

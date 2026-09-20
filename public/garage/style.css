@@ -712,6 +712,17 @@ table.card-table {
   outline-offset: 1px;
 }
 
+/* Same clickable-badge look as .badge-link, for a real <button> (opens the
+   record modal) instead of an <a> (opens an external URL), so it needs its
+   own reset of the browser's default button chrome first. */
+.badge-button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
 .table-empty {
   padding: 40px 20px;
   text-align: center;

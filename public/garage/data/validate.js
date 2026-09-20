@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
  * Validates listings.json, pipeline.json, activity.json, sales.json,
- * expenses.json, disputes.json, and supplies.json against the field rules
- * documented in public/garage/index.html.
+ * expenses.json, disputes.json, supplies.json, and acquisitions.json against
+ * the field rules documented in public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -32,6 +32,12 @@
  * "shoes" category also size and color): eBay's Cassini search excludes a
  * listing entirely from a buyer's filtered results once one of those
  * filters is applied and the field is missing, not just ranks it lower.
+ * Every acquisitions.json entry needs a real source and, if logged,
+ * "listingIds" must each match a real id in listings.json (a lot that's
+ * only partly itemized so far is fine, that's just a warning); "itemCount"
+ * and "pricePaid" are the two real numbers the per-item cost math on the
+ * page needs together, so one logged without the other is flagged the same
+ * "can't compute yet" way the mileage/reorder gaps above already are.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -62,6 +68,7 @@ const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived',
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
 const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
 const ITEM_SPECIFIC_KEYS = ['brand', 'size', 'color', 'condition'];
+const ACQUISITION_SOURCES = ['thrift-store', 'estate-sale', 'garage-sale', 'wholesale-lot', 'online-marketplace', 'personal-item', 'other'];
 // Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
 // Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
 // announced 2026-07-13 (irs.gov/newsroom: "IRS sets 2026 business standard
@@ -115,7 +122,7 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData;
+  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData, acquisitionsData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
@@ -124,6 +131,7 @@ function main() {
     expensesData = loadJson('expenses.json');
     disputesData = loadJson('disputes.json');
     suppliesData = loadJson('supplies.json');
+    acquisitionsData = loadJson('acquisitions.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -552,6 +560,71 @@ function main() {
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
+  const acquisitions = acquisitionsData.acquisitions || [];
+  const seenAcquisitionIds = new Set();
+
+  acquisitions.forEach((a, idx) => {
+    const where = 'acquisitions[' + idx + ']' + (a && a.id ? ' (' + a.id + ')' : '');
+
+    if (!a.id) errors.push(where + ': missing "id"');
+    else if (seenAcquisitionIds.has(a.id)) errors.push(where + ': duplicate id "' + a.id + '"');
+    else seenAcquisitionIds.add(a.id);
+
+    if (!a.source) {
+      errors.push(where + ': missing "source"');
+    } else if (!ACQUISITION_SOURCES.includes(a.source)) {
+      errors.push(where + ': source "' + a.source + '" is not one of ' + ACQUISITION_SOURCES.join(', '));
+    }
+
+    if (a.sourceName !== null && a.sourceName !== undefined && typeof a.sourceName !== 'string') {
+      errors.push(where + ': "sourceName" must be a string or null');
+    }
+
+    if (!isDateOrNull(a.date)) {
+      errors.push(where + ': "date" is not a YYYY-MM-DD date or null: ' + JSON.stringify(a.date));
+    }
+
+    if (a.pricePaid !== null && a.pricePaid !== undefined) {
+      if (typeof a.pricePaid !== 'number' || a.pricePaid < 0) {
+        errors.push(where + ': "pricePaid" must be a non-negative number or null');
+      }
+    }
+
+    if (a.itemCount !== null && a.itemCount !== undefined) {
+      if (typeof a.itemCount !== 'number' || a.itemCount < 0 || !Number.isInteger(a.itemCount)) {
+        errors.push(where + ': "itemCount" must be a non-negative integer or null');
+      }
+    }
+
+    if (a.notes !== null && a.notes !== undefined && typeof a.notes !== 'string') {
+      errors.push(where + ': "notes" must be a string or null');
+    }
+
+    if (a.listingIds !== undefined && a.listingIds !== null) {
+      if (!Array.isArray(a.listingIds)) {
+        errors.push(where + ': "listingIds" must be an array of listing ids, or omitted');
+      } else {
+        a.listingIds.forEach(id => {
+          if (!listingById[id]) {
+            warnings.push(where + ': listingIds "' + id + '" does not match any listing in listings.json (fine if not itemized there yet, or it has since fully sold through and was removed)');
+          }
+        });
+      }
+    }
+
+    // Mirrors the mileage-with-no-rate and qtyOnHand-with-no-threshold gaps
+    // above: the per-item cost math on the page needs both a real total and
+    // a real item count together, one alone can't compute anything.
+    if (a.pricePaid != null && a.itemCount == null) {
+      warnings.push(where + ': "pricePaid" is logged but "itemCount" is not, per-item cost can\'t be computed without both');
+    } else if (a.pricePaid == null && a.itemCount != null) {
+      warnings.push(where + ': "itemCount" is logged but "pricePaid" is not, per-item cost can\'t be computed without both');
+    }
+
+    emDashFields(a, ['sourceName', 'notes']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
+  });
+
   // Every soldOn entry should have a matching sale logged, since a platform
   // only belongs in soldOn once something has actually sold there.
   listings.forEach(l => {
@@ -611,7 +684,8 @@ function main() {
 
   console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
     events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
-    disputes.length + ' dispute(s), ' + supplies.length + ' suppl' + (supplies.length === 1 ? 'y' : 'ies') + ').');
+    disputes.length + ' dispute(s), ' + supplies.length + ' suppl' + (supplies.length === 1 ? 'y' : 'ies') + ', ' +
+    acquisitions.length + ' acquisition(s)).');
   process.exit(0);
 }
 
@@ -635,7 +709,7 @@ function checkChangelogFreshness(warnings) {
     if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: DATA_DIR, encoding: 'utf8' }).trim() === 'true') return;
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
-      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json'
+      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
     ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
     const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     let changelogData = null;

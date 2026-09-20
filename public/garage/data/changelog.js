@@ -2,8 +2,8 @@
 /*
  * Regenerates changelog.json from this repo's real git history of
  * listings.json, pipeline.json, activity.json, sales.json, expenses.json,
- * disputes.json, and supplies.json, one entry per commit that actually
- * touched one of them.
+ * disputes.json, supplies.json, and acquisitions.json, one entry per commit
+ * that actually touched one of them.
  *
  * This exists so the "Data changelog" section on the page shows real,
  * independently-verifiable provenance (an actual commit hash, author, and
@@ -23,7 +23,7 @@ const { execFileSync } = require('child_process');
 
 const DATA_DIR = __dirname;
 const OUT_FILE = path.join(DATA_DIR, 'changelog.json');
-const TRACKED_FILES = ['listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json'];
+const TRACKED_FILES = ['listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'];
 const RECORD_SEP = '\x1e';
 
 function repoRoot() {
