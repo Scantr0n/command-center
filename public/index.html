@@ -410,6 +410,20 @@
       overflow: visible !important;
       text-overflow: unset !important;
     }
+    /* Same fix again, third and last spot on this page with a screen-only
+       single-line .truncate on a real summary: the Needs Attention cards'
+       own summary sits in a min-w-0/flex-1 column specifically so the
+       ellipsis can trigger, which is exactly what would silently clip a
+       long stalled/broken project's real note on paper. Not visibly clipped
+       by any of today's real summaries (checked directly), but that's a
+       property of today's data, not of this markup, so it stays fixed
+       regardless of how long a future one runs. */
+    .attn-card { align-items: flex-start !important; }
+    .attn-card .truncate {
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: unset !important;
+    }
     #statsRow, #statsRow * { color: #111 !important; }
     /* Every one of the 9 category colors and 5 status colors was checked for
        real WCAG contrast against this stylesheet's white background: every
