@@ -1018,18 +1018,30 @@ function buildPortfolioValueTimeline() {
   const sortedDates = [...allDates].sort();
   if (sortedDates.length < 2) return null;
 
-  return sortedDates.map(date => {
-    let total = 0;
-    let countedCards = 0;
-    perCard.forEach(({ card, points }) => {
-      if (isSold(card) && card.soldDate && card.soldDate <= date) return;
-      const known = points.filter(p => p.date <= date);
-      if (!known.length) return;
-      total += known[known.length - 1].value;
-      countedCards++;
-    });
-    return { date, total, countedCards };
+  // Was one full points.filter() per (card, date) pair, O(dates x cards x
+  // points), re-scanning every card's whole price history from scratch at
+  // every single date. Harmless with 3 cards, but the same "recompute over
+  // everything on every render" shape the 13x-candidate-list-rebuild and
+  // O(n^2) photo-audit-grid perf fixes already caught elsewhere on this hub.
+  // Since both sortedDates and each card's own points are already ascending,
+  // a single forward-walking pointer per card finds the same "latest point
+  // on or before this date" value without re-scanning: dates and a card's
+  // points only ever move forward together, never backward.
+  const totals = sortedDates.map(date => ({ date, total: 0, countedCards: 0 }));
+  perCard.forEach(({ card, points }) => {
+    let pointIdx = -1;
+    for (let i = 0; i < sortedDates.length; i++) {
+      const date = sortedDates[i];
+      // soldDate <= date only ever gets truer as date increases, so once a
+      // card drops out here it stays out for every later date too.
+      if (isSold(card) && card.soldDate && card.soldDate <= date) break;
+      while (pointIdx + 1 < points.length && points[pointIdx + 1].date <= date) pointIdx++;
+      if (pointIdx < 0) continue;
+      totals[i].total += points[pointIdx].value;
+      totals[i].countedCards++;
+    }
   });
+  return totals;
 }
 
 // Each timeline dot's real per-point data (exact date, dollar total, card
