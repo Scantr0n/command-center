@@ -491,13 +491,23 @@ function renderMeterSparkline(history, title) {
 // next entry's timestamp (or now, for the most recent one, which is still
 // current). history is oldest-first, same assumption the connection-history
 // helpers above make.
-function computeRegimeSegments(history) {
+//
+// frozenAsOf (real server-timestamp string, or falsy while connected) caps
+// the current segment's end instead of Date.now(): recordClientRegimeObservation
+// only appends while genuinely connected, so during a real outage nothing
+// confirms the regime hasn't changed in the meantime, yet the "current"
+// segment kept ticking its displayed duration up to now regardless, the one
+// place on this page that showed a frozen reading as though still live (see
+// the effectiveData comment in loadStatus, and renderLastKnownBanner, for
+// the same distinction made everywhere else).
+function computeRegimeSegments(history, frozenAsOf) {
   if (!Array.isArray(history) || !history.length) return [];
   return history.map((entry, i) => ({
     regime: entry.regime,
     start: entry.at,
     end: i + 1 < history.length ? history[i + 1].at : null,
-    current: i === history.length - 1
+    current: i === history.length - 1,
+    frozenAsOf: (i === history.length - 1 && frozenAsOf) ? frozenAsOf : null
   }));
 }
 
@@ -505,24 +515,25 @@ const REGIME_HISTORY_LIMIT = 10;
 
 function regimeSegmentItem(seg) {
   const startAbs = formatAbsolute(seg.start);
-  const endMs = seg.current ? Date.now() : new Date(seg.end).getTime();
+  const endMs = seg.current ? (seg.frozenAsOf ? new Date(seg.frozenAsOf).getTime() : Date.now()) : new Date(seg.end).getTime();
   const durationText = formatDuration(endMs - new Date(seg.start).getTime()) || 'under 1m';
   const rangeText = seg.current
-    ? 'Since ' + startAbs
+    ? (seg.frozenAsOf ? 'Since ' + startAbs + ', last confirmed ' + formatAbsolute(seg.frozenAsOf) : 'Since ' + startAbs)
     : startAbs + ' to ' + formatAbsolute(seg.end);
+  const label = seg.current ? (seg.frozenAsOf ? 'Last confirmed · ' : 'Current · ') : '';
   return `
-    <li class="regime-history-item${seg.current ? ' regime-history-current' : ''}">
+    <li class="regime-history-item${seg.current && !seg.frozenAsOf ? ' regime-history-current' : ''}">
       <span class="regime-history-label-value font-mono">${escapeHtml(seg.regime)}</span>
-      <span class="regime-history-duration font-mono">${seg.current ? 'Current · ' : ''}${escapeHtml(durationText)}</span>
+      <span class="regime-history-duration font-mono">${label}${escapeHtml(durationText)}</span>
       <span class="regime-history-range">${escapeHtml(rangeText)}</span>
     </li>
   `;
 }
 
-function renderRegimeHistory(clientRegimeHistory) {
+function renderRegimeHistory(clientRegimeHistory, frozenAsOf) {
   const list = document.getElementById('regimeHistoryList');
   if (!list) return;
-  const segments = computeRegimeSegments(clientRegimeHistory);
+  const segments = computeRegimeSegments(clientRegimeHistory, frozenAsOf);
   renderRegimeDistribution(segments);
   if (!segments.length) {
     list.innerHTML = `<li class="regime-history-empty font-mono">No regime changes observed by this browser yet.</li>`;
@@ -564,15 +575,17 @@ function regimeColor(label) {
 // conditions have actually evolved) rather than only a moment-to-moment
 // transition log. Sorted by real total duration, longest first, so the
 // dominant regime this browser has actually observed leads. The current,
-// still-open segment's duration is measured up to now, same "current" logic
-// regimeSegmentItem already uses, so the totals stay accurate between polls
-// rather than freezing at whenever the last transition was recorded.
+// still-open segment's duration is measured up to now (or to seg.frozenAsOf
+// during a real outage, same reasoning as regimeSegmentItem), so the totals
+// stay accurate between polls rather than freezing at whenever the last
+// transition was recorded, but also never grow on a segment nothing has
+// actually reconfirmed since the connection dropped.
 function computeRegimeDistribution(segments) {
   if (!Array.isArray(segments) || !segments.length) return { totalMs: 0, rows: [] };
   const byLabel = new Map();
   let totalMs = 0;
   segments.forEach(seg => {
-    const endMs = seg.current ? Date.now() : new Date(seg.end).getTime();
+    const endMs = seg.current ? (seg.frozenAsOf ? new Date(seg.frozenAsOf).getTime() : Date.now()) : new Date(seg.end).getTime();
     const ms = Math.max(0, endMs - new Date(seg.start).getTime());
     totalMs += ms;
     byLabel.set(seg.regime, (byLabel.get(seg.regime) || 0) + ms);
@@ -1878,7 +1891,7 @@ async function loadStatus() {
     renderConnectionHistory(data, clientConnHistory);
     renderDailyUptime(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
-    renderRegimeHistory(clientRegimeHistory);
+    renderRegimeHistory(clientRegimeHistory, lastKnown && lastKnown.asOf);
     // Kill switch engaged outranks plain connection freshness for the one
     // glance a background tab gives Jack, same priority it gets everywhere
     // else on this page.
@@ -1933,7 +1946,13 @@ window.addEventListener('storage', (e) => {
   renderConnectionHistory(lastRawData, connHistory);
   renderDailyUptime(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
-  renderRegimeHistory(regimeHistory);
+  // Same last-known/frozen distinction loadStatus applies via `lastKnown`:
+  // lastStatusIsLastKnown and lastStatusData are the same two values this
+  // tab's own last loadStatus() call already computed, so a sibling tab's
+  // history write doesn't make a disconnected tab's regime history look
+  // live again just because new data landed in localStorage.
+  const regimeFrozenAsOf = lastStatusIsLastKnown && lastStatusData && lastStatusData.live ? lastStatusData.live.asOf : null;
+  renderRegimeHistory(regimeHistory, regimeFrozenAsOf);
   // Keeps the drawdown/robustness sparklines in agreement across open tabs
   // too, same reasoning as the sections above; re-renders from lastStatusData
   // (the same effectiveData the page itself last rendered from) rather than
