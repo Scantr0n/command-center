@@ -30,7 +30,7 @@
   // (a pace tooltip overrunning its own window, a malformed-date crash) now
   // live in one place a test suite can actually exercise.
   const {
-    daysBetween, addDays, isValidDateStr, downloadsPerDayRate, recentDownloadsPerDayRate,
+    daysBetween, addDays, isValidDateStr, recentDownloadsPerDayRate,
     goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
   } = window.SondrikGoalsCore;
 
@@ -733,10 +733,13 @@
     return null;
   }
 
-  // downloadsPerDayRate, recentDownloadsPerDayRate, and goalReachedDate now
-  // live in goals-core.js (destructured from SondrikGoalsCore near the top
-  // of this file), so the pace/projection math they feed can actually be
-  // unit-tested.
+  // recentDownloadsPerDayRate and goalReachedDate now live in goals-core.js
+  // (destructured from SondrikGoalsCore near the top of this file), so the
+  // pace/projection math they feed can actually be unit-tested.
+  // downloadsPerDayRate (the lifetime average) lives there too, kept for its
+  // own tests even though nothing in this file calls it directly right now:
+  // Traction's own "~X/day over that span" line computes its inline perDay
+  // straight from the first/latest checks instead of calling it.
 
   // Renders the real target-vs-actual goal Jack has logged, if any. This is
   // the standard "target vs actual" pattern from traction dashboards: a
