@@ -1041,8 +1041,10 @@
       refreshed. This needs a real <code>datePublished</code> logged per item to compute anything, it stays
       honestly blank until then, no guessed dates. No cross-listing tool is connected here to relist
       automatically, so <strong>Add to calendar</strong> exports the real upcoming due dates below as a
-      downloadable <code>.ics</code> file, one event per item/platform, that imports into Google Calendar,
-      Apple Calendar, or Outlook so the reminder actually surfaces on the day it matters.
+      downloadable <code>.ics</code> file, up to two events per item: one combined event for all non-Poshmark
+      platforms it's live on together (they share the same 30-day guidance), and a separate one if it's on
+      Poshmark, since that platform's 60-day hold window is a real, distinct deadline. Imports into Google
+      Calendar, Apple Calendar, or Outlook so the reminder actually surfaces on the day it matters.
     </div>
     <div class="table-wrap">
       <table class="card-table" id="relistTable">
