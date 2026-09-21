@@ -1620,6 +1620,32 @@ function renderGenealogy(data) {
 // connection state changes, whatever a future live feed appends to
 // data.events. Empty today since this sandbox has no real history yet, not
 // because the feature is unfinished.
+// server.js's real anomaly events (see evolutionEvents/the anomalies map in
+// server.js) carry `detail: JSON.stringify(a)`, Alpha's own real anomaly
+// object serialized as-is, never reformatted for this page. Rendered
+// verbatim, that's a compact single-line JSON blob (e.g.
+// `{"agentId":"AGENT_7","reason":"no signal 3 cycles"}`), harder to read at
+// a glance than the plain-language detail every other event type on this
+// page already gets. This is purely a display transform: it never changes
+// what's stored in `evt.detail` itself (the CSV export below still writes
+// the real raw string, useful for re-parsing), and only reformats a flat
+// JSON object into "key: value" pairs; anything that isn't a flat object
+// (already-plain text, an array, malformed JSON) renders exactly as before.
+function prettifyEventDetail(detail) {
+  if (typeof detail !== 'string') return detail;
+  const trimmed = detail.trim();
+  if (!trimmed.startsWith('{')) return detail;
+  let parsed;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (e) {
+    return detail;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return detail;
+  const pairs = Object.entries(parsed).map(([k, v]) => `${k}: ${typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}`);
+  return pairs.length ? pairs.join(' · ') : detail;
+}
+
 function eventItem(evt) {
   const tone = ['good', 'alert'].includes(evt.tone) ? evt.tone : 'neutral';
   const age = timeAgo(evt.at);
@@ -1628,7 +1654,7 @@ function eventItem(evt) {
       <span class="event-tag event-tag-${tone} font-mono">${escapeHtml(evt.type || 'event')}</span>
       <div class="event-body">
         <div class="event-label">${escapeHtml(evt.label)}</div>
-        ${evt.detail ? `<div class="event-detail">${escapeHtml(evt.detail)}</div>` : ''}
+        ${evt.detail ? `<div class="event-detail">${escapeHtml(prettifyEventDetail(evt.detail))}</div>` : ''}
       </div>
       <time class="event-time font-mono" datetime="${escapeHtml(evt.at)}" title="${escapeHtml(formatAbsolute(evt.at))}">${escapeHtml(age || evt.at)}</time>
     </li>
