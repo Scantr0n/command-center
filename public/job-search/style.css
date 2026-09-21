@@ -287,7 +287,12 @@ section { margin-bottom: 36px; }
 .dealbreaker-intro { color: var(--sub); font-size: 0.82rem; line-height: 1.6; margin: 0 0 12px; }
 
 /* Standout lead cards (Next up + latest digest) */
-.lead-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+/* minmax(280px, 1fr) alone never shrinks a track below 280px even when the
+   container itself is narrower, a real ~320px phone (once page padding is
+   subtracted) is; min(280px, 100%) lets it collapse to one column instead
+   of overflowing the page, same fix already applied to Garage's own
+   280px template-card grid (public/garage/style.css). */
+.lead-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 14px; }
 .lead-card {
   border: 1px solid var(--hairline);
   border-radius: 12px;
