@@ -1077,12 +1077,22 @@
       Object.values(latestByPlatform).forEach(snap => {
         const bucket = bucketFor(snap.platform);
         bucket.prospectCount += 1;
-        if (snap.followers != null) {
-          bucket.totalFollowers += Number(snap.followers);
+        // validate.js already rejects a non-numeric followers/engagementRate
+        // as a hard error, but that only runs from the CLI, not against
+        // whatever socialSnapshots data is actually live on disk right now.
+        // Without the Number.isFinite guard, one bad hand-edited value (a
+        // "12K" string, a typo) turned Number(snap.followers) into NaN,
+        // which then poisoned this whole platform's totalFollowers/
+        // engagementSum for every other prospect on that platform too, not
+        // just the bad entry, showing "NaN followers" for the whole bucket.
+        const followers = Number(snap.followers);
+        if (snap.followers != null && Number.isFinite(followers)) {
+          bucket.totalFollowers += followers;
           bucket.hasFollowers = true;
         }
-        if (snap.engagementRate != null) {
-          bucket.engagementSum += Number(snap.engagementRate);
+        const engagementRate = Number(snap.engagementRate);
+        if (snap.engagementRate != null && Number.isFinite(engagementRate)) {
+          bucket.engagementSum += engagementRate;
           bucket.engagementCount += 1;
         }
         if (snap.asOfDate && (!bucket.mostRecentAsOf || snap.asOfDate > bucket.mostRecentAsOf)) {
