@@ -45,6 +45,47 @@
     document.title = overdueCount > 0 ? '(' + overdueCount + ') ' + BASE_TITLE : BASE_TITLE;
   }
 
+  // A pinned tab shows only the favicon, no title text at all, so the count
+  // above can't reach it. Same red-dot-on-the-icon convention as Slack/Gmail:
+  // draw the existing favicon onto a canvas and stamp a dot in the corner
+  // only while a nudge is actually due, then hand the result back to the
+  // <link rel="icon"> as a generated data URL. Never edits favicon.svg
+  // itself, which every other hub's page also links to.
+  const faviconLinkEl = document.querySelector('link[rel="icon"]');
+  const FAVICON_SRC = faviconLinkEl ? faviconLinkEl.getAttribute('href') : null;
+  let faviconHasDot = null;
+  function updateFavicon(overdueCount) {
+    if (!faviconLinkEl || !FAVICON_SRC) return;
+    const wantDot = overdueCount > 0;
+    if (wantDot === faviconHasDot) return;
+    if (!wantDot) {
+      faviconLinkEl.setAttribute('href', FAVICON_SRC);
+      faviconLinkEl.setAttribute('type', 'image/svg+xml');
+      faviconHasDot = false;
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, 64, 64);
+      ctx.beginPath();
+      ctx.arc(50, 14, 11, 0, Math.PI * 2);
+      ctx.fillStyle = '#E5484D';
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#08090A';
+      ctx.stroke();
+      faviconLinkEl.setAttribute('href', canvas.toDataURL('image/png'));
+      faviconLinkEl.setAttribute('type', 'image/png');
+      faviconHasDot = true;
+    };
+    img.src = FAVICON_SRC;
+  }
+
   printBtn.addEventListener('click', () => window.print());
 
   // Every "overdue" / "in Xd" label in the nudge queue below is computed
@@ -1563,6 +1604,7 @@
       CSMValidateCore.findDuplicateProspects(prospects).length;
 
     updateDocumentTitle(overdueCount);
+    updateFavicon(overdueCount);
 
     const chips = [
       {
