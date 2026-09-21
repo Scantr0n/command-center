@@ -829,6 +829,35 @@ app.get('/api/garage/changelog-status', changelogStatusHandler('garage', [
   'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
 ]));
 
+// Real, unfilterable proof of recent work on the dashboard itself: the
+// repo's own git log, not a hand-maintained "what's new" note that can
+// silently go stale the moment someone forgets to update it. Whole-repo,
+// not scoped to one hub's tracked files like changelogStatusHandler above,
+// since this is meant to answer "is anything actually happening here" at a
+// glance across every hub at once. Read-only, same shallow-clone guard and
+// timeout as the rest of this file's git calls.
+const RECENT_COMMITS_LIMIT = 12;
+const RECENT_COMMITS_FIELD_SEP = '\x1f';
+app.get('/api/recent-commits', (req, res) => {
+  try {
+    if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: __dirname, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
+      throw new Error('shallow clone');
+    }
+    const raw = execFileSync('git', [
+      'log', `-${RECENT_COMMITS_LIMIT}`, `--format=%H${RECENT_COMMITS_FIELD_SEP}%an${RECENT_COMMITS_FIELD_SEP}%aI${RECENT_COMMITS_FIELD_SEP}%s`
+    ], { cwd: __dirname, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
+    const commits = raw ? raw.split('\n').map(line => {
+      const [hash, author, date, subject] = line.split(RECENT_COMMITS_FIELD_SEP);
+      return { hash: hash.slice(0, 7), author, date, subject };
+    }) : [];
+    res.json({ commits });
+  } catch (err) {
+    // Not a git checkout, git isn't on PATH, or a shallow clone: an
+    // environment gap, not something to show a broken widget over.
+    res.json({ commits: [], unavailable: true });
+  }
+});
+
 // Every hub's validate.js CLI script (run every cycle via `npm run validate`)
 // already knows the real, hub-specific rules for what counts as a real
 // backfill gap - not just presence/absence, but things like "has an
