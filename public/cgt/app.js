@@ -1245,33 +1245,14 @@ function isExampleCandidate(c) {
   return c.id === 'example-candidate-not-real';
 }
 
-// Applies the published "2x margin" rule of thumb for whether grading a raw
-// card is actually worth it (see e.g. CardGrade.io's and PreGradeCards' 2026
-// grading-ROI writeups): the expected gain over raw value should clear the
-// full cost of grading by at least 2x before committing, since the card
-// could come back at a lower grade than expected and a 1x-or-less margin
-// leaves no room for that risk. Returns null (not a verdict) whenever any of
-// the three real numbers this depends on hasn't actually been researched
-// yet, same "never guess at a missing input" rule as everything else here.
-const GRADING_RISK_MULTIPLE = 2;
-
-function computeGradingMath(c) {
-  if (c.rawValue == null || c.expectedGradedValue == null || c.estimatedGradingCost == null) return null;
-  const totalCost = c.estimatedGradingCost + (c.shippingCost || 0);
-  // The "2x margin" rule above is about the raw upside (graded value over
-  // raw value) clearing the cost of grading by 2x, not the already-cost-net
-  // expectedGain clearing it a second time (that silently demanded a 3x
-  // margin instead of the documented 2x, since expectedGain is gross minus
-  // totalCost already). expectedGain itself stays net, it is the real
-  // "Expected gain" figure shown and sorted on elsewhere.
-  const grossGain = c.expectedGradedValue - c.rawValue;
-  const expectedGain = grossGain - totalCost;
-  let verdict;
-  if (grossGain >= totalCost * GRADING_RISK_MULTIPLE) verdict = 'worth-grading';
-  else if (expectedGain > 0) verdict = 'marginal';
-  else verdict = 'not-worth';
-  return { totalCost, expectedGain, verdict };
-}
+// The "worth grading?" 2x-margin math now lives in grading-core.js (loaded
+// as window.CGTGradingCore by a script tag in index.html right before this
+// file's own), the same reason validate-core.js was split out: a plain Node test
+// (grading-core.test.js) can exercise the real rule directly without loading
+// the rest of this DOM-touching file. Pulled into bare identifiers here so
+// every existing call site below (computeGradingMath(c), GRADING_RISK_MULTIPLE)
+// keeps working unchanged.
+const { computeGradingMath, GRADING_RISK_MULTIPLE } = window.CGTGradingCore;
 
 const CANDIDATE_VERDICT_META = {
   'worth-grading': { label: 'Worth grading', cls: 'badge-worth' },
