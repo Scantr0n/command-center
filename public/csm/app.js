@@ -88,6 +88,16 @@
     });
     forceExpandColumnsForPrint = true;
     applyFilter();
+    // Print CSS always shows .board and hides .board-list-wrap (there is no
+    // printed List layout), but applyFilter() above only renders #board when
+    // viewMode is already 'board'. In List view (including one restored
+    // straight from a shared "?view=list" link, which never touches #board
+    // at all) that left the printed page's kanban section completely empty.
+    // Render it explicitly here so printing from List view shows the same
+    // real pipeline data as printing from Board view.
+    if (viewMode === 'list' && lastFilterArgs) {
+      renderBoard(allStages, lastFilterArgs.filtered, allProspects, lastFilterArgs.rawQuery, lastFilterArgs.filterActive);
+    }
   });
   window.addEventListener('afterprint', () => {
     if (printReopenedDetails) {
