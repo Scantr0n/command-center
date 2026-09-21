@@ -34,6 +34,17 @@
   const changelogFeedEl = document.getElementById('changelogFeed');
   const ACTIVITY_PREVIEW_COUNT = 8;
 
+  // Standard tab-title badge pattern ("(2) Page Title", same convention as
+  // Gmail's unread count): lets a nudge that's actually due surface in a
+  // background/pinned tab without having to switch to it first, which the
+  // on-page nudge queue can't do by itself. Only counts nudges due today or
+  // overdue, same definition renderSnapshot already uses for its own count,
+  // so the two never disagree.
+  const BASE_TITLE = document.title;
+  function updateDocumentTitle(overdueCount) {
+    document.title = overdueCount > 0 ? '(' + overdueCount + ') ' + BASE_TITLE : BASE_TITLE;
+  }
+
   printBtn.addEventListener('click', () => window.print());
 
   // Every "overdue" / "in Xd" label in the nudge queue below is computed
@@ -1550,6 +1561,8 @@
     const attentionCount = overdueCount + computeStalled(stages, prospects).length +
       computeColdSignal(prospects).active.length + computeDataQualityFlags(stages, prospects).length +
       CSMValidateCore.findDuplicateProspects(prospects).length;
+
+    updateDocumentTitle(overdueCount);
 
     const chips = [
       {
