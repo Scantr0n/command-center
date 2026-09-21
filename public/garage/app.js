@@ -563,7 +563,7 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions) 
   const knownAgeCount = live.filter(l => l.datePublished).length;
   const dueForRelistCount = live.filter(l => {
     const days = daysSincePublished(l.datePublished);
-    return days != null && days >= RELIST_FRESH_DAYS;
+    return days != null && days >= RELIST_FRESH_DAYS && remainingPlatforms(l).length > 0;
   }).length;
   const realizedRevenue = sales.reduce((s, sale) => s + (sale.salePrice || 0), 0);
   const salesWithCost = sales.filter(sale => sale.costBasis != null || sale.shippingCost != null);
