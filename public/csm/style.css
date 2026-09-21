@@ -926,6 +926,26 @@ header.page-head .sub {
   margin-bottom: 6px;
 }
 
+/* Toggle for an empty column, same +/- text-marker convention as
+   .section-details above. Sits between the stage name and its count, so
+   .column-count's margin-left:auto still pushes the count flush right
+   whether or not this button is present. */
+.column-toggle {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  color: var(--dim);
+  border-radius: 999px;
+  width: 18px; height: 18px;
+  line-height: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.column-toggle:hover, .column-toggle:focus-visible { color: var(--ink); border-color: var(--hairlineHover); }
+.column-collapsed { min-height: 0; }
+
 .card {
   background: var(--panelLight);
   border: 1px solid var(--hairline);
@@ -1486,6 +1506,10 @@ footer.page-foot {
   }
   .column-head h2, .column-count, .column-desc { color: #111; }
   .column-desc { color: #555; }
+  /* Belt-and-braces alongside the JS forceExpandColumnsForPrint re-render:
+     app.js already re-renders every column fully expanded before print, so
+     this only guards a print triggered before that re-render has painted. */
+  .column-toggle { display: none !important; }
 
   .card {
     background: none;

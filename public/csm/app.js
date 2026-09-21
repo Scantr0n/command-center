@@ -76,18 +76,47 @@
   // on-screen state (and its localStorage record above) isn't disturbed by
   // having printed.
   let printReopenedDetails = null;
+  // Collapsed empty board columns need the same treatment: expand them for
+  // the printed page (an empty stage is still real pipeline structure worth
+  // showing on paper), then restore the on-screen collapsed state after.
+  let forceExpandColumnsForPrint = false;
   window.addEventListener('beforeprint', () => {
     printReopenedDetails = [];
     document.querySelectorAll('.section-details').forEach(d => {
       printReopenedDetails.push([d, d.open]);
       d.open = true;
     });
+    forceExpandColumnsForPrint = true;
+    applyFilter();
   });
   window.addEventListener('afterprint', () => {
-    if (!printReopenedDetails) return;
-    printReopenedDetails.forEach(([d, wasOpen]) => { d.open = wasOpen; });
-    printReopenedDetails = null;
+    if (printReopenedDetails) {
+      printReopenedDetails.forEach(([d, wasOpen]) => { d.open = wasOpen; });
+      printReopenedDetails = null;
+    }
+    forceExpandColumnsForPrint = false;
+    applyFilter();
   });
+
+  // Right now 4 of the 5 board columns are genuinely empty (only one real
+  // prospect exists), which is honest but means most of the board's width
+  // and, on a phone, most of its scroll is "No prospects in this stage
+  // yet." repeated four times. A stage with zero prospects can collapse to
+  // just its header, same disclosure convention as SECTION_OPEN_KEY_PREFIX
+  // above; a stage that actually has prospects is never collapsible, so a
+  // stale "collapsed" preference from when a stage used to be empty can
+  // never hide a real one once it gains prospects (checked fresh on every
+  // render against the real, unfiltered count, not remembered).
+  const COLUMN_COLLAPSE_KEY_PREFIX = 'csm-column-collapsed-';
+  function isColumnCollapsed(stageId) {
+    try {
+      const v = localStorage.getItem(COLUMN_COLLAPSE_KEY_PREFIX + stageId);
+      return v === null ? true : v === '1';
+    } catch (e) { return true; /* localStorage unavailable: default to collapsed */ }
+  }
+  function setColumnCollapsed(stageId, collapsed) {
+    try { localStorage.setItem(COLUMN_COLLAPSE_KEY_PREFIX + stageId, collapsed ? '1' : '0'); } catch (e) { /* see above */ }
+  }
 
   function fmtDate(iso) {
     if (!iso) return null;
@@ -1200,6 +1229,11 @@
     boardEl.innerHTML = stages.map(stage => {
       const inStage = prospects.filter(p => p.stage === stage.id).sort(byUrgency);
       const totalInStage = allProspects.filter(p => p.stage === stage.id).length;
+      // Collapsible only when truly empty across the whole pipeline (not
+      // just filtered to zero matches), so collapsing can never hide a real
+      // prospect behind a stale preference or an active search.
+      const isEmptyStage = totalInStage === 0;
+      const collapsed = isEmptyStage && !forceExpandColumnsForPrint && isColumnCollapsed(stage.id);
       let cards;
       if (inStage.length) {
         cards = inStage.map(p => renderCard(p, stageById, nudgeUrgencyById)).join('');
@@ -1209,19 +1243,33 @@
       } else {
         cards = '<div class="column-empty">No prospects in this stage yet.</div>';
       }
-      return '<div class="column" data-stage-id="' + escapeHtml(stage.id) + '">' +
+      const toggleLabel = (collapsed ? 'Expand' : 'Collapse') + ' ' + escapeHtml(stage.label) + ', an empty stage';
+      const toggleBtn = isEmptyStage
+        ? '<button type="button" class="column-toggle font-mono" data-stage-id="' + escapeHtml(stage.id) + '" ' +
+          'aria-expanded="' + (!collapsed) + '" aria-label="' + toggleLabel + '" title="' + toggleLabel + '">' +
+          (collapsed ? '+' : '-') + '</button>'
+        : '';
+      return '<div class="column' + (collapsed ? ' column-collapsed' : '') + '" data-stage-id="' + escapeHtml(stage.id) + '">' +
         '<div class="column-head">' +
         '<span class="stage-dot" style="background:' + escapeHtml(stage.color) + '"></span>' +
         '<h2>' + escapeHtml(stage.label) + '</h2>' +
+        toggleBtn +
         '<span class="column-count font-mono">' + inStage.length + '</span>' +
         '</div>' +
-        '<div class="column-desc">' + escapeHtml(stage.description) + '</div>' +
-        cards +
+        (collapsed ? '' : '<div class="column-desc">' + escapeHtml(stage.description) + '</div>' + cards) +
         '</div>';
     }).join('');
 
     boardEl.querySelectorAll('[data-prospect-id]').forEach(el => {
       el.addEventListener('click', () => openModal(el.getAttribute('data-prospect-id')));
+    });
+    boardEl.querySelectorAll('.column-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const stageId = btn.getAttribute('data-stage-id');
+        setColumnCollapsed(stageId, btn.getAttribute('aria-expanded') === 'true');
+        applyFilter();
+      });
     });
     wireCardDragAndDrop();
   }
