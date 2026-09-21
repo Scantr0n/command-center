@@ -908,7 +908,7 @@ async function loadClusters() {
     // when nothing moved), since rebuilding the graph/grid DOM every time
     // would drop keyboard focus mid-tab and restart the pulse animations
     // on every active-status node. But every relative-time label on the
-    // page (activity feed, LAST SYNC, graph node tooltips) is computed at
+    // page (activity feed, LATEST STATUS, graph node tooltips) is computed at
     // render time and frozen otherwise, so a dashboard left open with truly
     // unchanged data would keep saying "today" days later. Force a real
     // re-render at least every 5 minutes regardless, to bound how stale
@@ -1035,7 +1035,7 @@ function renderStats() {
   const active = clusters.filter(c => c.status === 'active').length;
   const attention = clusters.filter(c => c.status === 'stalled' || c.status === 'broken').length;
   const dated = clusters.filter(c => c.lastUpdate).map(c => c.lastUpdate).sort().reverse();
-  const lastSync = dated[0] || 'n/a';
+  const latestStatusDate = dated[0] || 'n/a';
   const attnColor = attention ? statusColor('broken') : 'var(--faint)';
   const activeColor = statusColor('active');
 
@@ -1077,11 +1077,11 @@ function renderStats() {
         <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">NEEDS ATTN</div>
       </div>
     </button>
-    <div class="stat-tile flex items-center gap-2">
+    <div class="stat-tile flex items-center gap-2" title="The most recent lastUpdate date logged on any project's own status entry, not a sync timestamp - this page has no separate sync step of its own to report, and real code/feature activity (see Recent Commits above) can be more current than any project's own status note.">
       <span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--sub)">${statIcon(ICON_CLOCK)}</span>
       <div class="text-left">
-        <div class="font-display font-bold text-sm leading-none" style="color:var(--sub)">${escapeHtml(lastSync)}</div>
-        <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">LAST SYNC</div>
+        <div class="font-display font-bold text-sm leading-none" style="color:var(--sub)">${escapeHtml(latestStatusDate)}</div>
+        <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">LATEST STATUS</div>
       </div>
     </div>
   `;
