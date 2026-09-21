@@ -619,6 +619,27 @@ function evolutionEvents(history) {
   });
 }
 
+// The Activity log's own empty state already promises "connection state
+// changes" alongside kill-switch triggers and regime changes, but nothing
+// ever populated that, since connection.history above only started
+// persisting real checks just now. This turns that same real, just-persisted
+// history into real events the moment the state actually flips between
+// consecutive checks, oldest first; never a separate guess, just a diff over
+// data already being recorded for the connectivity strip.
+function connectionStateEvents(history) {
+  const events = [];
+  for (let i = 1; i < history.length; i++) {
+    if (history[i].connected === history[i - 1].connected) continue;
+    events.push({
+      type: 'connection',
+      tone: history[i].connected ? 'good' : 'alert',
+      label: history[i].connected ? 'Connection restored' : 'Connection lost',
+      at: history[i].at
+    });
+  }
+  return events;
+}
+
 app.get('/api/alpha/live', async (req, res) => {
   // Same skip-and-log guard as readLocalClusters/readToggles above: this read
   // sat outside the try block below, so a missing or malformed status.json
@@ -652,6 +673,7 @@ app.get('/api/alpha/live', async (req, res) => {
     // never hand-edited into the static fallback.
     const account = mapAccount(state.account);
     if (account) account.equityCurve = mapEquityCurve(equity.history);
+    const connHistory = appendAlphaConnHistory(now, true);
 
     res.json({
       system: fallback.system,
@@ -659,7 +681,7 @@ app.get('/api/alpha/live', async (req, res) => {
         connected: true,
         checkedAt: now,
         note: 'Live feed connected: reading directly from Alpha\'s real daemon on this Mac (127.0.0.1:3847).',
-        history: appendAlphaConnHistory(now, true)
+        history: connHistory
       },
       live: {
         asOf: now,
@@ -694,6 +716,7 @@ app.get('/api/alpha/live', async (req, res) => {
         }
       },
       events: [
+        ...connectionStateEvents(connHistory),
         ...evolutionEvents(history),
         ...(Array.isArray(anomalies.stuck) ? anomalies.stuck.map(a => ({
           type: 'anomaly', tone: 'alert', label: 'Stuck agent detected', detail: JSON.stringify(a), at: anomalies.checkedAt
@@ -708,14 +731,19 @@ app.get('/api/alpha/live', async (req, res) => {
     // checkedAt and history should say so instead of the fallback file's own
     // static checkedAt: null.
     const now = new Date().toISOString();
+    const connHistory = appendAlphaConnHistory(now, false);
     res.json({
       ...fallback,
       connection: {
         ...fallback.connection,
         connected: false,
         checkedAt: now,
-        history: appendAlphaConnHistory(now, false)
-      }
+        history: connHistory
+      },
+      events: [
+        ...connectionStateEvents(connHistory),
+        ...(Array.isArray(fallback.events) ? fallback.events : [])
+      ]
     });
   }
 });
