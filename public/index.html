@@ -420,6 +420,10 @@
        invisible, leaving only a stray colored sliver with no visible track
        to show it as a proportion of. */
     .cluster-card [style*="rgba(255,255,255,0.08)"] { background: #ddd !important; }
+    /* The toggle itself has no purpose on paper (see the beforeprint listener
+       near activityFeedExpanded below, which expands the feed in full for
+       print instead of leaving this truncated behind a dead button). */
+    #activityFeedToggle { display: none !important; }
   }
 </style>
 </head>
@@ -929,6 +933,29 @@ function renderActivityFeed() {
   // until the next keystroke.
   applyFilters();
 }
+
+// Same beforeprint/afterprint force-open-then-restore pattern CSM/Garage/CGT
+// already use for their own collapsed <details> sections: printing while the
+// feed is still collapsed silently left the newest-but-one 5+ activity
+// entries off the page entirely, behind a "Show N more" button that does
+// nothing on paper. Forcing the full, real list for the printed page and
+// restoring the on-screen collapsed state after (rather than actually
+// changing activityFeedExpanded, which would also flip its own toggle label)
+// keeps this consistent with every other "ignore the current view state,
+// print the whole real report" rule already in the print stylesheet above.
+let printRestoreActivityFeed = false;
+window.addEventListener('beforeprint', () => {
+  if (activityFeedExpanded) return;
+  printRestoreActivityFeed = true;
+  activityFeedExpanded = true;
+  renderActivityFeed();
+});
+window.addEventListener('afterprint', () => {
+  if (!printRestoreActivityFeed) return;
+  printRestoreActivityFeed = false;
+  activityFeedExpanded = false;
+  renderActivityFeed();
+});
 
 function renderStats() {
   const total = clusters.length;
