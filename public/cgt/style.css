@@ -1432,6 +1432,20 @@ textarea.np-input { resize: vertical; }
   .breakdown-label, .breakdown-value { color: #111 !important; }
   .breakdown-bar-track { background: #eee; }
   .breakdown-bar-fill { background: #888 !important; }
+  /* .breakdown-label's own screen-only ellipsis (its `title` attribute
+     covers that with a hover tooltip on screen) has no fallback on paper,
+     which silently clips a real label to unreadable ambiguity, confirmed
+     against a real pricing-batch row ("2026-07-13-hockey-already-graded"
+     currently clips to "2026-07-13-hoc..." at this column's 96px). Letting
+     it wrap keeps the real label readable; the grid row's own
+     align-items: center already handles a taller wrapped cell without
+     further changes. */
+  .breakdown-label {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    word-break: break-word;
+  }
 
   .timeline-area { fill: rgba(0,0,0,0.06) !important; }
   .timeline-line { stroke: #444 !important; }
