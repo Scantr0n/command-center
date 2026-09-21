@@ -424,8 +424,19 @@
     )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
   }
 
-  function lockBodyScroll() { document.body.style.overflow = 'hidden'; }
-  function unlockBodyScroll() { document.body.style.overflow = ''; }
+  // Same scrollbar-width compensation the other 5 hubs already have: without
+  // it, hiding the scrollbar on overflow:hidden shifts all page content
+  // left by its width for as long as the shortcuts modal is open, a real,
+  // visible jump on any page tall enough to actually have a scrollbar.
+  function lockBodyScroll() {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + 'px';
+    document.body.style.overflow = 'hidden';
+  }
+  function unlockBodyScroll() {
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+  }
 
   function openShortcuts() {
     if (shortcutsOpen) return;
