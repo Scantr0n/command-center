@@ -3,9 +3,9 @@
   "name": "Things To Do Calendar App",
   "category": "Personal & Infra",
   "priority": "low",
-  "lastUpdate": null,
-  "summary": "Session exists, ties into the same Calendar infrastructure (Google Calendar as single source of truth). No detailed status captured yet. Placeholder until real data is pulled in, same as Garage/Mechanic.",
-  "status": "unknown",
+  "lastUpdate": "2026-09-06",
+  "summary": "Real name: Haul Calendar. A curated real-events discovery calendar (car shows, flea/antique markets, vintage/thrift pop-ups, art & maker fairs, sports, Startup & Biz) across St. Cloud/St. Joseph and the Twin Cities. Manual by design: Jack says \"update the hub\" for a fresh research pass, and tells Claude in chat to add a specific event to his real Google Calendar, no automated refresh or auto-add button.",
+  "status": "active",
   "sessionTitle": "Things to do calendar app",
   "relatedTo": ["calendar"],
   "relationReasons": {
