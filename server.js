@@ -434,6 +434,9 @@ app.post('/api/garage/draft-listing', async (req, res) => {
         return res.status(400).json({ error: 'Each image needs a supported mediaType and dataBase64' });
       }
     }
+    if (notes != null && typeof notes !== 'string') {
+      return res.status(400).json({ error: 'notes must be a string' });
+    }
 
     const systemPrompt = `Never use em dashes (—) anywhere in your response, under any circumstances. Use periods, commas, or semicolons instead.\n\nYou are drafting a resale listing for Jack from real photos of a real item, for his Command Center Garage hub (multi-platform: eBay, Vinted, Poshmark, Depop). This is a draft for human review, not a publish, so be honest about uncertainty rather than confident.\n\nReal packaging Jack already has on hand, use these when the item actually matches one, otherwise estimate a reasonable box/mailer size and weight for the item type and mark it lower confidence:\n${KNOWN_PACKAGING.map(p => '- ' + p).join('\n')}\n\nUse the web_search tool to find 2-3 real comparable sold or actively listed items (same brand, same or very similar model, similar condition) to ground suggestedPrice in real market data, not a guess. Cite the real title, price, platform, and condition of each comp you actually used.\n\n${DRAFT_LISTING_SCHEMA_HINT}`;
 

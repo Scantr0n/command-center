@@ -430,6 +430,13 @@
   const BUGFIX_CHECKPOINT_GRACE_DAYS = 3;
   function bugfixCheckinStatus(release) {
     if (!release || release.type !== 'bugfix' || !release.date) return null;
+    // A malformed release.date (a non-zero-padded "2026-9-5") makes
+    // daysBetween return NaN, and every `days < N` comparison below is
+    // always false for NaN, so both checkpoints fell into missedCheckpoints
+    // and rendered "day NaN" instead of erroring, the same date-guard bug
+    // goals-core.js's own header describes and computeGoalPaceStatus
+    // already guards against elsewhere in this file.
+    if (!isValidDateStr(release.date)) return null;
     const days = daysBetween(release.date, todayIso());
     if (days < 0) return null;
 
