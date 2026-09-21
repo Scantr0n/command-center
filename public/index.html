@@ -1221,11 +1221,24 @@ async function renderDataQuality() {
     }
   }));
   // A hub with real errors is genuinely broken data (fails npm run validate
-  // outright), a different severity than a hub with only backfill warnings,
-  // so it gets the same red "broken" color the rest of this page already
-  // uses for that severity, not just a louder version of the amber "stalled"
-  // color warnings-only hubs get. Clean hubs (0 of both) are left out
-  // entirely, same as renderAttention()'s own empty state above.
+  // outright), a different severity than a hub with only validation
+  // warnings, so it gets the same red "broken" color the rest of this page
+  // already uses for that severity, not just a louder version of the amber
+  // "stalled" color warnings-only hubs get. Clean hubs (0 of both) are left
+  // out entirely, same as renderAttention()'s own empty state above.
+  //
+  // Deliberately worded "validation warning/error", never "to backfill":
+  // CGT and Garage each already show their own "N card(s)/listing(s) need
+  // backfill" pill on their own page (buildDataQualityFlags in their own
+  // app.js), and that count is a real, different, broader thing - it also
+  // catches gaps like a missing storage location or cost basis that
+  // validate.js's schema rules never check at all. Confirmed directly: right
+  // now CGT's own page shows "3 cards need backfill" (missing cert numbers)
+  // while validate.js reports CGT fully clean, because cert-number presence
+  // isn't a validate.js rule. Reusing "to backfill" here would silently
+  // imply this pill means the same thing as that other, already-real number,
+  // when it doesn't - this only ever reflects what validate.js itself
+  // checks, a real but narrower signal.
   const flagged = results.filter(r => r && (r.warnings + r.errors) > 0);
   if (!flagged.length) return;
 
@@ -1236,12 +1249,11 @@ async function renderDataQuality() {
     </span>
     ${flagged.map(f => {
       const color = f.errors > 0 ? statusColor('broken') : statusColor('stalled');
-      const total = f.warnings + f.errors;
       const label = f.errors > 0
         ? `${f.name} · ${f.errors} error${f.errors === 1 ? '' : 's'}${f.warnings ? ', ' + f.warnings + ' warning' + (f.warnings === 1 ? '' : 's') : ''}`
-        : `${f.name} · ${total} to backfill`;
+        : `${f.name} · ${f.warnings} validation warning${f.warnings === 1 ? '' : 's'}`;
       return `
-        <button class="attn-pill" data-id="${escapeHtml(f.clusterId)}" style="border-color:${color}66; color:${color}">
+        <button class="attn-pill" data-id="${escapeHtml(f.clusterId)}" title="From this hub's own npm run validate rules. Some hubs also show a separate, broader 'needs backfill' count on their own page that checks more than this does." style="border-color:${color}66; color:${color}">
           <span class="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style="background:${color}"></span>${escapeHtml(label)}
         </button>
       `;
