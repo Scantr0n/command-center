@@ -90,18 +90,49 @@
     });
   }
 
+  // Real glyphs, one per snapshot card, same "hub within a hub" pattern
+  // just shipped on Sondrik: each card is a real link into the section it
+  // summarizes (jumpToSection below), not a dead number tile. Centered on
+  // (0,0) at roughly an 18x18 box.
+  const SNAPSHOT_ICON = {
+    applications: '<path d="M-6,-8 L4,-8 Q6,-8 6,-6 L6,7 Q6,9 4,9 L-6,9 Q-8,9 -8,7 L-8,-6 Q-8,-8 -6,-8 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M-4.5,0 L-1,3.5 L5,-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    saved: '<path d="M-5,-8 L5,-8 Q6,-8 6,-7 L6,8 L0,4 L-6,8 L-6,-7 Q-6,-8 -5,-8 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
+    digest: '<rect x="-7.5" y="-6.5" width="15" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="-7.5" y1="-2.5" x2="7.5" y2="-2.5" stroke="currentColor" stroke-width="1.4"/><line x1="-4" y1="-8.5" x2="-4" y2="-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="4" y1="-8.5" x2="4" y2="-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+    verified: '<circle cx="0" cy="0" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M-4,0 L-1,3.5 L4.5,-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+  const SNAPSHOT_TARGET = { applications: 'applicationsSection', saved: 'applicationsSection', digest: 'digestSection', verified: 'digestSection' };
+
+  // Real "clicked through" confirmation, identical pattern to Sondrik's
+  // jumpToSection: a brief highlight on the section a card actually jumps
+  // to, so a click on this long, mostly-static page gives visible feedback
+  // instead of a silent scroll.
+  let sectionFlashTimer = null;
+  function jumpToSection(targetId) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    clearTimeout(sectionFlashTimer);
+    document.querySelectorAll('.section-flash').forEach(n => n.classList.remove('section-flash'));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.classList.add('section-flash');
+      sectionFlashTimer = setTimeout(() => el.classList.remove('section-flash'), 1600);
+    }));
+  }
+
   function renderSnapshot(applicationsData, digestData) {
     const apps = (applicationsData && applicationsData.applications) || [];
     const saved = (applicationsData && applicationsData.savedCount) || {};
     const chips = [];
 
     chips.push({
+      kind: 'applications',
       number: apps.length,
       label: 'Applications submitted',
       meta: apps.length ? 'Most recent: ' + (fmtDate(mostRecentAppliedDate(apps)) || 'undated') : null
     });
 
     chips.push({
+      kind: 'saved',
       number: typeof saved.count === 'number' ? saved.count : 'N/A',
       label: 'Currently saved',
       meta: saved.asOfDate
@@ -110,8 +141,9 @@
     });
 
     if (digestData && digestData.runDate) {
-      chips.push({ number: fmtDate(digestData.runDate), label: 'Most recent digest run', meta: 'Automated daily digest' });
+      chips.push({ kind: 'digest', number: fmtDate(digestData.runDate), label: 'Most recent digest run', meta: 'Automated daily digest' });
       chips.push({
+        kind: 'verified',
         number: typeof digestData.fullyVerifiedCount === 'number' ? digestData.fullyVerifiedCount : 'N/A',
         label: 'Verified leads in latest run',
         meta: typeof digestData.totalItemsCount === 'number' ? (digestData.totalItemsCount + ' item(s) reviewed total') : null
@@ -119,12 +151,20 @@
     }
 
     snapshotStrip.innerHTML = chips.map(c =>
-      '<div class="snapshot-chip">' +
+      '<a href="#' + SNAPSHOT_TARGET[c.kind] + '" class="snapshot-chip snapshot-chip-' + c.kind + '" data-target="' + SNAPSHOT_TARGET[c.kind] + '">' +
+      '<div class="snapshot-chip-icon"><svg viewBox="-10 -10 20 20" width="18" height="18" aria-hidden="true">' + SNAPSHOT_ICON[c.kind] + '</svg></div>' +
       '<div class="snapshot-chip-number font-display">' + escapeHtml(String(c.number)) + '</div>' +
       '<div class="snapshot-chip-label">' + escapeHtml(c.label) + '</div>' +
       (c.meta ? '<div class="snapshot-chip-meta">' + escapeHtml(c.meta) + '</div>' : '') +
-      '</div>'
+      '</a>'
     ).join('');
+
+    snapshotStrip.querySelectorAll('.snapshot-chip').forEach(el => {
+      el.addEventListener('click', (event) => {
+        event.preventDefault();
+        jumpToSection(el.dataset.target);
+      });
+    });
   }
 
   function renderApplications(data) {
