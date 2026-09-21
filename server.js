@@ -908,7 +908,12 @@ const SEARCH_SOURCES = [
   {
     hub: 'cgt', clusterId: 'card-grading', file: 'cards.json', key: 'cards', type: 'card',
     label: c => c.cardName, detail: c => [c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '),
-    fields: c => [c.cardName]
+    // sport/gradingCompany added after checking this was too narrow: cardName
+    // alone (a player name) is the main real search intent, but "which PSA
+    // cards do I have" or "find my hockey cards" is a real, plausible search
+    // too, and both are short structured fields already on every real card,
+    // not free text that would return noisy partial matches.
+    fields: c => [c.cardName, c.sport, c.gradingCompany]
   },
   {
     hub: 'csm', clusterId: 'csm', file: 'prospects.json', key: 'prospects', type: 'prospect',
@@ -918,7 +923,14 @@ const SEARCH_SOURCES = [
   {
     hub: 'garage', clusterId: 'garage', file: 'listings.json', key: 'listings', type: 'listing',
     label: l => l.title, detail: l => l.status ? l.status.toUpperCase() : '',
-    fields: l => [l.title]
+    // category/itemSpecifics added the same way: title alone missed a real,
+    // verified case (both real boot listings have itemSpecifics.color set to
+    // "Black"/"White" right now, a real color a person would plausibly type
+    // to find them, even though title alone already happens to say "boots").
+    // brand is null on every real listing today, but it's exactly the field
+    // Data Quality already flags as missing, so it's included now for when
+    // it's genuinely backfilled rather than needing a second change later.
+    fields: l => [l.title, l.category, l.itemSpecifics && l.itemSpecifics.brand, l.itemSpecifics && l.itemSpecifics.color]
   },
   {
     hub: 'sondrik', clusterId: 'sondrik', file: 'leads.json', key: 'leads', type: 'lead',
@@ -928,7 +940,10 @@ const SEARCH_SOURCES = [
   {
     hub: 'job-search', clusterId: 'job-search', file: 'applications.json', key: 'applications', type: 'application',
     label: a => a.company, detail: a => a.role || '',
-    fields: a => [a.company, a.role]
+    // location added after checking it's real and distinct per real
+    // application right now ("NY (Remote)", "Goa, India (Remote)", etc.), a
+    // real plausible thing to search by ("what did I apply to in India").
+    fields: a => [a.company, a.role, a.location]
   }
 ];
 const SEARCH_RESULT_CAP = 20;
