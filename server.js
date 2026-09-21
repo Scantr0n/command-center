@@ -487,6 +487,47 @@ async function fetchAlpha(pathname) {
   return r.json();
 }
 
+// Every /api/alpha/live request already performs a real connectivity check
+// against Alpha's daemon (the fetchAlpha('/health') call below); until now
+// that result was thrown away the moment the response was sent, so the
+// connection.history the page renders (uptime strip, daily uptime, recent
+// incidents) had nothing server-side to draw on and app.js fell back to a
+// per-browser localStorage record instead (see its own long comment on
+// CLIENT_CONN_HISTORY_KEY). This persists that same real result, once per
+// request, to a small local file so every browser hitting this same running
+// server sees one shared, honest history instead of each tab keeping its own.
+// Gitignored on purpose: unlike status.json this isn't a hand-verified fact,
+// it's a constantly-growing log local to whichever machine is actually
+// running server.js, and this sandbox's own checks (always "not connected",
+// since it has no path to Jack's Mac) would otherwise pollute the shared repo
+// file the moment it got committed.
+const ALPHA_CONN_HISTORY_FILE = path.join(__dirname, 'public', 'alpha', 'data', 'connection-history.json');
+const ALPHA_CONN_HISTORY_CAP = 500;
+
+function readAlphaConnHistory() {
+  if (!fs.existsSync(ALPHA_CONN_HISTORY_FILE)) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(ALPHA_CONN_HISTORY_FILE, 'utf8'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error(`Ignoring malformed connection-history.json: ${err.message}`);
+    return [];
+  }
+}
+
+// Same atomic temp-file-then-rename pattern as writeToggles above, for the
+// same reason: a write killed mid-save should never leave readers looking at
+// a truncated file.
+function appendAlphaConnHistory(at, connected) {
+  const history = readAlphaConnHistory();
+  history.push({ at, connected });
+  const capped = history.slice(-ALPHA_CONN_HISTORY_CAP);
+  const tmpFile = `${ALPHA_CONN_HISTORY_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(tmpFile, JSON.stringify(capped, null, 2));
+  fs.renameSync(tmpFile, ALPHA_CONN_HISTORY_FILE);
+  return capped;
+}
+
 // Real peak-to-trough drawdown, computed from the daemon's actual equity
 // curve (never estimated): walks the real history tracking the running
 // peak, and returns how far the latest point sits below the running peak at
@@ -618,7 +659,7 @@ app.get('/api/alpha/live', async (req, res) => {
         connected: true,
         checkedAt: now,
         note: 'Live feed connected: reading directly from Alpha\'s real daemon on this Mac (127.0.0.1:3847).',
-        history: []
+        history: appendAlphaConnHistory(now, true)
       },
       live: {
         asOf: now,
@@ -661,8 +702,21 @@ app.get('/api/alpha/live', async (req, res) => {
     });
   } catch (err) {
     // Daemon not reachable (not running, different machine, etc). Fall back
-    // to the same honest static placeholder the page has always shown.
-    res.json(fallback);
+    // to the same honest static placeholder the page has always shown, but
+    // still record and return the real, just-attempted check: the fetchAlpha
+    // call above did genuinely try and fail, at this exact moment, so
+    // checkedAt and history should say so instead of the fallback file's own
+    // static checkedAt: null.
+    const now = new Date().toISOString();
+    res.json({
+      ...fallback,
+      connection: {
+        ...fallback.connection,
+        connected: false,
+        checkedAt: now,
+        history: appendAlphaConnHistory(now, false)
+      }
+    });
   }
 });
 

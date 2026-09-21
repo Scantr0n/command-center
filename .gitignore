@@ -2,3 +2,8 @@ node_modules/
 .env
 credentials/drive_token.json
 credentials/drive_client_secret.json
+
+# Server-persisted, constantly-growing connectivity log for the Alpha hub.
+# Real data local to whichever machine runs server.js, not a hand-verified
+# fact like status.json, so it never belongs in the shared repo.
+public/alpha/data/connection-history.json

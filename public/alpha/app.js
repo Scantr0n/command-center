@@ -385,18 +385,20 @@ function formatDuration(ms) {
   return days + 'd' + (remHours ? ' ' + remHours + 'h' : '');
 }
 
-// server.js's live branch never actually persists connection.history (its
-// /api/alpha/live route hardcodes history: [] on every connected response,
-// see that route's own comment), and the static fallback file starts empty
-// and has no mechanism to grow, so the uptime-strip feature below would
-// otherwise show "no checks recorded yet" forever, on a real Mac with a real
-// daemon, indefinitely. This page already performs a genuine connectivity
-// check on every load, 30s interval tick, and tab-visibility change, so it
-// keeps its own honest record of those real results in this browser's
-// localStorage and uses that whenever the server hasn't sent a populated
-// history yet. If a future session wires in real server-side persistence,
-// that becomes authoritative again the moment it has any entries, since this
-// only fills the gap while the server-side array is empty.
+// server.js's /api/alpha/live route now persists connection.history itself
+// (one real entry per request, to a local file next to status.json, see its
+// own connection-history comment), so on a real Mac running server.js that
+// history fills in on its own over time and this client-side record becomes
+// redundant the moment the server has any entries (renderConnectionHistory
+// below always prefers a non-empty server history). This client-side record
+// still matters for two real gaps the server can't cover: a brand-new
+// deployment before the server file has accumulated any entries yet, and
+// this page being served some other way entirely (a static host, a stale
+// cached copy) with no server behind /api/alpha/live at all. This page
+// already performs a genuine connectivity check on every load, 30s interval
+// tick, and tab-visibility change, so it keeps its own honest record of
+// those real results in this browser's localStorage for exactly those two
+// cases.
 const CLIENT_CONN_HISTORY_KEY = 'alpha:clientConnHistory';
 const CLIENT_CONN_HISTORY_CAP = 500;
 
