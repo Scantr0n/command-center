@@ -1413,6 +1413,27 @@ function eventItem(evt) {
 // fetch or a re-sort that could disagree with what's on screen.
 let lastEventLogSnapshot = [];
 
+// Connection already tells Jack "Down for Xh" right in its own header, so a
+// dead feed reads as dead at a glance instead of requiring him to scroll the
+// tick strip. The Activity log had no equivalent: a busy log and a log whose
+// newest entry is three days old render identically until you actually read
+// every row's own timestamp. This mirrors renderArchitectureVerifiedMeta's
+// same section-title-meta convention (real timestamp in the title tooltip,
+// nothing invented) so "how current is this list" is answerable without
+// reading it.
+function renderEventLogMeta(sorted) {
+  const meta = document.getElementById('eventLogMeta');
+  if (!meta) return;
+  if (!sorted.length) {
+    meta.textContent = '';
+    meta.title = '';
+    return;
+  }
+  const mostRecent = sorted[0].at;
+  meta.textContent = 'Most recent ' + (timeAgo(mostRecent) || 'earlier');
+  meta.title = 'Newest of ' + sorted.length + ' logged event(s), at ' + formatAbsolute(mostRecent);
+}
+
 function renderEventLog(data) {
   const log = document.getElementById('eventLog');
   const events = Array.isArray(data.events) ? data.events : [];
@@ -1420,6 +1441,7 @@ function renderEventLog(data) {
 
   if (!events.length) {
     lastEventLogSnapshot = [];
+    renderEventLogMeta([]);
     if (csvBtn) {
       csvBtn.disabled = true;
       csvBtn.title = 'No events recorded yet.';
@@ -1440,6 +1462,7 @@ function renderEventLog(data) {
   log.classList.remove('event-log-empty');
   const sorted = [...events].sort((a, b) => new Date(b.at) - new Date(a.at));
   lastEventLogSnapshot = sorted;
+  renderEventLogMeta(sorted);
   if (csvBtn) {
     csvBtn.disabled = false;
     csvBtn.title = '';
