@@ -515,11 +515,32 @@ function readAlphaConnHistory() {
   }
 }
 
+// This is one shared file read by every /api/alpha/live caller, and more
+// than one caller can genuinely be polling it at once: the Alpha page's own
+// 30s interval, a second open Alpha tab, and (since tonight) the main
+// dashboard's Venture Snapshot card each hit this same endpoint on their own
+// clock. Without a debounce, two callers polling a few seconds apart doubles
+// the real append rate, which quietly halves how much real wall-clock time
+// the ALPHA_CONN_HISTORY_CAP-entry file and the tick strip's most-recent-60
+// window actually cover, purely as a side effect of how many tabs happen to
+// be open, not anything about Alpha's real connectivity. Skipping a same-
+// state append inside this window never loses a real state transition (the
+// very next differing check still appends immediately), so
+// connectionStateEvents/computeIncidents durations stay exact; only the
+// redundant "still connected"/"still down" heartbeat density drops, which
+// gives a closer approximation to one entry per ~30s of real elapsed time
+// regardless of how many tabs happen to be polling right now.
+const ALPHA_CONN_HISTORY_DEBOUNCE_MS = 10000;
+
 // Same atomic temp-file-then-rename pattern as writeToggles above, for the
 // same reason: a write killed mid-save should never leave readers looking at
 // a truncated file.
 function appendAlphaConnHistory(at, connected) {
   const history = readAlphaConnHistory();
+  const last = history[history.length - 1];
+  if (last && last.connected === connected && (new Date(at) - new Date(last.at)) < ALPHA_CONN_HISTORY_DEBOUNCE_MS) {
+    return history.slice(-ALPHA_CONN_HISTORY_CAP);
+  }
   history.push({ at, connected });
   const capped = history.slice(-ALPHA_CONN_HISTORY_CAP);
   const tmpFile = `${ALPHA_CONN_HISTORY_FILE}.${process.pid}.tmp`;
