@@ -370,6 +370,7 @@ async function loadData() {
     renderPayoutTable(listings);
     renderOfferItemChips(listings);
     renderTemplateItemChips(listings);
+    renderPromotedItemChips(listings);
     renderKanban(listings, pipelineData);
     renderPoshmarkShareTracker(listings);
   } else {
@@ -385,6 +386,7 @@ async function loadData() {
     document.getElementById('payoutTableBody').innerHTML = '';
     renderOfferItemChips([]);
     renderTemplateItemChips([]);
+    renderPromotedItemChips([]);
     document.getElementById('kanbanBoard').innerHTML = '';
     document.getElementById('poshmarkShareSection').hidden = true;
     errBox.hidden = false;
@@ -1843,6 +1845,94 @@ function renderPoshWeightCheck() {
 function wirePoshWeightCheck() {
   document.getElementById('poshWeightInput').addEventListener('input', renderPoshWeightCheck);
   renderPoshWeightCheck();
+}
+
+// eBay Promoted Listings Standard (General campaign) cost check: a
+// cost-per-sale ad, so the only real dollar cost is adRate% of the item's
+// actual sale price, charged only if that exact listing sells inside eBay's
+// 30-day attribution window (a click on it now attributing any purchase of
+// it within 30 days, not only by the same buyer, since eBay's January 2026
+// attribution change). eBay's own published minimum ad rate for a General
+// campaign is 2%, raised from 1% in July 2023, so anything entered below
+// that isn't a rate eBay would actually let this be set to. Only applies to
+// listings still live on eBay, Promoted Listings Standard is eBay-only.
+const EBAY_PROMOTED_MIN_RATE = 2;
+let promotedItemId = null;
+
+function promotedEligibleListings(currentListings) {
+  return currentListings.filter(l =>
+    l.status === 'live' && (l.platforms || []).includes('ebay') && !(l.soldOn || []).includes('ebay'));
+}
+
+function renderPromotedItemChips(currentListings) {
+  const container = document.getElementById('promotedItemChips');
+  const eligible = promotedEligibleListings(currentListings);
+  if (!eligible.some(l => l.id === promotedItemId)) {
+    promotedItemId = eligible.length ? eligible[0].id : null;
+  }
+  container.innerHTML = eligible.map(l => `
+    <button type="button" class="chip" data-promoted-item="${escapeHtml(l.id)}" aria-pressed="${promotedItemId === l.id}">${escapeHtml(l.title || 'Untitled item')}</button>
+  `).join('');
+  container.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      promotedItemId = chip.getAttribute('data-promoted-item');
+      renderPromotedItemChips(listings);
+      renderPromotedCalc();
+    });
+  });
+  renderPromotedCalc();
+}
+
+function renderPromotedCalc() {
+  const result = document.getElementById('promotedResult');
+  const rateInput = document.getElementById('promotedRateInput');
+  const eligible = promotedEligibleListings(listings);
+
+  if (!eligible.length) {
+    result.innerHTML = '<p class="pace-result-note">No live eBay listing to check, Promoted Listings Standard is eBay-only.</p>';
+    return;
+  }
+  const l = eligible.find(x => x.id === promotedItemId) || eligible[0];
+  if (l.price == null) {
+    result.innerHTML = `<p class="pace-result-note">` +
+      `<span class="pace-result-figure">${escapeHtml(l.title || 'This item')}</span> has no asking price logged yet, nothing to check against.</p>`;
+    return;
+  }
+  const raw = rateInput.value.trim();
+  const rate = raw === '' ? null : Number(raw);
+
+  if (raw === '' || Number.isNaN(rate) || rate <= 0) {
+    result.innerHTML = `<p class="pace-result-note">Enter an ad rate to see the real cost against ` +
+      `<span class="pace-result-figure">${escapeHtml(l.title || 'this item')}</span>'s ` +
+      `<span class="pace-result-figure">${formatUsd(l.price)}</span> real asking price.</p>`;
+    return;
+  }
+  if (rate < EBAY_PROMOTED_MIN_RATE) {
+    result.innerHTML = `<p class="pace-result-note">eBay's own General campaign minimum is ` +
+      `<span class="pace-result-figure">${EBAY_PROMOTED_MIN_RATE}%</span>, a rate can't actually be set below that.</p>`;
+    return;
+  }
+
+  const price = l.price;
+  const organicNet = estimateNetPayout('ebay', price, l.category);
+  const adFee = price * (rate / 100);
+  const promotedNet = organicNet - adFee;
+
+  result.innerHTML = `
+    <p class="pace-result-note">
+      A <span class="pace-result-figure">${rate}%</span> ad rate on
+      <span class="pace-result-figure">${escapeHtml(l.title || 'this item')}</span>'s real
+      <span class="pace-result-figure">${formatUsd(price)}</span> asking price costs
+      <span class="pace-result-figure">${formatUsd(adFee)}</span>, only if this exact listing sells within eBay's
+      30-day attribution window after a promoted click, taking net payout from
+      <span class="pace-result-figure">${formatUsd(organicNet)}</span> organic down to
+      <span class="pace-result-figure">${formatUsd(promotedNet)}</span> promoted.
+    </p>`;
+}
+
+function wirePromotedCalc() {
+  document.getElementById('promotedRateInput').addEventListener('input', renderPromotedCalc);
+  renderPromotedItemChips([]);
 }
 
 // Offer response guide: applies a real, documented counteroffer-ladder
@@ -4766,6 +4856,7 @@ wireCalc();
 wireBreakEven();
 wireBundle();
 wirePoshWeightCheck();
+wirePromotedCalc();
 wireOfferGuide();
 wireMessageTemplates();
 wireChecklist();
