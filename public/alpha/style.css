@@ -173,6 +173,12 @@ header.page-head .sub {
 .market-pill.open .market-text { color: #3DDC84; }
 .market-pill.closed .market-dot { background: #7B8188; }
 .market-pill.closed .market-text { color: var(--sub); }
+/* Same amber used everywhere else on this page for "stale, not wrong" (see
+   .conn-dot.stale, .section-title-meta.warn). Fires once the ET calendar
+   year outruns MARKET_CALENDAR_YEAR, when open/closed genuinely can't be
+   computed rather than just being closed. */
+.market-pill.stale .market-dot { background: #E0A030; box-shadow: 0 0 0 3px rgba(224,160,48,0.18); }
+.market-pill.stale .market-text { color: #E0A030; }
 
 .callout {
   border: 1px solid var(--hairline);

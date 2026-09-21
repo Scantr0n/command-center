@@ -38,6 +38,17 @@ const MARKET_EARLY_CLOSES_2026 = new Set([
   '2026-12-24'
 ]);
 const MARKET_CALENDAR_SOURCE_CHECKED_AT = '2026-09-17';
+// The holiday/early-close sets above only ever cover this one year, and
+// MARKET_CALENDAR_SOURCE_CHECKED_AT was tracked as a note for a human to spot
+// during an annual re-check that, in practice, never actually happened here
+// (this page has no periodic re-check step for it, unlike the 90-day
+// lastVerifiedAt staleness check just below). Once the real ET date rolls
+// into a year this calendar doesn't cover, isTradingDayKey stops seeing any
+// holidays at all for that year, so the market pill would confidently show
+// "open"/"closed" based on weekday alone, silently wrong on every real
+// holiday. Checked against the calendar's actual coverage below instead of
+// trusting the year never changes.
+const MARKET_CALENDAR_YEAR = 2026;
 
 function nowInET() {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -78,6 +89,14 @@ function computeMarketStatus() {
   const p = nowInET();
   const dateKey = `${p.year}-${p.month}-${p.day}`;
   const weekday = p.weekday;
+  if (Number(p.year) !== MARKET_CALENDAR_YEAR) {
+    return {
+      isOpen: false,
+      isUnknown: true,
+      label: 'Market status unknown',
+      detail: `Holiday calendar only covers ${MARKET_CALENDAR_YEAR}, open/closed can't be trusted past it. Update MARKET_HOLIDAYS_2026 and MARKET_EARLY_CLOSES_2026 in alpha/app.js for ${p.year}.`
+    };
+  }
   const minutesNow = Number(p.hour) * 60 + Number(p.minute);
   const isHoliday = MARKET_HOLIDAYS_2026.has(dateKey);
   const isWeekend = weekday === 'Sat' || weekday === 'Sun';
@@ -112,7 +131,8 @@ function renderMarketStatus() {
   if (!pill) return;
   const status = computeMarketStatus();
   pill.classList.toggle('open', status.isOpen);
-  pill.classList.toggle('closed', !status.isOpen);
+  pill.classList.toggle('closed', !status.isOpen && !status.isUnknown);
+  pill.classList.toggle('stale', !!status.isUnknown);
   document.getElementById('marketText').textContent = status.label;
   pill.title = status.detail;
 }
