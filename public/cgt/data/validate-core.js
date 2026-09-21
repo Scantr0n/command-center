@@ -67,6 +67,21 @@
     return Number.isInteger(year) && year >= 1860 && year <= new Date().getFullYear() + 1;
   }
 
+  // BGS (and, per its own public standards, SGC) publish four subgrades per
+  // card -- centering, corners, edges, surface -- each on a 1-10 scale in
+  // half-point steps, independent of the overall grade shown on the slab
+  // label (grade is a separate, sometimes-rounded-down number, not just the
+  // lowest subgrade). A card with all four at 10 is BGS's "Black Label",
+  // a real, well-documented designation worth surfacing since it carries a
+  // large real-world value premium over a plain BGS 10. Multiplying by 2 and
+  // checking for a whole number is the standard way to test "is this a
+  // multiple of 0.5" without floating-point equality problems.
+  const SUBGRADE_FIELDS = ['subgradeCentering', 'subgradeCorners', 'subgradeEdges', 'subgradeSurface'];
+  function isValidSubgradeOrNull(v) {
+    if (v === null || v === undefined) return true;
+    return typeof v === 'number' && !Number.isNaN(v) && v >= 1 && v <= 10 && Number.isInteger(v * 2);
+  }
+
   // Groups cards by cardName + year + gradingCompany + grade, to catch the
   // same physical card accidentally logged twice under two different ids
   // (e.g. a copy-pasted entry that only got the id changed). Distinct cert
@@ -131,6 +146,22 @@
       if (c.gradingCompany !== null && c.gradingCompany !== undefined && !GRADING_COMPANIES.includes(c.gradingCompany)) {
         warnings.push(where + ': gradingCompany "' + c.gradingCompany + '" is not one of the known companies (' +
           GRADING_COMPANIES.join(', ') + '). Not an error, just double-check it is not a typo.');
+      }
+
+      // Subgrades are optional even on a real BGS card (Jack may not have
+      // bothered logging them for a low-value common), so only the ones
+      // actually present get checked; a card with none set is not an error.
+      let anySubgradeSet = false;
+      SUBGRADE_FIELDS.forEach(f => {
+        if (c[f] === null || c[f] === undefined) return;
+        anySubgradeSet = true;
+        if (!isValidSubgradeOrNull(c[f])) {
+          errors.push(where + ': "' + f + '" must be a number from 1 to 10 in half-point steps (e.g. 9, 9.5, 10) or null, got ' + JSON.stringify(c[f]));
+        }
+      });
+      if (anySubgradeSet && c.gradingCompany !== 'BGS') {
+        warnings.push(where + ': has a subgrade logged but "gradingCompany" is "' + (c.gradingCompany || 'null') +
+          '", not "BGS". Subgrades are a BGS-specific concept, double-check this is not logged against the wrong row.');
       }
 
       if (c.estimatedValue !== null && c.estimatedValue !== undefined) {
@@ -496,6 +527,7 @@
 
   return {
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findGradeLadderInversions,
-    isDateOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES, SUBMISSION_STATUSES, CANDIDATE_DECISIONS
+    isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
+    SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };
 });

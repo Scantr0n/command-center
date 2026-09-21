@@ -162,6 +162,29 @@ function isExample(c) {
   return c.id === 'example-row-not-real';
 }
 
+// BGS's own four subgrades (centering, corners, edges, surface), each 1-10
+// in half-point steps, independent of the overall grade on the slab label.
+// SUBGRADE_FIELDS/label pairs kept together so every place that needs to
+// list them (detail view, edit form, quick-log form, CSV export) reads from
+// one source instead of four field names getting typed out separately each
+// time and drifting if one is ever renamed.
+const SUBGRADE_LABELS = [
+  ['subgradeCentering', 'Centering'],
+  ['subgradeCorners', 'Corners'],
+  ['subgradeEdges', 'Edges'],
+  ['subgradeSurface', 'Surface']
+];
+function hasAnySubgrade(c) {
+  return SUBGRADE_LABELS.some(([f]) => c[f] != null);
+}
+// BGS's real "Black Label" designation: all four subgrades at a perfect 10.
+// Fewer than 1% of BGS submissions earn it, and it carries a large real
+// resale premium over a plain BGS 10, so it is worth its own badge rather
+// than only showing up as four separate numbers in the detail view.
+function isBgsBlackLabel(c) {
+  return c.gradingCompany === 'BGS' && SUBGRADE_LABELS.every(([f]) => c[f] === 10);
+}
+
 // A card is sold once it has a real soldDate (validate-core.js requires
 // soldPrice and soldDate together, so either field alone is enough to check
 // here). Sold cards stay in cards.json as a permanent record of what was
@@ -2382,7 +2405,7 @@ function applyFiltersAndRender() {
   tbody.innerHTML = filtered.map(c => `
     <tr tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled card')}" data-id="${escapeHtml(c.id)}">
       <td>
-        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}</div>
+        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isBgsBlackLabel(c) ? ' <span class="badge badge-black-label" title="All four BGS subgrades are a perfect 10">black label</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}</div>
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
       </td>
       <td class="cell-muted">${c.sport ? `<span class="badge badge-sport">${escapeHtml(c.sport)}</span>` : '<span class="cell-value empty">unknown</span>'}</td>
@@ -2533,6 +2556,15 @@ function cardEditFormHtml(c) {
     '<div class="form-row-split">' +
     ceSelectRow('ceGradingCompany', 'Grading company', c.gradingCompany, [['', 'Not graded / raw'], ['PSA', 'PSA'], ['BGS', 'BGS'], ['SGC', 'SGC'], ['CGC', 'CGC'], ['HGA', 'HGA'], ['KSA', 'KSA']]) +
     ceInputInner('ceGrade', 'Grade', c.grade) +
+    '</div>' +
+    '<p class="field-note">BGS subgrades (optional, BGS only): centering, corners, edges, surface, each 1-10 in half-point steps. All four at 10 is BGS\'s real "Black Label".</p>' +
+    '<div class="form-row-split">' +
+    ceInputInner('ceSubgradeCentering', 'Centering', c.subgradeCentering, 'number', '0.5') +
+    ceInputInner('ceSubgradeCorners', 'Corners', c.subgradeCorners, 'number', '0.5') +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('ceSubgradeEdges', 'Edges', c.subgradeEdges, 'number', '0.5') +
+    ceInputInner('ceSubgradeSurface', 'Surface', c.subgradeSurface, 'number', '0.5') +
     '</div>' +
     '<div class="form-row-split">' +
     ceInputInner('ceCertNumber', 'Cert number', c.certNumber) +
@@ -2836,8 +2868,13 @@ function wireCardEditForm(c) {
     const estimatedValueRaw = document.getElementById('ceEstimatedValue').value.trim();
     const costBasisRaw = document.getElementById('ceCostBasis').value.trim();
     const soldPriceRaw = document.getElementById('ceSoldPrice').value.trim();
+    const subgrades = {};
+    SUBGRADE_LABELS.forEach(([f]) => {
+      const raw = document.getElementById('ce' + f[0].toUpperCase() + f.slice(1)).value.trim();
+      subgrades[f] = raw === '' ? null : Number(raw);
+    });
 
-    const edited = Object.assign({}, c, {
+    const edited = Object.assign({}, c, subgrades, {
       cardName: ceVal('ceCardName') || c.cardName,
       year: yearRaw === '' ? null : Number(yearRaw),
       sport: document.getElementById('ceSport').value || null,
@@ -2954,6 +2991,10 @@ function openModal(id) {
     </div>`;
   }
   body += cardEditFormHtml(activeCard);
+  if (hasAnySubgrade(activeCard)) {
+    const parts = SUBGRADE_LABELS.map(([f, label]) => label + ' ' + (activeCard[f] != null ? activeCard[f] : '?'));
+    body += field('BGS subgrades', parts.join(' · ') + (isBgsBlackLabel(activeCard) ? ' -- Black Label (all four perfect 10s)' : ''), false);
+  }
   body += field('Cert number', activeCard.certNumber, !activeCard.certNumber);
   const lookup = certLookupLink(activeCard);
   if (lookup) {
@@ -3372,7 +3413,11 @@ function csvField(v) {
 // alongside the plain field lookups.
 const CSV_COLUMNS = [
   [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'], [c => c.gradingCompany, 'Grading company'],
-  [c => c.grade, 'Grade'], [c => c.certNumber, 'Cert number'], [c => c.storageLocation, 'Storage location'],
+  [c => c.grade, 'Grade'],
+  [c => c.subgradeCentering, 'BGS centering'], [c => c.subgradeCorners, 'BGS corners'],
+  [c => c.subgradeEdges, 'BGS edges'], [c => c.subgradeSurface, 'BGS surface'],
+  [c => isBgsBlackLabel(c) ? 'yes' : '', 'Black Label'],
+  [c => c.certNumber, 'Cert number'], [c => c.storageLocation, 'Storage location'],
   [c => c.estimatedValue, 'Estimated value'],
   [c => computeValueTrend(c)?.prevValue ?? null, 'Previous value'],
   [c => computeValueTrend(c)?.abs ?? null, 'Change since last check'],
@@ -3714,14 +3759,20 @@ function initQuickLogTool() {
     const yearRaw = document.getElementById('ncYear').value.trim();
     const estimatedValueRaw = document.getElementById('ncEstimatedValue').value.trim();
     const costBasisRaw = document.getElementById('ncCostBasis').value.trim();
+    const subgrades = {};
+    SUBGRADE_LABELS.forEach(([f]) => {
+      const raw = document.getElementById('nc' + f[0].toUpperCase() + f.slice(1)).value.trim();
+      subgrades[f] = raw === '' ? null : Number(raw);
+    });
 
-    const candidate = {
+    const candidate = Object.assign({
       id,
       cardName: cardName || null,
       year: yearRaw === '' ? null : Number(yearRaw),
       sport: document.getElementById('ncSport').value || null,
       gradingCompany: document.getElementById('ncGradingCompany').value || null,
-      grade: document.getElementById('ncGrade').value.trim() || null,
+      grade: document.getElementById('ncGrade').value.trim() || null
+    }, subgrades, {
       certNumber: document.getElementById('ncCertNumber').value.trim() || null,
       storageLocation: document.getElementById('ncStorageLocation').value.trim() || null,
       estimatedValue: estimatedValueRaw === '' ? null : Number(estimatedValueRaw),
@@ -3734,7 +3785,7 @@ function initQuickLogTool() {
       backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
       priceHistory: [],
       notes: document.getElementById('ncNotes').value.trim() || null
-    };
+    });
 
     let blockers = [];
     let advisory = [];

@@ -91,6 +91,7 @@
           <tr><th>sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
           <tr><th>gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
           <tr><th>grade</th><td>The grade as shown on the slab label, e.g. <code>"10"</code> or <code>"9.5"</code></td></tr>
+          <tr><th>subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
           <tr><th>certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
           <tr><th>storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
           <tr><th>estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
@@ -114,6 +115,10 @@
   "sport": "hockey",
   "gradingCompany": null,
   "grade": null,
+  "subgradeCentering": null,
+  "subgradeCorners": null,
+  "subgradeEdges": null,
+  "subgradeSurface": null,
   "certNumber": null,
   "storageLocation": null,
   "estimatedValue": null,
@@ -176,6 +181,14 @@
           </select>
           <label class="quick-log-label" for="ncGrade">Grade (optional)</label>
           <input class="quick-log-input" type="text" id="ncGrade" placeholder="e.g. 10 or 9.5">
+          <label class="quick-log-label" for="ncSubgradeCentering">BGS centering subgrade (optional, BGS only)</label>
+          <input class="quick-log-input" type="number" id="ncSubgradeCentering" min="1" max="10" step="0.5">
+          <label class="quick-log-label" for="ncSubgradeCorners">BGS corners subgrade (optional, BGS only)</label>
+          <input class="quick-log-input" type="number" id="ncSubgradeCorners" min="1" max="10" step="0.5">
+          <label class="quick-log-label" for="ncSubgradeEdges">BGS edges subgrade (optional, BGS only)</label>
+          <input class="quick-log-input" type="number" id="ncSubgradeEdges" min="1" max="10" step="0.5">
+          <label class="quick-log-label" for="ncSubgradeSurface">BGS surface subgrade (optional, BGS only)</label>
+          <input class="quick-log-input" type="number" id="ncSubgradeSurface" min="1" max="10" step="0.5">
           <label class="quick-log-label" for="ncCertNumber">Cert number (optional)</label>
           <input class="quick-log-input" type="text" id="ncCertNumber">
           <label class="quick-log-label" for="ncStorageLocation">Storage location (optional)</label>

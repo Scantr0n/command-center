@@ -112,6 +112,25 @@ test('validateCards requires soldDate and soldPrice together, not one without th
   assert.ok(missingPrice.errors.some(e => e.includes('soldPrice')));
 });
 
+test('validateCards accepts real BGS subgrades in half-point steps, rejects out-of-range or off-step values', () => {
+  const clean = validateCards([
+    { id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'BGS', grade: '9.5',
+      subgradeCentering: 9.5, subgradeCorners: 10, subgradeEdges: 9.5, subgradeSurface: 9.5 }
+  ]);
+  assert.deepEqual(clean.errors, []);
+
+  const outOfRange = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'BGS', subgradeCentering: 11 }]);
+  assert.ok(outOfRange.errors.some(e => e.includes('subgradeCentering')));
+
+  const offStep = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'BGS', subgradeCorners: 9.3 }]);
+  assert.ok(offStep.errors.some(e => e.includes('subgradeCorners')));
+});
+
+test('validateCards warns when a subgrade is logged against a non-BGS card', () => {
+  const { warnings } = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'PSA', subgradeSurface: 10 }]);
+  assert.ok(warnings.some(w => w.includes('subgrade') && w.includes('BGS')));
+});
+
 test('validateSubmissions requires returnedDate once status is returned', () => {
   const { warnings } = validateSubmissions([
     { id: 'a', description: 'test batch', gradingCompany: 'PSA', status: 'returned', returnedDate: null }
