@@ -247,11 +247,53 @@ header.page-head .sub {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 14px;
 }
+/* Each card is a real link into the section it summarizes (renderSnapshot's
+   jumpToSection), the "hub within a hub" entry point Jack asked for: a
+   dashboard-like jump-off point instead of a flat, non-interactive strip of
+   numbers at the top of a long scroll of text. One accent color per card,
+   reusing the same category palette the main dashboard's graph already
+   established rather than inventing a new one. */
 .snapshot-chip {
+  --chip-accent: var(--accent);
+  display: block;
+  text-decoration: none;
   border: 1px solid var(--hairline);
   border-radius: 12px;
   padding: 16px 18px;
   background: var(--panel);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease;
+}
+.snapshot-chip::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--chip-accent);
+  opacity: 0.85;
+}
+.snapshot-chip:hover, .snapshot-chip:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--chip-accent);
+  box-shadow: 0 10px 24px -14px var(--chip-accent), 0 0 0 1px var(--chip-accent);
+  outline: none;
+}
+.snapshot-chip-downloads { --chip-accent: #4F9FD9; }
+.snapshot-chip-leads { --chip-accent: #DB5C82; }
+.snapshot-chip-release { --chip-accent: #D9A441; }
+.snapshot-chip-goal { --chip-accent: #3DDC84; }
+.snapshot-chip-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--chip-accent) 18%, transparent);
+  color: var(--chip-accent);
+  margin-bottom: 10px;
 }
 .snapshot-chip-number {
   font-weight: 800;
@@ -270,6 +312,21 @@ header.page-head .sub {
   color: var(--dim);
   margin-top: 8px;
   line-height: 1.5;
+}
+
+/* Real "you clicked through, here's where you landed" confirmation for the
+   snapshot cards above, since a silent scrollIntoView gave no feedback that
+   the click actually did anything on a page this long. Respects
+   prefers-reduced-motion via the existing blanket rule further down this
+   file (transition-duration override), the outline itself still appears
+   instantly either way. */
+.section-flash {
+  animation: sectionFlash 1.6s ease-out;
+  border-radius: 12px;
+}
+@keyframes sectionFlash {
+  0% { box-shadow: 0 0 0 2px var(--hairlineHover), 0 0 32px -8px var(--hairlineHover); background: rgba(255,255,255,0.035); }
+  100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
 }
 
 /* Next steps checklist */

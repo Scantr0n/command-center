@@ -264,7 +264,42 @@
   // a Reddit comment) with no confirmed link between them, they are shown
   // as independent facts side by side, never as a funnel one feeds into
   // the next.
-  function renderSnapshot(releasesData, downloadsData, leadsData) {
+  // Real glyphs, not decoration: each "at a glance" card is a clickable
+  // entry point into a specific section below (jumpToSection), so the icon
+  // gives that destination a real visual identity the same way the main
+  // dashboard's graph nodes now do, rather than four interchangeable plain
+  // number tiles. Centered on (0,0) at roughly an 18x18 box.
+  const SNAPSHOT_ICON = {
+    downloads: '<path d="M0,-8 L0,4 M-4.5,-0.5 L0,4 L4.5,-0.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M-7,6.5 L-7,8 Q-7,9 -6,9 L6,9 Q7,9 7,8 L7,6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+    leads: '<path d="M-8,-5 Q-8,-7 -6,-7 L6,-7 Q8,-7 8,-5 L8,1 Q8,3 6,3 L-1,3 L-4.5,6.5 L-4.5,3 L-6,3 Q-8,3 -8,1 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
+    release: '<path d="M0,-8.5 C3.5,-6 5,-1.5 3.8,3 L2,6.5 L-2,6.5 L-3.8,3 C-5,-1.5 -3.5,-6 0,-8.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="0" cy="-2.5" r="1.6" fill="currentColor"/><path d="M-2,6.5 L-3.6,9 M2,6.5 L3.6,9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+    goal: '<circle cx="0" cy="0" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="0" cy="0" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="0" cy="0" r="1.6" fill="currentColor"/>'
+  };
+  const SNAPSHOT_TARGET = { downloads: 'tractionSection', leads: 'leadsSection', release: 'releaseSection', goal: 'goalsSection' };
+
+  // Real "clicked through" confirmation: a brief highlight on the section a
+  // snapshot card actually jumps to, not just a silent scroll. Timeout
+  // clears the class itself so a second click while it's still fading
+  // restarts a clean flash instead of stacking animation state.
+  let sectionFlashTimer = null;
+  function jumpToSection(targetId) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    const container = el.closest('section') || el;
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    clearTimeout(sectionFlashTimer);
+    document.querySelectorAll('.section-flash').forEach(n => n.classList.remove('section-flash'));
+    // Two rAFs: one for the browser to apply the removal above, one before
+    // adding it back, so a rapid repeat click restarts the CSS animation
+    // instead of a no-op (the class never actually left the element's
+    // computed style between the two clicks otherwise).
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      container.classList.add('section-flash');
+      sectionFlashTimer = setTimeout(() => container.classList.remove('section-flash'), 1600);
+    }));
+  }
+
+  function renderSnapshot(releasesData, downloadsData, leadsData, goalsData) {
     const chips = [];
 
     const metric = (downloadsData && downloadsData.metric) || {};
@@ -283,12 +318,13 @@
         meta += ' (' + (delta >= 0 ? '+' : '') + delta + ' vs ' + fmtDate(prev.date) + ')';
       }
       chips.push({
+        kind: 'downloads',
         number: String(latest.count),
         label: metric.label || 'downloads',
         meta: meta
       });
     } else {
-      chips.push({ number: '0', label: metric.label || 'downloads', meta: 'no checks logged yet' });
+      chips.push({ kind: 'downloads', number: '0', label: metric.label || 'downloads', meta: 'no checks logged yet' });
     }
 
     const leads = (leadsData && leadsData.leads) || [];
@@ -297,6 +333,7 @@
       return !o.sent && o.approvalStatus === 'awaiting-approval';
     }).length;
     chips.push({
+      kind: 'leads',
       number: String(leads.length),
       label: leads.length === 1 ? 'lead in the queue' : 'leads in the queue',
       meta: pendingApproval > 0
@@ -310,21 +347,51 @@
       const latestRelease = dated[0];
       const age = Math.max(0, daysBetween(latestRelease.date, todayIso()));
       chips.push({
+        kind: 'release',
         number: String(age),
         label: (age === 1 ? 'day since v' : 'days since v') + latestRelease.version,
         meta: 'shipped ' + fmtDate(latestRelease.date)
       });
     } else {
-      chips.push({ number: '-', label: 'days since last release', meta: 'no ship date logged yet' });
+      chips.push({ kind: 'release', number: '-', label: 'days since last release', meta: 'no ship date logged yet' });
+    }
+
+    // Fourth card, new: the snapshot strip used to stop at three facets and
+    // never surfaced the Goal section at all, even once a real one existed,
+    // so this is the direct fix for that gap as well as the entry point
+    // into a section a visitor otherwise had to scroll all the way past
+    // Channels to find.
+    const goals = (goalsData && goalsData.goals) || [];
+    if (goals.length > 0) {
+      const g = goals[0];
+      const current = currentMetricValue(g.metric, downloadsData, leadsData);
+      const currentCount = current ? current.count : 0;
+      const pct = computeGoalProgressPct(g.target, currentCount);
+      chips.push({
+        kind: 'goal',
+        number: pct + '%',
+        label: g.label || (g.target + ' ' + g.metric),
+        meta: currentCount + ' of ' + g.target + (g.targetDate ? ', by ' + fmtDate(g.targetDate) : '')
+      });
+    } else {
+      chips.push({ kind: 'goal', number: '-', label: 'no goal set yet', meta: 'add one once there is a real target' });
     }
 
     snapshotStrip.innerHTML = chips.map(c =>
-      '<div class="snapshot-chip">' +
+      '<a href="#' + SNAPSHOT_TARGET[c.kind] + '" class="snapshot-chip snapshot-chip-' + c.kind + '" data-target="' + SNAPSHOT_TARGET[c.kind] + '">' +
+      '<div class="snapshot-chip-icon"><svg viewBox="-10 -10 20 20" width="18" height="18" aria-hidden="true">' + SNAPSHOT_ICON[c.kind] + '</svg></div>' +
       '<div class="snapshot-chip-number font-display">' + escapeHtml(c.number) + '</div>' +
       '<div class="snapshot-chip-label">' + escapeHtml(c.label) + '</div>' +
       '<div class="snapshot-chip-meta">' + escapeHtml(c.meta) + '</div>' +
-      '</div>'
+      '</a>'
     ).join('');
+
+    snapshotStrip.querySelectorAll('.snapshot-chip').forEach(el => {
+      el.addEventListener('click', (event) => {
+        event.preventDefault();
+        jumpToSection(el.dataset.target);
+      });
+    });
   }
 
   function renderReleases(data) {
@@ -2052,7 +2119,7 @@
     }
 
     if (releasesData || downloadsData || leadsData) {
-      renderSnapshot(releasesData, downloadsData, leadsData);
+      renderSnapshot(releasesData, downloadsData, leadsData, goalsData);
     } else {
       snapshotStrip.innerHTML = '<div class="empty-state" role="alert">Could not compute the snapshot, data failed to load.</div>';
     }
