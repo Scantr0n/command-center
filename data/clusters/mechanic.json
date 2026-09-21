@@ -1,10 +1,10 @@
 {
   "id": "mechanic",
   "name": "The Mechanic",
-  "category": "Uncategorized",
+  "category": "Personal & Infra",
   "priority": "normal",
-  "lastUpdate": null,
-  "summary": "No detailed status captured yet in memory for this session. Placeholder cluster until real data is pulled in.",
-  "status": "unknown",
+  "lastUpdate": "2026-09-21",
+  "summary": "Jack's ad-hoc audit/ops session for Claude Code fleet efficiency (model selection, session hygiene, credit waste), not a built product. Real wins: archived ~30 dead/duplicate sessions, killed a 2.5-day stuck process, built the daily Mac performance watchdog (confirmed still running clean). Open, unresolved problem: scheduled tasks silently default to the expensive Opus-5-1M model regardless of settings, filed as an external Anthropic bug (github.com/anthropics/claude-code/issues/91884); a workaround applied 9/14 was reverified live 9/21 against 3 fresh scheduled-task runs and did NOT hold, all three still ran on Opus-5-1M. Real, ongoing cost waste, not resolved despite the earlier fix attempt.",
+  "status": "active",
   "sessionTitle": "The Mechanic"
 }
