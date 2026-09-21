@@ -616,6 +616,18 @@
       </div>
       <div id="paletteResults" role="listbox" aria-label="Projects and matching records" class="flex-1 overflow-y-auto py-1.5"></div>
       <div id="paletteEmpty" class="hidden px-4 py-6 text-xs text-center" style="color: var(--faint)"></div>
+      <!-- Real pattern confirmed against Raycast's own launcher (raycast.com,
+           checked live): a persistent hint bar naming the selected item's
+           primary action and its shortcut, not just an ESC hint in the
+           header. Before this, arrow-key nav and Enter-to-open had zero
+           on-screen affordance anywhere in the palette itself - discoverable
+           only by already knowing the convention or via the separate "?"
+           shortcuts overlay, a real gap for a first-time or infrequent user
+           exactly when they need it most, mid-search. -->
+      <div id="paletteFooter" class="flex items-center gap-3 px-4 py-2 border-t hairline text-[10px] font-mono" style="color: var(--faint)">
+        <span class="flex items-center gap-1"><kbd class="kbd-chip">&uarr;</kbd><kbd class="kbd-chip">&darr;</kbd> Navigate</span>
+        <span class="flex items-center gap-1"><kbd class="kbd-chip">&crarr;</kbd> Open</span>
+      </div>
     </div>
   </div>
 
@@ -2505,6 +2517,7 @@ function renderPaletteResults() {
   ];
   const list = document.getElementById('paletteResults');
   const empty = document.getElementById('paletteEmpty');
+  const footer = document.getElementById('paletteFooter');
 
   if (!paletteResultsCache.length) {
     list.innerHTML = '';
@@ -2512,9 +2525,15 @@ function renderPaletteResults() {
       ? (term.length >= 2 ? 'Nothing matches, in projects or your data.' : 'No projects match.')
       : 'Projects still loading...';
     empty.classList.remove('hidden');
+    // Nothing to navigate to or open with an empty result set, so showing
+    // those hints here would name an action that genuinely isn't available
+    // right now, same care as the Data Quality pill wording fix earlier
+    // tonight (never imply a capability that isn't actually there).
+    footer.classList.add('hidden');
     return;
   }
   empty.classList.add('hidden');
+  footer.classList.remove('hidden');
   paletteSelectedIndex = Math.max(0, Math.min(paletteSelectedIndex, paletteResultsCache.length - 1));
 
   // The divider only appears once, right where record results actually start,
