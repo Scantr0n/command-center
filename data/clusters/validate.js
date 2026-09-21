@@ -121,6 +121,14 @@ function main() {
       errors.push(where + ': "lastUpdate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.lastUpdate));
     } else if (isFutureDate(c.lastUpdate)) {
       warnings.push(where + ': "lastUpdate" (' + c.lastUpdate + ') is in the future, check for a typo\'d year');
+    } else if (c.lastUpdate === null && (c.status === 'active' || c.status === 'stalled')) {
+      // isStale() in public/index.html treats a null lastUpdate on an
+      // active/stalled cluster as stale by definition (a project that has
+      // never once logged a date is at least as neglected as one 31+ days
+      // old), so this is the same real gap the dashboard now surfaces
+      // visually, caught here too instead of only after someone happens to
+      // notice the dashed ring or "stale" label on the live page.
+      warnings.push(where + ': status is "' + c.status + '" but "lastUpdate" has never been set, log a real date once there is one to report');
     }
 
     if (c.link !== undefined && !c.linkLabel) {

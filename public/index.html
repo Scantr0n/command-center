@@ -1464,7 +1464,7 @@ function renderGraph() {
     // on a nested <title> for its accessible name across every browser and
     // screen reader pairing, so this is stated explicitly rather than only
     // implied by <title>, which stays for the native mouse-hover tooltip.
-    const nodeLabel = `${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}${stale ? ' (stale, over a month untouched)' : ''}`;
+    const nodeLabel = `${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}${stale ? (c.lastUpdate ? ' (stale, over a month untouched)' : ' (stale, no date ever logged)') : ''}`;
 
     // Connector badge: real last-update time sitting on the spoke itself
     // (n8n puts live state directly on its connector lines, not just the
@@ -1834,8 +1834,17 @@ function relativeTime(dateStr) {
 // silently dropping it: staleness was previously only visible as a dashed
 // stroke on a node, so anyone using Grid (a persisted, one-click-away default)
 // had no way to see a quietly stalled project without opening its modal.
+//
+// An active/stalled cluster with lastUpdate === null used to fall straight
+// through the `c.lastUpdate &&` short-circuit and read as never stale, no
+// matter how long it actually sat untouched: a project that has never once
+// logged a date is at least as neglected as one that logged a date 31+ days
+// ago, not less. done/unknown/broken clusters are left alone here: "done"
+// genuinely doesn't need a date, "unknown" and "broken" already render with
+// their own distinct, honest status treatment elsewhere on the page.
 function isStale(c) {
-  return !!(c.lastUpdate && (Date.now() - new Date(c.lastUpdate + 'T00:00:00')) / 86400000 > 30);
+  if (!c.lastUpdate) return c.status === 'active' || c.status === 'stalled';
+  return (Date.now() - new Date(c.lastUpdate + 'T00:00:00')) / 86400000 > 30;
 }
 
 let gridSortBy = 'priority';
