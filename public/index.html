@@ -2437,27 +2437,45 @@ let paletteLastFocusedEl = null;
 // uses above, so a slow response for an earlier keystroke can never overwrite
 // a newer, faster one for the term actually still in the box.
 let paletteRecordResults = [];
+// Real bug found and fixed by testing the actual timing, not just the
+// eventual result: typing "Malkin", letting its real match load, then
+// immediately typing "Fraga" kept showing "Evgeni Malkin Rookie" under FOUND
+// IN YOUR DATA for the whole 180ms debounce window plus however long the new
+// fetch took, since paletteRecordResults still held the PREVIOUS term's real
+// answer until the new one resolved - a real record result that was
+// genuinely wrong for what was currently typed, confirmed directly via
+// paletteRecordResults still equaling the Malkin result right after
+// dispatching the Fraga input event. invalidatePaletteRecordResults clears
+// it synchronously on every keystroke, before the debounce even starts, so
+// the palette is always either showing the current term's real answer or
+// honestly showing nothing/pending, never a stale one.
+let paletteRecordSearchPending = false;
 let latestPaletteRecordRequestId = 0;
 let paletteRecordDebounceTimer = null;
 
+function invalidatePaletteRecordResults(term) {
+  paletteRecordResults = [];
+  paletteRecordSearchPending = term.trim().length >= 2;
+}
+
 async function fetchPaletteRecordResults(term) {
   const requestId = ++latestPaletteRecordRequestId;
-  if (term.trim().length < 2) {
-    paletteRecordResults = [];
-    renderPaletteResults();
-    return;
+  let results = [];
+  if (term.trim().length >= 2) {
+    try {
+      const r = await fetch('/api/search?q=' + encodeURIComponent(term));
+      if (requestId !== latestPaletteRecordRequestId) return;
+      if (r.ok) {
+        const data = await r.json();
+        if (requestId !== latestPaletteRecordRequestId) return;
+        results = Array.isArray(data.results) ? data.results : [];
+      }
+    } catch (e) {
+      if (requestId !== latestPaletteRecordRequestId) return;
+    }
   }
-  try {
-    const r = await fetch('/api/search?q=' + encodeURIComponent(term));
-    if (requestId !== latestPaletteRecordRequestId) return;
-    if (!r.ok) { paletteRecordResults = []; renderPaletteResults(); return; }
-    const data = await r.json();
-    if (requestId !== latestPaletteRecordRequestId) return;
-    paletteRecordResults = Array.isArray(data.results) ? data.results : [];
-  } catch (e) {
-    if (requestId !== latestPaletteRecordRequestId) return;
-    paletteRecordResults = [];
-  }
+  paletteRecordResults = results;
+  paletteRecordSearchPending = false;
   renderPaletteResults();
 }
 let shortcutsOpen = false;
@@ -2521,8 +2539,12 @@ function renderPaletteResults() {
 
   if (!paletteResultsCache.length) {
     list.innerHTML = '';
+    // A pending record search genuinely hasn't answered yet at this point
+    // (invalidatePaletteRecordResults already cleared any stale answer), so
+    // claiming "nothing matches" here would be asserting a real result this
+    // page doesn't actually have yet, not just showing a stale one.
     empty.textContent = clusters.length
-      ? (term.length >= 2 ? 'Nothing matches, in projects or your data.' : 'No projects match.')
+      ? (paletteRecordSearchPending ? 'Searching your data…' : (term.length >= 2 ? 'Nothing matches, in projects or your data.' : 'No projects match.'))
       : 'Projects still loading...';
     empty.classList.remove('hidden');
     // Nothing to navigate to or open with an empty result set, so showing
@@ -2598,6 +2620,7 @@ function openPalette() {
   paletteLastFocusedEl = document.activeElement;
   document.getElementById('paletteInput').value = '';
   paletteRecordResults = [];
+  paletteRecordSearchPending = false;
   clearTimeout(paletteRecordDebounceTimer);
   document.getElementById('paletteOverlay').classList.remove('hidden');
   document.getElementById('paletteOverlay').classList.add('flex');
@@ -2618,6 +2641,10 @@ function closePalette() {
 
 document.getElementById('paletteInput').addEventListener('input', (e) => {
   paletteSelectedIndex = 0;
+  // Invalidated synchronously, before the debounce below even starts: see
+  // invalidatePaletteRecordResults's own comment for the real stale-result
+  // bug this closes.
+  invalidatePaletteRecordResults(e.target.value);
   renderPaletteResults();
   // Debounced so a fast typist doesn't fire a real network request per
   // keystroke; 180ms is short enough that the record results still feel
