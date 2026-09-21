@@ -53,6 +53,41 @@
     URL.revokeObjectURL(url);
   });
 
+  // Same csvField escape the other 5 hubs already use, copied verbatim: CSV
+  // formula injection (OWASP) is a real risk here too, since a hand-typed
+  // note starting with =, +, -, @, tab, or a carriage return is read as a
+  // live formula by Excel/Sheets when this export is opened there, not as
+  // plain text. A leading single quote is the standard mitigation both
+  // recommend.
+  function csvField(v) {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  // Same real local CSV export the other 5 hubs already have, just never
+  // shipped on this one. Exports the same 6 columns as the on-page
+  // Applications table (renderApplications below), in the same order,
+  // so the file matches what's on screen.
+  document.getElementById('csvBtn').addEventListener('click', () => {
+    if (!rawApplicationsData) return;
+    const apps = rawApplicationsData.applications || [];
+    const header = ['#', 'Role', 'Company', 'Location', 'Pay', 'Applied'].map(csvField).join(',');
+    const lines = apps.map(a => [
+      a.num, a.role, a.company, a.location, a.pay, fmtDate(a.appliedDate) || 'undated'
+    ].map(csvField).join(','));
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'job-search-applications-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
   // div.textContent round-trips escape &amp;/&lt;/&gt; but not quotes, so a
   // hand-typed value with a " or ' could break out of an attribute. Same
   // regex-based escape Sondrik/CGT/Garage all use for exactly that reason.
@@ -313,6 +348,18 @@
     } else {
       backupBtn.disabled = true;
       backupBtn.title = "Can't back up, no data loaded (see errors below)";
+    }
+    // CSV export only needs the applications table itself, unlike the
+    // full-fidelity backup above which bundles whatever loaded across all
+    // four files, so it's gated on applicationsData alone rather than any
+    // of the four.
+    const csvBtn = document.getElementById('csvBtn');
+    if (applicationsData) {
+      csvBtn.disabled = false;
+      csvBtn.title = '';
+    } else {
+      csvBtn.disabled = true;
+      csvBtn.title = "Can't export, applications data failed to load";
     }
 
     if (applicationsData || digestData) {

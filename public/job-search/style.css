@@ -115,6 +115,16 @@ header.page-head .sub {
 }
 .print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
 .print-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* backupBtn and csvBtn get disabled set by app.js while data is still
+   loading or failed to load. Same fix as Sondrik/CSM's own .print-btn:disabled:
+   without this, a disabled button still shows cursor: pointer and full-strength
+   text, indistinguishable from a working one, so a click that silently does
+   nothing reads as broken rather than as the honest "no data yet" state it is. */
+.print-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
 .callout {
   border: 1px solid var(--hairline);
