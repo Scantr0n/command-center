@@ -1591,9 +1591,16 @@ function estimatedReturnFor(s, turnaroundByGrader) {
   const hasRealHistory = graderStats && graderStats.count >= 2;
   const runningLong = days != null && hasRealHistory && days > graderStats.value;
   const publishedDays = !hasRealHistory && s.gradingCompany ? publishedTurnaroundDays(s.gradingCompany, s.serviceLevel) : null;
-  const estReturnDate = (!runningLong && s.submittedDate && hasRealHistory)
+  // Computed regardless of runningLong: buildSubmissionReturnReminders below
+  // needs a real past date to detect and pin an overdue submission's
+  // reminder to today (its own comment documents that as the intent), which
+  // is impossible if runningLong forces this to null before it ever gets a
+  // chance to be in the past. renderSubmissions (the on-page label) is the
+  // one place that still wants this hidden once running long, so it checks
+  // runningLong itself now instead of relying on this being null.
+  const estReturnDate = (s.submittedDate && hasRealHistory)
     ? addDaysIso(s.submittedDate, graderStats.value)
-    : (!runningLong && s.submittedDate && publishedDays != null)
+    : (s.submittedDate && publishedDays != null)
       ? addDaysIso(s.submittedDate, businessDaysToCalendarDays(publishedDays))
       : null;
   const estReturnIsPublished = estReturnDate != null && !hasRealHistory;
@@ -1661,7 +1668,7 @@ function renderSubmissions() {
           <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
           <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
           ${runningLong ? `<span class="badge badge-late" title="${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} is ${graderStats.value} days">past ${escapeHtml(s.gradingCompany)} avg (${graderStats.value}d)</span>` : ''}
-          ${estReturnDate ? (estReturnIsPublished
+          ${(estReturnDate && !runningLong) ? (estReturnIsPublished
             ? `<span class="submission-meta font-mono" title="${escapeHtml(s.gradingCompany)}'s own published estimate is about ${publishedDays} business days for this service level, not a guarantee and not this dataset's own return history yet -- see Grading service tiers reference below">est. back ~${escapeHtml(estReturnDate)} (published est.)</span>`
             : `<span class="submission-meta font-mono" title="Based on ${escapeHtml(s.gradingCompany)}'s own average turnaround across ${graderStats.count} returned submission${graderStats.count === 1 ? '' : 's'} (${graderStats.value} days), not a guarantee from the grader">est. back ~${escapeHtml(estReturnDate)}</span>`
           ) : ''}
