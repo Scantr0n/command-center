@@ -55,10 +55,10 @@
   #graphSvg { aspect-ratio: 1 / 1; }
   .graph-node { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform 0.18s ease; }
   .graph-node:hover { transform: scale(1.12); }
-  .graph-node:hover .node-glow { opacity: 0.95; }
-  .node-glow { opacity: 0.4; transition: opacity 0.18s ease; }
+  .graph-node:hover .node-glow { opacity: 1; }
+  .node-glow { opacity: 0.7; transition: opacity 0.18s ease; }
   .node-glow-active { animation: pulseGlow 2.8s ease-in-out infinite; }
-  @keyframes pulseGlow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+  @keyframes pulseGlow { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
   .graph-orbit-ring { animation: orbitSpin 90s linear infinite; }
   @keyframes orbitSpin { to { transform: rotate(360deg); } }
   .spoke-line { opacity: 0.5; }
@@ -134,14 +134,23 @@
     #categoryFilterRow .tag-chip { flex-shrink: 0; }
   }
 
-  /* Atmosphere: faint radar grid + vignette behind the graph, restrained not gimmicky */
+  /* Atmosphere behind the graph: radar grid + vignette, pushed bolder than
+     the first pass (which read as "no real difference" against the plain
+     void background it replaced) toward the orbital-map reference (ref3) -
+     a real dark-space gradient plus a soft multi-hue wash pulled from the
+     actual category colors on screen, not a single flat tint. */
   #graphView {
     position: relative;
+    background-color: #05060a;
     background-image:
-      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 48px),
-      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 48px),
-      radial-gradient(circle at center, rgba(255,255,255,0.04) 0%, transparent 65%);
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 44px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 44px),
+      radial-gradient(circle at 50% 42%, rgba(61,220,132,0.10) 0%, transparent 32%),
+      radial-gradient(circle at 30% 65%, rgba(139,127,217,0.08) 0%, transparent 30%),
+      radial-gradient(circle at 70% 62%, rgba(219,92,130,0.08) 0%, transparent 30%),
+      radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 68%);
     border-radius: 16px;
+    box-shadow: inset 0 0 90px rgba(0,0,0,0.55);
   }
   .search-input { transition: border-color 0.15s ease, background 0.15s ease; }
   .search-input:focus { border-color: var(--hairlineHover) !important; }
@@ -617,6 +626,29 @@ const CATEGORY_COLOR = {
 
 function categoryColor(cat) { return CATEGORY_COLOR[cat] || CATEGORY_COLOR['Uncategorized']; }
 
+// A real glyph per category, not a fabricated character illustration (no
+// image-generation tool exists in this pipeline, and a hand-drawn "portrait"
+// per project would be a guess about what that project should look like,
+// the same kind of invention this app's whole data model refuses to do
+// elsewhere). This is the honest version of the same idea from ref4
+// (osiris-agent-dungeons.png): each category gets its own recognizable
+// identity instead of every node being an interchangeable plain circle.
+// Centered on (0,0) at roughly an 18x18 box, scaled by the caller.
+const CATEGORY_ICON = {
+  'Ventures & Business': '<path d="M-7,-2 L-7,-6 Q-7,-8 -5,-8 L5,-8 Q7,-8 7,-6 L7,-2 M-9,-2 L9,-2 Q10,-2 10,-1 L10,7 Q10,8 9,8 L-9,8 Q-10,8 -10,7 L-10,-1 Q-10,-2 -9,-2 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><line x1="-10" y1="2.5" x2="10" y2="2.5" stroke="currentColor" stroke-width="1.4"/>',
+  'Trading': '<path d="M-8,6 L-2,-1 L2,3 L8,-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3,-6 L8,-6 L8,-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  'Content': '<circle cx="0" cy="0" r="9" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M-2.5,-4.5 L5,0 L-2.5,4.5 Z" fill="currentColor"/>',
+  'Reselling': '<path d="M-1,-8 L7,-8 Q8,-8 8,-7 L8,1 Q8,1.8 7.4,2.4 L-1.4,10.4 Q-2,11 -2.6,10.4 L-9.4,3.6 Q-10,3 -9.4,2.4 L-1,-6.8 Q-1,-8 -1,-8 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="3.6" cy="-4.4" r="1.5" fill="currentColor"/>',
+  'School & Career': '<path d="M-9,-1 L0,-6 L9,-1 L0,4 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M-5,1 L-5,6 Q0,9.5 5,6 L5,1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
+  'Health & Personal': '<path d="M0,7.5 C-8,1.5 -8.5,-4 -3.8,-5.8 C-1.5,-6.7 0,-4.8 0,-3.2 C0,-4.8 1.5,-6.7 3.8,-5.8 C8.5,-4 8,1.5 0,7.5 Z" fill="currentColor" opacity="0.92"/>',
+  'Travel & Logistics': '<path d="M-9,1.5 L9,-5 L5.5,1.5 L9,5 L4,3.5 L-1,7.5 L0,3 L-9,1.5 Z" fill="currentColor" opacity="0.92"/>',
+  'Personal & Infra': '<path d="M-8,0.5 L0,-7 L8,0.5 M-6,-1 L-6,8 L6,8 L6,-1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>',
+  'Uncategorized': '<circle cx="0" cy="0" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2,2.5"/><circle cx="0" cy="0" r="1.6" fill="currentColor"/>'
+};
+function categoryIconSvg(cat) {
+  return CATEGORY_ICON[cat] || CATEGORY_ICON['Uncategorized'];
+}
+
 // Makes a click-to-open-modal element also operable from the keyboard,
 // matching the graph nodes (which already had tabindex/role/Enter-Space).
 function makeCardClickable(el) {
@@ -1030,16 +1062,41 @@ function categorySlug(cat) { return (cat || 'uncategorized').toLowerCase().repla
 function ensureGraphDefs() {
   const defs = document.getElementById('graphDefs');
   if (!defs) return;
-  defs.innerHTML = Object.entries(CATEGORY_COLOR).map(([cat, color]) => {
+  // Pushed brighter/wider than the first tactical-HUD pass: that version's
+  // glow was real but subtle enough that Jack's own read on the result was
+  // "doesn't look any different", so this round leans into the actual
+  // orbital-map reference (ref3) instead of staying restrained, a fill
+  // gradient (solid-ish core fading only to mid-opacity, not to zero) for
+  // real dimensionality instead of a flat single-opacity fill, and a
+  // separate wider halo gradient for the bloom sitting behind it.
+  const gradients = Object.entries(CATEGORY_COLOR).map(([cat, color]) => {
     const slug = categorySlug(cat);
     return `
       <radialGradient id="glow-${slug}">
-        <stop offset="0%" stop-color="${color}" stop-opacity="0.85" />
-        <stop offset="60%" stop-color="${color}" stop-opacity="0.28" />
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.95" />
+        <stop offset="45%" stop-color="${color}" stop-opacity="0.45" />
         <stop offset="100%" stop-color="${color}" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id="fill-${slug}" cx="35%" cy="32%">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.85" />
+        <stop offset="70%" stop-color="${color}" stop-opacity="0.32" />
+        <stop offset="100%" stop-color="${color}" stop-opacity="0.16" />
       </radialGradient>
     `;
   }).join('');
+  // Hub gets its own warm neutral glow/fill so it reads as the one true
+  // center of gravity rather than a plain flat panel-colored disc.
+  const hubGradients = `
+    <radialGradient id="hub-glow">
+      <stop offset="0%" stop-color="var(--ink)" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="var(--ink)" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="hub-fill" cx="38%" cy="30%">
+      <stop offset="0%" stop-color="var(--hairlineHover)" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="var(--panel)" stop-opacity="1" />
+    </radialGradient>
+  `;
+  defs.innerHTML = gradients + hubGradients;
 }
 
 // Real collision check for a relation curve, not a guessed constant: samples
@@ -1266,16 +1323,24 @@ function renderGraph() {
       `;
     }
 
+    // Icon scale/position tuned per radius (22/28/34px, low/mid/top
+    // priority): a fixed scale either crowded the smallest nodes or looked
+    // tiny on the largest, so both grow together with r. Icon sits above
+    // center, label drops below it, real vertical separation instead of
+    // stacking on the same baseline the old text-only node used.
+    const iconScale = (r / 40).toFixed(2);
+    const iconY = ny - r * 0.32;
+
     nodesHtml += `
       <g class="graph-node" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(nodeLabel)}">
         <title>${escapeHtml(nodeLabel)}</title>
-        <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 16}" fill="url(#glow-${categorySlug(c.category)})" />
-        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="var(--void)" stroke="${color}" stroke-width="1.5" ${stale ? 'stroke-dasharray="4,3"' : ''} />
-        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${color}" opacity="0.14" />
+        <circle class="node-glow${c.status === 'active' ? ' node-glow-active' : ''}" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 30}" fill="url(#glow-${categorySlug(c.category)})" />
+        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="url(#fill-${categorySlug(c.category)})" stroke="${color}" stroke-width="1.5" ${stale ? 'stroke-dasharray="4,3"' : ''} />
+        <g transform="translate(${nx.toFixed(1)},${iconY.toFixed(1)}) scale(${iconScale})" opacity="0.9" color="var(--ink)">${categoryIconSvg(c.category)}</g>
         ${statusDotShape(c.status, dx, dy, 4.5, sColor, stale ? 0.45 : 1)}
         ${c.priority === 'top' ? `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 5}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.7" />` : ''}
         <circle class="node-focus-ring" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 8}" fill="none" stroke="var(--ink)" stroke-width="1.5" />
-        <text x="${nx.toFixed(1)}" y="${(ny + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${escapeHtml(truncateLabel(nodeLabelWord(c.name), 9))}</text>
+        <text x="${nx.toFixed(1)}" y="${(ny + r * 0.62).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${escapeHtml(truncateLabel(nodeLabelWord(c.name), 9))}</text>
         ${badgeHtml}
       </g>
     `;
@@ -1299,9 +1364,10 @@ function renderGraph() {
   }).join('');
 
   const hubHtml = `
+    <circle cx="${cx}" cy="${cy}" r="${hubR + 40}" fill="url(#hub-glow)" />
     <circle cx="${cx}" cy="${cy}" r="${hubR + 24}" fill="none" stroke="var(--hairline)" stroke-width="1" stroke-dasharray="1,7" class="graph-orbit-ring" style="transform-origin: ${cx}px ${cy}px" />
     ${bracketHtml}
-    <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="var(--panel)" stroke="var(--hairlineHover)" stroke-width="1.5" class="hub-node" />
+    <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="url(#hub-fill)" stroke="var(--hairlineHover)" stroke-width="1.5" class="hub-node" />
     <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">COMMAND</text>
     <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">CENTER</text>
   `;
