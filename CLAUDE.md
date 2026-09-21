@@ -10,7 +10,9 @@ Jack's unified dashboard — one hub, one cluster per project, radial node-graph
 
 ## Commands
 - `npm start` — run the server
-- `npm run build:css` — rebuild Tailwind output after editing `src/input.css` (run this after any style change, output isn't watched)
+- `npm run build:css` — rebuild Tailwind output after editing `src/input.css`, or after adding/removing any Tailwind class anywhere in `public/**/*.html`/`.js` (run this after any style change, output isn't watched — a class that never gets compiled in silently no-ops with zero console/visual signal, a real bug found twice this way)
+- `npm run validate` — check every hub's real data files (`data/clusters/*.json` plus each hub's own `data/*.json`) against that hub's own field rules; run after hand-editing any of them, before trusting what the dashboard shows
+- `npm run test:sondrik` — Sondrik's own regression tests for its shared date-math (`goals-core.js`, `validate-core.js`); run after touching either file
 
 ## Structure
 - `data/clusters/*.json` — one file per project, the source of truth for cluster status/summary
