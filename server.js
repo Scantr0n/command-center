@@ -52,6 +52,20 @@ app.use(compression());
 // item photos in one request; raised once globally rather than per-route
 // since no other endpoint here accepts a body anywhere near this size.
 app.use(express.json({ limit: '30mb' }));
+// A malformed request body (bad JSON, or one over the 30mb cap) throws inside
+// body-parser before any route's own try/catch runs, so without this handler
+// Express's default error page took over and returned a full server
+// file-path stack trace to the client, breaking the { error: '...' } JSON
+// contract every route below uses and disclosing internals for free.
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Malformed JSON in request body' });
+  }
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request body too large' });
+  }
+  next(err);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
