@@ -56,9 +56,8 @@
   // doesn't just rank it lower. "brand" and "condition" are treated as
   // universal, real buyer filters on every category this store lists in
   // (shoes and electronics alike); "size" and "color" only meaningfully
-  // apply to the "shoes" category (the same category classifier the eBay fee
-  // math already uses), so they're only required there, not on something
-  // like the swing analyzer.
+  // apply to the "shoes" category, so they're only required there, not on
+  // something like the swing analyzer.
   const ITEM_SPECIFIC_LABELS = { brand: 'brand', size: 'size', color: 'color', condition: 'condition' };
   function requiredItemSpecificFields(listing) {
     const fields = ['brand', 'condition'];

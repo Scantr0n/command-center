@@ -59,10 +59,11 @@ const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
 // deliberately left out here rather than treated as a validation error.
 const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
-// eBay category classifier: only "shoes" is modeled (that category's 14.9%
-// final value fee vs. the 13.6% standard rate other categories get, per
-// eBay's own published 2026 seller fee schedule), everything else stays null
-// for the standard rate rather than trying to model every category eBay has.
+// eBay category classifier: only "shoes" is modeled, since Clothing, Shoes &
+// Accessories charges the same 13.6% final value fee as most other
+// categories (no special rate to model there). What "shoes" actually drives
+// is which itemSpecifics fields get checked below (size and color only
+// matter for something you wear); everything else stays null.
 const LISTING_CATEGORIES = ['shoes'];
 const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];

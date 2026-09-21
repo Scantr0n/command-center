@@ -145,17 +145,17 @@ function computeExpenseAmount(e) {
 function estimateNetPayout(platform, price, category) {
   if (price == null) return null;
   switch (platform) {
-    // eBay's Clothing, Shoes & Accessories category charges shoes/boots a
-    // 14.9% final value fee, not the 13.6% standard rate most categories get
-    // (eBay's own published 2026 seller fee schedule). Both real live boots
-    // listings are logged with category:"shoes" in listings.json so this
-    // applies automatically wherever a real listing drives the math; a bare
-    // price with no category (the "price a new item" what-if calculators)
-    // defaults to the standard rate unless that category is opted in there.
-    case 'ebay': {
-      const feeRate = category === 'shoes' ? 0.149 : 0.136;
-      return price - (price * feeRate + (price > 10 ? 0.40 : 0.30));
-    }
+    // Clothing, Shoes & Accessories is one of eBay's standard-rate
+    // categories, 13.6% same as most others, not a higher rate of its own
+    // (eBay's published seller fee schedule; the only shoes-specific
+    // exception is a *lower* 8% rate for qualifying athletic shoes sold at
+    // $150+, which doesn't apply to either real boots listing here). An
+    // earlier version of this charged the "shoes" category 14.9%, mixing up
+    // that flat rate with the effective rate a small sale gets once the
+    // fixed per-order fee is folded in (13.6% + $0.40 on a $30 sale really
+    // is ~14.9% of the total), which isn't a category-specific number.
+    case 'ebay':
+      return price - (price * 0.136 + (price > 10 ? 0.40 : 0.30));
     case 'vinted': return price;
     case 'poshmark': return price < 15 ? price - 2.95 : price * 0.80;
     case 'depop': return price - (price * 0.033 + 0.45);
@@ -1507,7 +1507,6 @@ function initTableScrollShadows() {
 // payout table above, just driven by a typed price instead of listings.json.
 const CALC_FEE_DESCRIPTIONS = {
   ebay: '13.6% final value fee + $0.30 ($0.40 over $10) per-order fee',
-  ebayShoes: '14.9% final value fee (Clothing, Shoes & Accessories category) + $0.30 ($0.40 over $10) per-order fee',
   vinted: 'No seller fees',
   poshmark: 'Flat $2.95 under $15, otherwise 20% commission',
   depop: '3.3% + $0.45 payment processing, no commission'
@@ -1522,7 +1521,6 @@ const CALC_FEE_DESCRIPTIONS = {
 const DEPOP_BOOST_FEE_PCT = 0.12;
 let calcPlatforms = new Set(PAYOUT_PLATFORMS);
 let includeDepopBoost = false;
-let calcEbayShoesCategory = false;
 
 // Reads a positive-or-zero numeric input, treating blank as "not provided"
 // (null) rather than 0, since a real $0 cost and "haven't entered one yet"
@@ -1566,7 +1564,6 @@ function renderCalc() {
   const hasShipping = shipping != null && shipping !== undefined;
   const showProfit = hasCost || hasShipping;
   document.getElementById('calcDepopBoostWrap').hidden = !calcPlatforms.has('depop');
-  document.getElementById('calcShoesCategoryWrap').hidden = !calcPlatforms.has('ebay');
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;
@@ -1581,13 +1578,11 @@ function renderCalc() {
   profitHead.hidden = !showProfit;
 
   const applyBoost = includeDepopBoost && calcPlatforms.has('depop');
-  const applyShoes = calcEbayShoesCategory && calcPlatforms.has('ebay');
 
   const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => {
-    const category = p === 'ebay' && applyShoes ? 'shoes' : undefined;
     const net = p === 'depop' && applyBoost
       ? estimateNetPayout(p, price) - price * DEPOP_BOOST_FEE_PCT
-      : estimateNetPayout(p, price, category);
+      : estimateNetPayout(p, price);
     return { p, net };
   });
   const bestNet = rows.length > 1 ? Math.max(...rows.map(r => r.net)) : null;
@@ -1598,8 +1593,6 @@ function renderCalc() {
     const profit = showProfit ? r.net - (hasCost ? cost : 0) - (hasShipping ? shipping : 0) : null;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
-      : r.p === 'ebay' && applyShoes
-      ? CALC_FEE_DESCRIPTIONS.ebayShoes
       : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
@@ -1618,10 +1611,6 @@ function wireCalc() {
   document.getElementById('calcShippingInput').addEventListener('input', renderCalc);
   document.getElementById('calcDepopBoostInput').addEventListener('change', e => {
     includeDepopBoost = e.target.checked;
-    renderCalc();
-  });
-  document.getElementById('calcShoesCategoryInput').addEventListener('change', e => {
-    calcEbayShoesCategory = e.target.checked;
     renderCalc();
   });
   const container = document.getElementById('calcPlatformToggle');
@@ -1646,7 +1635,6 @@ function wireCalc() {
 // simple lookup once fees are a function of the unknown price.
 let beCalcPlatforms = new Set(PAYOUT_PLATFORMS);
 let beIncludeDepopBoost = false;
-let beEbayShoesCategory = false;
 
 // eBay's per-order fee is a step function of price ($0.30 at/under $10, else
 // $0.40), so solve assuming the lower step first; the lower step is always
@@ -1657,14 +1645,10 @@ let beEbayShoesCategory = false;
 // step first, as an earlier version of this did, missed that a price just
 // under $10 can clear the same target net as a price just over $10 (the fee
 // jump absorbs the gap), and returned the more expensive one every time.
-// category "shoes" uses the 14.9% Clothing, Shoes & Accessories rate instead
-// of the 13.6% standard rate, same distinction estimateNetPayout() draws for
-// real listings.
-function ebayMinPriceForNet(targetNet, category) {
-  const feeRate = category === 'shoes' ? 0.149 : 0.136;
-  const lowStep = (targetNet + 0.30) / (1 - feeRate);
+function ebayMinPriceForNet(targetNet) {
+  const lowStep = (targetNet + 0.30) / (1 - 0.136);
   if (lowStep <= 10) return lowStep;
-  return (targetNet + 0.40) / (1 - feeRate);
+  return (targetNet + 0.40) / (1 - 0.136);
 }
 
 function depopMinPriceForNet(targetNet, applyBoost) {
@@ -1682,9 +1666,9 @@ function poshmarkMinPriceForNet(targetNet) {
   return targetNet / 0.80;
 }
 
-function minListingPriceForNet(platform, targetNet, applyBoost, category) {
+function minListingPriceForNet(platform, targetNet, applyBoost) {
   switch (platform) {
-    case 'ebay': return ebayMinPriceForNet(targetNet, category);
+    case 'ebay': return ebayMinPriceForNet(targetNet);
     case 'vinted': return targetNet;
     case 'poshmark': return poshmarkMinPriceForNet(targetNet);
     case 'depop': return depopMinPriceForNet(targetNet, applyBoost);
@@ -1718,7 +1702,6 @@ function renderBreakEven() {
   profitError.textContent = profitInvalid ? 'Enter a valid target profit of $0 or more, ignoring it for now.' : '';
 
   document.getElementById('beDepopBoostWrap').hidden = !beCalcPlatforms.has('depop');
-  document.getElementById('beShoesCategoryWrap').hidden = !beCalcPlatforms.has('ebay');
 
   const hasCost = cost != null && cost !== undefined && cost > 0;
   const hasAnyInput = hasCost || (shipping != null && shipping !== undefined && shipping > 0) ||
@@ -1737,10 +1720,9 @@ function renderBreakEven() {
 
   const targetNet = (cost || 0) + (shipping || 0) + (profit || 0);
   const applyBoost = beIncludeDepopBoost && beCalcPlatforms.has('depop');
-  const applyShoes = beEbayShoesCategory && beCalcPlatforms.has('ebay');
 
   const rows = PAYOUT_PLATFORMS.filter(p => beCalcPlatforms.has(p)).map(p => {
-    const minPrice = minListingPriceForNet(p, targetNet, applyBoost, p === 'ebay' && applyShoes ? 'shoes' : undefined);
+    const minPrice = minListingPriceForNet(p, targetNet, applyBoost);
     return { p, minPrice };
   });
   const lowest = rows.length > 1 ? Math.min(...rows.map(r => r.minPrice)) : null;
@@ -1750,8 +1732,6 @@ function renderBreakEven() {
     const isBest = lowest != null && !tiedForLowest && r.minPrice === lowest;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
-      : r.p === 'ebay' && applyShoes
-      ? CALC_FEE_DESCRIPTIONS.ebayShoes
       : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
@@ -1769,10 +1749,6 @@ function wireBreakEven() {
   document.getElementById('beProfitInput').addEventListener('input', renderBreakEven);
   document.getElementById('beDepopBoostInput').addEventListener('change', e => {
     beIncludeDepopBoost = e.target.checked;
-    renderBreakEven();
-  });
-  document.getElementById('beShoesCategoryInput').addEventListener('change', e => {
-    beEbayShoesCategory = e.target.checked;
     renderBreakEven();
   });
   const container = document.getElementById('bePlatformToggle');
