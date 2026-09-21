@@ -660,6 +660,15 @@
       </div>
       <div id="paletteResults" role="listbox" aria-label="Projects and matching records" class="flex-1 overflow-y-auto py-1.5"></div>
       <div id="paletteEmpty" class="hidden px-4 py-6 text-xs text-center" style="color: var(--faint)"></div>
+      <!-- aria-activedescendant on paletteInput (set in renderPaletteResults)
+           already tells a screen reader which single option is highlighted,
+           but not how many results exist or that a new keystroke changed
+           that count at all - real, confirmed ARIA authoring-practice
+           guidance recommends exactly this, a separate visually-hidden
+           aria-live="polite" region carrying just the result count, same
+           idea as #filterStatus above for the header search box, kept as
+           its own element since this is a different modal context. -->
+      <div id="paletteResultsStatus" class="sr-only" role="status" aria-live="polite"></div>
       <!-- Real pattern confirmed against Raycast's own launcher (raycast.com,
            checked live): a persistent hint bar naming the selected item's
            primary action and its shortcut, not just an ESC hint in the
@@ -2620,6 +2629,7 @@ function renderPaletteResults() {
   const list = document.getElementById('paletteResults');
   const empty = document.getElementById('paletteEmpty');
   const footer = document.getElementById('paletteFooter');
+  const resultsStatus = document.getElementById('paletteResultsStatus');
 
   if (!paletteResultsCache.length) {
     list.innerHTML = '';
@@ -2636,10 +2646,28 @@ function renderPaletteResults() {
     // right now, same care as the Data Quality pill wording fix earlier
     // tonight (never imply a capability that isn't actually there).
     footer.classList.add('hidden');
+    // #paletteEmpty itself carries no live-region semantics of its own, so
+    // without this a screen reader user gets zero feedback in this state -
+    // no aria-activedescendant target exists to announce either, since
+    // there's genuinely nothing to select. Same real text already shown on
+    // screen, not a separate message.
+    resultsStatus.textContent = empty.textContent;
     return;
   }
   empty.classList.add('hidden');
   footer.classList.remove('hidden');
+  // Real result-count announcement per ARIA combobox authoring-practice
+  // guidance: aria-activedescendant (set below) only ever announces the one
+  // currently-highlighted option, never how many results exist or that a
+  // keystroke just changed that count, which a sighted user gets for free
+  // just by looking at the list.
+  {
+    const projectCount = projectMatches.length;
+    const recordCount = recordMatches.length;
+    resultsStatus.textContent = recordCount
+      ? `${projectCount} project${projectCount === 1 ? '' : 's'}, ${recordCount} in your data`
+      : `${projectCount} project${projectCount === 1 ? '' : 's'}${term ? ' match' + (projectCount === 1 ? 'es' : '') : ''}`;
+  }
   paletteSelectedIndex = Math.max(0, Math.min(paletteSelectedIndex, paletteResultsCache.length - 1));
 
   // The divider only appears once, right where record results actually start,
