@@ -1283,6 +1283,40 @@
       });
     }
 
+    // The Goals card already computes both of these (see renderGoals: the
+    // "TARGET DATE PASSED" pace line and the BEHIND PACE tier from
+    // computeGoalPaceStatus), but only ever showed them to someone who
+    // scrolled down to that card. Same consolidation this function already
+    // does for the stale-check and missed-checkin signals above, applied to
+    // the one real goal now on record. Skips an already-met goal entirely,
+    // "reached its target late" isn't an open action.
+    goals.forEach(g => {
+      const current = currentMetricValue(g.metric, downloadsData, leadsData);
+      const currentCount = current ? current.count : 0;
+      const pct = computeGoalProgressPct(g.target, currentCount);
+      const achieved = g.target > 0 && currentCount >= g.target;
+      if (achieved) return;
+
+      if (g.targetDate && isValidDateStr(g.targetDate) && daysBetween(todayIso(), g.targetDate) < 0) {
+        steps.push({
+          urgent: true,
+          text: '"' + g.label + '" target date has passed (' + fmtDate(g.targetDate) + '), ' +
+            currentCount + ' of ' + g.target + ' reached, revise the target or the date.',
+          href: '#goalsSection'
+        });
+      } else if (current) {
+        const paceStatus = computeGoalPaceStatus(g.setDate, g.targetDate, pct, todayIso());
+        if (paceStatus && paceStatus.tier === 'behind') {
+          steps.push({
+            urgent: false,
+            text: '"' + g.label + '" is behind pace, ' + pct + '% reached vs an expected ~' +
+              paceStatus.expectedPct + '% by now.',
+            href: '#goalsSection'
+          });
+        }
+      }
+    });
+
     const duplicateLeadGroups = SondrikValidateCore.findDuplicateLeads(leads);
     if (duplicateLeadGroups.length > 0) {
       const dupCount = duplicateLeadGroups.reduce((n, g) => n + g.length, 0);
