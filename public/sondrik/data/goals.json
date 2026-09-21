@@ -1,3 +1,13 @@
 {
-  "goals": []
+  "goals": [
+    {
+      "id": "launch-push-eoy-2026",
+      "label": "v0.3.7 DMG downloads by end of year",
+      "metric": "downloads",
+      "target": 150,
+      "targetDate": "2026-12-31",
+      "setDate": "2026-09-20",
+      "note": "Jack's real ask (2026-09-20) was launching for real by end of year, not a specific download number. The schema here only supports a downloads/leads target, so this converts that into a concrete number: current pace has slowed to ~0.54/day (8 to 15 over 13 days), which would only reach ~60 by Dec 31 on its own. 150 assumes a real push (the r/IMadeThis lead, Product Hunt, more channels) actually happens between now and then, not pure extrapolation. This number is a placeholder Jack can change any time, the real commitment is the Dec 31 date."
+    }
+  ]
 }

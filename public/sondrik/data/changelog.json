@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-21T02:49:49.065Z",
+  "generatedAt": "2026-09-21T03:05:44.954Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "6e19b46",
+      "fullHash": "6e19b4638ef59961b5ad81e201a43940d30e601f",
+      "date": "2026-09-20",
+      "author": "Jack Scanlon",
+      "subject": "Sondrik: log a fresh v0.3.7 DMG download count, 8 -> 15 over 13 days",
+      "historyReset": false,
+      "files": [
+        "downloads.json"
+      ]
+    },
     {
       "hash": "2e2f55d",
       "fullHash": "2e2f55dd1be165c5e891e792584160058439ea0d",
