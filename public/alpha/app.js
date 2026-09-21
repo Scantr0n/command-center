@@ -1044,53 +1044,13 @@ function renderPositionSizing(data, clientDrawdownHistory, clientRobustnessHisto
     robustnessMeter(ps.robustnessScore, robustnessSpark);
 }
 
-function fmtDollar(n) {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
-  const sign = n < 0 ? '-' : '';
-  return sign + '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtPct(n) {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
-  return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
-}
-
-// Same "never show a fabricated/misleading number" guard as fmtDollar/fmtPct
-// above, applied to share quantity: mapPositions in server.js always sends a
-// real number, but a missing/malformed qty from a future feed shape should
-// fall back to '-' like every other cell in this row, not Math.abs(undefined)'s
-// literal "NaN" text next to real dollar figures.
-function fmtQty(n) {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
-  return String(Math.abs(n));
-}
-
-// Total invested and % of equity deployed are never fetched as their own
-// field: they're derived client-side from live.account.equity and the real
-// live.positions[].marketValue figures server.js already sends, the same
-// "only ever computed from fields the daemon actually returned" rule
-// computeDrawdowns follows server-side. account is only ever populated once
-// the live proxy is connected (see the schema-help table), so positions.length
-// being 0 at that point is a real "fully in cash" reading, not an unknown,
-// and totalInvested is safe to report as exactly $0 rather than "-".
-function computeExposure(acct, positions) {
-  if (!acct) return { totalInvested: null, pctDeployed: null };
-  const marketValues = positions.map(p => p.marketValue);
-  // Same all-or-nothing rule renderPositions' own totals row uses just below
-  // (see its comment): filtering out the bad values and summing the rest
-  // used to silently treat one position's missing marketValue as $0 instead
-  // of admitting the total itself is unknown, so this panel and the
-  // positions table right beneath it could report two different totals for
-  // the same data.
-  if (positions.length && !marketValues.every(v => typeof v === 'number' && Number.isFinite(v))) {
-    return { totalInvested: null, pctDeployed: null };
-  }
-  const totalInvested = marketValues.reduce((sum, v) => sum + v, 0);
-  const pctDeployed = (typeof acct.equity === 'number' && Number.isFinite(acct.equity) && acct.equity > 0)
-    ? (totalInvested / acct.equity) * 100
-    : null;
-  return { totalInvested, pctDeployed };
-}
+// Account/position money math (fmtDollar, fmtPct, fmtQty, computeExposure,
+// computePositionsTotals) lives in account-core.js, loaded before this file
+// (see index.html), so it can be unit-tested outside the browser
+// (account-core.test.js) instead of only ever running live once a real
+// position feed exists. See that file's own header comment for the real bug
+// this already caused with no test coverage.
+const { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals } = AlphaAccountCore;
 
 // server.js's /equity-history proxy (see mapEquityCurve's own comment there)
 // forwards the raw real equity readings its drawdown calculation already
@@ -1241,23 +1201,12 @@ function renderPositions(data) {
   }).join('');
 
   // Totals row: a standard trading-table footer, the portfolio-level number
-  // a per-row scan doesn't give at a glance. Summed only from the same real
-  // per-row marketValue/unrealizedPl fields already rendered above, and only
-  // when every row has a real number to sum, never partially totaled against
-  // a row silently treated as zero. The aggregate P&L% is computed against
-  // total cost basis (mktValue - pl per row, the real amount actually paid),
-  // not averaged from the per-row percentages, since averaging percentages
-  // across differently-sized positions misrepresents overall performance.
-  const mvValues = positions.map(p => p.marketValue);
-  const plValues = positions.map(p => p.unrealizedPl);
-  const allNumeric = arr => arr.every(v => typeof v === 'number' && Number.isFinite(v));
-  const totalsKnown = allNumeric(mvValues) && allNumeric(plValues);
+  // a per-row scan doesn't give at a glance. Math itself (all-or-nothing
+  // summation, cost-basis-weighted P&L%) lives in computePositionsTotals in
+  // account-core.js now, see the destructure near the top of this file.
+  const { totalsKnown, totalMv, totalPl, totalPlPct } = computePositionsTotals(positions);
   let totalsRow = '';
   if (totalsKnown) {
-    const totalMv = mvValues.reduce((sum, v) => sum + v, 0);
-    const totalPl = plValues.reduce((sum, v) => sum + v, 0);
-    const totalCostBasis = totalMv - totalPl;
-    const totalPlPct = totalCostBasis > 0 ? (totalPl / totalCostBasis) * 100 : null;
     const totalGoodClass = totalPl >= 0 ? 'pl-good' : 'pl-bad';
     totalsRow = `
       <tr class="pos-totals-row">
