@@ -156,6 +156,36 @@ header.page-head .sub {
 .callout-warn { border-color: rgba(224,160,48,0.32); background: rgba(224,160,48,0.06); margin-bottom: 14px; }
 .callout-warn strong { color: #E0A030; }
 
+/* Same attention-bar convention as CGT's and CSM's own renderAttentionBar:
+   click-to-scroll pills surfacing every real "needs a look" flag that would
+   otherwise only be found by scrolling past it further down the page. */
+.attention-bar[hidden] { display: none; }
+.attention-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.attention-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  color: var(--sub);
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+.attention-pill:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.attention-pill strong { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--ink); }
+.attention-pill.attention-warn { border-color: rgba(224,160,48,0.3); background: rgba(224,160,48,0.06); }
+.attention-pill.attention-warn strong { color: #E0A030; }
+.attention-pill.attention-urgent { border-color: rgba(229,72,77,0.35); background: rgba(229,72,77,0.08); }
+.attention-pill.attention-urgent strong { color: #E5484D; }
+
 .schema-help {
   border: 1px solid var(--hairline);
   border-radius: 10px;
@@ -1383,7 +1413,7 @@ textarea.np-input { resize: vertical; }
      on paper. */
   .section-details > summary.section-title::before { display: none; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .jump-nav-fab, #calcSection, #photoAuditSection, #paceSection, #poshmarkShareSection, .view-toggle-group {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .jump-nav-fab, #calcSection, #photoAuditSection, #paceSection, #poshmarkShareSection, .view-toggle-group, .attention-bar {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }

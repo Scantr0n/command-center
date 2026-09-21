@@ -17,6 +17,7 @@ let rawExpensesData = null;
 let rawDisputesData = null;
 let rawSuppliesData = null;
 let rawAcquisitionsData = null;
+let garageChangelogDriftStatus = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
@@ -290,6 +291,8 @@ async function loadChangelog() {
     renderChangelog({ entries: [] }, driftStatus);
     console.error("Couldn't load changelog.json: " + changelogResult.reason.message);
   }
+  garageChangelogDriftStatus = driftStatus;
+  renderAttentionBar();
 }
 
 function renderChangelog(data, driftStatus) {
@@ -502,6 +505,7 @@ async function loadData() {
   }
 
   initTableScrollShadows();
+  renderAttentionBar();
 }
 
 // Purely a "you are here" pointer into the static seasonal reference table,
@@ -1006,6 +1010,78 @@ function renderDuplicates(listings) {
   `).join('')).join('');
   list.querySelectorAll('[data-listing-id]').forEach(row => {
     row.addEventListener('click', () => openModal(row.dataset.listingId));
+  });
+}
+
+// Same attention-bar convention as CGT's and CSM's own renderAttentionBar:
+// every one of these panels (needs-backfill, needs-delisting, duplicates,
+// relist reminders, dispute deadlines, changelog drift) already hides
+// itself when nothing's flagged, but each only becomes visible by scrolling
+// past every section above it, so a real flag near the bottom of a page
+// this long could go unnoticed for weeks. This click-to-scroll summary
+// surfaces all of them up top instead, hidden entirely (not an empty bar)
+// when every one of them has nothing flagged. Called once loadData's main
+// fetch settles and again once loadChangelog's drift check settles, since
+// the two run concurrently and either can finish first; both calls are
+// idempotent, just re-render the same bar from current module state.
+function renderAttentionBar() {
+  const bar = document.getElementById('attentionBar');
+  if (!bar) return;
+  const today = todayDateStr();
+  const dataQualityCount = buildDataQualityFlags(listings, acquisitionsLog).length;
+  const atRiskCount = buildAtRiskListings(listings).length;
+  const duplicateCount = window.GarageValidateCore ? GarageValidateCore.findDuplicateListings(listings).length : 0;
+  const relistDueCount = buildRelistReminders(listings).filter(r => r.date <= today).length;
+  const disputeDueCount = buildDisputeReminders(disputesLog).filter(r => r.date <= today).length;
+
+  const items = [];
+  // A drifted changelog is misinformation already live on the page (a real
+  // commit history that no longer matches this repo's git log), an urgent
+  // tone rather than the routine "needs backfill" warn tone below.
+  if (garageChangelogDriftStatus && garageChangelogDriftStatus.drifted) {
+    items.push({ n: 1, tone: 'urgent', target: 'changelogFeed', label: 'data changelog out of sync with real git history' });
+  }
+  if (disputeDueCount) {
+    items.push({
+      n: disputeDueCount,
+      tone: 'urgent',
+      target: 'disputeGuideSection',
+      label: disputeDueCount === 1 ? 'dispute response is due or overdue' : 'dispute responses are due or overdue'
+    });
+  }
+  if (atRiskCount) {
+    items.push({
+      n: atRiskCount,
+      tone: 'warn',
+      target: 'delistSection',
+      label: atRiskCount === 1 ? 'listing needs delisting elsewhere (sold on one platform, still live on another)' : 'listings need delisting elsewhere (sold on one platform, still live on another)'
+    });
+  }
+  if (dataQualityCount) {
+    items.push({ n: dataQualityCount, tone: 'warn', target: 'dataQualitySection', label: dataQualityCount === 1 ? 'listing needs backfill' : 'listings need backfill' });
+  }
+  if (duplicateCount) {
+    items.push({ n: duplicateCount, tone: 'warn', target: 'duplicatesSection', label: duplicateCount === 1 ? 'possible duplicate listing' : 'possible duplicate listings' });
+  }
+  if (relistDueCount) {
+    items.push({ n: relistDueCount, tone: 'warn', target: 'relistSection', label: relistDueCount === 1 ? 'relist reminder is due' : 'relist reminders are due' });
+  }
+
+  if (!items.length) {
+    bar.hidden = true;
+    bar.innerHTML = '';
+    return;
+  }
+  bar.hidden = false;
+  bar.innerHTML = items.map(item =>
+    '<button type="button" class="attention-pill attention-' + item.tone + '" data-target="' + escapeHtml(item.target) + '">' +
+    '<strong>' + item.n + '</strong> ' + escapeHtml(item.label) + '</button>'
+  ).join('');
+  bar.querySelectorAll('[data-target]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = document.getElementById(btn.getAttribute('data-target'));
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   });
 }
 

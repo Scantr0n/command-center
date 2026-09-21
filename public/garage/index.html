@@ -43,6 +43,8 @@
     wire live data in on top of this structure.
   </div>
 
+  <div class="attention-bar" id="attentionBar" role="status" aria-live="polite" hidden></div>
+
   <details class="schema-help">
     <summary>How to log a real update (until a backend is wired in)</summary>
     <div class="schema-help-body">
@@ -1028,7 +1030,7 @@
     </details>
   </section>
 
-  <section>
+  <section id="relistSection">
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Relist reminders</h2>
       <button type="button" id="relistIcsBtn" class="print-btn font-mono" aria-live="polite">Add to calendar (.ics)</button>
