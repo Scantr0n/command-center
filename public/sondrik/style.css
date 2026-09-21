@@ -595,13 +595,17 @@ header.page-head .sub {
   overflow-wrap: anywhere;
 }
 
-section { margin-bottom: 36px; }
+/* Spacing bumped from 36px: Jack's direct comparison was Granola/Spotify/
+   Amazon, all of which give real content room to breathe rather than
+   packing sections tight. Real vertical rhythm reads as intentional
+   design, not just "more margin". */
+section { margin-bottom: 52px; }
 
 /* Stat tile */
 .stat-tile {
   border: 1px solid var(--hairline);
-  border-radius: 12px;
-  padding: 22px 24px;
+  border-radius: 14px;
+  padding: 26px 28px;
   background: var(--panel);
   display: flex;
   flex-wrap: wrap;
@@ -824,7 +828,7 @@ section { margin-bottom: 36px; }
   background: var(--panel);
 }
 .timeline-item {
-  padding: 14px 18px;
+  padding: 18px 22px;
   border-bottom: 1px solid var(--hairline);
 }
 .timeline-item:last-child { border-bottom: none; }
@@ -852,8 +856,10 @@ section { margin-bottom: 36px; }
 }
 .timeline-date-unknown { font-style: italic; }
 .timeline-title {
-  font-size: 0.88rem;
+  font-size: 0.98rem;
+  font-weight: 600;
   color: var(--ink);
+  margin-top: 2px;
 }
 .timeline-detail {
   font-size: 0.78rem;
@@ -886,8 +892,8 @@ section { margin-bottom: 36px; }
 /* Release card */
 .release-card {
   border: 1px solid var(--hairline);
-  border-radius: 12px;
-  padding: 18px 20px;
+  border-radius: 14px;
+  padding: 24px 26px;
   background: var(--panel);
   display: flex;
   flex-wrap: wrap;
@@ -896,8 +902,9 @@ section { margin-bottom: 36px; }
 }
 .release-version {
   font-family: 'Manrope', sans-serif;
-  font-weight: 700;
-  font-size: 1.05rem;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: -0.01em;
 }
 .release-date {
   font-family: 'JetBrains Mono', monospace;
@@ -1007,24 +1014,28 @@ section { margin-bottom: 36px; }
 /* Channels */
 .channel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
 }
 .channel-card {
   border: 1px solid var(--hairline);
-  border-radius: 12px;
-  padding: 16px 18px;
+  border-radius: 14px;
+  padding: 20px 22px;
   background: var(--panel);
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
+.channel-card:hover { border-color: var(--hairlineHover); transform: translateY(-1px); }
 .channel-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .channel-name {
-  font-size: 0.85rem;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
   color: var(--ink);
 }
 .channel-pill {
@@ -1060,8 +1071,8 @@ section { margin-bottom: 36px; }
 /* Goal (target vs actual) */
 .goal-card {
   border: 1px solid var(--hairline);
-  border-radius: 12px;
-  padding: 18px 20px;
+  border-radius: 14px;
+  padding: 24px 26px;
   background: var(--panel);
 }
 .goal-head {
@@ -1070,12 +1081,13 @@ section { margin-bottom: 36px; }
   justify-content: space-between;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .goal-label {
   font-family: 'Manrope', sans-serif;
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
 }
 .goal-set-date {
   font-size: 0.68rem;
@@ -1150,8 +1162,8 @@ section { margin-bottom: 36px; }
 /* Lead / engagement queue */
 .lead-card {
   border: 1px solid var(--hairline);
-  border-radius: 12px;
-  padding: 18px 20px;
+  border-radius: 14px;
+  padding: 22px 24px;
   background: var(--panel);
 }
 .lead-head {
@@ -1177,9 +1189,10 @@ section { margin-bottom: 36px; }
   padding: 2px 8px;
 }
 .lead-summary {
-  font-size: 0.88rem;
+  font-size: 1rem;
+  font-weight: 500;
   line-height: 1.5;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .lead-status-row {
   display: flex;
