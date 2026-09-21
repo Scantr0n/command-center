@@ -108,10 +108,23 @@
     const closeMin = isEarlyClose ? 13 * 60 : 16 * 60;
     const isOpen = tradingDay && minutesNow >= openMin && minutesNow < closeMin;
 
+    // The pill's own detail already spells out the exact close/open clock
+    // time, but reading "closes 4:00 PM ET" still costs a reader their own
+    // mental subtraction against whatever time it is right now. Both branches
+    // below stay same-calendar-day arithmetic on minutesNow (already a
+    // timezone-correct ET wall-clock minute from nowInET, not a manual UTC
+    // offset), so this never has to reason about a DST transition landing
+    // between now and the target: NYSE hours never span one. A countdown to
+    // an open more than a day out is deliberately left alone, same "don't
+    // model what isn't cheaply exact" restraint nextTradingDayFrom already
+    // applies to weekday math, since simulating cross-day ET wall-clock
+    // arithmetic here would risk exactly the kind of one-off DST bug this
+    // file's own header comment warns a page like this can't afford.
     if (isOpen) {
+      const closeCountdown = formatDuration((closeMin - minutesNow) * 60000);
       return {
         isOpen: true,
-        label: 'Market open',
+        label: 'Market open' + (closeCountdown ? ' · closes in ' + closeCountdown : ''),
         detail: 'Closes ' + (isEarlyClose ? '1:00 PM ET (early close)' : '4:00 PM ET') + ' · regular NYSE session'
       };
     }
@@ -119,13 +132,20 @@
     const next = (tradingDay && minutesNow < openMin) ? { key: dateKey, weekday } : nextTradingDayFrom(dateKey, false);
     const reason = isHoliday ? 'holiday' : isWeekend ? 'weekend' : null;
     let detail = 'Regular NYSE session, next open unknown';
+    let openCountdown = null;
     if (next) {
-      const dateLabel = next.key === dateKey
+      const opensToday = next.key === dateKey;
+      const dateLabel = opensToday
         ? 'today'
         : new Date(next.key + 'T00:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
       detail = 'Opens ' + dateLabel + ' 9:30 AM ET · regular NYSE session';
+      if (opensToday) openCountdown = formatDuration((openMin - minutesNow) * 60000);
     }
-    return { isOpen: false, label: 'Market closed' + (reason ? ' (' + reason + ')' : ''), detail };
+    return {
+      isOpen: false,
+      label: 'Market closed' + (reason ? ' (' + reason + ')' : '') + (openCountdown ? ' · opens in ' + openCountdown : ''),
+      detail
+    };
   }
 
   // `now` defaults to Date.now(); a test passes a fixed timestamp so the

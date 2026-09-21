@@ -39,19 +39,37 @@ function etInstant(dateKey, hour, minute) {
 test('computeMarketStatus: open during a regular Tuesday session', () => {
   const status = computeMarketStatus(etInstant('2026-09-15', 10, 0));
   assert.equal(status.isOpen, true);
-  assert.equal(status.label, 'Market open');
+  assert.equal(status.label, 'Market open · closes in 6h');
   assert.match(status.detail, /4:00 PM ET/);
 });
 
 test('computeMarketStatus: closed before the open and after the close on a trading day', () => {
   const before = computeMarketStatus(etInstant('2026-09-15', 8, 0));
   assert.equal(before.isOpen, false);
-  assert.equal(before.label, 'Market closed');
+  assert.equal(before.label, 'Market closed · opens in 1h 30m');
   assert.match(before.detail, /Opens today 9:30 AM ET/);
 
   const after = computeMarketStatus(etInstant('2026-09-15', 17, 0));
   assert.equal(after.isOpen, false);
+  // Next real open is tomorrow, not later today, so no same-day countdown
+  // to append (see computeMarketStatus's own comment on why a cross-day
+  // countdown is deliberately left unmodeled).
+  assert.equal(after.label, 'Market closed');
   assert.match(after.detail, /Opens .* 9:30 AM ET/);
+});
+
+test('computeMarketStatus: close countdown crosses the early-close boundary correctly', () => {
+  // Day after Thanksgiving 2026, 1pm ET early close: 30 minutes out.
+  const status = computeMarketStatus(etInstant('2026-11-27', 12, 30));
+  assert.equal(status.isOpen, true);
+  assert.equal(status.label, 'Market open · closes in 30m');
+});
+
+test('computeMarketStatus: weekend/holiday closures never get a same-day open countdown', () => {
+  const weekend = computeMarketStatus(etInstant('2026-09-19', 12, 0));
+  assert.equal(weekend.label, 'Market closed (weekend)');
+  const holiday = computeMarketStatus(etInstant('2026-09-07', 12, 0));
+  assert.equal(holiday.label, 'Market closed (holiday)');
 });
 
 test('computeMarketStatus: closed on a weekend, names the reason', () => {
