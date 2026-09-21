@@ -3,7 +3,7 @@ const express = require('express');
 const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 
 // execFileSync blocks Node's single event loop thread until the process
 // exits, worse than an async call hanging (which only stalls its own
@@ -14,6 +14,12 @@ const { execFileSync } = require('child_process');
 // trips on a genuinely stuck process (a corrupted index, a stale lock file),
 // same defensive-only intent as the Drive API timeout added elsewhere.
 const GIT_EXEC_TIMEOUT_MS = 5000;
+
+// Same blocking-call caveat as GIT_EXEC_TIMEOUT_MS above, bounding
+// dataQualityHandler below (see its own comment for what it runs). A full
+// `npm run validate` across every hub already runs in well under a second
+// locally, so 8s only ever trips on a genuinely stuck process.
+const VALIDATE_EXEC_TIMEOUT_MS = 8000;
 
 const app = express();
 // This binds to all interfaces (no host passed to app.listen below), so it's
@@ -822,6 +828,66 @@ app.get('/api/garage/changelog-status', changelogStatusHandler('garage', [
   'listings.json', 'pipeline.json', 'activity.json', 'sales.json',
   'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
 ]));
+
+// CGT/CSM/Garage/Sondrik each already have their own validate.js CLI script
+// (run every cycle via `npm run validate`) that knows the real, hub-specific
+// rules for what counts as a real backfill gap - not just presence/absence,
+// but things like "has an estimatedValue but no valuationBasis" or "missing
+// eBay item specifics that Cassini search actually excludes on". CGT's own
+// rules alone are 300+ lines. Reimplementing any of that here to show a
+// number on the dashboard would either drift from the real rules over time
+// or duplicate them outright. Running the actual CLI script as a subprocess
+// and reading its own already-trusted "N warning(s)"/"N error(s)" output
+// reuses the real rules with no duplication at all, the same principle as
+// changelogStatusHandler above reading real git history instead of guessing.
+// job-search has no validate.js of this shape (its checks are all inline in
+// one script, not exported as reusable rules), so it has no route here; an
+// honest scope gap, not an oversight.
+function parseValidateCounts(text) {
+  const sum = (re) => {
+    let match, total = 0;
+    while ((match = re.exec(text))) total += Number(match[1]);
+    return total;
+  };
+  return {
+    warnings: sum(/(\d+)\s+warning\(s\)/g),
+    errors: sum(/(\d+)\s+error\(s\)/g)
+  };
+}
+
+function dataQualityHandler(hub) {
+  const validateScript = path.join(__dirname, 'public', hub, 'data', 'validate.js');
+  return (req, res) => {
+    // spawnSync (not execFileSync) on purpose: validate.js exits 1 when it
+    // finds real errors, and execFileSync throws on a nonzero exit, discarding
+    // the real stdout/stderr the moment that happens unless it's fished back
+    // out of the error object. spawnSync never throws on a nonzero exit, just
+    // reports it in .status, so the real output is always there to read the
+    // same way regardless of whether the run found only warnings or real
+    // errors too.
+    const result = spawnSync(process.execPath, [validateScript], {
+      encoding: 'utf8',
+      timeout: VALIDATE_EXEC_TIMEOUT_MS
+    });
+    if (result.error || (result.stdout == null && result.stderr == null)) {
+      // node isn't reachable at process.execPath, the script itself is
+      // missing, or it hard-crashed with no output at all: a real environment
+      // gap, not a real data-quality reading, same "unavailable" contract as
+      // changelogStatusHandler above.
+      res.json({ warnings: 0, errors: 0, unavailable: true });
+      return;
+    }
+    // console.warn/console.error both write to stderr, not stdout, so both
+    // streams have to be read to see the real warning/error lines, not just
+    // the plain console.log "is valid" lines that land on stdout alone.
+    res.json(parseValidateCounts((result.stdout || '') + (result.stderr || '')));
+  };
+}
+
+app.get('/api/cgt/data-quality', dataQualityHandler('cgt'));
+app.get('/api/csm/data-quality', dataQualityHandler('csm'));
+app.get('/api/garage/data-quality', dataQualityHandler('garage'));
+app.get('/api/sondrik/data-quality', dataQualityHandler('sondrik'));
 
 const PORT = process.env.PORT || 4488;
 app.listen(PORT, () => {

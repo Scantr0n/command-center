@@ -468,6 +468,8 @@
       <p class="text-[10px] font-mono mt-2" style="color: var(--faint)">Real numbers fetched live from each venture's own data, never estimated. A blank field means that venture genuinely hasn't logged it yet, not that it was skipped.</p>
     </section>
 
+    <div id="dataQualityCompact" class="hidden flex-wrap items-center gap-2 mb-6"></div>
+
     <div id="statusLegend" class="flex items-center gap-4 text-[10px] font-mono mb-2 flex-wrap" style="color: var(--faint)">
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#3DDC84"></span>Active</span>
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 inline-block" style="background:#4A9EDB; transform: rotate(45deg)"></span>Done</span>
@@ -823,6 +825,7 @@ async function loadClusters() {
     renderStats();
     renderAttention();
     renderVentureSnapshot();
+    renderDataQuality();
     renderCategoryFilter();
     renderGraph();
     renderGrid();
@@ -1175,6 +1178,77 @@ async function renderVentureSnapshot() {
       if (document.visibilityState === 'visible') updateVentureCard(grid, 'alpha');
     }, 30000);
   }
+}
+
+// Only the 4 hubs with a real, exported validate.js CLI script (see
+// server.js's dataQualityHandler comment for why job-search has none) get a
+// pill here. clusterId is each hub's real id in data/clusters/*.json, the
+// same id openModal and every other clickable card on this page already
+// takes, confirmed directly against those files rather than assumed from
+// the hub's URL path (card-grading's hub folder is cgt, but its cluster id
+// is card-grading, not cgt).
+const DATA_QUALITY_HUBS = [
+  { hub: 'cgt', clusterId: 'card-grading', name: 'CGT' },
+  { hub: 'csm', clusterId: 'csm', name: 'CSM' },
+  { hub: 'garage', clusterId: 'garage', name: 'Garage' },
+  { hub: 'sondrik', clusterId: 'sondrik', name: 'Sondrik' }
+];
+
+// Fetched once, not on the 30s poll Venture Snapshot's Alpha card uses:
+// unlike live trading equity, a real data-quality gap (a card with no
+// valuation basis, a listing missing eBay item specifics) doesn't change
+// within a browsing session, and each fetch here spawns a real Node
+// subprocess server-side (see dataQualityHandler), not just a static file
+// read, so polling it every 30s the way Alpha's card does would be real,
+// pointless load for no real benefit.
+let dataQualityLoaded = false;
+async function renderDataQuality() {
+  if (dataQualityLoaded) return;
+  dataQualityLoaded = true;
+  const compact = document.getElementById('dataQualityCompact');
+  const results = await Promise.all(DATA_QUALITY_HUBS.map(async h => {
+    try {
+      const r = await fetch(`/api/${h.hub}/data-quality`);
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (data.unavailable) return null;
+      return { ...h, warnings: data.warnings || 0, errors: data.errors || 0 };
+    } catch (e) {
+      return null;
+    }
+  }));
+  // A hub with real errors is genuinely broken data (fails npm run validate
+  // outright), a different severity than a hub with only backfill warnings,
+  // so it gets the same red "broken" color the rest of this page already
+  // uses for that severity, not just a louder version of the amber "stalled"
+  // color warnings-only hubs get. Clean hubs (0 of both) are left out
+  // entirely, same as renderAttention()'s own empty state above.
+  const flagged = results.filter(r => r && (r.warnings + r.errors) > 0);
+  if (!flagged.length) return;
+
+  compact.innerHTML = `
+    <span class="text-[10px] font-mono tracking-wide mr-1 flex items-center gap-2" style="color:var(--faint)">
+      <span aria-hidden="true" style="width:3px; height:11px; background:#E0A030; border-radius:1px; display:inline-block"></span>
+      DATA QUALITY
+    </span>
+    ${flagged.map(f => {
+      const color = f.errors > 0 ? statusColor('broken') : statusColor('stalled');
+      const total = f.warnings + f.errors;
+      const label = f.errors > 0
+        ? `${f.name} · ${f.errors} error${f.errors === 1 ? '' : 's'}${f.warnings ? ', ' + f.warnings + ' warning' + (f.warnings === 1 ? '' : 's') : ''}`
+        : `${f.name} · ${total} to backfill`;
+      return `
+        <button class="attn-pill" data-id="${escapeHtml(f.clusterId)}" style="border-color:${color}66; color:${color}">
+          <span class="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style="background:${color}"></span>${escapeHtml(label)}
+        </button>
+      `;
+    }).join('')}
+  `;
+  compact.classList.remove('hidden');
+  compact.classList.add('flex');
+  compact.querySelectorAll('.attn-pill').forEach(el => {
+    el.addEventListener('click', () => openModal(el.dataset.id));
+  });
 }
 
 function updateAttentionVisibility() {
