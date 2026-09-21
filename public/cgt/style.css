@@ -108,6 +108,17 @@ header.page-head .sub {
 }
 .print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
 .print-btn:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: 2px; }
+/* backupBtn gets .disabled set by app.js while data is still loading or
+   failed to load. Without this, a disabled button still shows cursor:
+   pointer and full-strength text, indistinguishable from a working one, so
+   a click that silently does nothing reads as broken rather than as the
+   honest "no data yet" state it actually is. Same fix already shipped on
+   Sondrik/CSM/Job Search. */
+.print-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
 /* This device has no network path at all (navigator.onLine / online / offline,
    never inferred from a failed fetch), a different question from whether the

@@ -108,6 +108,17 @@ header.page-head .sub {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .print-btn:hover, .print-btn:focus-visible { border-color: var(--hairlineHover); color: var(--ink); }
+/* backupBtn/draftBtn get .disabled set by app.js while data is still
+   loading, failed to load, or a draft is in flight. Without this, a
+   disabled button still shows cursor: pointer and full-strength text,
+   indistinguishable from a working one, so a click that silently does
+   nothing reads as broken rather than the honest state it actually is.
+   Same fix already shipped on Sondrik/CSM/Job Search/CGT. */
+.print-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 .print-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* This device has no network path at all (navigator.onLine / online / offline,
