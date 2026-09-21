@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-21T03:05:44.954Z",
+  "generatedAt": "2026-09-21T03:06:14.051Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "2a6f0f0",
+      "fullHash": "2a6f0f0a8ec2fad09c2272541ae5d8b4928b10fa",
+      "date": "2026-09-20",
+      "author": "Jack Scanlon",
+      "subject": "Sondrik: set a real goal, 150 v0.3.7 downloads by end of year",
+      "historyReset": false,
+      "files": [
+        "goals.json"
+      ]
+    },
     {
       "hash": "6e19b46",
       "fullHash": "6e19b4638ef59961b5ad81e201a43940d30e601f",
