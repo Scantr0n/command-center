@@ -1521,12 +1521,52 @@ function openCandidateModal(id) {
   body += field('Decision', c.decision, !c.decision);
   body += field('Decision note', c.decisionNote, !c.decisionNote);
   body += field('Notes', c.notes, !c.notes);
+  // "How to log a 'should I grade this?' candidate" above documents the
+  // manual next step once decision is "submit": add a real row to
+  // submissions.json and note the candidate's own id in decisionNote. That
+  // still requires retyping description/grading company/service level by
+  // hand into the quick-log submission form below; this button pre-fills
+  // those three fields from the candidate instead, the same "close the gap
+  // between two tools that already exist" pattern as emptyStateCta above.
+  if (c.decision === 'submit') {
+    body += `<div class="field-row">
+      <button type="button" class="print-btn" id="candidateToSubmissionBtn">Pre-fill "Quick log a new submission" from this candidate &rarr;</button>
+      <div class="field-note">Fills description/grading company/service level, everything else (id, submitted date, status) still needs a real answer.</div>
+    </div>`;
+  }
 
   document.getElementById('modalBody').innerHTML = body;
   wireCandidateEditForm(c);
+  const toSubmissionBtn = document.getElementById('candidateToSubmissionBtn');
+  if (toSubmissionBtn) {
+    toSubmissionBtn.addEventListener('click', () => {
+      closeModal();
+      prefillQuickLogSubmissionFromCandidate(c);
+    });
+  }
   document.getElementById('modalOverlay').hidden = false;
   lockBodyScroll();
   document.getElementById('modalClose').focus();
+}
+
+// Same "open the tool, scroll it into view, focus the first empty field"
+// behavior as openQuickLogForm above, plus filling description/grading
+// company/service level from the candidate that's turning into a real
+// submission. Only fills what a candidate actually has a real answer for;
+// nsGradingCompany/nsServiceLevel are left on their default when the
+// candidate never had a targetGradingCompany/targetServiceLevel logged,
+// same "don't guess" rule as everywhere else in this file.
+function prefillQuickLogSubmissionFromCandidate(c) {
+  openQuickLogForm('quickLogSubmissionTool', 'quickSubmissionForm');
+  const descriptionParts = [c.cardName, c.year ? String(c.year) : null].filter(Boolean);
+  const description = document.getElementById('nsDescription');
+  if (description && !description.value) description.value = descriptionParts.join(' ');
+  const company = document.getElementById('nsGradingCompany');
+  if (company && !company.value && c.targetGradingCompany) company.value = c.targetGradingCompany;
+  const serviceLevel = document.getElementById('nsServiceLevel');
+  if (serviceLevel && !serviceLevel.value && c.targetServiceLevel) serviceLevel.value = c.targetServiceLevel;
+  const idField = document.getElementById('nsId');
+  if (idField) idField.focus();
 }
 
 // Full detail for a grading submission: the feed row only has room for
