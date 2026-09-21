@@ -262,27 +262,47 @@ function renderDataFreshness(lastModifiedDates) {
 }
 
 // changelog.json is generated (see public/garage/data/changelog.js), not
-// hand-edited, from this repo's real git history over the six data files
-// above. A fresh clone before anyone has run that script is a real,
-// expected state (an honest empty state), not a load failure, so it never
-// blocks or fails the rest of loadData. Same pattern as CSM's, Sondrik's,
-// and CGT's own loadChangelog.
+// hand-edited, from this repo's real git history over the eight data files
+// TRACKED_FILES there lists. A fresh clone before anyone has run that script
+// is a real, expected state (an honest empty state), not a load failure, so
+// it never blocks or fails the rest of loadData. Same pattern as CSM's,
+// Sondrik's, and CGT's own loadChangelog.
+// driftStatus comes from /api/garage/changelog-status, the same live drift
+// check already exposed for Sondrik, Alpha, CSM, and CGT: it compares
+// changelog.json's recorded commit hashes against this repo's real git log
+// for those eight files, so a real drift shows up here on the live page
+// instead of only when someone happens to run node public/garage/data/
+// changelog.js from the command line. Best-effort and independent of the
+// changelog fetch itself, so a failure here (no git checkout, shallow clone,
+// etc) never blocks rendering the changelog entries.
 async function loadChangelog() {
-  try {
-    const res = await fetch('/garage/data/changelog.json');
-    if (!res.ok) throw new Error('Server returned ' + res.status);
-    renderChangelog(await res.json());
-  } catch (e) {
-    renderChangelog({ entries: [] });
-    console.error("Couldn't load changelog.json: " + e.message);
+  const [changelogResult, driftResult] = await Promise.allSettled([
+    fetch('/garage/data/changelog.json').then(r => {
+      if (!r.ok) throw new Error('Server returned ' + r.status);
+      return r.json();
+    }),
+    fetch('/api/garage/changelog-status').then(r => r.ok ? r.json() : null)
+  ]);
+  const driftStatus = driftResult.status === 'fulfilled' ? driftResult.value : null;
+  if (changelogResult.status === 'fulfilled') {
+    renderChangelog(changelogResult.value, driftStatus);
+  } else {
+    renderChangelog({ entries: [] }, driftStatus);
+    console.error("Couldn't load changelog.json: " + changelogResult.reason.message);
   }
 }
 
-function renderChangelog(data) {
+function renderChangelog(data, driftStatus) {
   const el = document.getElementById('changelogFeed');
+  const driftWarning = (driftStatus && driftStatus.drifted)
+    ? '<div class="callout callout-warn"><strong>Changelog is out of sync.</strong> changelog.json records ' +
+      driftStatus.recordedCount + ' commit' + (driftStatus.recordedCount === 1 ? '' : 's') +
+      ' for its tracked data files, but this repo&rsquo;s real git history has ' + driftStatus.realCount +
+      '. Run <code>node public/garage/data/changelog.js</code> to regenerate it.</div>'
+    : '';
   const entries = (data && data.entries) || [];
   if (entries.length === 0) {
-    el.innerHTML = '<p class="changelog-empty">No changelog generated yet. Run ' +
+    el.innerHTML = driftWarning + '<p class="changelog-empty">No changelog generated yet. Run ' +
       '<code>node public/garage/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
     return;
   }
@@ -297,7 +317,7 @@ function renderChangelog(data) {
       (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
       '</div>';
   }).join('');
-  el.innerHTML = rowsHtml;
+  el.innerHTML = driftWarning + rowsHtml;
   let noteEl = el.nextElementSibling;
   if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
     noteEl = document.createElement('p');
