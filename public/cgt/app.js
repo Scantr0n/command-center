@@ -3267,8 +3267,32 @@ document.getElementById('insurancePrintBtn').addEventListener('click', () => {
   document.body.classList.add('insurance-print-mode');
   window.print();
 });
+
+// Real gap found tonight: CGT's "Grading service tiers reference" already
+// uses class="section-details" (index.html), the same convention CSM and
+// Garage use for content that should print even when left collapsed on
+// screen, but this hub never had the JS that actually force-opens it, and
+// style.css's print block was hiding .section-details outright instead
+// (fixed there too). A closed <details>'s content sits behind an internal
+// browser slot that a plain CSS "display: block !important" on the slotted
+// children can't override, so printing whatever was left collapsed has to
+// force each one open in JS, for both the in-page print button and a
+// browser/OS print triggered directly. Restored after printing so the
+// on-screen state (and its localStorage open/closed record above) isn't
+// disturbed by having printed. Same exact mechanism as CSM/Garage.
+let printReopenedDetails = null;
+window.addEventListener('beforeprint', () => {
+  printReopenedDetails = [];
+  document.querySelectorAll('.section-details').forEach(d => {
+    printReopenedDetails.push([d, d.open]);
+    d.open = true;
+  });
+});
 window.addEventListener('afterprint', () => {
   document.body.classList.remove('insurance-print-mode');
+  if (!printReopenedDetails) return;
+  printReopenedDetails.forEach(([d, wasOpen]) => { d.open = wasOpen; });
+  printReopenedDetails = null;
 });
 
 // The current filters/search/sort are already mirrored into the address bar

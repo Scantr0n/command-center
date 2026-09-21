@@ -1385,10 +1385,16 @@ textarea.np-input { resize: vertical; }
   .attention-pill.attention-urgent strong { color: #111 !important; }
   .callout-warn strong { color: #111 !important; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .section-details, .modal-overlay {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }
+  /* .section-details (the grading tiers reference) is real content worth
+     having on paper, unlike .schema-help above, so it's force-opened in JS
+     (see the beforeprint/afterprint handling in app.js) instead of hidden
+     here, same convention as CSM/Garage. This just drops the on-screen +/-
+     marker once nothing is collapsible on paper. */
+  .section-details > summary.section-title::before { display: none; }
 
   /* Insurance print mode: hide every normal dashboard section (all direct
      `main > section` children, plus the callout above them) and show only
