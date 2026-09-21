@@ -36,15 +36,16 @@
      below can reference it in one shared rule, rather than fighting the
      .hairline class's `border-color !important` (which would otherwise win
      over a plain inline border-left-color). */
-  .cluster-card, .attn-card {
+  .cluster-card, .attn-card, .venture-card {
     box-shadow: inset 3px 0 0 0 var(--cat, transparent);
     transition: box-shadow 0.18s ease;
   }
-  .cluster-card:hover, .attn-card:hover {
+  .cluster-card:hover, .attn-card:hover, .venture-card:hover {
     box-shadow: inset 3px 0 0 0 var(--cat, transparent), 0 0 0 1px var(--cat, transparent), 0 14px 28px -12px var(--cat, transparent);
   }
   .cluster-card { transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease; }
   .cluster-card:hover { transform: translateY(-3px); }
+  .venture-card { transition: border-color 0.15s ease, box-shadow 0.18s ease; cursor: pointer; }
   .status-dot { box-shadow: 0 0 8px currentColor; }
   .status-pulse { animation: statusPulse 2.4s ease-in-out infinite; }
   @keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -1114,13 +1115,21 @@ async function renderVentureSnapshot() {
   const targets = clusters.filter(c => VENTURE_SNAPSHOT_IDS.includes(c.id));
   if (!targets.length) { document.getElementById('ventureSnapshotSection').classList.add('hidden'); return; }
 
+  // Same click-opens-modal behavior as every other card in the app (grid
+  // cards, attention cards, graph nodes via makeCardClickable), not a new,
+  // divergent pattern: the modal already has a real "Open ->" link
+  // (#linkRow) straight to the hub when activeCluster.link exists, so
+  // reusing it here gives these cards a real path to the venture's own
+  // hub, the AI chat scoped to it, and its full real summary, all through
+  // the one mechanism already used everywhere else.
   grid.innerHTML = targets.map(c => `
-    <div class="rounded-xl p-4 border hairline" data-venture-id="${escapeHtml(c.id)}" style="background: var(--panel)">
+    <div class="venture-card rounded-xl p-4 border hairline" data-venture-id="${escapeHtml(c.id)}" data-id="${escapeHtml(c.id)}" style="background: var(--panel); --cat: ${categoryColor(c.category)}">
       <div class="text-xs font-mono truncate" style="color: var(--sub)">${escapeHtml(c.name)}</div>
       <div class="venture-metric-value font-display font-bold text-lg mt-1" style="color: var(--ink)">Loading&hellip;</div>
       <div class="venture-metric-meta text-[10px] font-mono mt-1" style="color: var(--faint)"></div>
     </div>
   `).join('');
+  grid.querySelectorAll('[data-venture-id]').forEach(makeCardClickable);
 
   const results = await Promise.all(targets.map(c => fetchVentureMetric(c.id)));
   targets.forEach((c, i) => {
