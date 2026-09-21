@@ -296,6 +296,28 @@ function businessDaysToCalendarDays(businessDays) {
   return Math.round(businessDays * 1.4);
 }
 
+// PSA's four Value tiers (Value, Value Plus, Value Max, Value Bulk) have
+// been closed to new submissions since 2026-06-02, tied to PSA's own public
+// backlog tracker falling to 5 million cards -- see the "Grading service
+// tiers reference" section (index.html) for the full writeup and sources.
+// That section is a static reference table, though, so a candidate someone
+// is actively weighing toward one of those tiers (Worth grading? below)
+// never actually surfaces the pause unless they scroll down and reread it.
+// This turns the same fact into a real per-candidate flag instead, same
+// normalized-tier matching as publishedTurnaroundDays above (PUBLISHED_
+// TURNAROUND_DAYS.PSA.tiers already carries the matching turnaround numbers
+// for these four keys). Flip PSA_VALUE_TIERS_PAUSED to false once PSA's
+// backlog tracker (psacard.com/info/backlog-tracker) shows the tiers
+// reopened -- do not leave this true past that date, it would misinform
+// every open candidate targeting a normal, open PSA tier.
+const PSA_VALUE_TIERS_PAUSED = true;
+const PSA_PAUSED_VALUE_TIER_NAMES = ['value', 'value plus', 'value max', 'value bulk'];
+function isPsaPausedValueTier(gradingCompany, serviceLevel) {
+  if (!PSA_VALUE_TIERS_PAUSED || gradingCompany !== 'PSA' || !serviceLevel) return false;
+  const norm = serviceLevel.toLowerCase().trim();
+  return PSA_PAUSED_VALUE_TIER_NAMES.some(tierName => norm === tierName || norm.includes(tierName) || tierName.includes(norm));
+}
+
 function publishedTurnaroundDays(gradingCompany, serviceLevel) {
   const entry = gradingCompany && PUBLISHED_TURNAROUND_DAYS[gradingCompany];
   if (!entry) return null;
@@ -1423,6 +1445,11 @@ function renderCandidates() {
     // this badge is the same "already decided, not still being weighed"
     // signal the STATUS filter chips above now let you filter by.
     const decisionLabel = c.decision ? c.decision.replace('-', ' ') : null;
+    // Only worth flagging while the candidate is still heading toward an
+    // actual submission (no decision yet, or already decided "submit"); a
+    // candidate already decided hold/sell-raw/pass was never going to hit
+    // PSA's Value-tier pause since it isn't going to be submitted at all.
+    const targetsPausedTier = (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel);
     const metaParts = [
       c.sport,
       c.targetGradingCompany,
@@ -1431,10 +1458,11 @@ function renderCandidates() {
       math ? 'costs ' + formatUsd(math.totalCost) : null
     ].filter(Boolean);
     return `
-      <div class="submission-row candidate-row" tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled candidate')}${decisionLabel ? ', decision: ' + escapeHtml(decisionLabel) : ''}" data-id="${escapeHtml(c.id)}">
+      <div class="submission-row candidate-row" tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled candidate')}${decisionLabel ? ', decision: ' + escapeHtml(decisionLabel) : ''}${targetsPausedTier ? ', PSA tier paused' : ''}" data-id="${escapeHtml(c.id)}">
         <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         ${decisionLabel ? `<span class="badge badge-decided">${escapeHtml(decisionLabel)}</span>` : ''}
+        ${targetsPausedTier ? `<span class="badge badge-paused" title="PSA ${escapeHtml(c.targetServiceLevel)} is currently paused to new submissions">tier paused</span>` : ''}
         <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
       </div>
@@ -1478,6 +1506,12 @@ function openCandidateModal(id) {
   let body = '';
   body += candidateEditFormHtml(c);
   body += `<div class="field-row"><span class="badge ${verdictMeta.cls}">${escapeHtml(verdictMeta.label)}</span></div>`;
+  if ((c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel)) {
+    body += `<div class="field-row">
+      <span class="badge badge-paused">tier paused</span>
+      <div class="field-note">PSA ${escapeHtml(c.targetServiceLevel)} has been closed to new submissions since 2026-06-02, tied to PSA's own public backlog tracker falling to 5 million cards. See the Grading service tiers reference below for the full writeup, or check <a href="https://www.psacard.com/info/backlog-tracker" target="_blank" rel="noopener noreferrer">psacard.com/info/backlog-tracker</a> directly before deciding to submit here.</div>
+    </div>`;
+  }
   body += field('Year', c.year != null ? String(c.year) : null, c.year == null);
   body += field('Raw value (ungraded)', c.rawValue != null ? formatUsd(c.rawValue) : null, c.rawValue == null);
   body += field('Raw value basis', c.rawValueBasis === 'recent-sale' ? 'Recent sale' : c.rawValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.rawValueBasis);
@@ -1968,6 +2002,15 @@ function renderAttentionBar() {
   const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
   const overdueSubmissionsCount = buildActiveSubmissions()
     .filter(s => !isExampleSubmission(s) && estimatedReturnFor(s, turnaroundByGrader).runningLong).length;
+  // Same targetsPausedTier test as renderCandidates' own badge below: a
+  // candidate still heading toward an actual submission (no decision, or
+  // already decided "submit") whose target is one of PSA's four paused
+  // Value tiers. Worth a top-of-page flag since deciding "worth grading"
+  // on stale turnaround math for a tier that will not even accept the
+  // submission right now is a real, avoidable mistake, not just a data gap.
+  const pausedTierCandidatesCount = candidates
+    .filter(c => !isExampleCandidate(c) && (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel))
+    .length;
 
   const items = [];
   // Same reasoning as CSM's own renderAttentionBar: a drifted changelog is
@@ -2011,6 +2054,16 @@ function renderAttentionBar() {
       label: candidatesNeedingDataCount === 1
         ? 'open candidate has no verdict yet, needs graded-value research'
         : 'open candidates have no verdict yet, need graded-value research'
+    });
+  }
+  if (pausedTierCandidatesCount) {
+    items.push({
+      n: pausedTierCandidatesCount,
+      tone: 'warn',
+      target: 'candidatesSection',
+      label: pausedTierCandidatesCount === 1
+        ? 'candidate targets a PSA Value tier currently paused to new submissions'
+        : 'candidates target a PSA Value tier currently paused to new submissions'
     });
   }
 

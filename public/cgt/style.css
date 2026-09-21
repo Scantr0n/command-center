@@ -790,6 +790,10 @@ table.card-table {
 .badge-black-label { background: #000; color: #D4AF37; border-color: #D4AF37; text-transform: uppercase; }
 .badge-sport { background: rgba(255,255,255,0.03); color: var(--sub); }
 .badge-stale { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
+/* Same red "real, avoidable problem" tone as badge-stale: flags a candidate
+   still heading toward a PSA Value-tier submission that PSA is not actually
+   accepting right now (see isPsaPausedValueTier in app.js). */
+.badge-paused { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
 
 /* Grading submission status badges: neutral while sitting in the queue,
    amber while actively being graded (same "in progress" color as
