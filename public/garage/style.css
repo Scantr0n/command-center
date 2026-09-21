@@ -140,6 +140,11 @@ header.page-head .sub {
 }
 .callout strong { color: var(--ink); }
 
+/* Same pattern as CSM's and CGT's own .callout-warn: a real changelog drift
+   is flagged in a warning tone distinct from the neutral .callout above. */
+.callout-warn { border-color: rgba(224,160,48,0.32); background: rgba(224,160,48,0.06); margin-bottom: 14px; }
+.callout-warn strong { color: #E0A030; }
+
 .schema-help {
   border: 1px solid var(--hairline);
   border-radius: 10px;
@@ -1372,6 +1377,7 @@ textarea.np-input { resize: vertical; }
 
   .callout { border-color: #bbb; background: none; color: #333; }
   .callout strong { color: #111; }
+  .callout-warn strong { color: #111 !important; }
 
   .stat-tile, .pipeline-stage, .activity-item { background: none; border: 1px solid #ccc; }
   .stat-tile-warn { border-color: #999; }
