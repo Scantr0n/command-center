@@ -43,13 +43,28 @@
   function findCasingDrift(prospects, getValues) {
     const byNorm = new Map();
     (prospects || []).forEach(p => {
+      // A multi-valued getValues (socialSnapshots[].platform: zero or more
+      // per prospect) can hand back the same prospect's own two differently-
+      // cased snapshots of the same real platform (a real re-pull relogged
+      // under a slightly different spelling), which used to push that one
+      // prospect into entry.prospects twice, once per raw value seen, not
+      // once per prospect. The dashboard's own renderCasingDrift renders one
+      // row per prospects[] entry with no dedup of its own, so that one
+      // person rendered as two identical rows needing the same fix, an
+      // inflated drift count for a single-valued field (category) could
+      // never actually trigger, since each prospect only ever contributes at
+      // most one raw value there.
+      const addedForThisProspect = new Set();
       getValues(p).forEach(raw => {
         if (!raw) return;
         const norm = raw.trim().toLowerCase();
         if (!byNorm.has(norm)) byNorm.set(norm, { variants: new Map(), prospects: [] });
         const entry = byNorm.get(norm);
         entry.variants.set(raw, (entry.variants.get(raw) || 0) + 1);
-        entry.prospects.push(p);
+        if (!addedForThisProspect.has(norm)) {
+          addedForThisProspect.add(norm);
+          entry.prospects.push(p);
+        }
       });
     });
     return [...byNorm.values()].filter(entry => entry.variants.size > 1);
