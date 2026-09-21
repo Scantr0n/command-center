@@ -340,11 +340,13 @@
         unlabeled basis on either priced field, a comp-estimate with no note explaining what it is based on, and
         bad dates.</p>
       <p>The verdict shown on the dashboard (Worth grading / Marginal / Not worth it / Needs more data) applies the
-        common "2x margin" rule of thumb from real card-grading ROI writeups: expected gain (estimated graded value
-        minus raw value minus grading and shipping costs) should clear the total cost by at least 2x before it
-        counts as clearly worth it, since the card could come back at a lower grade than expected. A margin above
-        0 but under 2x shows as "Marginal" rather than "Worth grading", and any candidate missing one of the three
-        real numbers the math needs (<code>rawValue</code>, <code>expectedGradedValue</code>,
+        common "2x margin" rule of thumb from real card-grading ROI writeups: the raw upside (estimated graded value
+        minus raw value, before grading and shipping costs are subtracted) should clear the total cost of grading by
+        at least 2x before it counts as clearly worth it, since the card could come back at a lower grade than
+        expected. That upside clearing the cost at all, but by less than 2x, shows as "Marginal" rather than "Worth
+        grading"; the page's own "Expected gain" figure is the net number (upside minus total cost) and is what
+        candidates are sorted by, but it is not itself what the 2x threshold is measured against. Any candidate
+        missing one of the three real numbers the math needs (<code>rawValue</code>, <code>expectedGradedValue</code>,
         <code>estimatedGradingCost</code>) shows "Needs more data" rather than a guessed verdict.</p>
       <div class="table-wrap">
       <table class="schema-table">
@@ -519,11 +521,11 @@
       <button type="button" id="candidatesCsvBtn" class="print-btn font-mono">Export CSV</button>
     </div>
     <p class="section-subtitle">Raw cards being weighed against the real cost of grading them, before anything is
-      shipped. Verdict uses the common "2x margin" rule (the expected gain over raw value should clear grading +
-      shipping costs by at least 2x, to leave room for coming back at a lower grade than expected), applied only to
-      real researched numbers, never a guess. See "Grading service tiers reference" below for current published
-      per-tier pricing and turnaround to fill in <code class="inline-code">estimatedGradingCost</code> with a real
-      number instead of a guess.</p>
+      shipped. Verdict uses the common "2x margin" rule (the real upside, graded value minus raw value, should clear
+      the cost of grading and shipping by at least 2x, to leave room for coming back at a lower grade than
+      expected), applied only to real researched numbers, never a guess. See "Grading
+      service tiers reference" below for current published per-tier pricing and turnaround to fill in
+      <code class="inline-code">estimatedGradingCost</code> with a real number instead of a guess.</p>
     <input
       type="search"
       id="candidateSearchInput"
