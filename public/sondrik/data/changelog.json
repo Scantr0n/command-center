@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-20T08:35:00.578Z",
+  "generatedAt": "2026-09-21T02:49:49.065Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
     {

@@ -6,7 +6,8 @@
     "liveBackend": false,
     "checks": [
       { "date": "2026-09-04", "count": 0, "note": "Baseline, 3 days before the next check" },
-      { "date": "2026-09-07", "count": 8, "note": "Confirmed via gh api" }
+      { "date": "2026-09-07", "count": 8, "note": "Confirmed via gh api" },
+      { "date": "2026-09-20", "count": 15, "note": "Confirmed via gh api (Sondrik-0.3.7-arm64.dmg asset download_count). +7 over 13 days, ~0.54/day, slower than the Sep 4-7 pace." }
     ]
   }
 }
