@@ -666,191 +666,59 @@ app.get('/api/alpha/live', async (req, res) => {
   }
 });
 
-// validate.js's own changelog-drift check (comparing changelog.json's
-// recorded commit hashes against this repo's real git log for the same
-// files) only ever runs from the command line, so a real drift went
-// unnoticed on the live page multiple times tonight until someone happened
-// to run the CLI validator. git log is the one part of this check that
-// genuinely can't run in the browser, so it's exposed here as a small,
-// read-only, best-effort API instead: a real drift becomes a real Next
-// Steps item on the page itself, not something only the CLI ever surfaces.
-app.get('/api/sondrik/changelog-status', (req, res) => {
-  const dataDir = path.join(__dirname, 'public', 'sondrik', 'data');
-  try {
-    // A shallow clone's `git log` for these files only ever sees the commits
-    // fetched, not the real full history, which would report drift that
-    // isn't real (the same bug fixed in changelog.js and validate.js after
-    // it collapsed real changelog entries on 2026-09-19). Treated as
-    // "unavailable" below, same as no git checkout at all.
-    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
-      throw new Error('shallow clone');
+// Every hub with a changelog.json (Sondrik, Alpha, CSM, CGT, Garage) had its
+// own hand-copied route here, identical except for dataDir and which data
+// files to check, five copies of the same real bug fix drifting slightly
+// further apart every time one got copy-pasted for the next hub. Collapsed
+// into one factory: validate.js's own changelog-drift check (comparing
+// changelog.json's recorded commit hashes against this repo's real git log
+// for a hub's tracked data files) only ever ran from the command line, so a
+// real drift went unnoticed on a live page multiple times until someone
+// happened to run the CLI validator. git log is the one part of this check
+// that genuinely can't run in the browser, so it's exposed here as a small,
+// read-only, best-effort API per hub instead: a real drift becomes a real
+// page warning, not something only the CLI ever surfaces.
+function changelogStatusHandler(hub, trackedFiles) {
+  const dataDir = path.join(__dirname, 'public', hub, 'data');
+  return (req, res) => {
+    try {
+      // A shallow clone's `git log` for these files only ever sees the
+      // commits fetched, not the real full history, which would report
+      // drift that isn't real (the same bug fixed in changelog.js and
+      // validate.js after it collapsed real changelog entries on
+      // 2026-09-19). Treated as "unavailable" below, same as no git
+      // checkout at all.
+      if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
+        throw new Error('shallow clone');
+      }
+      const realHashesRaw = execFileSync('git', [
+        'log', '--format=%H', '--', ...trackedFiles
+      ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
+      const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
+      const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
+      const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+      res.json({
+        drifted: recordedHashes.join(',') !== realHashes.join(','),
+        recordedCount: recordedHashes.length,
+        realCount: realHashes.length
+      });
+    } catch (err) {
+      // Not a git checkout, git isn't on PATH, or changelog.json is missing:
+      // an environment gap, not a real drift, so this stays a quiet false
+      // rather than a page warning no one can act on.
+      res.json({ drifted: false, unavailable: true });
     }
-    const realHashesRaw = execFileSync('git', [
-      'log', '--format=%H', '--',
-      'releases.json', 'downloads.json', 'leads.json', 'channels.json', 'goals.json'
-    ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
-    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
-    const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
-    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
-    res.json({
-      drifted: recordedHashes.join(',') !== realHashes.join(','),
-      recordedCount: recordedHashes.length,
-      realCount: realHashes.length
-    });
-  } catch (err) {
-    // Not a git checkout, git isn't on PATH, or changelog.json is missing:
-    // an environment gap, not a real drift, so this stays a quiet false
-    // rather than a page warning no one can act on.
-    res.json({ drifted: false, unavailable: true });
-  }
-});
+  };
+}
 
-// Same pattern as /api/sondrik/changelog-status just above: validate.js's own
-// changelog-drift check for status.json only ever ran from the command line,
-// so a real drift here would go unnoticed on the live page the same way it
-// did for Sondrik until someone happened to run the CLI validator. Exposed
-// read-only so the Data changelog section on the Alpha page itself can flag
-// a real drift instead of silently showing a changelog that's fallen behind.
-app.get('/api/alpha/changelog-status', (req, res) => {
-  const dataDir = path.join(__dirname, 'public', 'alpha', 'data');
-  try {
-    // Same shallow-clone guard as the Sondrik route: a shallow clone's
-    // `git log` for status.json only sees the commits actually fetched, not
-    // the real full history, which would report drift that isn't real.
-    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
-      throw new Error('shallow clone');
-    }
-    const realHashesRaw = execFileSync('git', [
-      'log', '--format=%H', '--', 'status.json'
-    ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
-    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
-    const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
-    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
-    res.json({
-      drifted: recordedHashes.join(',') !== realHashes.join(','),
-      recordedCount: recordedHashes.length,
-      realCount: realHashes.length
-    });
-  } catch (err) {
-    // Not a git checkout, git isn't on PATH, or changelog.json is missing:
-    // an environment gap, not a real drift, so this stays a quiet false
-    // rather than a page warning no one can act on.
-    res.json({ drifted: false, unavailable: true });
-  }
-});
-
-// Same pattern as /api/sondrik/changelog-status and /api/alpha/changelog-status
-// above: public/csm/data/changelog.js's own drift check (recorded commit
-// hashes vs this repo's real git log for prospects.json/stages.json) only
-// ever ran from the command line, so a real drift there would go unnoticed
-// on the live CSM page the same way it did for Sondrik and Alpha until
-// someone happened to run the CLI validator. Exposed read-only so the Data
-// changelog section on the CSM page itself can flag a real drift instead of
-// silently showing a changelog that's fallen behind.
-app.get('/api/csm/changelog-status', (req, res) => {
-  const dataDir = path.join(__dirname, 'public', 'csm', 'data');
-  try {
-    // Same shallow-clone guard as the Sondrik/Alpha routes: a shallow
-    // clone's `git log` for these files only sees the commits actually
-    // fetched, not the real full history, which would report drift that
-    // isn't real.
-    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
-      throw new Error('shallow clone');
-    }
-    const realHashesRaw = execFileSync('git', [
-      'log', '--format=%H', '--', 'prospects.json', 'stages.json'
-    ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
-    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
-    const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
-    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
-    res.json({
-      drifted: recordedHashes.join(',') !== realHashes.join(','),
-      recordedCount: recordedHashes.length,
-      realCount: realHashes.length
-    });
-  } catch (err) {
-    // Not a git checkout, git isn't on PATH, or changelog.json is missing:
-    // an environment gap, not a real drift, so this stays a quiet false
-    // rather than a page warning no one can act on.
-    res.json({ drifted: false, unavailable: true });
-  }
-});
-
-// Same pattern as /api/sondrik/changelog-status, /api/alpha/changelog-status,
-// and /api/csm/changelog-status above: public/cgt/data/changelog.js's own
-// drift check (recorded commit hashes vs this repo's real git log for
-// cards.json/submissions.json/candidates.json) only ever ran from the
-// command line, so a real drift there would go unnoticed on the live CGT
-// page the same way it did for the other three hubs until someone happened
-// to run the CLI validator. Exposed read-only so the Data changelog section
-// on the CGT page itself can flag a real drift instead of silently showing
-// a changelog that's fallen behind.
-app.get('/api/cgt/changelog-status', (req, res) => {
-  const dataDir = path.join(__dirname, 'public', 'cgt', 'data');
-  try {
-    // Same shallow-clone guard as the other three changelog-status routes: a
-    // shallow clone's `git log` for these files only sees the commits
-    // actually fetched, not the real full history, which would report drift
-    // that isn't real.
-    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
-      throw new Error('shallow clone');
-    }
-    const realHashesRaw = execFileSync('git', [
-      'log', '--format=%H', '--', 'cards.json', 'submissions.json', 'candidates.json'
-    ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
-    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
-    const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
-    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
-    res.json({
-      drifted: recordedHashes.join(',') !== realHashes.join(','),
-      recordedCount: recordedHashes.length,
-      realCount: realHashes.length
-    });
-  } catch (err) {
-    // Not a git checkout, git isn't on PATH, or changelog.json is missing:
-    // an environment gap, not a real drift, so this stays a quiet false
-    // rather than a page warning no one can act on.
-    res.json({ drifted: false, unavailable: true });
-  }
-});
-
-// Same pattern as the Sondrik/Alpha/CSM/CGT changelog-status routes above:
-// public/garage/data/changelog.js's own drift check only ever ran from the
-// command line, so a real drift here would go unnoticed on the live Garage
-// page the same way it did for the other four hubs until someone happened to
-// run the CLI validator. Exposed read-only so the Data changelog section on
-// the Garage page itself can flag a real drift instead of silently showing a
-// changelog that's fallen behind.
-app.get('/api/garage/changelog-status', (req, res) => {
-  const dataDir = path.join(__dirname, 'public', 'garage', 'data');
-  try {
-    // Same shallow-clone guard as the other four changelog-status routes: a
-    // shallow clone's `git log` for these files only sees the commits
-    // actually fetched, not the real full history, which would report drift
-    // that isn't real.
-    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
-      throw new Error('shallow clone');
-    }
-    const realHashesRaw = execFileSync('git', [
-      'log', '--format=%H', '--',
-      'listings.json', 'pipeline.json', 'activity.json', 'sales.json',
-      'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
-    ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
-    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
-    const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
-    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
-    res.json({
-      drifted: recordedHashes.join(',') !== realHashes.join(','),
-      recordedCount: recordedHashes.length,
-      realCount: realHashes.length
-    });
-  } catch (err) {
-    // Not a git checkout, git isn't on PATH, or changelog.json is missing:
-    // an environment gap, not a real drift, so this stays a quiet false
-    // rather than a page warning no one can act on.
-    res.json({ drifted: false, unavailable: true });
-  }
-});
+app.get('/api/sondrik/changelog-status', changelogStatusHandler('sondrik', ['releases.json', 'downloads.json', 'leads.json', 'channels.json', 'goals.json']));
+app.get('/api/alpha/changelog-status', changelogStatusHandler('alpha', ['status.json']));
+app.get('/api/csm/changelog-status', changelogStatusHandler('csm', ['prospects.json', 'stages.json']));
+app.get('/api/cgt/changelog-status', changelogStatusHandler('cgt', ['cards.json', 'submissions.json', 'candidates.json']));
+app.get('/api/garage/changelog-status', changelogStatusHandler('garage', [
+  'listings.json', 'pipeline.json', 'activity.json', 'sales.json',
+  'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
+]));
 
 const PORT = process.env.PORT || 4488;
 app.listen(PORT, () => {
