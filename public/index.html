@@ -381,7 +381,7 @@
     body { background: #fff; }
     .max-w-7xl { max-width: none; padding: 0.3in 0.4in; }
 
-    #searchWrap, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner,
+    #searchWrap, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner, #driveStatusBadge,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
     #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay,
     /* Both added after the comment above was written, and both missed being
@@ -512,6 +512,7 @@
           <kbd class="kbd-chip text-[10px]" style="color: var(--sub)" aria-hidden="true">&#8984;K</kbd>
         </button>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
+        <div id="driveStatusBadge" class="hidden items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border" style="color: #E0807A; background: #E04A4A1A; border-color: #E04A4A40"></div>
         <div id="viewToggleGroup" class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5" aria-pressed="true">Graph</button>
           <button id="viewGridBtn" class="view-toggle-btn px-3 py-1.5" aria-pressed="false">Grid</button>
@@ -902,6 +903,24 @@ async function loadClusters() {
       errBox.classList.remove('hidden');
     } else {
       errBox.classList.add('hidden');
+    }
+
+    // "not-configured" (no credentials on this machine, e.g. a fresh
+    // checkout) stays silent on purpose, same as this has always behaved -
+    // not every machine needs Drive sync. A real "error" state means Drive
+    // WAS working here and just stopped (an expired/revoked token, usually),
+    // which every other case of "this reads as stale/broken" fixed today
+    // (LATEST STATUS, Recent Commits) argues should be visible instead of
+    // only ever discoverable by someone reading the server's own console log.
+    const driveBadge = document.getElementById('driveStatusBadge');
+    if (data.driveStatus && data.driveStatus.state === 'error') {
+      driveBadge.textContent = 'Drive sync unavailable';
+      driveBadge.title = 'Google Drive cross-machine sync last failed with: ' + (data.driveStatus.message || 'unknown error') + '. Local project data still loads and saves fine, this only affects syncing with other machines. Needs a real re-authentication (re-run the OAuth setup), not something this page can fix on its own.';
+      driveBadge.classList.remove('hidden');
+      driveBadge.classList.add('flex');
+    } else {
+      driveBadge.classList.add('hidden');
+      driveBadge.classList.remove('flex');
     }
 
     // Skip the re-render on unchanged data (the 30s poll refetches even

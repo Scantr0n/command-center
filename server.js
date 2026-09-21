@@ -145,6 +145,19 @@ async function getDriveCache() {
   }
 }
 
+// A missing credentials/token file (ENOENT, from getAuthClient's own
+// fs.readFileSync calls) means Drive was never set up on this machine at
+// all - a normal state (see CLAUDE.md: each machine needs its own OAuth
+// client) that's never worth alarming Jack over. Anything else means Drive
+// WAS working here and is now actually failing (a real invalid_grant, a
+// network drop, a revoked token) - a real, actionable gap worth surfacing,
+// not something to keep silently swallowing forever.
+function classifyDriveError(err) {
+  if (!err) return null;
+  if (err.code === 'ENOENT') return { state: 'not-configured' };
+  return { state: 'error', message: err.message };
+}
+
 // Merges in live Drive snapshots where they exist, falls back to local-only
 // silently if Drive is unreachable (auth not set up yet, network down, etc.)
 async function readClusters() {
@@ -156,10 +169,10 @@ async function readClusters() {
       const snapshot = snapshots.get(c.id);
       return snapshot ? { ...c, ...snapshot, fromDrive: true } : c;
     });
-    return { clusters: merged, brokenFiles };
+    return { clusters: merged, brokenFiles, driveStatus: { state: 'ok' } };
   } catch (err) {
     console.log('Drive unavailable, using local snapshots only:', err.message);
-    return { clusters: localClusters, brokenFiles };
+    return { clusters: localClusters, brokenFiles, driveStatus: classifyDriveError(err) };
   }
 }
 
@@ -193,7 +206,7 @@ function writeToggles(toggles) {
 
 app.get('/api/clusters', async (req, res) => {
   try {
-    const { clusters, brokenFiles } = await readClusters();
+    const { clusters, brokenFiles, driveStatus } = await readClusters();
     const toggles = readToggles();
     const withToggleState = clusters.map(c => {
       if (c.toggleable) {
@@ -201,7 +214,7 @@ app.get('/api/clusters', async (req, res) => {
       }
       return c;
     });
-    res.json({ clusters: withToggleState, brokenFiles });
+    res.json({ clusters: withToggleState, brokenFiles, driveStatus });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
