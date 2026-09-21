@@ -1305,6 +1305,17 @@ async function renderDataQuality() {
   if (dataQualityLoaded) return;
   dataQualityLoaded = true;
   const compact = document.getElementById('dataQualityCompact');
+  // Same one-shot role="status"/aria-live="polite" pattern renderVentureSnapshot
+  // already uses above for its own real Loading-to-value transition, and the
+  // same reason: this section can be entirely absent (every hub clean) or
+  // take a moment to populate (each hub's data-quality check is a real
+  // subprocess call, not a static file read), and without this a screen
+  // reader user tabbing past an empty, still-loading dataQualityCompact has
+  // no way to tell "still checking" from "genuinely nothing to report" -
+  // removed again below regardless of which of those two this call ends in,
+  // so it never re-announces on anything after this one real transition.
+  compact.setAttribute('role', 'status');
+  compact.setAttribute('aria-live', 'polite');
   const results = await Promise.all(DATA_QUALITY_HUBS.map(async h => {
     try {
       const r = await fetch(`/api/${h.hub}/data-quality`);
@@ -1336,7 +1347,11 @@ async function renderDataQuality() {
   // when it doesn't - this only ever reflects what validate.js itself
   // checks, a real but narrower signal.
   const flagged = results.filter(r => r && (r.warnings + r.errors) > 0);
-  if (!flagged.length) return;
+  if (!flagged.length) {
+    compact.removeAttribute('role');
+    compact.removeAttribute('aria-live');
+    return;
+  }
 
   compact.innerHTML = `
     <span class="text-[10px] font-mono tracking-wide mr-1 flex items-center gap-2" style="color:var(--faint)">
@@ -1360,6 +1375,8 @@ async function renderDataQuality() {
   compact.querySelectorAll('.attn-pill').forEach(el => {
     el.addEventListener('click', () => openModal(el.dataset.id));
   });
+  compact.removeAttribute('role');
+  compact.removeAttribute('aria-live');
 }
 
 function updateAttentionVisibility() {
