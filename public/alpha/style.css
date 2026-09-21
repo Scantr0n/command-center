@@ -700,6 +700,72 @@ header.page-head .sub {
   list-style: none;
 }
 
+/* Time-in-regime distribution: aggregates the same real per-segment
+   durations the chronological list below already computes (see
+   computeRegimeDistribution in app.js) into a single stacked bar plus a
+   legend, real trading-dashboard "regime analytics" convention (pairing the
+   current label with how conditions have actually evolved) rather than only
+   a transition log. Segments are real <button>s with a title/tooltip, same
+   tap/keyboard-accessible pattern as .history-tick and .daily-uptime-bar
+   above (see wireTickTooltips), and the legend repeats each regime's name
+   and share in text, so the breakdown is never color-only (WCAG 1.4.1,
+   confirmed against real status-page UX guidance during this pass: a
+   meaningful share of readers can't tell segments apart by hue alone). */
+.regime-dist-wrap {
+  margin-bottom: 22px;
+}
+.regime-dist-bar {
+  display: flex;
+  width: 100%;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  background: var(--panelLight);
+}
+.regime-dist-segment {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 100%;
+  border: none;
+  border-right: 1px solid rgba(0,0,0,0.35);
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  min-width: 2px;
+}
+.regime-dist-segment:last-child { border-right: none; }
+.regime-dist-segment:focus-visible {
+  outline: 1.5px solid var(--hairlineHover);
+  outline-offset: -2px;
+}
+.regime-dist-legend {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.regime-dist-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.75rem;
+}
+.regime-dist-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.regime-dist-legend-label {
+  color: var(--ink);
+}
+.regime-dist-legend-value {
+  color: var(--dim);
+}
+
 /* Regime history: same real-log-over-time treatment as the incident list
    above, applied to live.regime instead of connection state (see the
    recordClientRegimeObservation comment in app.js for why this is built
@@ -1398,6 +1464,15 @@ footer.page-foot {
     border: 1px solid #ccc;
   }
   .conn-latency-spark, .meter-spark, .history-tick.placeholder { display: none; }
+  /* .regime-dist-segment/.regime-dist-swatch set their real per-regime color
+     as an inline style (see regimeColor in app.js), which normally wins over
+     a stylesheet rule of equal specificity; !important here is what lets
+     this print block still force them to the same grayscale-safe treatment
+     as every other status color on this page (.history-tick.up/.down just
+     above), rather than printing a hue some readers can't tell apart. */
+  .regime-dist-bar { border: 1px solid #ccc; }
+  .regime-dist-segment { background: #999 !important; border-right-color: #fff !important; }
+  .regime-dist-swatch { background: #999 !important; }
   .equity-curve-line { stroke: #111 !important; }
   .equity-curve-fill { fill: #ccc !important; }
   .equity-curve-range { color: #333; }

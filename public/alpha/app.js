@@ -687,12 +687,102 @@ function renderRegimeHistory(clientRegimeHistory) {
   const list = document.getElementById('regimeHistoryList');
   if (!list) return;
   const segments = computeRegimeSegments(clientRegimeHistory);
+  renderRegimeDistribution(segments);
   if (!segments.length) {
     list.innerHTML = `<li class="regime-history-empty font-mono">No regime changes observed by this browser yet.</li>`;
     return;
   }
   const recent = [...segments].reverse().slice(0, REGIME_HISTORY_LIMIT);
   list.innerHTML = recent.map(regimeSegmentItem).join('');
+}
+
+// Real regime labels come from Alpha's own live feed as arbitrary strings
+// (see the live.regime schema-help row), never a fixed enum this page
+// controls, so there is no way to pre-assign a meaningful color per regime
+// the way, say, pl-good/pl-bad can for a known up/down axis. This instead
+// hashes each label to a stable index into a fixed, distinguishable palette,
+// so the same regime label always gets the same color across renders and
+// reloads (as long as the label spelling itself doesn't change), without
+// needing to know the real regime vocabulary in advance. Kept distinct from
+// the page's existing green/amber/red status hues (used everywhere else for
+// good/caution/critical) so a "trending" or "volatile" swatch here is never
+// mistaken for a status reading.
+const REGIME_PALETTE = ['#7CA8E0', '#3DDC84', '#E0A030', '#B892E0', '#5FD0C0', '#E0819A'];
+
+function hashStringToIndex(str, mod) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % mod;
+}
+
+function regimeColor(label) {
+  return REGIME_PALETTE[hashStringToIndex(String(label), REGIME_PALETTE.length)];
+}
+
+// Aggregates the same real per-segment durations regimeSegmentItem already
+// renders chronologically (see computeRegimeSegments) into a total time spent
+// in each distinct regime label, real trading-dashboard "regime analytics"
+// UX (breakdown/explainability widgets pairing the current label with how
+// conditions have actually evolved) rather than only a moment-to-moment
+// transition log. Sorted by real total duration, longest first, so the
+// dominant regime this browser has actually observed leads. The current,
+// still-open segment's duration is measured up to now, same "current" logic
+// regimeSegmentItem already uses, so the totals stay accurate between polls
+// rather than freezing at whenever the last transition was recorded.
+function computeRegimeDistribution(segments) {
+  if (!Array.isArray(segments) || !segments.length) return { totalMs: 0, rows: [] };
+  const byLabel = new Map();
+  let totalMs = 0;
+  segments.forEach(seg => {
+    const endMs = seg.current ? Date.now() : new Date(seg.end).getTime();
+    const ms = Math.max(0, endMs - new Date(seg.start).getTime());
+    totalMs += ms;
+    byLabel.set(seg.regime, (byLabel.get(seg.regime) || 0) + ms);
+  });
+  const rows = [...byLabel.entries()]
+    .map(([regime, ms]) => ({ regime, ms, pct: totalMs > 0 ? (ms / totalMs) * 100 : 0 }))
+    .sort((a, b) => b.ms - a.ms);
+  return { totalMs, rows };
+}
+
+function renderRegimeDistribution(segments) {
+  const wrap = document.getElementById('regimeDistWrap');
+  const bar = document.getElementById('regimeDistBar');
+  const legend = document.getElementById('regimeDistLegend');
+  if (!wrap || !bar || !legend) return;
+  const { totalMs, rows } = computeRegimeDistribution(segments);
+  // Needs at least two distinct regimes to say anything a single stat tile
+  // doesn't already cover (one regime for the whole observed window is just
+  // "detected regime" again, under a different label); same
+  // more-than-one-point-needed threshold this page's other sparklines use
+  // before rendering a trend rather than nothing.
+  if (rows.length < 2 || totalMs <= 0) {
+    wrap.hidden = true;
+    bar.innerHTML = '';
+    legend.innerHTML = '';
+    return;
+  }
+  wrap.hidden = false;
+  bar.innerHTML = rows.map(r => {
+    const pctText = r.pct >= 10 ? Math.round(r.pct) + '%' : (r.pct >= 1 ? r.pct.toFixed(1) + '%' : '<1%');
+    const durationText = formatDuration(r.ms) || 'under 1m';
+    const title = `${r.regime}: ${durationText} (${pctText})`;
+    return `<button type="button" class="regime-dist-segment" style="width:${r.pct}%;background:${regimeColor(r.regime)}"
+      title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-tick-detail="${escapeHtml(title)}"></button>`;
+  }).join('');
+  wireTickTooltips(bar);
+  legend.innerHTML = rows.map(r => {
+    const pctText = r.pct >= 10 ? Math.round(r.pct) + '%' : (r.pct >= 1 ? r.pct.toFixed(1) + '%' : '<1%');
+    return `
+      <li class="regime-dist-legend-item">
+        <span class="regime-dist-swatch" style="background:${regimeColor(r.regime)}" aria-hidden="true"></span>
+        <span class="regime-dist-legend-label font-mono">${escapeHtml(r.regime)}</span>
+        <span class="regime-dist-legend-value">${escapeHtml(formatDuration(r.ms) || 'under 1m')} &middot; ${pctText}</span>
+      </li>
+    `;
+  }).join('');
 }
 
 // Returns the connection-freshness class ('down'/'live'/'stale') so the
