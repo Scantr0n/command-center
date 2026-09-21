@@ -1,0 +1,25 @@
+# Command Center
+
+Jack's unified dashboard — one hub, one cluster per project, radial node-graph + grid views, per-cluster AI chat.
+
+## Stack
+- Node/Express (`server.js`), port set in `.env`
+- Tailwind CSS (`src/input.css` → `public/style.css`, built via `npm run build:css`)
+- D3.js for the radial hub-and-spoke graph view
+- Google Drive sync (`credentials/drive.js`) merges local cluster JSON with live snapshots, falls back to local-only silently if Drive is unreachable
+
+## Commands
+- `npm start` — run the server
+- `npm run build:css` — rebuild Tailwind output after editing `src/input.css` (run this after any style change, output isn't watched)
+
+## Structure
+- `data/clusters/*.json` — one file per project, the source of truth for cluster status/summary
+- `data/toggles.json` — per-cluster on/off toggles
+- `public/index.html` + `public/style.css` — frontend, both views (graph + grid) live here
+- `credentials/` — Drive OAuth + secrets, all gitignored except `drive.js`/`write_snapshot.js`/`oauth_setup.py` (the code, not the keys)
+
+## Conventions
+- Never commit `.env`, `credentials/drive_token.json`, or `credentials/drive_client_secret.json` — check `.gitignore` covers them before any commit touching `credentials/`
+- Each machine (Mac, PC) needs its own OAuth client under `credentials/drive_client_secret.json` — do not reuse one client's credentials across machines, it invalidates the other's token (see the 9/10-9/11 outage this caused)
+- Grid view's click-to-summarize flow is something Jack explicitly likes — don't regress it when changing the graph view
+- No `agents: [...]` field exists per-cluster in the data model yet — don't fabricate agent-level sub-nodes in the graph until that's added for real
