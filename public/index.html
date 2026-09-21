@@ -1107,6 +1107,23 @@ async function fetchVentureMetric(clusterId) {
   }
 }
 
+async function updateVentureCard(grid, clusterId) {
+  const card = grid.querySelector(`[data-venture-id="${CSS.escape(clusterId)}"]`);
+  if (!card) return;
+  const metric = await fetchVentureMetric(clusterId);
+  const valueEl = card.querySelector('.venture-metric-value');
+  const metaEl = card.querySelector('.venture-metric-meta');
+  if (!metric || metric.value == null) {
+    valueEl.textContent = 'n/a';
+    valueEl.style.color = 'var(--faint)';
+    metaEl.textContent = (metric && metric.meta) || 'Not tracked yet';
+  } else {
+    valueEl.textContent = metric.value;
+    valueEl.style.color = 'var(--ink)';
+    metaEl.textContent = [metric.label, metric.meta].filter(Boolean).join(' · ');
+  }
+}
+
 let ventureSnapshotLoaded = false;
 async function renderVentureSnapshot() {
   if (ventureSnapshotLoaded) return;
@@ -1131,22 +1148,22 @@ async function renderVentureSnapshot() {
   `).join('');
   grid.querySelectorAll('[data-venture-id]').forEach(makeCardClickable);
 
-  const results = await Promise.all(targets.map(c => fetchVentureMetric(c.id)));
-  targets.forEach((c, i) => {
-    const card = grid.querySelector(`[data-venture-id="${CSS.escape(c.id)}"]`);
-    if (!card) return;
-    const metric = results[i];
-    const valueEl = card.querySelector('.venture-metric-value');
-    const metaEl = card.querySelector('.venture-metric-meta');
-    if (!metric || metric.value == null) {
-      valueEl.textContent = 'n/a';
-      valueEl.style.color = 'var(--faint)';
-      metaEl.textContent = (metric && metric.meta) || 'Not tracked yet';
-    } else {
-      valueEl.textContent = metric.value;
-      metaEl.textContent = [metric.label, metric.meta].filter(Boolean).join(' · ');
-    }
-  });
+  await Promise.all(targets.map(c => updateVentureCard(grid, c.id)));
+
+  // Alpha alone gets a real recurring refresh: it's genuinely live,
+  // continuously-moving trading equity, unlike the other ventures here
+  // (a download count, a card's price, realized sales, a pipeline count)
+  // which don't meaningfully change within a browsing session. Freezing
+  // Alpha's number forever after one fetch would be a real staleness bug
+  // specific to that one card, not a reasonable trade-off like it is for
+  // the others. Matches Alpha's own dedicated page's real refresh cadence
+  // (REFRESH_INTERVAL_MS in public/alpha/app.js), paused while the tab is
+  // hidden for the same reason that page pauses too.
+  if (targets.some(c => c.id === 'alpha')) {
+    setInterval(() => {
+      if (document.visibilityState === 'visible') updateVentureCard(grid, 'alpha');
+    }, 30000);
+  }
 }
 
 function updateAttentionVisibility() {
