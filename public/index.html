@@ -420,6 +420,19 @@
        invisible, leaving only a stray colored sliver with no visible track
        to show it as a proportion of. */
     .cluster-card [style*="rgba(255,255,255,0.08)"] { background: #ddd !important; }
+    /* line-clamp-3 truncates every card summary to 3 lines with a hidden
+       remainder on screen, on purpose, for a compact grid, but the same
+       cutoff on a printed report silently drops real project detail mid-
+       sentence with no way to see the rest (confirmed against Sondrik's
+       card, whose real summary runs past 3 lines). CSM's own print
+       stylesheet already unsets its card-next-action's line-clamp for the
+       identical reason; same fix here for the one summary field this page
+       truncates the same way. */
+    .cluster-card .line-clamp-3 {
+      -webkit-line-clamp: unset;
+      display: block;
+      overflow: visible;
+    }
     /* The toggle itself has no purpose on paper (see the beforeprint listener
        near activityFeedExpanded below, which expands the feed in full for
        print instead of leaving this truncated behind a dead button). */
