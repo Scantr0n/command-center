@@ -397,6 +397,19 @@
 
     .tag-chip { background: none !important; color: #111 !important; border: 1px solid #999 !important; }
     .status-dot, .activity-row > span.rounded-full { display: none !important; }
+    /* Same real-content-loss bug as the grid card's line-clamp-3 fix above,
+       one row down: the activity feed's own summary uses a single-line
+       .truncate (overflow hidden, ellipsis) sized to fit on screen next to
+       the fixed-width time/name columns, which just as silently clips a real
+       project update mid-sentence on paper. Letting it wrap instead of
+       clipping needs the row itself to stop vertically centering against a
+       now-taller wrapped block. */
+    .activity-row { align-items: flex-start !important; }
+    .activity-row .truncate {
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: unset !important;
+    }
     #statsRow, #statsRow * { color: #111 !important; }
     /* Every one of the 9 category colors and 5 status colors was checked for
        real WCAG contrast against this stylesheet's white background: every
