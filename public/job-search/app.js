@@ -69,6 +69,20 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  // ISO "YYYY-MM-DD" strings compare correctly with plain >, so this finds
+  // the real most-recent appliedDate rather than assuming applications.json
+  // is always hand-edited in chronological append order (a backfilled entry
+  // added out of order would otherwise silently show the wrong "most recent"
+  // date below). Entries with no appliedDate logged yet are skipped, not
+  // treated as older or newer than a real date.
+  function mostRecentAppliedDate(apps) {
+    let latest = null;
+    apps.forEach(a => {
+      if (a.appliedDate && (!latest || a.appliedDate > latest)) latest = a.appliedDate;
+    });
+    return latest;
+  }
+
   function loadDataFile(name) {
     return fetch('/job-search/data/' + name + '.json').then(r => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -84,7 +98,7 @@
     chips.push({
       number: apps.length,
       label: 'Applications submitted',
-      meta: apps.length ? 'Most recent: ' + (fmtDate(apps[apps.length - 1].appliedDate) || 'undated') : null
+      meta: apps.length ? 'Most recent: ' + (fmtDate(mostRecentAppliedDate(apps)) || 'undated') : null
     });
 
     chips.push({
