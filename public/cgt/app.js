@@ -201,7 +201,7 @@ function isSold(c) {
 // unrealized version. A card sold with no logged costBasis has a real sale
 // price but no real realized gain/loss to compute against.
 function computeRealizedGainLoss(c) {
-  if (!isSold(c) || c.costBasis == null) return null;
+  if (!isSold(c) || c.costBasis == null || c.soldPrice == null) return null;
   const abs = c.soldPrice - c.costBasis;
   const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
   return { abs, pct };
