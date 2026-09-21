@@ -2571,8 +2571,21 @@ function renderAcquisitions(acquisitions, currentListings, sales) {
   // Same "first acquisition that links this listing wins" rule as cost basis
   // above, so a sale's revenue and a listing's cost basis always agree on
   // which channel gets credit.
+  //
+  // Built once as a listingId -> owner acquisition lookup rather than an
+  // acquisitions.find() per sale (same O(sales x acquisitions) shape the CGT
+  // 13x-rebuild and photo-audit-grid perf fixes already caught elsewhere in
+  // this codebase, harmless at today's small log size but growing quadratic
+  // with real use). Iterated in array order, first acquisition to claim a
+  // listingId wins, matching .find()'s own first-match semantics exactly.
+  const acquisitionByListingId = new Map();
+  acquisitions.forEach(a => {
+    (a.listingIds || []).forEach(listingId => {
+      if (!acquisitionByListingId.has(listingId)) acquisitionByListingId.set(listingId, a);
+    });
+  });
   sales.forEach(sale => {
-    const owner = acquisitions.find(a => (a.listingIds || []).includes(sale.listingId));
+    const owner = acquisitionByListingId.get(sale.listingId);
     if (!owner) return;
     const key = owner.source || 'other';
     bySource[key].revenue += sale.salePrice || 0;
