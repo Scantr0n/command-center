@@ -4,6 +4,7 @@ let candidates = [];
 let rawCardsData = null;
 let rawSubmissionsData = null;
 let rawCandidatesData = null;
+let changelogDriftStatus = null;
 let activeCard = null;
 let lastFocusedEl = null;
 let searchTerm = '';
@@ -500,22 +501,43 @@ async function loadCandidates() {
 // submissions.json, and candidates.json. A fresh clone before anyone has
 // run that script is a real, expected state (an honest empty state), not a
 // load failure, so it never blocks or fails the rest of loadCards.
+// driftStatus comes from /api/cgt/changelog-status, the same live drift
+// check already exposed for Sondrik, Alpha, and CSM: it compares
+// changelog.json's recorded commit hashes for cards.json/submissions.json/
+// candidates.json against this repo's real git log, so a real drift shows up
+// here on the live page instead of only when someone happens to run
+// node public/cgt/data/changelog.js from the command line. Best-effort and
+// independent of the changelog fetch itself, so a failure here (no git
+// checkout, shallow clone, etc) never blocks rendering the changelog entries.
 async function loadChangelog() {
-  try {
-    const res = await fetch('/cgt/data/changelog.json');
-    if (!res.ok) throw new Error('Server returned ' + res.status);
-    renderChangelog(await res.json());
-  } catch (e) {
-    renderChangelog({ entries: [] });
-    console.error("Couldn't load changelog.json: " + e.message);
+  const [changelogResult, driftResult] = await Promise.allSettled([
+    fetch('/cgt/data/changelog.json').then(r => {
+      if (!r.ok) throw new Error('Server returned ' + r.status);
+      return r.json();
+    }),
+    fetch('/api/cgt/changelog-status').then(r => r.ok ? r.json() : null)
+  ]);
+  changelogDriftStatus = driftResult.status === 'fulfilled' ? driftResult.value : null;
+  if (changelogResult.status === 'fulfilled') {
+    renderChangelog(changelogResult.value, changelogDriftStatus);
+  } else {
+    renderChangelog({ entries: [] }, changelogDriftStatus);
+    console.error("Couldn't load changelog.json: " + changelogResult.reason.message);
   }
+  renderAttentionBar();
 }
 
-function renderChangelog(data) {
+function renderChangelog(data, driftStatus) {
   const el = document.getElementById('changelogFeed');
+  const driftWarning = (driftStatus && driftStatus.drifted)
+    ? '<div class="callout callout-warn"><strong>Changelog is out of sync.</strong> changelog.json records ' +
+      driftStatus.recordedCount + ' commit' + (driftStatus.recordedCount === 1 ? '' : 's') +
+      ' for cards.json/submissions.json/candidates.json, but this repo&rsquo;s real git history has ' +
+      driftStatus.realCount + '. Run <code>node public/cgt/data/changelog.js</code> to regenerate it.</div>'
+    : '';
   const entries = (data && data.entries) || [];
   if (entries.length === 0) {
-    el.innerHTML = '<p class="changelog-empty">No changelog generated yet. Run ' +
+    el.innerHTML = driftWarning + '<p class="changelog-empty">No changelog generated yet. Run ' +
       '<code>node public/cgt/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
     return;
   }
@@ -530,7 +552,7 @@ function renderChangelog(data) {
       (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
       '</div>';
   }).join('');
-  el.innerHTML = rowsHtml;
+  el.innerHTML = driftWarning + rowsHtml;
   let noteEl = el.nextElementSibling;
   if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
     noteEl = document.createElement('p');
@@ -1886,24 +1908,33 @@ function renderAttentionBar() {
   const candidatesNeedingDataCount = openCandidates.filter(c => !computeGradingMath(c)).length;
 
   const items = [];
+  // Same reasoning as CSM's own renderAttentionBar: a drifted changelog is
+  // actively showing a real commit history that no longer matches this
+  // repo's git log, an urgent tone rather than the routine "needs backfill"
+  // warn tone below, since it's misinformation already on the page, not just
+  // an unlogged field.
+  if (changelogDriftStatus && changelogDriftStatus.drifted) {
+    items.push({ n: 1, tone: 'urgent', target: 'changelogFeed', label: 'data changelog out of sync with real git history' });
+  }
   if (unpricedCount) {
-    items.push({ n: unpricedCount, target: 'unpricedSection', label: unpricedCount === 1 ? 'card not priced yet' : 'cards not priced yet' });
+    items.push({ n: unpricedCount, tone: 'warn', target: 'unpricedSection', label: unpricedCount === 1 ? 'card not priced yet' : 'cards not priced yet' });
   }
   if (dataQualityCount) {
-    items.push({ n: dataQualityCount, target: 'dataQualitySection', label: dataQualityCount === 1 ? 'card needs backfill' : 'cards need backfill' });
+    items.push({ n: dataQualityCount, tone: 'warn', target: 'dataQualitySection', label: dataQualityCount === 1 ? 'card needs backfill' : 'cards need backfill' });
   }
   if (stalePricingCount) {
-    items.push({ n: stalePricingCount, target: 'stalePricingSection', label: stalePricingCount === 1 ? 'price is stale' : 'prices are stale' });
+    items.push({ n: stalePricingCount, tone: 'warn', target: 'stalePricingSection', label: stalePricingCount === 1 ? 'price is stale' : 'prices are stale' });
   }
   if (duplicateCount) {
-    items.push({ n: duplicateCount, target: 'duplicatesSection', label: duplicateCount === 1 ? 'possible duplicate group' : 'possible duplicate groups' });
+    items.push({ n: duplicateCount, tone: 'warn', target: 'duplicatesSection', label: duplicateCount === 1 ? 'possible duplicate group' : 'possible duplicate groups' });
   }
   if (gradeLadderCount) {
-    items.push({ n: gradeLadderCount, target: 'gradeLadderSection', label: gradeLadderCount === 1 ? 'grade ladder inversion' : 'grade ladder inversions' });
+    items.push({ n: gradeLadderCount, tone: 'warn', target: 'gradeLadderSection', label: gradeLadderCount === 1 ? 'grade ladder inversion' : 'grade ladder inversions' });
   }
   if (candidatesNeedingDataCount) {
     items.push({
       n: candidatesNeedingDataCount,
+      tone: 'warn',
       target: 'candidatesSection',
       label: candidatesNeedingDataCount === 1
         ? 'open candidate has no verdict yet, needs graded-value research'
@@ -1918,7 +1949,7 @@ function renderAttentionBar() {
   }
   bar.hidden = false;
   bar.innerHTML = items.map(item =>
-    '<button type="button" class="attention-pill attention-warn" data-target="' + escapeHtml(item.target) + '">' +
+    '<button type="button" class="attention-pill attention-' + item.tone + '" data-target="' + escapeHtml(item.target) + '">' +
     '<strong>' + item.n + '</strong> ' + escapeHtml(item.label) + '</button>'
   ).join('');
   bar.querySelectorAll('[data-target]').forEach(btn => {
