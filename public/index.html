@@ -1811,7 +1811,7 @@ function renderGraph() {
     // on a nested <title> for its accessible name across every browser and
     // screen reader pairing, so this is stated explicitly rather than only
     // implied by <title>, which stays for the native mouse-hover tooltip.
-    const nodeLabel = `${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}${stale ? (c.lastUpdate ? ' (stale, over a month untouched)' : ' (stale, no date ever logged)') : ''}`;
+    const nodeLabel = clusterAriaLabel(c);
 
     // Connector badge: real last-update time sitting on the spoke itself
     // (n8n puts live state directly on its connector lines, not just the
@@ -2215,6 +2215,16 @@ function isStale(c) {
   return daysAgoLocal(c.lastUpdate) > 30;
 }
 
+// Shared accessible name for a cluster, used by both the graph node (whose
+// nested <title> alone isn't a reliable accessible name for a JS role="button"
+// SVG group across screen readers) and the grid card (which otherwise had no
+// aria-label at all and fell back to reading its full visible text in DOM
+// order, noisier and inconsistent with the graph's curated label).
+function clusterAriaLabel(c) {
+  const stale = isStale(c);
+  return `${c.name}, ${c.status}, updated ${relativeTime(c.lastUpdate)}${stale ? (c.lastUpdate ? ' (stale, over a month untouched)' : ' (stale, no date ever logged)') : ''}`;
+}
+
 let gridSortBy = 'priority';
 try { gridSortBy = localStorage.getItem('ccGridSort') || 'priority'; } catch {}
 document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
@@ -2320,7 +2330,7 @@ function renderGrid() {
     }).length;
 
     return `
-    <div class="cluster-card cursor-pointer rounded-xl p-6 border hairline" style="background: var(--panel); --cat: ${color};${isTop ? ` outline: 1px dashed ${color}80; outline-offset: -1px;` : ''}" data-id="${escapeHtml(c.id)}">
+    <div class="cluster-card cursor-pointer rounded-xl p-6 border hairline" style="background: var(--panel); --cat: ${color};${isTop ? ` outline: 1px dashed ${color}80; outline-offset: -1px;` : ''}" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(clusterAriaLabel(c))}">
       <div class="flex items-center justify-between gap-2 mb-4">
         <span class="flex items-center gap-1.5 text-[10px] font-mono tracking-wide truncate" style="color: ${color}">
           <span class="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style="background:${color}"></span>${escapeHtml((c.category || 'Uncategorized').toUpperCase())}
