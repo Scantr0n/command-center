@@ -397,7 +397,7 @@
   // a stalled deal doesn't require scrolling past several sections to
   // notice. Never computes anything new, just points at where each count
   // already lives, so it can never drift out of sync with those sections.
-  function renderAttentionBar(stages, prospects) {
+  function renderAttentionBar(stages, prospects, driftStatus) {
     const nudgeRows = computeNudgeRows(prospects);
     const overdueCount = nudgeRows.filter(r => r.days <= 0).length;
     const stalledCount = computeStalled(stages, prospects).length;
@@ -406,6 +406,17 @@
     const duplicateCount = CSMValidateCore.findDuplicateProspects(prospects).length;
 
     const items = [];
+    // Same reasoning as Sondrik's own Next Steps widget: a drifted changelog
+    // is actively showing a real commit history that no longer matches this
+    // repo's git log, an urgent tone rather than the routine "needs
+    // backfill" warn tone below, since it's misinformation already on the
+    // page, not just an unlogged field.
+    if (driftStatus && driftStatus.drifted) {
+      items.push({
+        n: 1, tone: 'urgent', target: 'changelogFeed',
+        label: 'data changelog out of sync with real git history'
+      });
+    }
     if (overdueCount) {
       items.push({
         n: overdueCount, tone: 'urgent', target: 'nudgeQueue',
@@ -3656,7 +3667,7 @@
     if (prospectsResult.status === 'rejected') failures.push('prospects.json: ' + prospectsResult.reason.message);
 
     if (stagesData || prospectsData) {
-      renderAttentionBar(allStages, allProspects);
+      renderAttentionBar(allStages, allProspects, driftStatus);
       renderNudgeQueue(allProspects);
       renderStats(allStages, allProspects);
       renderChannelFilterCounts(allProspects);
