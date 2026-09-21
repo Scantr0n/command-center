@@ -406,7 +406,7 @@
   <div class="max-w-7xl mx-auto px-6 py-10">
     <header class="mb-7 pb-6 border-b hairline flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display font-800 text-3xl" style="letter-spacing: -0.02em; color: var(--ink)">COMMAND CENTER</h1>
+        <h1 class="font-display font-extrabold text-3xl" style="letter-spacing: -0.02em; color: var(--ink)">COMMAND CENTER</h1>
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
       <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
@@ -510,8 +510,8 @@
       </div>
     </div>
 
-    <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-    <div id="gridSkeleton" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-hidden="true"></div>
+    <div id="clusterGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    <div id="gridSkeleton" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" aria-hidden="true"></div>
 
     <div class="mt-10 pt-6 border-t hairline">
       <h2 class="text-xs font-mono tracking-wide mb-3 flex items-center gap-2" style="color: var(--faint)">
@@ -529,7 +529,7 @@
       <div class="flex items-center justify-between px-6 py-4 border-b hairline">
         <div class="flex items-center gap-3">
           <div id="modalDot" class="w-3 h-3 rounded-full status-dot"></div>
-          <h2 id="modalTitle" class="font-display font-700 text-lg"></h2>
+          <h2 id="modalTitle" class="font-display font-bold text-lg"></h2>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
           <button id="copyLinkBtn" type="button" class="text-[10px] font-mono px-2.5 py-1 rounded border hairline" style="color: var(--sub)" aria-live="polite">Copy link</button>
@@ -590,7 +590,7 @@
   <div id="shortcutsOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
     <div class="corner-notch rounded-xl w-full max-w-sm overflow-hidden border hairline" style="background: var(--panel)" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div class="flex items-center justify-between px-5 py-3.5 border-b hairline">
-        <h2 class="font-display font-700 text-sm" style="color: var(--ink)">Keyboard shortcuts</h2>
+        <h2 class="font-display font-bold text-sm" style="color: var(--ink)">Keyboard shortcuts</h2>
         <button id="closeShortcuts" type="button" aria-label="Close" class="text-xl leading-none" style="color: var(--sub)">&times;</button>
       </div>
       <div id="shortcutsList" class="px-5 py-4 flex flex-col gap-3 text-sm"></div>
@@ -905,7 +905,7 @@ function renderStats() {
     <div class="stat-tile flex items-center gap-2">
       <span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--sub)">${statIcon(ICON_GRID)}</span>
       <div class="text-left">
-        <div class="font-display font-700 text-lg leading-none" style="color: var(--ink)">${total}</div>
+        <div class="font-display font-bold text-lg leading-none" style="color: var(--ink)">${total}</div>
         <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">PROJECTS</div>
       </div>
     </div>
@@ -924,14 +924,14 @@ function renderStats() {
     <div class="stat-tile flex items-center gap-2">
       <span class="stat-badge" style="background: ${attnColor}1F; color: ${attnColor}">${statIcon(ICON_ALERT)}</span>
       <div class="text-left">
-        <div class="font-display font-700 text-lg leading-none" style="color: ${attnColor}">${attention}</div>
+        <div class="font-display font-bold text-lg leading-none" style="color: ${attnColor}">${attention}</div>
         <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">NEEDS ATTN</div>
       </div>
     </div>
     <div class="stat-tile flex items-center gap-2">
       <span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--sub)">${statIcon(ICON_CLOCK)}</span>
       <div class="text-left">
-        <div class="font-display font-700 text-sm leading-none" style="color:var(--sub)">${escapeHtml(lastSync)}</div>
+        <div class="font-display font-bold text-sm leading-none" style="color:var(--sub)">${escapeHtml(lastSync)}</div>
         <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">LAST SYNC</div>
       </div>
     </div>
@@ -988,7 +988,7 @@ function renderAttention() {
     <div class="attn-card cursor-pointer flex items-center gap-3 rounded-lg px-4 py-3 border hairline" data-id="${escapeHtml(c.id)}" style="background: var(--panel); --cat: ${statusColor(c.status)};">
       <div class="w-2 h-2 rounded-full flex-shrink-0 status-dot" style="background:${statusColor(c.status)}; color:${statusColor(c.status)}"></div>
       <div class="min-w-0 flex-1">
-        <div class="font-display font-700 text-sm" style="color: var(--ink)">${escapeHtml(c.name)}</div>
+        <div class="font-display font-bold text-sm" style="color: var(--ink)">${escapeHtml(c.name)}</div>
         <div class="text-xs truncate" style="color: var(--sub)">${escapeHtml(c.summary)}</div>
       </div>
       <span class="tag-chip flex-shrink-0" style="${pillStyle(c.status)}">${escapeHtml(c.status.toUpperCase())}</span>
@@ -1721,13 +1721,13 @@ document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
 function renderGridSkeleton() {
   const bar = (w, h, o = 0.06) => `<span style="display:block; width:${w}; height:${h}px; border-radius:4px; background: rgba(255,255,255,${o})"></span>`;
   const card = `
-    <div class="rounded-xl p-5 border hairline skeleton-pulse" style="background: var(--panel)">
-      <div class="flex items-center justify-between mb-3">
+    <div class="rounded-xl p-6 border hairline skeleton-pulse" style="background: var(--panel)">
+      <div class="flex items-center justify-between mb-4">
         ${bar('64px', 16)}
         <span style="width:10px; height:10px; border-radius:999px; background: rgba(255,255,255,0.06)"></span>
       </div>
-      <div class="mb-3">${bar('70%', 15)}</div>
-      <div class="flex flex-col gap-1.5 mb-4">${bar('100%', 10, 0.045)}${bar('88%', 10, 0.045)}${bar('55%', 10, 0.045)}</div>
+      <div class="mb-3">${bar('70%', 20)}</div>
+      <div class="flex flex-col gap-1.5 mb-5">${bar('100%', 11, 0.045)}${bar('88%', 11, 0.045)}${bar('55%', 11, 0.045)}</div>
       <div class="flex items-center justify-between">
         ${bar('46px', 16)}
         ${bar('58px', 10, 0.045)}
@@ -1780,8 +1780,8 @@ function renderGrid() {
     }).length;
 
     return `
-    <div class="cluster-card cursor-pointer rounded-xl p-5 border hairline" style="background: var(--panel); --cat: ${color};${isTop ? ` outline: 1px dashed ${color}80; outline-offset: -1px;` : ''}" data-id="${escapeHtml(c.id)}">
-      <div class="flex items-center justify-between gap-2 mb-3">
+    <div class="cluster-card cursor-pointer rounded-xl p-6 border hairline" style="background: var(--panel); --cat: ${color};${isTop ? ` outline: 1px dashed ${color}80; outline-offset: -1px;` : ''}" data-id="${escapeHtml(c.id)}">
+      <div class="flex items-center justify-between gap-2 mb-4">
         <span class="flex items-center gap-1.5 text-[10px] font-mono tracking-wide truncate" style="color: ${color}">
           <span class="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style="background:${color}"></span>${escapeHtml((c.category || 'Uncategorized').toUpperCase())}
         </span>
@@ -1789,11 +1789,11 @@ function renderGrid() {
           <span class="w-1.5 h-1.5 rounded-full inline-block${c.status === 'active' ? ' status-pulse' : ''}" style="background:${sColor}"></span>${escapeHtml(c.status.toUpperCase())}
         </span>
       </div>
-      <h2 class="font-display font-700 text-base mb-1 flex items-center gap-1.5 flex-wrap" style="color: var(--ink)">
+      <h2 class="font-display font-extrabold text-lg mb-1.5 flex items-center gap-1.5 flex-wrap tracking-tight" style="color: var(--ink)">
         <span>${escapeHtml(c.name)}</span>${isTop ? `<span class="text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style="color:${color}; background:${color}1F; letter-spacing:0.5px">TOP</span>` : ''}
       </h2>
-      <p class="text-xs leading-relaxed line-clamp-3" style="color: var(--sub)">${escapeHtml(c.summary)}</p>
-      <div class="mt-4 pt-3 border-t hairline flex items-center justify-between gap-2">
+      <p class="text-[13px] leading-relaxed line-clamp-3" style="color: var(--sub)">${escapeHtml(c.summary)}</p>
+      <div class="mt-5 pt-4 border-t hairline flex items-center justify-between gap-2">
         <span class="text-[10px] font-mono truncate" style="color: ${stale ? statusColor('stalled') : 'var(--faint)'}; font-weight: ${stale ? '600' : '400'}">${stale ? '● stale, ' : ''}${escapeHtml(relativeTime(c.lastUpdate))}</span>
         <div class="flex items-center gap-2.5 flex-shrink-0">
           ${relatedCount ? `<span class="text-[10px] font-mono" style="color: var(--faint)" title="${relatedCount} related project${relatedCount === 1 ? '' : 's'}">⇄ ${relatedCount}</span>` : ''}
