@@ -791,10 +791,24 @@
   // repo instead of resting on a hand-typed claim. Missing the file
   // entirely (never generated yet, or a fresh clone) is an honest empty
   // state, not an error, same as an empty prospects list.
-  function renderChangelog(data) {
+  // driftStatus comes from /api/csm/changelog-status, the same live drift
+  // check already exposed for Sondrik and Alpha: it compares changelog.json's
+  // recorded commit hashes for prospects.json/stages.json against this
+  // repo's real git log, so a real drift shows up here on the live page
+  // instead of only when someone happens to run node public/csm/data/
+  // changelog.js from the command line. "unavailable" (not a git checkout,
+  // shallow clone, etc) is an environment gap, not a data error, so it stays
+  // silent rather than showing a warning no one can act on.
+  function renderChangelog(data, driftStatus) {
+    const driftWarning = (driftStatus && driftStatus.drifted)
+      ? '<div class="callout callout-warn"><strong>Changelog is out of sync.</strong> changelog.json records ' +
+        driftStatus.recordedCount + ' commit' + (driftStatus.recordedCount === 1 ? '' : 's') +
+        ' for prospects.json/stages.json, but this repo’s real git history has ' + driftStatus.realCount +
+        '. Run <code>node public/csm/data/changelog.js</code> to regenerate it.</div>'
+      : '';
     const entries = (data && data.entries) || [];
     if (entries.length === 0) {
-      changelogFeedEl.innerHTML = '<p class="changelog-empty">No changelog generated yet. Run ' +
+      changelogFeedEl.innerHTML = driftWarning + '<p class="changelog-empty">No changelog generated yet. Run ' +
         '<code>node public/csm/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
       return;
     }
@@ -809,7 +823,7 @@
         (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
         '</div>';
     }).join('');
-    changelogFeedEl.innerHTML = rowsHtml;
+    changelogFeedEl.innerHTML = driftWarning + rowsHtml;
     let noteEl = changelogFeedEl.nextElementSibling;
     if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
       noteEl = document.createElement('p');
@@ -3589,9 +3603,14 @@
     fetch('/csm/data/changelog.json').then(r => {
       if (!r.ok) throw new Error('changelog.json returned ' + r.status);
       return r.json();
-    })
-  ]).then(([stagesResult, prospectsResult, changelogResult]) => {
-    renderChangelog(changelogResult.status === 'fulfilled' ? changelogResult.value : { entries: [] });
+    }),
+    // Best-effort and independent of the changelog fetch itself (it can be
+    // unavailable, e.g. no git checkout, while the changelog still loads
+    // fine), so a failure here never blocks rendering the changelog entries.
+    fetch('/api/csm/changelog-status').then(r => r.ok ? r.json() : null).catch(() => null)
+  ]).then(([stagesResult, prospectsResult, changelogResult, driftResult]) => {
+    const driftStatus = driftResult.status === 'fulfilled' ? driftResult.value : null;
+    renderChangelog(changelogResult.status === 'fulfilled' ? changelogResult.value : { entries: [] }, driftStatus);
     const stagesData = stagesResult.status === 'fulfilled' ? stagesResult.value.data : null;
     const prospectsData = prospectsResult.status === 'fulfilled' ? prospectsResult.value.data : null;
     allStages = (stagesData && stagesData.stages) || [];

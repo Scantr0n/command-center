@@ -141,6 +141,14 @@ header.page-head .sub {
 }
 .callout strong { color: var(--ink); }
 
+/* Same pattern as public/alpha/style.css's .callout-warn: a real changelog
+   drift (recorded commit hashes for prospects.json/stages.json no longer
+   matching this repo's actual git log) is a data-integrity warning, not a
+   routine caveat, so it gets the same amber already used for the
+   "silent-replied" stage color instead of the neutral .callout tone. */
+.callout-warn { border-color: rgba(224,160,48,0.32); background: rgba(224,160,48,0.06); margin-bottom: 14px; }
+.callout-warn strong { color: #E0A030; }
+
 /* At-a-glance digest of what this board already knows needs a look, so a
    real overdue nudge or a stalled deal doesn't require reading every section
    below to notice. Purely a jump-link to the section that already computed
@@ -1356,6 +1364,8 @@ footer.page-foot {
     color: #333;
   }
   .callout strong { color: #111; }
+  .callout-warn { border-color: #b5860f; }
+  .callout-warn strong { color: #7a5a08; }
 
   /* .offline-banner is worth keeping on paper (unlike .attention-bar, hidden
      above): if the page was printed while genuinely offline, that is real
