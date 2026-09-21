@@ -5,6 +5,16 @@ const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 
+// execFileSync blocks Node's single event loop thread until the process
+// exits, worse than an async call hanging (which only stalls its own
+// request): an unbounded git call here would freeze every other request
+// this server is handling, not just the changelog-status routes below that
+// use it. Both routes' real git log calls run against a handful of tracked
+// files and always return in well under a second locally, so this only ever
+// trips on a genuinely stuck process (a corrupted index, a stale lock file),
+// same defensive-only intent as the Drive API timeout added elsewhere.
+const GIT_EXEC_TIMEOUT_MS = 5000;
+
 const app = express();
 // This binds to all interfaces (no host passed to app.listen below), so it's
 // reachable from any device on Jack's LAN, not just this Mac, meaning these
@@ -672,13 +682,13 @@ app.get('/api/sondrik/changelog-status', (req, res) => {
     // isn't real (the same bug fixed in changelog.js and validate.js after
     // it collapsed real changelog entries on 2026-09-19). Treated as
     // "unavailable" below, same as no git checkout at all.
-    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() === 'true') {
+    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
       throw new Error('shallow clone');
     }
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
       'releases.json', 'downloads.json', 'leads.json', 'channels.json', 'goals.json'
-    ], { cwd: dataDir, encoding: 'utf8' }).trim();
+    ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
     const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
     const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
@@ -707,12 +717,12 @@ app.get('/api/alpha/changelog-status', (req, res) => {
     // Same shallow-clone guard as the Sondrik route: a shallow clone's
     // `git log` for status.json only sees the commits actually fetched, not
     // the real full history, which would report drift that isn't real.
-    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() === 'true') {
+    if (execFileSync('git', ['-C', dataDir, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
       throw new Error('shallow clone');
     }
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--', 'status.json'
-    ], { cwd: dataDir, encoding: 'utf8' }).trim();
+    ], { cwd: dataDir, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim();
     const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     const changelogData = JSON.parse(fs.readFileSync(path.join(dataDir, 'changelog.json'), 'utf8'));
     const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
