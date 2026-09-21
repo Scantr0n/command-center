@@ -397,6 +397,17 @@
       digestGrid.innerHTML = '<div class="empty-state" role="alert">Failed to load latest-digest data: ' +
         escapeHtml(digestResult.reason.message) + '</div>';
     }
+
+    // The four sections above already announce their own failures via
+    // role="alert" on each empty-state div, but nothing ever announced a
+    // real *success*, unlike Command Center's own Data Quality/Venture
+    // Snapshot panels. A screen-reader user tabbing in during this fetch had
+    // no way to tell "still loading" from "genuinely done", since every
+    // section renders into a plain, non-live container on the success path.
+    const loadedCount = [applicationsData, criteriaData, nextUpData, digestData].filter(Boolean).length;
+    document.getElementById('loadStatusLive').textContent = loadedCount === 4
+      ? 'Job search data loaded.'
+      : `Job search data loaded, ${4 - loadedCount} of 4 section${4 - loadedCount === 1 ? '' : 's'} failed to load.`;
   });
 
   // Keyboard shortcuts overlay, same markup/behavior as the other hubs.
