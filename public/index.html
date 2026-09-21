@@ -2049,13 +2049,34 @@ document.getElementById('searchClearBtn').addEventListener('click', () => {
   searchInputEl.focus();
 });
 
+// Real calendar-day difference between dateStr's local date and today's
+// local date. Dividing a raw Date.now() - dateStr-midnight ms gap by a
+// fixed 86400000 (the old approach here) silently loses or gains whatever
+// hour a DST transition falls in between the two, so for the several months
+// between a spring-forward and the following fall-back, any date logged
+// before that transition read as one calendar day "fresher" than it really
+// was on every single render, in relativeTime's activity-feed labels and
+// shortRelativeTime's graph badges alike. Naively swapping Math.floor for
+// Math.round doesn't fix this: it would round the ordinary second half of
+// *today* (any time from noon on) up to "1 day ago". Subtracting two Date
+// objects built straight from Y/M/D components instead, each resolved by
+// the runtime to its own correct local-midnight instant, cancels the DST
+// hour out entirely and stays exact for the plain same-day case too.
+function daysAgoLocal(dateStr) {
+  const then = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const thenMidnight = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((nowMidnight - thenMidnight) / 86400000);
+}
+
 // Compact form of relativeTime() for the graph's connector badges, where
 // "3 days ago" is too wide to sit on a spoke without crowding a 22-node
 // canvas. No real date means no badge at all (return null, skip rendering)
 // rather than force an awkward "no date on record" pill onto the graph.
 function shortRelativeTime(dateStr) {
   if (!dateStr) return null;
-  const days = Math.floor((Date.now() - new Date(dateStr + 'T00:00:00')) / 86400000);
+  const days = daysAgoLocal(dateStr);
   if (days <= 0) return 'today';
   if (days < 30) return `${days}d`;
   const months = Math.floor(days / 30);
@@ -2064,7 +2085,7 @@ function shortRelativeTime(dateStr) {
 
 function relativeTime(dateStr) {
   if (!dateStr) return 'no date on record';
-  const days = Math.floor((Date.now() - new Date(dateStr + 'T00:00:00')) / 86400000);
+  const days = daysAgoLocal(dateStr);
   if (days <= 0) return 'today';
   if (days === 1) return '1 day ago';
   if (days < 30) return `${days} days ago`;
@@ -2087,7 +2108,7 @@ function relativeTime(dateStr) {
 // their own distinct, honest status treatment elsewhere on the page.
 function isStale(c) {
   if (!c.lastUpdate) return c.status === 'active' || c.status === 'stalled';
-  return (Date.now() - new Date(c.lastUpdate + 'T00:00:00')) / 86400000 > 30;
+  return daysAgoLocal(c.lastUpdate) > 30;
 }
 
 let gridSortBy = 'priority';
