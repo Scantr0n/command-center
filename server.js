@@ -892,6 +892,76 @@ app.get('/api/garage/data-quality', dataQualityHandler('garage'));
 app.get('/api/sondrik/data-quality', dataQualityHandler('sondrik'));
 app.get('/api/job-search/data-quality', dataQualityHandler('job-search'));
 
+// The main dashboard's search box has only ever matched project-level
+// metadata (data/clusters/*.json's own name/category/summary/status), never
+// the real records living inside each hub - a card in CGT, a prospect in
+// CSM, a listing in Garage, a lead in Sondrik, an application in job-search.
+// Typing a real name like "Fraga" or "Malkin" found nothing, even though
+// that record genuinely exists. This reads each hub's own real data file
+// (already served as plain JSON elsewhere on this same server, nothing new
+// exposed) and does a plain case-insensitive substring match against a
+// small, deliberately chosen set of real fields per hub - not every field,
+// just the ones a real person would actually type to find that record.
+// Real records only: no fabricated snippets, no fuzzy/ranked matching, just
+// "does this real field contain what was typed".
+const SEARCH_SOURCES = [
+  {
+    hub: 'cgt', clusterId: 'card-grading', file: 'cards.json', key: 'cards', type: 'card',
+    label: c => c.cardName, detail: c => [c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '),
+    fields: c => [c.cardName]
+  },
+  {
+    hub: 'csm', clusterId: 'csm', file: 'prospects.json', key: 'prospects', type: 'prospect',
+    label: p => p.name, detail: p => p.company || '',
+    fields: p => [p.name, p.company]
+  },
+  {
+    hub: 'garage', clusterId: 'garage', file: 'listings.json', key: 'listings', type: 'listing',
+    label: l => l.title, detail: l => l.status ? l.status.toUpperCase() : '',
+    fields: l => [l.title]
+  },
+  {
+    hub: 'sondrik', clusterId: 'sondrik', file: 'leads.json', key: 'leads', type: 'lead',
+    label: l => l.sourceDetail || l.source || 'Lead', detail: l => l.summary || '',
+    fields: l => [l.sourceDetail, l.source, l.summary]
+  },
+  {
+    hub: 'job-search', clusterId: 'job-search', file: 'applications.json', key: 'applications', type: 'application',
+    label: a => a.company, detail: a => a.role || '',
+    fields: a => [a.company, a.role]
+  }
+];
+const SEARCH_RESULT_CAP = 20;
+
+app.get('/api/search', (req, res) => {
+  const term = String(req.query.q || '').trim().toLowerCase();
+  if (term.length < 2) { res.json({ results: [] }); return; }
+  const results = [];
+  for (const source of SEARCH_SOURCES) {
+    if (results.length >= SEARCH_RESULT_CAP) break;
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', source.hub, 'data', source.file), 'utf8'));
+    } catch (err) {
+      continue;
+    }
+    const items = Array.isArray(data[source.key]) ? data[source.key] : [];
+    for (const item of items) {
+      if (results.length >= SEARCH_RESULT_CAP) break;
+      const matched = source.fields(item).some(f => typeof f === 'string' && f.toLowerCase().includes(term));
+      if (!matched) continue;
+      results.push({
+        hub: source.hub,
+        clusterId: source.clusterId,
+        type: source.type,
+        label: source.label(item) || 'Untitled',
+        detail: source.detail(item) || ''
+      });
+    }
+  }
+  res.json({ results });
+});
+
 const PORT = process.env.PORT || 4488;
 app.listen(PORT, () => {
   console.log(`Command Center running at http://localhost:${PORT}`);

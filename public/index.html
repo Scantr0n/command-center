@@ -112,6 +112,16 @@
   .palette-item-name { color: var(--ink); font-weight: 500; font-size: 13px; flex-shrink: 0; }
   .palette-item-cat { color: var(--sub); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3px; margin-left: auto; white-space: nowrap; }
   .palette-item-status { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; }
+  /* A record result (a real card/prospect/listing/lead/application, not a
+     project) carries its own detail line, so it needs two lines of vertical
+     room where a project row only ever needed one; palette-record-body wraps
+     both so the row's flex layout still aligns the trailing project·type tag
+     to the row's vertical center, not just its first line. */
+  .palette-item-record { align-items: flex-start; padding-top: 8px; padding-bottom: 8px; }
+  .palette-item-record .w-2 { margin-top: 4px; }
+  .palette-record-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .palette-record-detail { color: var(--faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+  .palette-section-label { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.5px; color: var(--faint); padding: 10px 16px 4px; border-top: 1px solid var(--hairline); margin-top: 4px; }
   #paletteResults::-webkit-scrollbar { width: 6px; }
   #paletteResults::-webkit-scrollbar-thumb { background: #23262b; border-radius: 3px; }
 
@@ -429,7 +439,7 @@
             class="absolute inset-y-0 right-1.5 flex items-center text-[10px] font-mono leading-none pointer-events-none"
             style="color: var(--faint)">/</kbd>
         </div>
-        <button id="paletteBtn" type="button" aria-label="Jump to a project"
+        <button id="paletteBtn" type="button" aria-label="Jump to a project or search your data"
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">
           <span>Jump to</span>
@@ -589,15 +599,15 @@
 
   <!-- Quick-jump palette (Ctrl/Cmd+K) -->
   <div id="paletteOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-start justify-center z-50 p-6" style="padding-top: 12vh;">
-    <div class="corner-notch rounded-xl w-full max-w-lg max-h-[60vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)" role="dialog" aria-modal="true" aria-label="Jump to a project">
+    <div class="corner-notch rounded-xl w-full max-w-lg max-h-[60vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)" role="dialog" aria-modal="true" aria-label="Jump to a project or search your data">
       <div class="flex items-center gap-2.5 px-4 py-3 border-b hairline">
         <span aria-hidden="true" style="color: var(--faint)">&#8981;</span>
-        <input id="paletteInput" type="text" placeholder="Jump to a project..." aria-label="Jump to a project"
+        <input id="paletteInput" type="text" placeholder="Jump to a project, or search a card, prospect, lead..." aria-label="Jump to a project or search your data"
           class="flex-1 bg-transparent text-sm focus:outline-none" style="color: var(--ink)"
           role="combobox" aria-expanded="true" aria-controls="paletteResults" aria-autocomplete="list">
         <kbd class="kbd-chip text-[10px]" style="color: var(--sub)">ESC</kbd>
       </div>
-      <div id="paletteResults" role="listbox" aria-label="Projects" class="flex-1 overflow-y-auto py-1.5"></div>
+      <div id="paletteResults" role="listbox" aria-label="Projects and matching records" class="flex-1 overflow-y-auto py-1.5"></div>
       <div id="paletteEmpty" class="hidden px-4 py-6 text-xs text-center" style="color: var(--faint)"></div>
     </div>
   </div>
@@ -2400,6 +2410,37 @@ let paletteOpen = false;
 let paletteSelectedIndex = 0;
 let paletteResultsCache = [];
 let paletteLastFocusedEl = null;
+
+// Project matches above are instant (clusters is already loaded client-side),
+// but a real record match (a CGT card, a CSM prospect, a Garage listing, a
+// Sondrik lead, a job-search application) only exists in /api/search, a real
+// network call. Same incrementing-request-id guard loadClusters() already
+// uses above, so a slow response for an earlier keystroke can never overwrite
+// a newer, faster one for the term actually still in the box.
+let paletteRecordResults = [];
+let latestPaletteRecordRequestId = 0;
+let paletteRecordDebounceTimer = null;
+
+async function fetchPaletteRecordResults(term) {
+  const requestId = ++latestPaletteRecordRequestId;
+  if (term.trim().length < 2) {
+    paletteRecordResults = [];
+    renderPaletteResults();
+    return;
+  }
+  try {
+    const r = await fetch('/api/search?q=' + encodeURIComponent(term));
+    if (requestId !== latestPaletteRecordRequestId) return;
+    if (!r.ok) { paletteRecordResults = []; renderPaletteResults(); return; }
+    const data = await r.json();
+    if (requestId !== latestPaletteRecordRequestId) return;
+    paletteRecordResults = Array.isArray(data.results) ? data.results : [];
+  } catch (e) {
+    if (requestId !== latestPaletteRecordRequestId) return;
+    paletteRecordResults = [];
+  }
+  renderPaletteResults();
+}
 let shortcutsOpen = false;
 let shortcutsLastFocusedEl = null;
 
@@ -2426,28 +2467,81 @@ function paletteFilteredResults() {
     .map(x => x.c);
 }
 
+// A record result only ever names the project it lives in through
+// clusterId, so its real display name/category color come from the same
+// already-loaded `clusters` array every other card on this page uses, never
+// a second, separately-maintained name.
+function paletteRecordProjectName(clusterId) {
+  const c = clusters.find(x => x.id === clusterId);
+  return c ? c.name : clusterId;
+}
+
+// paletteResultsCache entries are { kind: 'project', c } or { kind: 'record',
+// r }, never a bare cluster object with its own .id the way this cache used
+// to work before record results existed, so anything that needs "the real
+// cluster id to open" goes through this instead of reading .id directly off
+// a cache entry.
+function paletteItemId(item) {
+  return item.kind === 'project' ? item.c.id : item.r.clusterId;
+}
+
 function renderPaletteResults() {
-  paletteResultsCache = paletteFilteredResults();
+  const projectMatches = paletteFilteredResults();
+  const term = document.getElementById('paletteInput').value.trim();
+  // Record results only ever apply to a real typed term (fetchPaletteRecordResults
+  // itself clears them below 2 characters), never shown for the default
+  // "show every project" empty-input state.
+  const recordMatches = term.length >= 2 ? paletteRecordResults : [];
+  paletteResultsCache = [
+    ...projectMatches.map(c => ({ kind: 'project', c })),
+    ...recordMatches.map(r => ({ kind: 'record', r }))
+  ];
   const list = document.getElementById('paletteResults');
   const empty = document.getElementById('paletteEmpty');
 
   if (!paletteResultsCache.length) {
     list.innerHTML = '';
-    empty.textContent = clusters.length ? 'No projects match.' : 'Projects still loading...';
+    empty.textContent = clusters.length
+      ? (term.length >= 2 ? 'Nothing matches, in projects or your data.' : 'No projects match.')
+      : 'Projects still loading...';
     empty.classList.remove('hidden');
     return;
   }
   empty.classList.add('hidden');
   paletteSelectedIndex = Math.max(0, Math.min(paletteSelectedIndex, paletteResultsCache.length - 1));
 
-  list.innerHTML = paletteResultsCache.map((c, i) => `
-    <div class="palette-item" role="option" id="palette-opt-${i}" data-id="${escapeHtml(c.id)}" aria-selected="${i === paletteSelectedIndex}">
-      <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${categoryColor(c.category)}"></span>
-      <span class="palette-item-name">${escapeHtml(c.name)}</span>
-      <span class="palette-item-cat">${escapeHtml((c.category || 'Uncategorized').toUpperCase())}</span>
-      <span class="palette-item-status" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
-    </div>
-  `).join('');
+  // The divider only appears once, right where record results actually start,
+  // so a query that matches zero projects but real records doesn't show an
+  // empty "Projects" heading above them, and a query matching zero records
+  // doesn't show a heading with nothing under it either.
+  const firstRecordIndex = paletteResultsCache.findIndex(x => x.kind === 'record');
+  list.innerHTML = paletteResultsCache.map((item, i) => {
+    const divider = i === firstRecordIndex && firstRecordIndex > 0
+      ? `<div class="palette-section-label">FOUND IN YOUR DATA</div>` : '';
+    if (item.kind === 'project') {
+      const c = item.c;
+      return `${divider}
+        <div class="palette-item" role="option" id="palette-opt-${i}" data-id="${escapeHtml(c.id)}" aria-selected="${i === paletteSelectedIndex}">
+          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${categoryColor(c.category)}"></span>
+          <span class="palette-item-name">${escapeHtml(c.name)}</span>
+          <span class="palette-item-cat">${escapeHtml((c.category || 'Uncategorized').toUpperCase())}</span>
+          <span class="palette-item-status" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
+        </div>
+      `;
+    }
+    const r = item.r;
+    const projectName = paletteRecordProjectName(r.clusterId);
+    return `${divider}
+      <div class="palette-item palette-item-record" role="option" id="palette-opt-${i}" data-id="${escapeHtml(r.clusterId)}" aria-selected="${i === paletteSelectedIndex}">
+        <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:var(--faint)"></span>
+        <span class="palette-record-body">
+          <span class="palette-item-name">${escapeHtml(r.label)}</span>
+          ${r.detail ? `<span class="palette-record-detail">${escapeHtml(r.detail)}</span>` : ''}
+        </span>
+        <span class="palette-item-cat">${escapeHtml(projectName.toUpperCase())} · ${escapeHtml(r.type.toUpperCase())}</span>
+      </div>
+    `;
+  }).join('');
   document.getElementById('paletteInput').setAttribute('aria-activedescendant', `palette-opt-${paletteSelectedIndex}`);
   list.querySelectorAll('.palette-item').forEach(el => {
     el.addEventListener('click', () => activatePaletteItem(el.dataset.id));
@@ -2477,6 +2571,8 @@ function openPalette() {
   paletteSelectedIndex = 0;
   paletteLastFocusedEl = document.activeElement;
   document.getElementById('paletteInput').value = '';
+  paletteRecordResults = [];
+  clearTimeout(paletteRecordDebounceTimer);
   document.getElementById('paletteOverlay').classList.remove('hidden');
   document.getElementById('paletteOverlay').classList.add('flex');
   lockBodyScroll();
@@ -2494,9 +2590,17 @@ function closePalette() {
   paletteLastFocusedEl = null;
 }
 
-document.getElementById('paletteInput').addEventListener('input', () => {
+document.getElementById('paletteInput').addEventListener('input', (e) => {
   paletteSelectedIndex = 0;
   renderPaletteResults();
+  // Debounced so a fast typist doesn't fire a real network request per
+  // keystroke; 180ms is short enough that the record results still feel
+  // like they're keeping up, per real research on perceived-instant search
+  // latency thresholds (well under the ~300ms where a delay starts reading
+  // as a stall rather than a live filter).
+  clearTimeout(paletteRecordDebounceTimer);
+  const term = e.target.value;
+  paletteRecordDebounceTimer = setTimeout(() => fetchPaletteRecordResults(term), 180);
 });
 document.getElementById('paletteOverlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('paletteOverlay')) closePalette();
@@ -2508,7 +2612,7 @@ document.getElementById('paletteBtn').addEventListener('click', openPalette);
 // below (never an invented or aspirational one).
 const SHORTCUTS = [
   { keys: ['/'], label: 'Focus search' },
-  { keys: ['&#8984;K', 'Ctrl K'], label: 'Jump to a project' },
+  { keys: ['&#8984;K', 'Ctrl K'], label: 'Jump to a project, or search a card/prospect/listing/lead/application' },
   { keys: ['&uarr;', '&darr;'], label: 'Move selection in Jump to' },
   { keys: ['Enter'], label: 'Open the focused project' },
   { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
@@ -2760,7 +2864,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const target = paletteResultsCache[paletteSelectedIndex];
-      if (target) activatePaletteItem(target.id);
+      if (target) activatePaletteItem(paletteItemId(target));
       return;
     }
     if (e.key === 'Tab') { trapTabInside('paletteOverlay', e); return; }
