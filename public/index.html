@@ -134,20 +134,24 @@
     #categoryFilterRow .tag-chip { flex-shrink: 0; }
   }
 
-  /* Atmosphere behind the graph: radar grid + vignette, pushed bolder than
-     the first pass (which read as "no real difference" against the plain
-     void background it replaced) toward the orbital-map reference (ref3) -
-     a real dark-space gradient plus a soft multi-hue wash pulled from the
-     actual category colors on screen, not a single flat tint. */
+  /* Atmosphere behind the graph: real dark-space gradient + radar grid.
+     An earlier pass here added a 3-hue wash (green/purple/pink radial
+     gradients) pulled from category colors already on screen, but real
+     premium references (Spotify's actual dark theme, a real "AgentOS"
+     agent-orchestration dashboard kit pulled up for direct comparison)
+     use ONE confident accent, never a decorative rainbow, and this app's
+     own established convention is the same: one functional color per
+     category, reserved for actually identifying something (a node, a
+     status), never spent on ambient background decoration. Simplified to
+     a single neutral vignette, the real color richness now comes only
+     from each node's own real category-color glow, not manufactured
+     background wash. */
   #graphView {
     position: relative;
     background-color: #05060a;
     background-image:
       repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 44px),
       repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 44px),
-      radial-gradient(circle at 50% 42%, rgba(61,220,132,0.10) 0%, transparent 32%),
-      radial-gradient(circle at 30% 65%, rgba(139,127,217,0.08) 0%, transparent 30%),
-      radial-gradient(circle at 70% 62%, rgba(219,92,130,0.08) 0%, transparent 30%),
       radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 68%);
     border-radius: 16px;
     box-shadow: inset 0 0 90px rgba(0,0,0,0.55);
