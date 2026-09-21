@@ -5,6 +5,7 @@
   const viewToggleEl = document.getElementById('viewToggle');
   const nudgeEl = document.getElementById('nudgeQueue');
   const statsEl = document.getElementById('statsBar');
+  const snapshotStripEl = document.getElementById('snapshotStrip');
   const searchInput = document.getElementById('searchInput');
   const channelFilterEl = document.getElementById('channelFilter');
   const categoryFilterEl = document.getElementById('categoryFilter');
@@ -1443,6 +1444,85 @@
     const latestDateStr = latest.getFullYear() + '-' + String(latest.getMonth() + 1).padStart(2, '0') + '-' + String(latest.getDate()).padStart(2, '0');
     el.textContent = ' Last hand-edited ' + when + ' (' + latestDateStr + ').';
     el.classList.toggle('data-freshness-stale', daysAgo > 14);
+  }
+
+  // Real glyphs, one per snapshot card, same "hub within a hub" pattern
+  // shipped on Sondrik and Job Search tonight: each card is a real link
+  // into the section it summarizes (jumpToSection below), not a dead
+  // number. CSM had no glanceable top-of-page summary at all before this,
+  // just a plain unstyled stats string buried near the Pipeline board.
+  // Centered on (0,0) at roughly an 18x18 box.
+  const SNAPSHOT_ICON = {
+    prospects: '<circle cx="-3" cy="-4" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M-8,7 C-8,2 -5.8,-0.2 -3,-0.2 C-0.2,-0.2 2,2 2,7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="5" cy="-2" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1,7 C1,3.2 2.6,1.3 5,1.3 C7.4,1.3 9,3.2 9,7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+    nudges: '<path d="M0,-8 C3,-8 5,-5.5 5,-2 L5,2 L7,5.5 L-7,5.5 L-5,2 L-5,-2 C-5,-5.5 -3,-8 0,-8 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M-2.3,5.5 C-2.3,7 -1.2,8 0,8 C1.2,8 2.3,7 2.3,5.5" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+    attention: '<path d="M0,-8.5 L8.5,7 L-8.5,7 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><line x1="0" y1="-3" x2="0" y2="2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="0" cy="4.6" r="1" fill="currentColor"/>'
+  };
+  const SNAPSHOT_TARGET = { prospects: 'board', nudges: 'nudgeQueue', attention: 'attentionBar' };
+
+  // Real "clicked through" confirmation, same pattern as Sondrik/Job
+  // Search: a brief highlight on the section a card actually jumps to.
+  let sectionFlashTimer = null;
+  function jumpToSection(targetId) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    const container = el.closest('section') || el;
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    clearTimeout(sectionFlashTimer);
+    document.querySelectorAll('.section-flash').forEach(n => n.classList.remove('section-flash'));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      container.classList.add('section-flash');
+      sectionFlashTimer = setTimeout(() => container.classList.remove('section-flash'), 1600);
+    }));
+  }
+
+  // Reuses the exact same compute functions renderAttentionBar already
+  // calls (computeNudgeRows, computeStalled, computeColdSignal,
+  // computeDataQualityFlags, CSMValidateCore.findDuplicateProspects), so
+  // this card's numbers can never drift from what the attention bar itself
+  // shows for the same real data.
+  function renderSnapshot(stages, prospects) {
+    const nudgeRows = computeNudgeRows(prospects);
+    const overdueCount = nudgeRows.filter(r => r.days <= 0).length;
+    const attentionCount = overdueCount + computeStalled(stages, prospects).length +
+      computeColdSignal(prospects).active.length + computeDataQualityFlags(stages, prospects).length +
+      CSMValidateCore.findDuplicateProspects(prospects).length;
+
+    const chips = [
+      {
+        kind: 'prospects',
+        number: prospects.length,
+        label: prospects.length === 1 ? 'prospect in the pipeline' : 'prospects in the pipeline',
+        meta: null
+      },
+      {
+        kind: 'nudges',
+        number: overdueCount,
+        label: overdueCount === 1 ? 'nudge due or overdue' : 'nudges due or overdue',
+        meta: nudgeRows.length ? nudgeRows.length + ' total on the queue' : 'no nudge dates logged yet'
+      },
+      {
+        kind: 'attention',
+        number: attentionCount,
+        label: attentionCount === 1 ? 'item needs attention' : 'items need attention',
+        meta: attentionCount ? 'stalled, cold, backfill, or duplicate flags' : 'nothing flagged right now'
+      }
+    ];
+
+    snapshotStripEl.innerHTML = chips.map(c =>
+      '<a href="#' + SNAPSHOT_TARGET[c.kind] + '" class="snapshot-chip snapshot-chip-' + c.kind + '" data-target="' + SNAPSHOT_TARGET[c.kind] + '">' +
+      '<div class="snapshot-chip-icon"><svg viewBox="-10 -10 20 20" width="18" height="18" aria-hidden="true">' + SNAPSHOT_ICON[c.kind] + '</svg></div>' +
+      '<div class="snapshot-chip-number font-display">' + escapeHtml(String(c.number)) + '</div>' +
+      '<div class="snapshot-chip-label">' + escapeHtml(c.label) + '</div>' +
+      (c.meta ? '<div class="snapshot-chip-meta">' + escapeHtml(c.meta) + '</div>' : '') +
+      '</a>'
+    ).join('');
+
+    snapshotStripEl.querySelectorAll('.snapshot-chip').forEach(el => {
+      el.addEventListener('click', (event) => {
+        event.preventDefault();
+        jumpToSection(el.dataset.target);
+      });
+    });
   }
 
   function renderStats(stages, prospects) {
@@ -3667,6 +3747,7 @@
     if (prospectsResult.status === 'rejected') failures.push('prospects.json: ' + prospectsResult.reason.message);
 
     if (stagesData || prospectsData) {
+      renderSnapshot(allStages, allProspects);
       renderAttentionBar(allStages, allProspects, driftStatus);
       renderNudgeQueue(allProspects);
       renderStats(allStages, allProspects);

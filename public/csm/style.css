@@ -256,6 +256,88 @@ header.page-head .sub {
   line-height: 1.5;
 }
 
+/* At-a-glance snapshot strip: CSM had no glanceable top-of-page summary at
+   all before this, real headline numbers (renderSnapshot in app.js), each
+   card a real link into the section it summarizes, same "hub within a hub"
+   pattern shipped on Sondrik and Job Search tonight. */
+.snapshot-section { margin-bottom: 32px; }
+.snapshot-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px;
+}
+.snapshot-chip {
+  --chip-accent: #4F9FD9;
+  display: block;
+  text-decoration: none;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 22px 24px;
+  background: var(--panel);
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease;
+}
+.snapshot-chip::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+  background: var(--chip-accent);
+  opacity: 0.85;
+}
+.snapshot-chip:hover, .snapshot-chip:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--chip-accent);
+  box-shadow: 0 10px 24px -14px var(--chip-accent), 0 0 0 1px var(--chip-accent);
+  outline: none;
+}
+.snapshot-chip-prospects { --chip-accent: #4F9FD9; }
+.snapshot-chip-nudges { --chip-accent: #D9A441; }
+.snapshot-chip-attention { --chip-accent: #E5484D; }
+.snapshot-chip-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--chip-accent) 18%, transparent);
+  color: var(--chip-accent);
+  margin-bottom: 12px;
+}
+.snapshot-chip-number {
+  font-weight: 800;
+  font-size: 1.9rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.snapshot-chip-label {
+  color: var(--sub);
+  font-size: 0.78rem;
+  margin-top: 6px;
+}
+.snapshot-chip-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  color: var(--dim);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* Real "you clicked through, here's where you landed" confirmation for the
+   snapshot cards, same pattern as Sondrik/Job Search: a silent
+   scrollIntoView gave no feedback that the click did anything. */
+.section-flash {
+  animation: sectionFlash 1.6s ease-out;
+  border-radius: 12px;
+}
+@keyframes sectionFlash {
+  0% { box-shadow: 0 0 0 2px var(--hairlineHover), 0 0 32px -8px var(--hairlineHover); background: rgba(255,255,255,0.035); }
+  100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+}
+
 .section-title {
   font-family: 'Manrope', sans-serif;
   font-weight: 700;
