@@ -3173,7 +3173,11 @@ async function sendChat() {
       appendMessage('assistant', data.text);
       chatHistory.push({ role: 'assistant', content: data.text });
     } else {
-      appendMessage('assistant', 'Error reaching the assistant.');
+      // The server normalizes any real Anthropic API error (a rate limit,
+      // an invalid key, a content-safety block) to a plain string in
+      // data.error, so this can show the real, specific reason instead of
+      // a one-size-fits-all message that hides whether it's worth retrying.
+      appendMessage('assistant', 'Error reaching the assistant.' + (typeof data.error === 'string' ? ' (' + data.error + ')' : ''));
     }
   } catch (e) {
     if (sessionId !== chatSessionId) return;

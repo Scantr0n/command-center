@@ -344,6 +344,20 @@ const DRAFT_RATE_LIMIT = 8;
 const DRAFT_RATE_WINDOW_MS = 10 * 60 * 1000;
 const isDraftRateLimited = createRateLimiter(DRAFT_RATE_LIMIT, DRAFT_RATE_WINDOW_MS);
 
+// Anthropic's own error responses are shaped {type: 'error', error: {type,
+// message}}, one level deeper than every other error this server returns (a
+// plain {error: '...'} string). Both proxy routes below used to forward that
+// raw shape straight through as the whole "error" field, so the real,
+// specific, actionable reason (a rate limit, an invalid key, a content-safety
+// block) never actually reached Jack: new Error(thatWholeObject) stringifies
+// to the literal, useless text "[object Object]" wherever a frontend tried
+// to read it as a plain message, exactly what the Garage draft form did.
+function anthropicErrorMessage(data) {
+  if (data && data.error && typeof data.error.message === 'string') return data.error.message;
+  if (typeof data === 'string') return data;
+  return 'Anthropic API error';
+}
+
 app.post('/api/clusters/:id/chat', async (req, res) => {
   try {
     if (isChatRateLimited(req.ip)) {
@@ -381,7 +395,7 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
       signal: AbortSignal.timeout(25000)
     });
     const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: data });
+    if (!r.ok) return res.status(r.status).json({ error: anthropicErrorMessage(data) });
     res.json({ text: data.content[0].text });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -484,7 +498,7 @@ app.post('/api/garage/draft-listing', async (req, res) => {
       signal: AbortSignal.timeout(120000)
     });
     const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: data });
+    if (!r.ok) return res.status(r.status).json({ error: anthropicErrorMessage(data) });
 
     // With web_search enabled, content is a mix of server_tool_use /
     // web_search_tool_result / text blocks; the actual drafted JSON is in the
