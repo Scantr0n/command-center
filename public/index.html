@@ -1147,13 +1147,34 @@ async function fetchVentureMetric(clusterId) {
       const data = await r.json();
       const account = data.live && data.live.account;
       if (!account) return { label: 'Trading equity', value: null, meta: 'Daemon unreachable right now' };
-      const changeSign = account.dayChangeDollar >= 0 ? '+' : '';
+      // dayChangeDollar and dayChangePct are independently nullable
+      // (server.js only computes the percent when lastEquity is nonzero, to
+      // avoid a divide-by-zero on a freshly-funded account), same real edge
+      // case alpha/app.js's own renderAccount already guards against. This
+      // used to assume the two always arrive together and call
+      // account.dayChangePct.toFixed(2) unconditionally, throwing when
+      // lastEquity was 0 and landing in the catch below, which mislabeled a
+      // real, knowable equity reading as a generic fetch failure.
+      //
+      // Sign handling is deliberately different for the two numbers: the
+      // dollar amount is rendered via Math.abs + an explicit sign (so it
+      // needs a real '-' for a loss, not just an omitted '+'), while the
+      // percent already carries its own sign from toFixed() on the signed
+      // number itself, so reusing one shared sign string for both (the old
+      // "'+' for >=0, else ''" single variable) silently dropped the minus
+      // sign off a real dollar loss instead of double-signing the percent.
+      let meta = null;
+      if (account.dayChangeDollar != null) {
+        const dollarSign = account.dayChangeDollar < 0 ? '-' : '+';
+        const pctPart = account.dayChangePct != null
+          ? ` (${account.dayChangePct >= 0 ? '+' : ''}${account.dayChangePct.toFixed(2)}%)`
+          : '';
+        meta = `${dollarSign}$${Math.abs(account.dayChangeDollar).toFixed(2)} today${pctPart}`;
+      }
       return {
         label: 'Trading equity',
         value: '$' + account.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        meta: account.dayChangeDollar != null
-          ? `${changeSign}$${Math.abs(account.dayChangeDollar).toFixed(2)} today (${changeSign}${account.dayChangePct.toFixed(2)}%)`
-          : null
+        meta
       };
     }
     if (clusterId === 'sondrik') {
