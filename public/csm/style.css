@@ -611,6 +611,17 @@ header.page-head .sub {
   font-size: 0.72rem;
   font-family: 'JetBrains Mono', monospace;
 }
+/* Full width of its own so the channel-escalation hint reads as a distinct
+   line under the row, not a trailing clause easy to skim past, matching the
+   "first-class visible" requirement this field has (see prospects.json's
+   schema note and the CLAUDE.md-equivalent CSM brief). */
+.data-quality-row .dq-escalate {
+  flex-basis: 100%;
+  color: #E0A030;
+  font-weight: 600;
+  font-size: 0.72rem;
+  font-family: 'JetBrains Mono', monospace;
+}
 
 /* Recent activity feed: merges stage moves and content ideas from every
    prospect into one pipeline-wide, newest-first list. */
@@ -1515,6 +1526,7 @@ footer.page-foot {
   .data-quality-list { background: none; border-color: #bbb; }
   .data-quality-row { border-color: #ddd; }
   .data-quality-row .dq-why { color: #555; }
+  .data-quality-row .dq-escalate { color: #654600; }
 
   .activity-feed { background: none; border-color: #bbb; }
   .activity-row { border-color: #ddd; }

@@ -639,6 +639,9 @@
         '<strong>' + escapeHtml(p.name) + '</strong>' +
         '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
         '<span class="dq-why">' + touches + ' REAL TOUCHES LOGGED, STILL WAITING ON A REPLY</span>' +
+        (p.contactChannel && p.contactChannel.type === 'generic-inbox'
+          ? '<span class="dq-escalate">STILL ON A GENERIC INBOX, TRY A NAMED DECISION-MAKER NEXT</span>'
+          : '') +
         '</button>'
       ).join('');
       wireRowsToModal(coldSignalEl);
@@ -652,6 +655,9 @@
         '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
         '<span class="dq-why">' + touches + ' TOUCHES SO FAR &middot; RE-ENGAGE ' +
         fmtDate(p.nudgeSchedule.doNotNudgeBefore).toUpperCase() + '</span>' +
+        (p.contactChannel && p.contactChannel.type === 'generic-inbox'
+          ? '<span class="dq-escalate">STILL ON A GENERIC INBOX, TRY A NAMED DECISION-MAKER NEXT</span>'
+          : '') +
         '</button>'
       ).join('');
       wireRowsToModal(coldSignalParkedEl);
