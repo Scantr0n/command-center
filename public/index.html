@@ -1148,7 +1148,18 @@ async function renderVentureSnapshot() {
   `).join('');
   grid.querySelectorAll('[data-venture-id]').forEach(makeCardClickable);
 
+  // Unlike #filterStatus (a permanent sr-only live region), this is only
+  // turned on for the one real Loading-to-value transition below, not left
+  // on afterward: Alpha's own recurring refresh a few lines down would
+  // otherwise re-announce its trading number to a screen reader every 30s
+  // for as long as the tab stays open, the same kind of unwanted repeating
+  // announcement this app's purely-visual status-pulse/spoke-live
+  // animations were already careful never to back with a live region.
+  grid.setAttribute('role', 'status');
+  grid.setAttribute('aria-live', 'polite');
   await Promise.all(targets.map(c => updateVentureCard(grid, c.id)));
+  grid.removeAttribute('role');
+  grid.removeAttribute('aria-live');
 
   // Alpha alone gets a real recurring refresh: it's genuinely live,
   // continuously-moving trading equity, unlike the other ventures here
