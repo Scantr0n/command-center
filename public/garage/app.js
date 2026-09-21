@@ -3381,7 +3381,18 @@ function renderKanban(listings, pipelineData) {
   board.innerHTML = KANBAN_STAGE_ORDER.map(stageId => {
     const cards = listings.filter(l => l.status === stageId);
     const known = countByStage[stageId];
-    const moreCount = (typeof known === 'number' && known > cards.length) ? known - cards.length : 0;
+    // pipeline.json's real "live" count is documented as listing instances
+    // across platforms (its own note field says so, e.g. "9, 3 unique
+    // items"), a different unit than every other stage's count, which is a
+    // real count of items. Comparing it against cards.length (unique items,
+    // same as renderStats' own listingInstances split above) falsely showed
+    // "+N more" live items that don't exist: 3 real live listings across 9
+    // platform instances read as only 3 logged against a known 9, an
+    // apparent 6-item gap that was never real.
+    const loggedForCompare = stageId === 'live'
+      ? cards.reduce((s, l) => s + remainingPlatforms(l).length, 0)
+      : cards.length;
+    const moreCount = (typeof known === 'number' && known > loggedForCompare) ? known - loggedForCompare : 0;
     const cardsHtml = cards.length ? cards.map(l => `
       <div class="kanban-card" draggable="true" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="${escapeHtml(l.title || 'Untitled item')}, open to edit">
         <div class="kanban-card-title">${escapeHtml(l.title || 'Untitled item')}</div>
