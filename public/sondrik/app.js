@@ -461,6 +461,19 @@
         };
       }
       if (days < checkpoint + BUGFIX_CHECKPOINT_GRACE_DAYS) {
+        // An earlier checkpoint's own grace window can close before this
+        // one's due window even opens (true for 7: 7+3=10 is before 14),
+        // so missedCheckpoints can already be non-empty by the time this
+        // branch runs. Returning plain "due" here dropped that missed
+        // checkpoint the moment the next one's window opened, the same
+        // silent-drop this function's own comment above says never to do.
+        if (missedCheckpoints.length) {
+          return {
+            tier: 'missed',
+            text: 'Missed the ' + missedCheckpoints.join(' and ') + '-day check-in' + (missedCheckpoints.length > 1 ? 's' : '') +
+              ' (day ' + days + '); the ' + checkpoint + '-day check-in is also due now, confirm no new reports of the fixed bug'
+          };
+        }
         return {
           tier: 'due',
           text: 'Past the ' + checkpoint + '-day check-in (day ' + days + '), confirm no new reports of the fixed bug'
