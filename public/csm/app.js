@@ -740,6 +740,19 @@
         const label = (OUTREACH_TYPE_LABEL[entry.type] || entry.type || 'Touch') + (entry.note ? ': ' + entry.note : '');
         events.push({ date: entry.date, type: 'touch', prospect: p, label });
       });
+      // A logged social snapshot is just as real a research event as a
+      // stage move, a touch, or a content idea, it just used to only ever
+      // show up inside that prospect's own detail view (Social snapshots
+      // field), never in this cross-prospect feed. asOfDate is when the
+      // numbers were actually pulled, the same real date every other event
+      // type here is keyed on.
+      (p.socialSnapshots || []).forEach(snap => {
+        if (!snap.asOfDate) return;
+        const label = 'Logged ' + (snap.platform || 'platform not logged') + ' snapshot' +
+          (snap.followers != null ? ': ' + Number(snap.followers).toLocaleString() + ' followers' : '') +
+          (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '');
+        events.push({ date: snap.asOfDate, type: 'snapshot', prospect: p, label });
+      });
     });
     events.sort((a, b) => b.date.localeCompare(a.date));
     return events;
@@ -759,6 +772,8 @@
         ? '<span class="activity-tag activity-tag-stage" style="color:' + escapeHtml(ev.color) + ';border-color:' + escapeHtml(ev.color) + '66;background:' + escapeHtml(ev.color) + '14">MOVED</span>'
         : ev.type === 'touch'
         ? '<span class="activity-tag activity-tag-touch">TOUCH</span>'
+        : ev.type === 'snapshot'
+        ? '<span class="activity-tag activity-tag-snapshot">SNAPSHOT</span>'
         : '<span class="activity-tag activity-tag-idea">IDEA</span>';
       return '<button type="button" class="activity-row" data-prospect-id="' + escapeHtml(ev.prospect.id) + '">' +
         '<span class="activity-date font-mono">' + escapeHtml(fmtDate(ev.date)) + '</span>' +
