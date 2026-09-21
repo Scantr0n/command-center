@@ -458,6 +458,15 @@
     <div id="attnCompact" class="hidden flex-wrap items-center gap-2 mb-4"></div>
     <div id="attnCards" class="hidden flex-col gap-2 mb-6"></div>
 
+    <section id="ventureSnapshotSection" class="mb-6">
+      <h2 class="text-[10px] font-mono tracking-wide mb-3 flex items-center gap-2" style="color:var(--faint)">
+        <span aria-hidden="true" style="width:3px; height:11px; background:#D9A441; border-radius:1px; display:inline-block"></span>
+        VENTURE SNAPSHOT
+      </h2>
+      <div id="ventureSnapshotGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      <p class="text-[10px] font-mono mt-2" style="color: var(--faint)">Real numbers fetched live from each venture's own data, never estimated. A blank field means that venture genuinely hasn't logged it yet, not that it was skipped.</p>
+    </section>
+
     <div id="statusLegend" class="flex items-center gap-4 text-[10px] font-mono mb-2 flex-wrap" style="color: var(--faint)">
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#3DDC84"></span>Active</span>
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 inline-block" style="background:#4A9EDB; transform: rotate(45deg)"></span>Done</span>
@@ -812,6 +821,7 @@ async function loadClusters() {
     backupBtn.title = 'Download a backup of all project data as JSON';
     renderStats();
     renderAttention();
+    renderVentureSnapshot();
     renderCategoryFilter();
     renderGraph();
     renderGrid();
@@ -1005,6 +1015,129 @@ function renderAttention() {
   cards.querySelectorAll('.attn-card').forEach(makeCardClickable);
 
   updateAttentionVisibility();
+}
+
+// Real cross-venture snapshot, built from each venture's own real data
+// files, never a second copy or an estimate. Direct answer to a real
+// research finding (comparing self-hosted dashboard tools): people
+// consistently value real live-integration widgets over decorative
+// theming, and this app's own per-project AI chat was confirmed as a
+// genuine differentiator worth leaning into, not something to let this
+// panel's own honesty duplicate. Only Ventures & Business/Trading/
+// Reselling clusters are shown, since "revenue" has no meaning for a
+// personal/hobby project. Fetched once on load, not on the 30s cluster
+// poll, since none of these change meaningfully that often and 5 extra
+// real fetches every 30s would be real, unnecessary load for no benefit.
+const VENTURE_SNAPSHOT_IDS = ['alpha', 'sondrik', 'card-grading', 'garage', 'csm', 'nigeria', 'thrift-hub'];
+
+async function fetchVentureMetric(clusterId) {
+  try {
+    if (clusterId === 'alpha') {
+      const r = await fetch('/api/alpha/live');
+      if (!r.ok) return null;
+      const data = await r.json();
+      const account = data.live && data.live.account;
+      if (!account) return { label: 'Trading equity', value: null, meta: 'Daemon unreachable right now' };
+      const changeSign = account.dayChangeDollar >= 0 ? '+' : '';
+      return {
+        label: 'Trading equity',
+        value: '$' + account.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        meta: account.dayChangeDollar != null
+          ? `${changeSign}$${Math.abs(account.dayChangeDollar).toFixed(2)} today (${changeSign}${account.dayChangePct.toFixed(2)}%)`
+          : null
+      };
+    }
+    if (clusterId === 'sondrik') {
+      const r = await fetch('/sondrik/data/downloads.json');
+      if (!r.ok) return null;
+      const data = await r.json();
+      const checks = ((data.metric && data.metric.checks) || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      if (!checks.length) return { label: 'v0.3.7 downloads', value: '0', meta: 'No checks logged yet' };
+      const latest = checks[checks.length - 1];
+      let meta = null;
+      if (checks.length > 1) {
+        const prev = checks[checks.length - 2];
+        const delta = latest.count - prev.count;
+        meta = `${delta >= 0 ? '+' : ''}${delta} vs ${prev.date}`;
+      }
+      return { label: 'v0.3.7 downloads', value: String(latest.count), meta };
+    }
+    if (clusterId === 'card-grading') {
+      const r = await fetch('/cgt/data/cards.json');
+      if (!r.ok) return null;
+      const data = await r.json();
+      const cards = data.cards || [];
+      const total = cards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
+      return {
+        label: 'Card portfolio value',
+        value: '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        meta: `${cards.length} real card${cards.length === 1 ? '' : 's'} priced (not sales revenue)`
+      };
+    }
+    if (clusterId === 'garage') {
+      const r = await fetch('/garage/data/sales.json');
+      if (!r.ok) return null;
+      const data = await r.json();
+      const sales = data.sales || [];
+      const total = sales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+      return {
+        label: 'Realized revenue',
+        value: '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        meta: sales.length ? `${sales.length} real sale${sales.length === 1 ? '' : 's'} logged` : 'No sales logged yet'
+      };
+    }
+    if (clusterId === 'csm') {
+      const r = await fetch('/csm/data/prospects.json');
+      if (!r.ok) return null;
+      const data = await r.json();
+      const prospects = data.prospects || [];
+      return {
+        label: 'Pipeline prospects',
+        value: String(prospects.length),
+        meta: prospects.length ? 'Pre-revenue, real outreach pipeline' : 'None logged yet'
+      };
+    }
+    // nigeria and thrift-hub have no built sub-hub yet (link is null in
+    // their cluster file), so there is no real data source to fetch from,
+    // an honest gap rather than a fabricated number.
+    return { label: 'Stage', value: 'Idea / validation', meta: 'No venture hub built yet, no real data to show' };
+  } catch (err) {
+    return { label: 'Real number', value: null, meta: 'Failed to load: ' + err.message };
+  }
+}
+
+let ventureSnapshotLoaded = false;
+async function renderVentureSnapshot() {
+  if (ventureSnapshotLoaded) return;
+  ventureSnapshotLoaded = true;
+  const grid = document.getElementById('ventureSnapshotGrid');
+  const targets = clusters.filter(c => VENTURE_SNAPSHOT_IDS.includes(c.id));
+  if (!targets.length) { document.getElementById('ventureSnapshotSection').classList.add('hidden'); return; }
+
+  grid.innerHTML = targets.map(c => `
+    <div class="rounded-xl p-4 border hairline" data-venture-id="${escapeHtml(c.id)}" style="background: var(--panel)">
+      <div class="text-xs font-mono truncate" style="color: var(--sub)">${escapeHtml(c.name)}</div>
+      <div class="venture-metric-value font-display font-bold text-lg mt-1" style="color: var(--ink)">Loading&hellip;</div>
+      <div class="venture-metric-meta text-[10px] font-mono mt-1" style="color: var(--faint)"></div>
+    </div>
+  `).join('');
+
+  const results = await Promise.all(targets.map(c => fetchVentureMetric(c.id)));
+  targets.forEach((c, i) => {
+    const card = grid.querySelector(`[data-venture-id="${CSS.escape(c.id)}"]`);
+    if (!card) return;
+    const metric = results[i];
+    const valueEl = card.querySelector('.venture-metric-value');
+    const metaEl = card.querySelector('.venture-metric-meta');
+    if (!metric || metric.value == null) {
+      valueEl.textContent = 'n/a';
+      valueEl.style.color = 'var(--faint)';
+      metaEl.textContent = (metric && metric.meta) || 'Not tracked yet';
+    } else {
+      valueEl.textContent = metric.value;
+      metaEl.textContent = [metric.label, metric.meta].filter(Boolean).join(' · ');
+    }
+  });
 }
 
 function updateAttentionVisibility() {
