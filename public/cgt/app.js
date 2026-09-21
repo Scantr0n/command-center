@@ -1906,6 +1906,17 @@ function renderAttentionBar() {
   // just show it as one bucket among four rather than flagging it as a gap.
   const openCandidates = candidates.filter(c => !isExampleCandidate(c) && !c.decision);
   const candidatesNeedingDataCount = openCandidates.filter(c => !computeGradingMath(c)).length;
+  // Mirrors the "past grader avg" badge already shown inline on the
+  // submission row itself (see renderSubmissions), surfaced up here too so
+  // a batch that's run past its own grader's real average turnaround shows
+  // up in the same top-of-page scan as every other real "needs a look"
+  // signal instead of only being visible after scrolling to the
+  // submissions section. Same runningLong test, same real-history-only
+  // gate (estimatedReturnFor only sets runningLong once that grader has at
+  // least 2 real returned submissions to average).
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const overdueSubmissionsCount = buildActiveSubmissions()
+    .filter(s => !isExampleSubmission(s) && estimatedReturnFor(s, turnaroundByGrader).runningLong).length;
 
   const items = [];
   // Same reasoning as CSM's own renderAttentionBar: a drifted changelog is
@@ -1930,6 +1941,16 @@ function renderAttentionBar() {
   }
   if (gradeLadderCount) {
     items.push({ n: gradeLadderCount, tone: 'warn', target: 'gradeLadderSection', label: gradeLadderCount === 1 ? 'grade ladder inversion' : 'grade ladder inversions' });
+  }
+  if (overdueSubmissionsCount) {
+    items.push({
+      n: overdueSubmissionsCount,
+      tone: 'warn',
+      target: 'submissionsSection',
+      label: overdueSubmissionsCount === 1
+        ? 'submission is past that grader’s own average turnaround'
+        : 'submissions are past that grader’s own average turnaround'
+    });
   }
   if (candidatesNeedingDataCount) {
     items.push({
