@@ -1344,6 +1344,13 @@ footer.page-foot {
     display: none !important;
   }
 
+  /* Reports live connectivity, a fact about this device right now, not
+     about the data in the export, so it is dropped the same as the other
+     interactive-only elements above rather than recolored for paper. */
+  .offline-banner {
+    display: none !important;
+  }
+
   /* A drafted, not-yet-approved outreach message is meant for Jack's own
      approval decision on screen, not to end up in a PDF export that could
      get shared further before he's decided whether to send it. */
@@ -1392,4 +1399,29 @@ footer.page-foot {
 
   .empty-state { border-color: #ccc; color: #555; }
   footer.page-foot { border-color: #ccc; color: #555; }
+
+  /* Same real bug as the comment above, a second wave of it: every class
+     below sets its screen color as a bare hex (#E0A030 amber, #3DDC84
+     green) or var(--accent), none of which --ink/--sub/--dim's print
+     redefinition above touches, so each kept its dark-mode value on white
+     until caught here. Confirmed real cases with today's real data: the
+     14-day bugfix check-in banner on the Latest release card (2.3:1 on
+     white) and the Traction card's "N more to reach" / "next check
+     suggested" lines (var(--accent), 2.25:1). The rest (stale/aging
+     freshness badges, an overdue or ahead/behind goal pace, a flat
+     projection, a crossed goal, a reset timeline entry, a data load
+     error) aren't live in today's real data but are real reachable states,
+     not hypothetical ones, so they get the same fix rather than waiting to
+     be caught the next time one of them actually fires during a print/PDF
+     export. Colors are the same amber/green families darkened until they
+     clear 4.5:1 on white, not arbitrary picks. */
+  .bugfix-checkin-due, .bugfix-checkin-missed, .bugfix-checkin-upcoming,
+  .last-updated-stale, .freshness-aging, .freshness-stale,
+  .goal-pace-overdue, .goal-pace-status-behind, .goal-projection-flat,
+  .timeline-title-reset, .empty-state.file-error, .stat-milestone, .stat-cadence {
+    color: #8a5a00;
+  }
+  .goal-pace-status-ahead, .goal-achieved {
+    color: #176b3a;
+  }
 }
