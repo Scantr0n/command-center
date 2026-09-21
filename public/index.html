@@ -370,7 +370,14 @@
 
     #searchWrap, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
-    #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay {
+    #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay,
+    /* Both added after the comment above was written, and both missed being
+       added here: neither is part of the documented "grid + needs-attention +
+       activity feed" printed report, Venture Snapshot is a live-glance panel
+       and Data Quality a diagnostic strip, not a per-project status entry.
+       Confirmed neither has any print-specific logic elsewhere depending on
+       it staying visible before hiding it. */
+    #ventureSnapshotSection, #dataQualityCompact {
       display: none !important;
     }
 
