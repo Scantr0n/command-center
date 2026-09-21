@@ -24,6 +24,16 @@
   const pageFavicon = document.getElementById('pageFavicon');
   const DEFAULT_FAVICON_HREF = pageFavicon ? pageFavicon.getAttribute('href') : null;
 
+  // Shared, unit-tested date/goal math (public/sondrik/data/goals-core.js),
+  // same shared-core pattern as SondrikValidateCore below: the exact
+  // functions that have already produced two real bugs in the Goals card
+  // (a pace tooltip overrunning its own window, a malformed-date crash) now
+  // live in one place a test suite can actually exercise.
+  const {
+    daysBetween, addDays, isValidDateStr, downloadsPerDayRate,
+    goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
+  } = window.SondrikGoalsCore;
+
   printBtn.addEventListener('click', () => window.print());
 
   // "New since your last visit" is a per-browser convenience, not a second
@@ -114,22 +124,6 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-  // goals.json's setDate/targetDate are hand-typed, and daysBetween below has
-  // no guard of its own: a malformed string (a non-zero-padded "2026-9-5")
-  // makes it return NaN, and every renderGoals() call site compares that
-  // against 0 with < or >, both of which are always false for NaN, so a goal
-  // with a bad date used to silently fall through to the wrong branch (e.g.
-  // "ON THE TARGET DATE" or a skipped pace block) instead of erroring. Same
-  // shape+rollover check CSM's app.js already uses for the identical reason.
-  function isValidDateStr(iso) {
-    if (typeof iso !== 'string' || !DATE_RE.test(iso)) return false;
-    const [y, m, d] = iso.split('-').map(Number);
-    const parsed = new Date(y, m - 1, d);
-    return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
-  }
-
   // An empty state that just says "add one to whatever.json" is a dead end,
   // the quick-log tool that builds that exact JSON already exists further
   // up the page but stays collapsed and easy to miss. This turns each empty
@@ -153,19 +147,6 @@
   function emptyStateCta(formId, label) {
     return '<button type="button" class="print-btn empty-state-cta" data-open-quick-log="' +
       escapeHtml(formId) + '">' + escapeHtml(label) + '</button>';
-  }
-
-  function daysBetween(a, b) {
-    return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
-  }
-
-  // Local calendar date arithmetic to match daysBetween/todayIso above,
-  // used by the check-in cadence estimate to project a suggested next
-  // check date from a real logged one plus a real gap.
-  function addDays(iso, days) {
-    const d = new Date(iso + 'T00:00:00');
-    d.setDate(d.getDate() + days);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
   // Local calendar date as YYYY-MM-DD. daysBetween (like CSM's daysUntil)
@@ -678,47 +659,9 @@
     return null;
   }
 
-  // The real per-day rate between the first and latest logged download check,
-  // the same two checks the traction section's own rateHtml already divides.
-  // Needs at least two real checks (no rate exists off a single point) and a
-  // positive span (guards the same same-day-typo case daysBetween elsewhere
-  // has to guard). Downloads-only: a goal against "leads" has no comparable
-  // trend to divide, just one real Reddit comment logged so far, not a
-  // history of checks.
-  function downloadsPerDayRate(downloadsData) {
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length < 2) return null;
-    const first = checks[0];
-    const latest = checks[checks.length - 1];
-    const span = daysBetween(first.date, latest.date);
-    if (span <= 0) return null;
-    return { perDay: (latest.count - first.count) / span, first, latest };
-  }
-
-  // The real date a now-met goal actually crossed its target, derived only
-  // from dates already logged elsewhere, never estimated. For downloads,
-  // that's the first real check whose count reached the target. For leads,
-  // it's the loggedDate of the Nth lead once leads are ordered by that same
-  // real date, and only if every lead up to that point actually has one, an
-  // undated lead earlier in the queue could put the real crossing point
-  // anywhere, so this returns null (an honest "reached, exact date unknown")
-  // rather than guess an ordering that isn't backed by real logged dates.
-  function goalReachedDate(g, downloadsData, leadsData) {
-    if (g.metric === 'downloads') {
-      const checks = (((downloadsData && downloadsData.metric) || {}).checks || [])
-        .slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-      const hit = checks.find(c => c.count >= g.target && c.date);
-      return hit ? hit.date : null;
-    }
-    if (g.metric === 'leads') {
-      const leads = (leadsData && leadsData.leads) || [];
-      if (leads.length < g.target || leads.some(l => !l.loggedDate)) return null;
-      const sorted = leads.slice().sort((a, b) => a.loggedDate.localeCompare(b.loggedDate));
-      return sorted[g.target - 1].loggedDate;
-    }
-    return null;
-  }
+  // downloadsPerDayRate and goalReachedDate now live in goals-core.js
+  // (destructured from SondrikGoalsCore near the top of this file), so the
+  // pace/projection math they feed can actually be unit-tested.
 
   // Renders the real target-vs-actual goal Jack has logged, if any. This is
   // the standard "target vs actual" pattern from traction dashboards: a
@@ -737,10 +680,7 @@
     goalsSection.innerHTML = goals.map(g => {
       const current = currentMetricValue(g.metric, downloadsData, leadsData);
       const currentCount = current ? current.count : 0;
-      // A target of 0 (or a negative typo) would otherwise divide out to
-      // NaN/Infinity here, which Math.max/min don't clamp away, so guard it
-      // explicitly rather than rendering "NaN%".
-      const pct = g.target > 0 ? Math.max(0, Math.min(100, Math.round((currentCount / g.target) * 100))) : 0;
+      const pct = computeGoalProgressPct(g.target, currentCount);
       const achieved = g.target > 0 && currentCount >= g.target;
 
       // Once the real number has actually reached the target, "3 days left"
@@ -785,24 +725,13 @@
       // (current, not just currentCount defaulting to 0) so an unlogged
       // metric never reads as "behind pace" when it might just be untracked.
       let paceStatusHtml = '';
-      if (!achieved && current && g.setDate && g.targetDate && isValidDateStr(g.setDate) && isValidDateStr(g.targetDate)) {
-        const totalDays = daysBetween(g.setDate, g.targetDate);
-        const elapsedDays = daysBetween(g.setDate, todayIso());
-        if (totalDays > 0 && elapsedDays > 0) {
-          // Once the target date itself has passed, elapsedDays can run past
-          // totalDays (e.g. a goal set 50 days ago against a 31-day window),
-          // which used to print a self-contradictory "50 of 31 days elapsed"
-          // in the tooltip even though expectedPct below was already clamped
-          // to 100%. Clamping the displayed elapsed figure the same way keeps
-          // the two numbers in the tooltip consistent with each other.
-          const clampedElapsedDays = Math.min(elapsedDays, totalDays);
-          const expectedPct = Math.round((clampedElapsedDays / totalDays) * 100);
-          const diff = pct - expectedPct;
-          const tier = diff <= -10 ? 'behind' : diff >= 10 ? 'ahead' : 'on';
-          const label = tier === 'behind' ? 'BEHIND PACE' : tier === 'ahead' ? 'AHEAD OF PACE' : 'ON PACE';
-          paceStatusHtml = '<div class="goal-pace-status goal-pace-status-' + tier + ' font-mono" ' +
-            'title="Based on ' + clampedElapsedDays + ' of ' + totalDays + ' days elapsed, expected roughly ' + expectedPct + '% by now">' +
-            label + ' (EXPECTED ~' + expectedPct + '%)</div>';
+      if (!achieved && current) {
+        const paceStatus = computeGoalPaceStatus(g.setDate, g.targetDate, pct, todayIso());
+        if (paceStatus) {
+          const label = paceStatus.tier === 'behind' ? 'BEHIND PACE' : paceStatus.tier === 'ahead' ? 'AHEAD OF PACE' : 'ON PACE';
+          paceStatusHtml = '<div class="goal-pace-status goal-pace-status-' + paceStatus.tier + ' font-mono" ' +
+            'title="Based on ' + paceStatus.clampedElapsedDays + ' of ' + paceStatus.totalDays + ' days elapsed, expected roughly ' + paceStatus.expectedPct + '% by now">' +
+            label + ' (EXPECTED ~' + paceStatus.expectedPct + '%)</div>';
         }
       }
 
