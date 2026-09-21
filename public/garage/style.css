@@ -261,20 +261,22 @@ section { margin-bottom: 36px; }
 /* Stat tiles */
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 36px;
 }
 .stat-tile {
   border: 1px solid var(--hairline);
   background: var(--panel);
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 18px 20px;
+  transition: border-color 0.15s ease;
 }
+.stat-tile:hover { border-color: var(--hairlineHover); }
 .stat-tile-value {
   font-family: 'Manrope', sans-serif;
   font-weight: 800;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   color: var(--ink);
   line-height: 1.1;
 }
