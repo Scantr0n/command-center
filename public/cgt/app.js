@@ -437,6 +437,22 @@ function rawCompSearchLink(c) {
   return { url, text: 'Search eBay sold comps for the raw card' };
 }
 
+// SportsCardsPro/PriceCharting (same company, same search-products?q=...
+// route, confirmed real and stable) is the actual source cited in most of
+// this hub's own compNote/rawValueNote/sourceNote fields, but until now
+// nothing here linked to it, only to eBay and the population reports. Unlike
+// compSearchLink above, this is not scoped to one grading company or grade:
+// a SportsCardsPro/PriceCharting product page lists ungraded and every
+// PSA/BGS/SGC/CGC grade's book value side by side on the same page, so one
+// link built from just year + card name covers re-checking the value at any
+// grade, raw or graded, rather than needing a separate link per grade.
+function bookValueSearchLink(c) {
+  if (!c.cardName) return null;
+  const parts = [c.year, c.cardName].filter(Boolean);
+  const url = 'https://www.sportscardspro.com/search-products?q=' + encodeURIComponent(parts.join(' ')) + '&type=prices';
+  return { url, text: 'Search SportsCardsPro book value' };
+}
+
 function isStale(c) {
   if (c.estimatedValue == null || !c.datePriced) return false;
   const age = daysSince(c.datePriced);
@@ -1440,6 +1456,13 @@ function openCandidateModal(id) {
   body += field('Raw value (ungraded)', c.rawValue != null ? formatUsd(c.rawValue) : null, c.rawValue == null);
   body += field('Raw value basis', c.rawValueBasis === 'recent-sale' ? 'Recent sale' : c.rawValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.rawValueBasis);
   body += field('Raw value note', c.rawValueNote, !c.rawValueNote);
+  const bookValue = bookValueSearchLink(c);
+  if (bookValue) {
+    body += `<div class="field-row">
+      <a href="${escapeHtml(bookValue.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(bookValue.text)} &rarr;</a>
+      <div class="field-note">Opens the actual price-guide page this card's raw/graded value notes usually cite, showing raw and every graded tier's book value on one page, so it covers both rawValue and expectedGradedValue below rather than needing a separate link for each.</div>
+    </div>`;
+  }
   const rawComp = rawCompSearchLink(c);
   if (rawComp) {
     body += `<div class="field-row">
@@ -2868,6 +2891,13 @@ function openModal(id) {
     </div>`;
   }
   body += field('Storage location', activeCard.storageLocation, !activeCard.storageLocation);
+  const bookValue = bookValueSearchLink(activeCard);
+  if (bookValue) {
+    body += `<div class="field-row">
+      <a href="${escapeHtml(bookValue.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(bookValue.text)} &rarr;</a>
+      <div class="field-note">Opens the actual price-guide page this card's comp/source notes usually cite, showing raw and every graded tier's book value side by side, for re-checking whether the number below is still current.</div>
+    </div>`;
+  }
   const comp = compSearchLink(activeCard);
   if (comp) {
     body += `<div class="field-row">
