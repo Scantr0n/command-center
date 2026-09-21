@@ -196,7 +196,14 @@ function addBusinessDays(dateStr, days) {
 function disputeResponseDeadline(d) {
   if (d.status !== 'open' || !d.openedDate) return null;
   if (d.platform === 'ebay') return addBusinessDays(d.openedDate, 3);
-  if (d.platform === 'poshmark') return addBusinessDays(d.openedDate, 1);
+  // Poshmark's ~24-hour window runs on the real-time clock, not business
+  // days (see the comment above addBusinessDays), so a case opened Friday
+  // or Saturday needs the plain next-calendar-day helper below, not the
+  // weekend-skipping one: addBusinessDays(d.openedDate, 1) on a Friday
+  // reported Monday as the deadline, up to 2 real days late on a window
+  // this short, and Jack could have already missed it before ever seeing
+  // "by Monday" as still-safe.
+  if (d.platform === 'poshmark') return addDaysToDateStr(d.openedDate, 1);
   return null;
 }
 
