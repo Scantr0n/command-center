@@ -2670,17 +2670,24 @@ function renderPaletteResults() {
   }
   paletteSelectedIndex = Math.max(0, Math.min(paletteSelectedIndex, paletteResultsCache.length - 1));
 
-  // The divider only appears once, right where record results actually start,
-  // so a query that matches zero projects but real records doesn't show an
-  // empty "Projects" heading above them, and a query matching zero records
-  // doesn't show a heading with nothing under it either.
-  const firstRecordIndex = paletteResultsCache.findIndex(x => x.kind === 'record');
-  list.innerHTML = paletteResultsCache.map((item, i) => {
-    const divider = i === firstRecordIndex && firstRecordIndex > 0
-      ? `<div class="palette-section-label">FOUND IN YOUR DATA</div>` : '';
+  // role="listbox" only ever validly contains role="option" children, or a
+  // role="group" that itself contains role="option" children - confirmed
+  // against real ARIA authoring guidance, not assumed. A bare, unroled
+  // <div> divider (the previous approach) satisfies neither, a real
+  // structural violation some assistive tech would skip or misread, worse
+  // than just "no divider" since role="separator" support here is still an
+  // open, inconsistent question in the tooling itself. Record results
+  // always sort after every project result (see how paletteResultsCache is
+  // built above), so they're always one contiguous run at the end, cleanly
+  // wrappable in one real role="group" - its own aria-label carries the
+  // same "found in your data" meaning as the plain-text heading a sighted
+  // user sees, so that heading is aria-hidden to avoid announcing it twice.
+  const projectItems = paletteResultsCache.filter(x => x.kind === 'project');
+  const recordItems = paletteResultsCache.filter(x => x.kind === 'record');
+  function paletteItemHtml(item, i) {
     if (item.kind === 'project') {
       const c = item.c;
-      return `${divider}
+      return `
         <div class="palette-item" role="option" id="palette-opt-${i}" data-id="${escapeHtml(c.id)}" aria-selected="${i === paletteSelectedIndex}">
           <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${categoryColor(c.category)}"></span>
           <span class="palette-item-name">${escapeHtml(c.name)}</span>
@@ -2691,7 +2698,7 @@ function renderPaletteResults() {
     }
     const r = item.r;
     const projectName = paletteRecordProjectName(r.clusterId);
-    return `${divider}
+    return `
       <div class="palette-item palette-item-record" role="option" id="palette-opt-${i}" data-id="${escapeHtml(r.clusterId)}" aria-selected="${i === paletteSelectedIndex}">
         <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:var(--faint)"></span>
         <span class="palette-record-body">
@@ -2701,7 +2708,15 @@ function renderPaletteResults() {
         <span class="palette-item-cat">${escapeHtml(projectName.toUpperCase())} · ${escapeHtml(r.type.toUpperCase())}</span>
       </div>
     `;
-  }).join('');
+  }
+  const projectHtml = projectItems.map((item, idx) => paletteItemHtml(item, idx)).join('');
+  const recordHtml = recordItems.length ? `
+    <div role="group" aria-label="Found in your data">
+      <div class="palette-section-label" aria-hidden="true">FOUND IN YOUR DATA</div>
+      ${recordItems.map((item, idx) => paletteItemHtml(item, projectItems.length + idx)).join('')}
+    </div>
+  ` : '';
+  list.innerHTML = projectHtml + recordHtml;
   document.getElementById('paletteInput').setAttribute('aria-activedescendant', `palette-opt-${paletteSelectedIndex}`);
   list.querySelectorAll('.palette-item').forEach(el => {
     el.addEventListener('click', () => activatePaletteItem(el.dataset.id));
