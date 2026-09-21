@@ -258,6 +258,16 @@ header.page-head .sub {
   max-width: 72ch;
   overflow-wrap: anywhere;
 }
+/* The -8px above pulls a note up snug against a section-title right before
+   it, the common case. #nextUpOlderNote and #digestRelocationNote instead
+   follow a .lead-grid of real cards, where that same -8px overlaps the last
+   row of cards by 8px (confirmed directly: getBoundingClientRect showed the
+   grid's own bottom edge sitting 8px below the note's top edge). Same fix
+   CSM already applies for its own different case
+   (.section-details > .section-note { margin-top: 0 }): reset to normal
+   spacing only for a .section-note that actually follows a grid, leaving the
+   snug-under-a-title behavior everywhere else untouched. */
+.lead-grid + .section-note { margin-top: 14px; }
 section { margin-bottom: 36px; }
 
 /* Applications table */
