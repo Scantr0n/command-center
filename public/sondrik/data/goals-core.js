@@ -49,7 +49,13 @@
   // The real per-day rate between the first and latest logged download
   // check. Needs at least two real checks (no rate exists off a single
   // point) and a positive span (guards the same same-day-typo case
-  // daysBetween otherwise has to guard).
+  // daysBetween otherwise has to guard). This is a lifetime average, it
+  // blends in the very first check-to-check gap along with every gap since,
+  // so an early burst (Sondrik's real launch-week jump, 0 to 8 in 3 days)
+  // keeps pulling this number up long after that burst is over. Used where
+  // the page is explicitly showing the all-time span (Traction's "vs
+  // [date] check" line), never where it's labeled as today's pace, see
+  // recentDownloadsPerDayRate below for that.
   function downloadsPerDayRate(downloadsData) {
     const metric = (downloadsData && downloadsData.metric) || {};
     const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -59,6 +65,28 @@
     const span = daysBetween(first.date, latest.date);
     if (span <= 0) return null;
     return { perDay: (latest.count - first.count) / span, first, latest };
+  }
+
+  // The real per-day rate between only the two most recent logged download
+  // checks, i.e. the actual current pace rather than a lifetime average.
+  // Sondrik's own real numbers are why this exists: 0 to 8 downloads in 3
+  // days at launch (2026-09-04 to 09-07), then 8 to 15 over the next 13
+  // days, a real slowdown the downloads.json check note itself already
+  // calls out. downloadsPerDayRate above blends both gaps into one
+  // all-time average (~0.94/day), which keeps reading as "current pace"
+  // long after the launch burst that produced it has passed; this instead
+  // looks at only the most recent gap (~0.54/day here), the actual pace
+  // right now. Same null cases as downloadsPerDayRate: fewer than two
+  // checks, or the last two logged on the same date.
+  function recentDownloadsPerDayRate(downloadsData) {
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length < 2) return null;
+    const prev = checks[checks.length - 2];
+    const latest = checks[checks.length - 1];
+    const span = daysBetween(prev.date, latest.date);
+    if (span <= 0) return null;
+    return { perDay: (latest.count - prev.count) / span, first: prev, latest };
   }
 
   // The real date a now-met goal actually crossed its target, derived only
@@ -122,6 +150,7 @@
     addDays,
     isValidDateStr,
     downloadsPerDayRate,
+    recentDownloadsPerDayRate,
     goalReachedDate,
     computeGoalProgressPct,
     computeGoalPaceStatus

@@ -15,7 +15,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  daysBetween, addDays, isValidDateStr, downloadsPerDayRate,
+  daysBetween, addDays, isValidDateStr, downloadsPerDayRate, recentDownloadsPerDayRate,
   goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
 } = require('./goals-core.js');
 
@@ -53,6 +53,33 @@ test('downloadsPerDayRate needs at least two checks and a positive span', () => 
   assert.equal(rate.perDay, 8 / 3);
   assert.equal(rate.first.date, '2026-09-04');
   assert.equal(rate.latest.date, '2026-09-07');
+});
+
+test('recentDownloadsPerDayRate needs at least two checks and a positive span', () => {
+  assert.equal(recentDownloadsPerDayRate({ metric: { checks: [] } }), null);
+  assert.equal(recentDownloadsPerDayRate({ metric: { checks: [{ date: '2026-09-07', count: 8 }] } }), null);
+  assert.equal(recentDownloadsPerDayRate({ metric: { checks: [
+    { date: '2026-09-07', count: 5 }, { date: '2026-09-07', count: 8 }
+  ] } }), null, 'same-day-typo case');
+});
+
+test('recentDownloadsPerDayRate uses only the most recent gap, not the lifetime average, the real Sondrik slowdown', () => {
+  // Real Sondrik history: launch burst 0 -> 8 in 3 days, then a real
+  // slowdown, 8 -> 15 over the next 13 days. The lifetime average
+  // (downloadsPerDayRate) blends both into ~0.94/day; the recent rate
+  // should reflect only the second, slower gap.
+  const downloadsData = { metric: { checks: [
+    { date: '2026-09-04', count: 0 },
+    { date: '2026-09-07', count: 8 },
+    { date: '2026-09-20', count: 15 }
+  ] } };
+  const lifetime = downloadsPerDayRate(downloadsData);
+  const recent = recentDownloadsPerDayRate(downloadsData);
+  assert.equal(Math.round(lifetime.perDay * 100) / 100, 0.94, 'lifetime average blends the launch burst in');
+  assert.equal(recent.perDay, 7 / 13, 'recent rate is only the last gap');
+  assert.equal(recent.first.date, '2026-09-07');
+  assert.equal(recent.latest.date, '2026-09-20');
+  assert.ok(recent.perDay < lifetime.perDay, 'the real slowdown means recent pace reads lower than the lifetime average');
 });
 
 test('goalReachedDate for downloads returns the first check that hit the target', () => {

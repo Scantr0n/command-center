@@ -30,7 +30,7 @@
   // (a pace tooltip overrunning its own window, a malformed-date crash) now
   // live in one place a test suite can actually exercise.
   const {
-    daysBetween, addDays, isValidDateStr, downloadsPerDayRate,
+    daysBetween, addDays, isValidDateStr, downloadsPerDayRate, recentDownloadsPerDayRate,
     goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
   } = window.SondrikGoalsCore;
 
@@ -733,9 +733,10 @@
     return null;
   }
 
-  // downloadsPerDayRate and goalReachedDate now live in goals-core.js
-  // (destructured from SondrikGoalsCore near the top of this file), so the
-  // pace/projection math they feed can actually be unit-tested.
+  // downloadsPerDayRate, recentDownloadsPerDayRate, and goalReachedDate now
+  // live in goals-core.js (destructured from SondrikGoalsCore near the top
+  // of this file), so the pace/projection math they feed can actually be
+  // unit-tested.
 
   // Renders the real target-vs-actual goal Jack has logged, if any. This is
   // the standard "target vs actual" pattern from traction dashboards: a
@@ -817,22 +818,30 @@
       // above already says that) and only for a positive real rate, since
       // dividing by a flat or negative one would produce a meaningless or
       // negative "days needed".
+      // Uses recentDownloadsPerDayRate (only the most recent check-to-check
+      // gap), not downloadsPerDayRate (the lifetime average since the first
+      // check). "AT CURRENT PACE" should mean the actual pace right now,
+      // and a lifetime average keeps a launch-week burst baked in long
+      // after it's over, exactly what happened here: Sondrik's real
+      // 0.94/day lifetime average (0 to 8 in 3 days, then 8 to 15 over the
+      // next 13) was overstating the real, slower 0.54/day pace the most
+      // recent check actually shows.
       let projectionHtml = '';
       if (g.metric === 'downloads' && currentCount < g.target) {
-        const rate = downloadsPerDayRate(downloadsData);
+        const rate = recentDownloadsPerDayRate(downloadsData);
         if (rate && rate.perDay > 0) {
           const daysNeeded = Math.ceil((g.target - currentCount) / rate.perDay);
           const projectedDate = addDays(rate.latest.date, daysNeeded);
-          projectionHtml = '<div class="goal-projection font-mono" title="Based on ~' + rate.perDay.toFixed(1) +
-            '/day between ' + fmtDate(rate.first.date) + ' and ' + fmtDate(rate.latest.date) + '">' +
-            'AT CURRENT PACE (~' + rate.perDay.toFixed(1) + '/DAY), TARGET AROUND ' + fmtDate(projectedDate).toUpperCase() +
+          projectionHtml = '<div class="goal-projection font-mono" title="Based on the most recent check-to-check gap only, ~' + rate.perDay.toFixed(1) +
+            '/day between ' + fmtDate(rate.first.date) + ' and ' + fmtDate(rate.latest.date) + '. Not a lifetime average.">' +
+            'AT RECENT PACE (~' + rate.perDay.toFixed(1) + '/DAY), TARGET AROUND ' + fmtDate(projectedDate).toUpperCase() +
             ' (~' + daysNeeded + (daysNeeded === 1 ? ' DAY' : ' DAYS') + ')</div>';
           const checkCount = ((downloadsData && downloadsData.metric && downloadsData.metric.checks) || []).length;
           const caveat = trendCaveatText(checkCount);
           if (caveat) projectionHtml += '<div class="trend-caveat font-mono">' + escapeHtml(caveat.toUpperCase()) + '</div>';
         } else if (rate) {
           projectionHtml = '<div class="goal-projection goal-projection-flat font-mono">' +
-            'FLAT OR DECLINING PACE SINCE ' + fmtDate(rate.first.date).toUpperCase() + ', NO PROJECTED DATE AT THIS RATE</div>';
+            'FLAT OR DECLINING SINCE THE ' + fmtDate(rate.first.date).toUpperCase() + ' CHECK, NO PROJECTED DATE AT THIS RATE</div>';
         }
       }
 
