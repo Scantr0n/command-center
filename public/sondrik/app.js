@@ -480,7 +480,14 @@
 
     const latest = checks[checks.length - 1];
     const first = checks[0];
-    const maxCount = Math.max(1, ...checks.map(c => c.count));
+    // validate.js already rejects a non-numeric count as a hard error, but
+    // that only runs from the CLI, not against whatever is actually live on
+    // disk right now (same reason the CGT/Sondrik date-math guards elsewhere
+    // in this file exist despite validate.js also checking dates). Without
+    // this, one bad hand-edited count (a stray string, a typo) turns
+    // Math.max(...) itself into NaN, which then poisons every bar's height
+    // below, not just the bad entry's own bar.
+    const maxCount = Math.max(1, ...checks.map(c => Number.isFinite(c.count) ? c.count : 0));
 
     let deltaHtml = '';
     let rateHtml = '';
@@ -549,7 +556,7 @@
     // two specific checks, not a fixed claim, since consecutive daily checks
     // (gap of exactly 1 day) do have daily tracking between them.
     const barsHtml = checks.map((c, i) => {
-      const heightPct = c.count === 0 ? 0 : Math.max(4, Math.round((c.count / maxCount) * 100));
+      const heightPct = !Number.isFinite(c.count) || c.count === 0 ? 0 : Math.max(4, Math.round((c.count / maxCount) * 100));
       let gapNote = '';
       if (i > 0) {
         const gap = daysBetween(checks[i - 1].date, c.date);
