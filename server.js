@@ -829,20 +829,22 @@ app.get('/api/garage/changelog-status', changelogStatusHandler('garage', [
   'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
 ]));
 
-// CGT/CSM/Garage/Sondrik each already have their own validate.js CLI script
-// (run every cycle via `npm run validate`) that knows the real, hub-specific
-// rules for what counts as a real backfill gap - not just presence/absence,
-// but things like "has an estimatedValue but no valuationBasis" or "missing
-// eBay item specifics that Cassini search actually excludes on". CGT's own
-// rules alone are 300+ lines. Reimplementing any of that here to show a
-// number on the dashboard would either drift from the real rules over time
-// or duplicate them outright. Running the actual CLI script as a subprocess
-// and reading its own already-trusted "N warning(s)"/"N error(s)" output
-// reuses the real rules with no duplication at all, the same principle as
-// changelogStatusHandler above reading real git history instead of guessing.
-// job-search has no validate.js of this shape (its checks are all inline in
-// one script, not exported as reusable rules), so it has no route here; an
-// honest scope gap, not an oversight.
+// Every hub's validate.js CLI script (run every cycle via `npm run validate`)
+// already knows the real, hub-specific rules for what counts as a real
+// backfill gap - not just presence/absence, but things like "has an
+// estimatedValue but no valuationBasis" or "missing eBay item specifics that
+// Cassini search actually excludes on". CGT's own rules alone are 300+ lines.
+// Reimplementing any of that here to show a number on the dashboard would
+// either drift from the real rules over time or duplicate them outright.
+// Running the actual CLI script as a subprocess and reading its own
+// already-trusted "N warning(s)"/"N error(s)" output reuses the real rules
+// with no duplication at all, the same principle as changelogStatusHandler
+// above reading real git history instead of guessing. This only needs every
+// validate.js to print that one conventional line, nothing about whether its
+// rules happen to also be exported as a reusable function (CGT's are, for
+// its own CSV importer's sake; CSM/Garage/Sondrik/job-search's aren't, and
+// don't need to be for this to work) - confirmed job-search's real output
+// matches the same convention before wiring its route up below.
 function parseValidateCounts(text) {
   const sum = (re) => {
     let match, total = 0;
@@ -888,6 +890,7 @@ app.get('/api/cgt/data-quality', dataQualityHandler('cgt'));
 app.get('/api/csm/data-quality', dataQualityHandler('csm'));
 app.get('/api/garage/data-quality', dataQualityHandler('garage'));
 app.get('/api/sondrik/data-quality', dataQualityHandler('sondrik'));
+app.get('/api/job-search/data-quality', dataQualityHandler('job-search'));
 
 const PORT = process.env.PORT || 4488;
 app.listen(PORT, () => {

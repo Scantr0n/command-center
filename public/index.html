@@ -1180,18 +1180,21 @@ async function renderVentureSnapshot() {
   }
 }
 
-// Only the 4 hubs with a real, exported validate.js CLI script (see
-// server.js's dataQualityHandler comment for why job-search has none) get a
-// pill here. clusterId is each hub's real id in data/clusters/*.json, the
-// same id openModal and every other clickable card on this page already
-// takes, confirmed directly against those files rather than assumed from
-// the hub's URL path (card-grading's hub folder is cgt, but its cluster id
-// is card-grading, not cgt).
+// Every hub with a validate.js CLI script gets a pill here (see server.js's
+// dataQualityHandler comment - the subprocess approach only needs the real
+// "N warning(s)"/"N error(s)" print convention, not an exported function, so
+// this covers all 5 real hubs, not just the ones whose rules also happen to
+// be reusable elsewhere). clusterId is each hub's real id in
+// data/clusters/*.json, the same id openModal and every other clickable card
+// on this page already takes, confirmed directly against those files rather
+// than assumed from the hub's URL path (card-grading's hub folder is cgt,
+// but its cluster id is card-grading, not cgt).
 const DATA_QUALITY_HUBS = [
   { hub: 'cgt', clusterId: 'card-grading', name: 'CGT' },
   { hub: 'csm', clusterId: 'csm', name: 'CSM' },
   { hub: 'garage', clusterId: 'garage', name: 'Garage' },
-  { hub: 'sondrik', clusterId: 'sondrik', name: 'Sondrik' }
+  { hub: 'sondrik', clusterId: 'sondrik', name: 'Sondrik' },
+  { hub: 'job-search', clusterId: 'job-search', name: 'Job Search' }
 ];
 
 // Fetched once, not on the 30s poll Venture Snapshot's Alpha card uses:
