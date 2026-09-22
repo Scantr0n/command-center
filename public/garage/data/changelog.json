@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T18:58:00.672Z",
+  "generatedAt": "2026-09-22T22:55:42.859Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json,acquisitions.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "db32f08",
+      "fullHash": "db32f082138608d832f942505975f2c038f0f4b4",
+      "date": "2026-09-22",
+      "author": "Claude",
+      "subject": "Garage: fix Cross-post coverage table suggesting Depop for the banned electronics item",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
     {
       "hash": "92840a6",
       "fullHash": "92840a6e843bfc9590676103bdb7cdd7267b8671",
