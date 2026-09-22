@@ -1567,6 +1567,61 @@ function renderChangelog(data, driftStatus) {
   `;
 }
 
+// status.json's own validate.js runs the two real safety checks this hub's
+// "never a guessed number" promise actually depends on: no key that looks
+// like real P&L/balance/win-rate/trade-count data (this sandbox has never
+// had access to Alpha's real performance numbers, so a hit here means
+// someone guessed instead of wiring in a real feed), and no "live" value
+// filled in without its own asOf timestamp. That script already runs in
+// `npm run validate` and in /api/alpha/data-quality (the same generic route
+// every other hub's validate.js is wired to, unused by any hub's own page
+// until now), but nothing on this page itself has ever shown whether the
+// last real run was clean, so a hand-edit that tripped it would only ever
+// surface on the command line. This renders those same real counts here.
+// "unavailable" (validate.js missing, node unreachable) is an environment
+// gap, not a real finding, so it stays silent like the changelog drift
+// check above.
+function renderDataQuality(data) {
+  const meta = document.getElementById('dataQualityMeta');
+  const callout = document.getElementById('dataQualityCallout');
+  if (!meta || !callout) return;
+  meta.classList.remove('warn');
+  if (!data || data.unavailable) {
+    meta.textContent = '';
+    meta.title = '';
+    callout.innerHTML = '';
+    return;
+  }
+  const warnings = data.warnings || 0;
+  const errors = data.errors || 0;
+  if (!warnings && !errors) {
+    meta.textContent = 'Self-check: clean';
+    meta.title = 'This hub\'s own validate.js (forbidden-key scan for guessed performance data, timestamp checks) found nothing to flag.';
+    callout.innerHTML = '';
+    return;
+  }
+  meta.textContent = errors ? `Self-check: ${errors} error(s)` : `Self-check: ${warnings} warning(s)`;
+  meta.classList.add('warn');
+  meta.title = 'Run node public/alpha/data/validate.js for the full detail.';
+  const counts = [errors ? `${errors} error(s)` : '', warnings ? `${warnings} warning(s)` : ''].filter(Boolean).join(', ');
+  callout.innerHTML = `
+    <div class="callout callout-warn">
+      <strong>${errors ? 'This hub\'s data-quality check found real errors.' : 'This hub\'s data-quality check found warnings.'}</strong>
+      ${escapeHtml(counts)} from status.json's own validate.js (guards against guessed P&amp;L/balance/trade-count
+      data and missing timestamps). Run <code>node public/alpha/data/validate.js</code> for the full detail.
+    </div>
+  `;
+}
+
+async function loadDataQuality() {
+  try {
+    const res = await fetch('/api/alpha/data-quality');
+    renderDataQuality(res.ok ? await res.json() : null);
+  } catch (e) {
+    renderDataQuality(null);
+  }
+}
+
 async function loadChangelog() {
   // The drift check is best-effort and independent of the changelog fetch
   // itself (it can be unavailable, e.g. no git checkout, while the
@@ -2388,4 +2443,8 @@ renderMarketStatus();
 // redeploys, never on Alpha's own 30s poll cadence, so it's fetched once
 // here rather than joining the loadStatus() interval below.
 loadChangelog();
+// Same one-time-on-load reasoning as loadChangelog() above: status.json's
+// own validate.js result only changes when someone hand-edits and redeploys
+// that file, never on the 30s live-poll cadence.
+loadDataQuality();
 loadStatus();
