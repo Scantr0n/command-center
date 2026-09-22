@@ -10,6 +10,32 @@ function escapeHtml(str) {
 // live on whatever day someone happens to load this page. See that file's
 // own comments for the real NYSE calendar source and the reasoning behind
 // each function.
+//
+// Both that script and account-core.js are loaded via plain <script> tags
+// before this one; if either one fails to load (a network blip on a first,
+// not-yet-cached visit, an ad blocker, a bad deploy that drops one file),
+// the destructure below throws and used to abort this entire script with no
+// visible sign of it, leaving the page stuck forever on its static
+// "Loading..." placeholders, indistinguishable from a page that is merely
+// slow. This page's whole job is to be trusted at a glance, so a load
+// failure gets the same honest, visible treatment every other failure mode
+// here already gets, instead of silently reading as "still loading".
+if (typeof AlphaDatesCore === 'undefined' || typeof AlphaAccountCore === 'undefined') {
+  const missing = typeof AlphaDatesCore === 'undefined' ? 'dates-core.js' : 'account-core.js';
+  const bar = document.getElementById('stickyCriticalBar');
+  if (bar) {
+    bar.hidden = false;
+    bar.textContent = 'Page failed to load fully (' + missing + ' did not load). Reload the page.';
+  }
+  const headlineEl = document.getElementById('headlineStatus');
+  const headlineText = document.getElementById('headlineText');
+  if (headlineEl) headlineEl.className = 'headline-status critical';
+  if (headlineText) headlineText.textContent = 'Page failed to load, reload';
+  const marketText = document.getElementById('marketText');
+  if (marketText) marketText.textContent = 'Unavailable';
+  throw new Error('Alpha app.js: ' + missing + ' did not load, aborting init');
+}
+
 const {
   computeMarketStatus,
   timeAgo,
