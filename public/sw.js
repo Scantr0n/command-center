@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v23';
+const CACHE_VERSION = 'v24';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
