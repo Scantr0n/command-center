@@ -537,11 +537,22 @@ function computeRegimeSegments(history, frozenAsOf) {
   }));
 }
 
+// Shared by regimeSegmentItem and computeRegimeDistribution below, which
+// used to each carry their own copy of this same rule: a fix or change to
+// how a segment's end is capped applied to only one copy would silently
+// desync the per-item duration shown in the regime history list from the
+// aggregated duration shown in the regime distribution totals, two
+// different totals for the same underlying data.
+function regimeSegmentEndMs(seg) {
+  if (!seg.current) return new Date(seg.end).getTime();
+  return seg.frozenAsOf ? new Date(seg.frozenAsOf).getTime() : Date.now();
+}
+
 const REGIME_HISTORY_LIMIT = 10;
 
 function regimeSegmentItem(seg) {
   const startAbs = formatAbsolute(seg.start);
-  const endMs = seg.current ? (seg.frozenAsOf ? new Date(seg.frozenAsOf).getTime() : Date.now()) : new Date(seg.end).getTime();
+  const endMs = regimeSegmentEndMs(seg);
   const durationText = formatDuration(endMs - new Date(seg.start).getTime()) || 'under 1m';
   const rangeText = seg.current
     ? (seg.frozenAsOf ? 'Since ' + startAbs + ', last confirmed ' + formatAbsolute(seg.frozenAsOf) : 'Since ' + startAbs)
@@ -611,7 +622,7 @@ function computeRegimeDistribution(segments) {
   const byLabel = new Map();
   let totalMs = 0;
   segments.forEach(seg => {
-    const endMs = seg.current ? (seg.frozenAsOf ? new Date(seg.frozenAsOf).getTime() : Date.now()) : new Date(seg.end).getTime();
+    const endMs = regimeSegmentEndMs(seg);
     const ms = Math.max(0, endMs - new Date(seg.start).getTime());
     totalMs += ms;
     byLabel.set(seg.regime, (byLabel.get(seg.regime) || 0) + ms);
