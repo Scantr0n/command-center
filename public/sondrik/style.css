@@ -233,6 +233,11 @@ header.page-head .sub {
   line-height: 1.5;
 }
 .callout strong { color: var(--ink); }
+/* Same amber used everywhere else on this page for "stale/flagged, not
+   broken" (see .section-title-meta.warn). Used for the data-quality callout:
+   a real validate.js warning or error, not an error in the page itself. */
+.callout-warn { border-color: rgba(224,160,48,0.32); background: rgba(224,160,48,0.06); margin-bottom: 14px; }
+.callout-warn strong { color: #E0A030; }
 
 /* At-a-glance snapshot strip: the real headline numbers from Traction,
    Engagement queue, and Latest release, side by side, so a visitor gets the
@@ -571,6 +576,19 @@ header.page-head .sub {
   color: var(--sub);
   margin: 0 0 14px;
 }
+/* Data changelog's own validate.js self-check result, same "warning if real
+   findings, silent if clean or unavailable" reading as Alpha's identical
+   .section-title-meta.warn on its Architecture section. */
+.section-title-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--dim);
+  margin-left: 8px;
+}
+.section-title-meta.warn { color: #E0A030; }
 
 /* Same "h2 + Export CSV" toolbar row as Garage's own .board-toolbar, for a
    section whose h2 needs an action button inline instead of standing alone. */
@@ -1418,7 +1436,8 @@ footer.page-foot {
   .bugfix-checkin-due, .bugfix-checkin-missed, .bugfix-checkin-upcoming,
   .last-updated-stale, .freshness-aging, .freshness-stale,
   .goal-pace-overdue, .goal-pace-status-behind, .goal-projection-flat,
-  .timeline-title-reset, .empty-state.file-error, .stat-milestone, .stat-cadence {
+  .timeline-title-reset, .empty-state.file-error, .stat-milestone, .stat-cadence,
+  .section-title-meta.warn {
     color: #8a5a00;
   }
   .goal-pace-status-ahead, .goal-achieved {

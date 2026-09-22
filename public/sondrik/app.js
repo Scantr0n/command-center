@@ -2435,6 +2435,54 @@
     }
   });
 
+  // Surfaces this hub's own validate.js self-check (em-dash scan, duplicate-
+  // lead detection, the outreach sent/approval guard, date sanity, changelog
+  // drift) on the page itself, via the same generic /api/<hub>/data-quality
+  // route Alpha's page just wired up (server.js already exposed it at
+  // /api/sondrik/data-quality, nothing on this page read it until now). A
+  // hand-edit that trips a real warning or error previously only ever
+  // surfaced on the command line. "unavailable" (validate.js missing, node
+  // unreachable) is an environment gap, not a real finding, so it stays
+  // silent, same as the changelog-drift check above.
+  function renderDataQuality(data) {
+    const meta = document.getElementById('dataQualityMeta');
+    const callout = document.getElementById('dataQualityCallout');
+    if (!meta || !callout) return;
+    meta.classList.remove('warn');
+    if (!data || data.unavailable) {
+      meta.textContent = '';
+      meta.title = '';
+      callout.innerHTML = '';
+      return;
+    }
+    const warnings = data.warnings || 0;
+    const errors = data.errors || 0;
+    if (!warnings && !errors) {
+      meta.textContent = 'Self-check: clean';
+      meta.title = 'This hub\'s own validate.js (em-dash scan, duplicate-lead detection, the outreach sent/approval guard, date sanity, changelog drift) found nothing to flag.';
+      callout.innerHTML = '';
+      return;
+    }
+    meta.textContent = errors ? 'Self-check: ' + errors + ' error(s)' : 'Self-check: ' + warnings + ' warning(s)';
+    meta.classList.add('warn');
+    meta.title = 'Run node public/sondrik/data/validate.js for the full detail.';
+    const counts = [errors ? errors + ' error(s)' : '', warnings ? warnings + ' warning(s)' : ''].filter(Boolean).join(', ');
+    callout.innerHTML = '<div class="callout callout-warn">' +
+      '<strong>' + (errors ? 'This hub\'s data-quality check found real errors.' : 'This hub\'s data-quality check found warnings.') + '</strong> ' +
+      escapeHtml(counts) + ' from public/sondrik/data/validate.js (guards against a bad outreach send, guessed metrics with ' +
+      'no source, and duplicate leads). Run <code>node public/sondrik/data/validate.js</code> for the full detail.' +
+      '</div>';
+  }
+
+  // One-time on load, independent of the Promise.allSettled batch above:
+  // validate.js's result only changes when someone hand-edits and redeploys
+  // a data file, never on its own poll cadence (this page has none), so
+  // there's nothing to gain from re-fetching it later.
+  function loadDataQuality() {
+    fetch('/api/sondrik/data-quality').then(r => r.ok ? r.json() : null).then(renderDataQuality).catch(() => renderDataQuality(null));
+  }
+  loadDataQuality();
+
   // "?" keyboard shortcuts overlay, same markup, CSS classes, and focus-trap
   // behavior as the CGT, Garage, Alpha, and CSM hubs, closing the one gap
   // that left Sondrik as the only hub without it. Wired independently of the
