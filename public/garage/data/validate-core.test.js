@@ -16,7 +16,8 @@ const {
   findDuplicateListings,
   isSuspiciousEbayReturnPolicy,
   requiredItemSpecificFields,
-  missingItemSpecifics
+  missingItemSpecifics,
+  isDepopIneligible
 } = require('./validate-core.js');
 
 test('findDuplicateListings flags two live listings with the same title and price', () => {
@@ -88,8 +89,22 @@ test('missingItemSpecifics treats a missing itemSpecifics object as every requir
   assert.deepEqual(missingItemSpecifics({ category: 'electronics' }), ['brand', 'condition']);
 });
 
+test('isDepopIneligible flags only the "electronics" category, Depop\'s real blanket ban', () => {
+  assert.equal(isDepopIneligible({ category: 'electronics' }), true);
+  assert.equal(isDepopIneligible({ category: 'shoes' }), false);
+  assert.equal(isDepopIneligible({}), false);
+  assert.equal(isDepopIneligible(null), false);
+});
+
 test('the real listings.json on disk has no duplicate live listings', () => {
   const data = require('./listings.json');
   const listings = data.listings || [];
   assert.deepEqual(findDuplicateListings(listings), []);
+});
+
+test('the real listings.json on disk has no electronics listing actually live on Depop', () => {
+  const data = require('./listings.json');
+  const listings = data.listings || [];
+  const violations = listings.filter(l => isDepopIneligible(l) && (l.platforms || []).includes('depop'));
+  assert.deepEqual(violations, []);
 });

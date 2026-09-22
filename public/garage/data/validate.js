@@ -45,7 +45,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics } = require('./validate-core.js');
+const { findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -59,12 +59,15 @@ const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
 // deliberately left out here rather than treated as a validation error.
 const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
-// eBay category classifier: only "shoes" is modeled, since Clothing, Shoes &
-// Accessories charges the same 13.6% final value fee as most other
-// categories (no special rate to model there). What "shoes" actually drives
-// is which itemSpecifics fields get checked below (size and color only
-// matter for something you wear); everything else stays null.
-const LISTING_CATEGORIES = ['shoes'];
+// eBay category classifier. Neither value changes eBay fee math (Clothing,
+// Shoes & Accessories and Consumer Electronics both charge the same 13.6%
+// final value fee, no special rate to model for either). What "shoes"
+// actually drives is which itemSpecifics fields get checked below (size and
+// color only matter for something you wear). "electronics" drives the real
+// Depop platform ban checked below instead (Depop prohibits battery-powered/
+// electronic items outright, see the Electronics & battery-item rules
+// reference on the page); everything else stays null.
+const LISTING_CATEGORIES = ['shoes', 'electronics'];
 const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
 const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
@@ -174,6 +177,11 @@ function main() {
           errors.push(where + ': platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
         }
       });
+      if (isDepopIneligible(l) && l.platforms.includes('depop')) {
+        errors.push(where + ': "platforms" includes "depop" but category is "electronics", Depop bans battery-' +
+          'powered/electronic items outright (see the Electronics & battery-item rules reference on the page), ' +
+          'this really risks account suspension if actually published, remove depop from platforms and listingUrls');
+      }
     }
 
     if (l.listingUrls !== undefined && l.listingUrls !== null) {

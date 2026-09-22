@@ -735,6 +735,13 @@ table.card-table {
   border-color: var(--hairline);
   border-style: dashed;
 }
+.badge-ineligible {
+  background: rgba(224,80,80,0.08);
+  color: #C47070;
+  border-color: rgba(224,80,80,0.3);
+  text-decoration: line-through;
+  text-decoration-color: rgba(196,112,112,0.6);
+}
 .badge-fresh { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
 .badge-due { background: rgba(224,160,48,0.12); color: #E0A030; border-color: rgba(224,160,48,0.4); }
 .badge-hold { background: rgba(76,154,255,0.12); color: #4C9AFF; border-color: rgba(76,154,255,0.35); }

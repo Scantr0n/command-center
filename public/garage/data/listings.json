@@ -37,6 +37,7 @@
       "title": "Softball Swing Analyzer",
       "price": 95,
       "costBasis": null,
+      "category": "electronics",
       "platforms": ["ebay"],
       "soldOn": [],
       "listingUrls": { "ebay": null },

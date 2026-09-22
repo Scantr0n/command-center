@@ -744,8 +744,18 @@ function renderCoverage(listings) {
 
   tbody.innerHTML = rows.map(l => {
     const missing = missingPlatforms(l);
+    // Depop bans battery-powered/electronic items outright (see the
+    // Electronics & battery-item rules reference), so for those listings
+    // Depop isn't a real coverage gap to close, it's ineligible. Showing it
+    // with the same plain "missing" badge as an actual expansion
+    // opportunity would tell Jack to cross-post something Depop's own
+    // policy already forbids, exactly the kind of silent-failure risk this
+    // page exists to catch, not create.
+    const depopBanned = GarageValidateCore.isDepopIneligible(l) && missing.includes('depop');
     const missingHtml = missing.length
-      ? missing.map(p => `<span class="badge badge-missing">${escapeHtml(PLATFORM_LABELS[p] || p)}</span>`).join('')
+      ? missing.map(p => (p === 'depop' && depopBanned)
+        ? `<span class="badge badge-ineligible" title="Depop bans battery-powered/electronic items outright, see the Electronics &amp; battery-item rules reference">${escapeHtml(PLATFORM_LABELS[p] || p)}</span>`
+        : `<span class="badge badge-missing">${escapeHtml(PLATFORM_LABELS[p] || p)}</span>`).join('')
       : '<span class="cell-value empty">none, fully cross-listed</span>';
     return `
     <tr>

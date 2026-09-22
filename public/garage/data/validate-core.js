@@ -69,11 +69,26 @@
     return requiredItemSpecificFields(listing).filter(f => !specifics[f]);
   }
 
+  // Depop bans the sale of virtually any item that runs on electrical power
+  // outright, batteries included, no opt-in or workaround (see the
+  // Electronics & battery-item rules reference on the page, sourced from
+  // Depop's own Technology and Electronics Policy). eBay, Vinted, and
+  // Poshmark all allow a battery item, with their own real handling rules,
+  // so this is the one real per-category platform restriction currently
+  // modeled, not a general eligibility matrix. "electronics" is the only
+  // category this applies to right now (this store's real inventory has no
+  // other electrical item), so this stays a plain category check rather than
+  // a broader denylist.
+  function isDepopIneligible(listing) {
+    return !!(listing && listing.category === 'electronics');
+  }
+
   return {
     findDuplicateListings,
     isSuspiciousEbayReturnPolicy,
     ITEM_SPECIFIC_LABELS,
     requiredItemSpecificFields,
-    missingItemSpecifics
+    missingItemSpecifics,
+    isDepopIneligible
   };
 });

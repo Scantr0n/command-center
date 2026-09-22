@@ -461,7 +461,10 @@
     <div class="callout">
       Shows which of the four platforms each live item is <em>not</em> on yet, since broader platform coverage
       is one of the main levers for selling faster. This only reads the real <code>platforms</code> field
-      already logged per item, it doesn't judge whether a given item actually fits a platform's audience.
+      already logged per item, it doesn't judge whether a given item actually fits a platform's audience, with
+      one real exception: an item logged with <code>"category": "electronics"</code> shows Depop struck through
+      as ineligible rather than a plain gap, since Depop bans battery-powered/electronic items outright (see the
+      Electronics &amp; battery-item rules reference below), that's a policy block, not an opportunity.
     </div>
     <div class="table-wrap">
       <table class="card-table" id="coverageTable">
