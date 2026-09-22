@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-21T03:06:14.051Z",
+  "generatedAt": "2026-09-22T15:45:55.773Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "91b990c",
+      "fullHash": "91b990cf68114e800de8632e31db46ae72fc7f28",
+      "date": "2026-09-22",
+      "author": "Claude",
+      "subject": "Sondrik: add Hacker News, r/SideProject, Indie Hackers as tracked channel cards",
+      "historyReset": false,
+      "files": [
+        "channels.json"
+      ]
+    },
     {
       "hash": "2a6f0f0",
       "fullHash": "2a6f0f0a8ec2fad09c2272541ae5d8b4928b10fa",
