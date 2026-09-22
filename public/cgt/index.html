@@ -103,6 +103,8 @@
           <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
           <tr><th>soldDate</th><td>ISO date this card was actually sold. Leave <code>null</code> while still owned. Once set, the card counts as sold: it drops out of the portfolio value, breakdowns, and insurance summary (nothing left to insure), but stays in the file as a permanent record. <strong>Required together with <code>soldPrice</code></strong>, one without the other is a validation error.</td></tr>
           <tr><th>soldPrice</th><td>USD number, what the card actually sold for. <strong>Required together with <code>soldDate</code>.</strong> Independent of <code>estimatedValue</code> (the last researched estimate before the sale) and <code>costBasis</code> (what was paid); logging both <code>costBasis</code> and <code>soldPrice</code> is what powers the "Realized gain / loss" summary tile and the detail view.</td></tr>
+          <tr><th>listedDate</th><td>ISO date this card actually went up for sale somewhere (eBay, etc), while still unsold. Leave <code>null</code> when not currently listed. <strong>Required together with <code>listedPrice</code></strong>, one without the other is a validation error. Clear both once the card actually sells, that's what <code>soldDate</code>/<code>soldPrice</code> are for.</td></tr>
+          <tr><th>listedPrice</th><td>USD number, the real current asking price. <strong>Required together with <code>listedDate</code>.</strong> Independent of <code>estimatedValue</code> (the researched number, not the ask); a listing 50%+ off the card's own <code>estimatedValue</code> in either direction shows up on the dashboard under "Listing price check" as a nudge to double-check the ask, not an error.</td></tr>
           <tr><th>backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
           <tr><th>priceHistory</th><td>Optional array of <code>{ "value": number, "date": "YYYY-MM-DD", "basis": "recent-sale" | "comp-estimate" }</code> objects, one per prior real price this card has had, each dated before the current <code>datePriced</code>. Leave off or empty until the card has actually been re-priced once; see the note above on how to fill it in when that happens. Powers the up/down indicator next to the value in the table, the price-history list in the detail view, and the "Price trend since last check" summary tile.</td></tr>
         </tbody>
@@ -130,6 +132,8 @@
   "datePriced": null,
   "soldDate": null,
   "soldPrice": null,
+  "listedDate": null,
+  "listedPrice": null,
   "backlogBatch": null,
   "priceHistory": [],
   "notes": null
@@ -722,6 +726,15 @@
       company) priced lower than a lower grade of it. Could be a genuine market quirk, but usually means a price or
       a grade got typed against the wrong row.</p>
     <div class="data-quality-list" id="gradeLadderList"></div>
+  </section>
+
+  <section id="listingPriceSection" hidden>
+    <h2 class="section-title">Listing price check</h2>
+    <p class="section-subtitle">A currently-listed card whose real asking price (<code class="inline-code">listedPrice</code>)
+      is 50%+ above or below its own researched <code class="inline-code">estimatedValue</code>. Not an error, a real
+      ask is routinely 10-20% over book, but a full 1.5x or 0.5x gap is more often a forgotten re-list or a stale
+      estimate than a deliberate price.</p>
+    <div class="data-quality-list" id="listingPriceList"></div>
   </section>
 
   <section>

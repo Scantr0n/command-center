@@ -196,6 +196,15 @@ function isSold(c) {
   return c.soldDate != null;
 }
 
+// Same "either field alone is enough, validate-core.js requires both" logic
+// as isSold above, for a card that's currently listed for sale but not yet
+// sold. A sold card can still carry stale listing fields (validate-core.js
+// only warns about it, doesn't block), so callers that care about "what's
+// actively for sale right now" should also check !isSold(c).
+function isListed(c) {
+  return c.listedDate != null;
+}
+
 // Only counts when both a real purchase price and a real sale price are on
 // record, same "never guess at a missing side" rule as computeGainLoss's
 // unrealized version. A card sold with no logged costBasis has a real sale
@@ -634,6 +643,7 @@ async function loadCards() {
     renderStalePricing();
     renderDuplicates();
     renderGradeLadderFlags();
+    renderListingPriceFlags();
     renderAttentionBar();
     renderBatchFilter();
     renderInsuranceSummary();
@@ -1968,6 +1978,37 @@ function renderGradeLadderFlags() {
   });
 }
 
+// Reuses CGTValidateCore.findListingPriceMismatches, the same rule
+// validate.js runs on the command line, rendered as a clickable panel like
+// the duplicates/grade-ladder ones above. Flags a currently-listed,
+// not-yet-sold card whose real asking price has drifted 50%+ from its own
+// researched estimatedValue in either direction.
+function renderListingPriceFlags() {
+  const section = document.getElementById('listingPriceSection');
+  const list = document.getElementById('listingPriceList');
+  if (!window.CGTValidateCore) {
+    section.hidden = true;
+    return;
+  }
+  const flags = CGTValidateCore.findListingPriceMismatches(cards.filter(c => !isExample(c)));
+
+  if (!flags.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flags.map(({ card: c, ratio, direction }) => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</span>
+      <span class="dq-meta">Listed ${escapeHtml(formatUsd(c.listedPrice))} vs. estimate ${escapeHtml(formatUsd(c.estimatedValue))}</span>
+      <span class="dq-why">${Math.round(Math.abs(ratio - 1) * 100)}% ${direction.toUpperCase()} THE RESEARCHED ESTIMATE</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
 // Same attention-bar convention as CSM's own renderAttentionBar: these
 // panels (unpriced, data quality, stale pricing, duplicates, grade ladder,
 // candidates stuck without a verdict) each already hide themselves when
@@ -1984,6 +2025,7 @@ function renderAttentionBar() {
   const stalePricingCount = buildStalePricingFlags().length;
   const duplicateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateGroups(realCards).length : 0;
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
+  const listingPriceCount = window.CGTValidateCore ? CGTValidateCore.findListingPriceMismatches(realCards).length : 0;
   // A candidate still being weighed (no decision logged yet) but missing
   // expectedGradedValue/estimatedGradingCost can't get a real verdict out of
   // computeGradingMath, so it sits stuck at "Needs more data" until that
@@ -2035,6 +2077,9 @@ function renderAttentionBar() {
   }
   if (gradeLadderCount) {
     items.push({ n: gradeLadderCount, tone: 'warn', target: 'gradeLadderSection', label: gradeLadderCount === 1 ? 'grade ladder inversion' : 'grade ladder inversions' });
+  }
+  if (listingPriceCount) {
+    items.push({ n: listingPriceCount, tone: 'warn', target: 'listingPriceSection', label: listingPriceCount === 1 ? 'listing is 50%+ off its own researched estimate' : 'listings are 50%+ off their own researched estimate' });
   }
   if (overdueSubmissionsCount) {
     items.push({
@@ -2458,7 +2503,7 @@ function applyFiltersAndRender() {
   tbody.innerHTML = filtered.map(c => `
     <tr tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled card')}" data-id="${escapeHtml(c.id)}">
       <td>
-        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isBgsBlackLabel(c) ? ' <span class="badge badge-black-label" title="All four BGS subgrades are a perfect 10">black label</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}</div>
+        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isBgsBlackLabel(c) ? ' <span class="badge badge-black-label" title="All four BGS subgrades are a perfect 10">black label</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}${!isSold(c) && isListed(c) ? ' <span class="badge badge-listed" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>' : ''}</div>
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
       </td>
       <td class="cell-muted">${c.sport ? `<span class="badge badge-sport">${escapeHtml(c.sport)}</span>` : '<span class="cell-value empty">unknown</span>'}</td>
@@ -2637,6 +2682,10 @@ function cardEditFormHtml(c) {
     '<div class="form-row-split">' +
     ceInputInner('ceSoldDate', 'Sold date (leave blank if still owned)', c.soldDate, 'date') +
     ceInputInner('ceSoldPrice', 'Sold price, USD', c.soldPrice, 'number') +
+    '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('ceListedDate', 'Listed date (leave blank if not currently for sale)', c.listedDate, 'date') +
+    ceInputInner('ceListedPrice', 'Listed price, USD (real current asking price)', c.listedPrice, 'number') +
     '</div>' +
     ceFieldRow('ceBacklogBatch', 'Backlog batch', c.backlogBatch) +
     ceFieldRow('ceNotes', 'Notes', c.notes, 'textarea') +
@@ -2921,6 +2970,7 @@ function wireCardEditForm(c) {
     const estimatedValueRaw = document.getElementById('ceEstimatedValue').value.trim();
     const costBasisRaw = document.getElementById('ceCostBasis').value.trim();
     const soldPriceRaw = document.getElementById('ceSoldPrice').value.trim();
+    const listedPriceRaw = document.getElementById('ceListedPrice').value.trim();
     const subgrades = {};
     SUBGRADE_LABELS.forEach(([f]) => {
       const raw = document.getElementById('ce' + f[0].toUpperCase() + f.slice(1)).value.trim();
@@ -2944,6 +2994,8 @@ function wireCardEditForm(c) {
       datePriced: document.getElementById('ceDatePriced').value || null,
       soldDate: document.getElementById('ceSoldDate').value || null,
       soldPrice: soldPriceRaw === '' ? null : Number(soldPriceRaw),
+      listedDate: document.getElementById('ceListedDate').value || null,
+      listedPrice: listedPriceRaw === '' ? null : Number(listedPriceRaw),
       backlogBatch: ceVal('ceBacklogBatch'),
       notes: ceVal('ceNotes')
     });
@@ -3094,6 +3146,18 @@ function openModal(id) {
     const gl = computeGainLoss(activeCard);
     if (gl) {
       body += field('Unrealized gain / loss', formatSignedUsd(gl.abs) + (gl.pct != null ? ' (' + (gl.pct >= 0 ? '+' : '') + gl.pct.toFixed(1) + '%)' : ''), false);
+    }
+    if (isListed(activeCard)) {
+      body += field('Listed date', activeCard.listedDate, false);
+      let listedPriceDisplay = formatUsd(activeCard.listedPrice);
+      if (activeCard.estimatedValue > 0) {
+        const ratio = activeCard.listedPrice / activeCard.estimatedValue;
+        if (ratio >= 1.5 || ratio <= 0.5) {
+          const pct = Math.round(Math.abs(ratio - 1) * 100);
+          listedPriceDisplay += ' (' + pct + '% ' + (ratio >= 1.5 ? 'above' : 'below') + ' the researched estimate, worth a look)';
+        }
+      }
+      body += field('Listed price', listedPriceDisplay, false);
     }
   }
   body += field('Comp note', activeCard.compNote, !activeCard.compNote);
@@ -3479,6 +3543,8 @@ const CSV_COLUMNS = [
   [c => c.costBasis, 'Cost basis'],
   [c => isSold(c) ? c.soldDate : null, 'Sold date'],
   [c => isSold(c) ? c.soldPrice : null, 'Sold price'],
+  [c => !isSold(c) && isListed(c) ? c.listedDate : null, 'Listed date'],
+  [c => !isSold(c) && isListed(c) ? c.listedPrice : null, 'Listed price'],
   // Realized once a card is sold (soldPrice vs costBasis), unrealized otherwise
   // (estimatedValue vs costBasis), same branch the detail modal already uses;
   // the label column says which one a given row is so the two never get

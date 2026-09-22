@@ -234,6 +234,34 @@
       if (!isDateOrNull(c.soldDate)) {
         errors.push(where + ': "soldDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.soldDate));
       }
+
+      // Same "one event, two halves, neither optional alone" rule as
+      // soldPrice/soldDate just above, for a card that is currently listed
+      // for sale (not yet sold, just actively asking). Kept as its own pair
+      // rather than reusing soldPrice/soldDate, since a listed-but-unsold
+      // card and a sold card are different real states, not two names for
+      // the same one, both need to coexist on a card that's been re-listed
+      // after a prior sale fell through.
+      if (c.listedPrice !== null && c.listedPrice !== undefined) {
+        if (typeof c.listedPrice !== 'number' || Number.isNaN(c.listedPrice) || c.listedPrice < 0) {
+          errors.push(where + ': "listedPrice" must be a non-negative number or null');
+        }
+        if (!c.listedDate) {
+          errors.push(where + ': has a "listedPrice" but no "listedDate". A real listing needs both, not just the amount.');
+        }
+      } else if (c.listedDate) {
+        errors.push(where + ': has a "listedDate" but no "listedPrice". A real listing needs both, not just the date.');
+      }
+      if (!isDateOrNull(c.listedDate)) {
+        errors.push(where + ': "listedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.listedDate));
+      }
+      // A sold card that still carries listing fields reads as both sold and
+      // for sale at once, almost always because the listing was never
+      // cleared once the sale went through rather than a real double state.
+      if ((c.listedPrice != null || c.listedDate != null) && c.soldPrice != null && c.soldDate != null) {
+        warnings.push(where + ': has both "soldPrice"/"soldDate" and "listedPrice"/"listedDate" set. Once a card ' +
+          'sells, clear the listing fields (or confirm it was re-listed after the sale fell through).');
+      }
       if (c.soldDate && c.datePriced && c.soldDate < c.datePriced) {
         warnings.push(where + ': "soldDate" (' + c.soldDate + ') is before "datePriced" (' + c.datePriced +
           '). Possible (sold before ever being individually priced), but double-check the two dates were not swapped.');
@@ -304,6 +332,14 @@
         'or typed against the wrong grade.');
     });
 
+    findListingPriceMismatches(cards).forEach(({ card, ratio, direction }) => {
+      const pct = Math.round(Math.abs(ratio - 1) * 100);
+      warnings.push('listed price looks ' + direction + ' the researched estimate: "' + (card.cardName || card.id) +
+        '" (' + (card.id || '(missing id)') + ') is listed at $' + card.listedPrice + ', ' + pct + '% ' + direction +
+        ' its own researched estimate of $' + card.estimatedValue + '. Could be intentional, but worth double-' +
+        'checking the ask is still what was meant.');
+    });
+
     return { errors, warnings };
   }
 
@@ -349,6 +385,29 @@
           }
         }
       }
+    });
+    return flags;
+  }
+
+  // Flags a currently-listed card (listedPrice/listedDate both set, not yet
+  // sold) whose active asking price has drifted far from its own researched
+  // estimatedValue -- either direction, not just "overpriced" -- since both
+  // are real signals something is stale: the listing was never updated after
+  // a re-price, or the estimate itself is the one that's gone stale. 50% off
+  // either way is the threshold: a real live listing is routinely 10-20%
+  // above book on the hope of a motivated buyer (see the real McDavid/Broten
+  // cards.json notes, which is normal and not worth flagging), but a full
+  // 1.5x or 0.5x gap is far more often a forgotten re-list or a stale
+  // estimate than a deliberate pricing choice. A warning, not an error: a
+  // real collector sometimes does list well above or below book on purpose.
+  function findListingPriceMismatches(cards) {
+    const flags = [];
+    (cards || []).forEach(c => {
+      if (c.listedPrice == null || c.estimatedValue == null || c.estimatedValue <= 0) return;
+      if (c.soldPrice != null && c.soldDate != null) return;
+      const ratio = c.listedPrice / c.estimatedValue;
+      if (ratio >= 1.5) flags.push({ card: c, ratio, direction: 'above' });
+      else if (ratio <= 0.5) flags.push({ card: c, ratio, direction: 'below' });
     });
     return flags;
   }
@@ -527,6 +586,7 @@
 
   return {
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findGradeLadderInversions,
+    findListingPriceMismatches,
     isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
     SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };

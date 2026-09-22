@@ -104,6 +104,8 @@ const DATASETS = {
       { key: 'datePriced', label: 'Date priced', aliases: ['datepriced', 'date'] },
       { key: 'soldDate', label: 'Sold date (blank if still owned)', aliases: ['solddate', 'datesold'] },
       { key: 'soldPrice', label: 'Sold price', aliases: ['soldprice', 'saleprice'], type: 'number' },
+      { key: 'listedDate', label: 'Currently listed date (blank if not for sale)', aliases: ['listeddate', 'datelisted'] },
+      { key: 'listedPrice', label: 'Currently listed price (real asking price)', aliases: ['listedprice', 'askingprice', 'listprice'], type: 'number' },
       { key: 'backlogBatch', label: 'Backlog batch', aliases: ['backlogbatch', 'batch'] },
       { key: 'notes', label: 'Notes', aliases: ['notes', 'note'] }
     ]

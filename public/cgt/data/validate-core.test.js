@@ -16,7 +16,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  isDateOrNull, findDuplicateGroups, findGradeLadderInversions,
+  isDateOrNull, findDuplicateGroups, findGradeLadderInversions, findListingPriceMismatches,
   validateCards, validateSubmissions, validateCandidates
 } = require('./validate-core.js');
 
@@ -110,6 +110,58 @@ test('validateCards requires soldDate and soldPrice together, not one without th
 
   const missingPrice = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', soldDate: '2026-08-08', soldPrice: null }]);
   assert.ok(missingPrice.errors.some(e => e.includes('soldPrice')));
+});
+
+test('validateCards requires listedDate and listedPrice together, not one without the other', () => {
+  const missingDate = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', listedPrice: 20, listedDate: null }]);
+  assert.ok(missingDate.errors.some(e => e.includes('listedDate')));
+
+  const missingPrice = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', listedDate: '2026-08-08', listedPrice: null }]);
+  assert.ok(missingPrice.errors.some(e => e.includes('listedPrice')));
+});
+
+test('validateCards warns when a card is both sold and still carries listing fields', () => {
+  const { warnings } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey',
+    soldDate: '2026-08-08', soldPrice: 40,
+    listedDate: '2026-07-01', listedPrice: 45
+  }]);
+  assert.ok(warnings.some(w => w.includes('listedPrice') && w.includes('soldPrice')));
+});
+
+test('validateCards passes a currently-listed unsold card clean, and does not require it to match estimatedValue', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey',
+    estimatedValue: 50, valuationBasis: 'recent-sale', datePriced: '2026-08-08',
+    listedDate: '2026-08-15', listedPrice: 55
+  }]);
+  assert.deepEqual(errors, []);
+});
+
+test('findListingPriceMismatches flags a listing far above its own researched estimate', () => {
+  const cards = [
+    { id: 'a', cardName: 'X', estimatedValue: 50, listedPrice: 100, listedDate: '2026-08-08' }
+  ];
+  const flags = findListingPriceMismatches(cards);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].direction, 'above');
+});
+
+test('findListingPriceMismatches flags a listing far below its own researched estimate', () => {
+  const cards = [
+    { id: 'a', cardName: 'X', estimatedValue: 100, listedPrice: 40, listedDate: '2026-08-08' }
+  ];
+  const flags = findListingPriceMismatches(cards);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].direction, 'below');
+});
+
+test('findListingPriceMismatches does not flag a listing that is only modestly above book, or a sold card', () => {
+  const cards = [
+    { id: 'a', cardName: 'X', estimatedValue: 100, listedPrice: 120, listedDate: '2026-08-08' },
+    { id: 'b', cardName: 'Y', estimatedValue: 100, listedPrice: 300, listedDate: '2026-08-08', soldDate: '2026-08-09', soldPrice: 290 }
+  ];
+  assert.deepEqual(findListingPriceMismatches(cards), []);
 });
 
 test('validateCards accepts real BGS subgrades in half-point steps, rejects out-of-range or off-step values', () => {
