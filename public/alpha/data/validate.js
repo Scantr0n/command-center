@@ -278,6 +278,19 @@ function main() {
     data.system.features.forEach((f, i) => {
       emDashFields(f, ['label', 'note']).forEach(field =>
         warnings.push('system.features[' + i + '].' + field + ' contains an em dash, this page never uses one, check for a paste-in'));
+      // The Architecture grid's built/pending badge reads this field, never
+      // whether note is set (note is free-text description, e.g. genealogy-
+      // wall's just explains what the feature is, and used to get badged
+      // "pending" for that alone, wrongly calling a real, built feature
+      // unbuilt). Required and boolean so a hand-added feature can't silently
+      // fall back to that same wrong reading.
+      if (typeof f.pending !== 'boolean') {
+        errors.push('system.features[' + i + '].pending: required, must be true or false ' +
+          '(whether this feature is genuinely not yet built/active, never inferred from note)');
+      }
+      if (f.pending === true && !f.note) {
+        warnings.push('system.features[' + i + '].pending is true but note is empty. A pending feature should say what it is blocked on.');
+      }
     });
   }
 

@@ -7,12 +7,12 @@
     "agentKind": "Evolved trading agents",
     "lastVerifiedAt": "2026-09-16T19:55:06Z",
     "features": [
-      { "id": "regime-detection", "label": "Regime detection", "note": null },
-      { "id": "drawdown-sizing", "label": "Drawdown-based position sizing", "note": null },
-      { "id": "robustness-sizing", "label": "Robustness-based position sizing", "note": null },
-      { "id": "kill-switch", "label": "Kill switch", "note": null },
-      { "id": "debate-panel", "label": "Debate panel", "note": "Pending an API key, not fully active yet" },
-      { "id": "genealogy-wall", "label": "Genealogy wall", "note": "Agent breeding / lineage history" }
+      { "id": "regime-detection", "label": "Regime detection", "note": null, "pending": false },
+      { "id": "drawdown-sizing", "label": "Drawdown-based position sizing", "note": null, "pending": false },
+      { "id": "robustness-sizing", "label": "Robustness-based position sizing", "note": null, "pending": false },
+      { "id": "kill-switch", "label": "Kill switch", "note": null, "pending": false },
+      { "id": "debate-panel", "label": "Debate panel", "note": "Pending an API key, not fully active yet", "pending": true },
+      { "id": "genealogy-wall", "label": "Genealogy wall", "note": "Agent breeding / lineage history", "pending": false }
     ]
   },
   "connection": {

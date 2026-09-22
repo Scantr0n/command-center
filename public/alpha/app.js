@@ -1319,6 +1319,10 @@ function renderArchitectureVerifiedMeta(data) {
     (isStale ? `. That's over ${ARCH_VERIFIED_STALE_DAYS} days ago, past due for rechecking against Alpha's actual code.` : '');
 }
 
+// The built/pending badge reads f.pending, never f.note: note is free-text
+// description (genealogy-wall's just explains what the feature is) and used
+// to say that on its own mislabeled any noted feature "pending", which wrongly
+// called the real, built genealogy wall unbuilt.
 function renderArchitecture(data) {
   renderArchitectureVerifiedMeta(data);
   const grid = document.getElementById('archGrid');
@@ -1326,7 +1330,7 @@ function renderArchitecture(data) {
     <div class="arch-card">
       <div class="arch-card-title">
         ${escapeHtml(f.label)}
-        ${f.note ? '<span class="badge badge-pending">pending</span>' : '<span class="badge badge-active">built</span>'}
+        ${f.pending ? '<span class="badge badge-pending">pending</span>' : '<span class="badge badge-active">built</span>'}
       </div>
       ${f.note ? `<div class="arch-card-note">${escapeHtml(f.note)}</div>` : ''}
     </div>
