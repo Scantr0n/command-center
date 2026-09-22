@@ -12,7 +12,8 @@
     "test:sondrik": "node --test public/sondrik/data/*.test.js",
     "test:cgt": "node --test public/cgt/data/*.test.js",
     "test:alpha": "node --test public/alpha/data/*.test.js",
-    "test:garage": "node --test public/garage/data/*.test.js"
+    "test:garage": "node --test public/garage/data/*.test.js",
+    "test:csm": "node --test public/csm/data/*.test.js"
   },
   "license": "ISC",
   "type": "commonjs",
