@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T08:35:00.736Z",
+  "generatedAt": "2026-09-22T15:54:54.319Z",
   "generatedFrom": "git log over public/alpha/data/{status.json}, run node public/alpha/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "1760243",
+      "fullHash": "1760243b799d8cac266521f53fb938d78adb4e98",
+      "date": "2026-09-22",
+      "author": "Claude",
+      "subject": "Alpha: fix Architecture badge mislabeling built features as pending",
+      "historyReset": false,
+      "files": [
+        "status.json"
+      ]
+    },
     {
       "hash": "d0368fc",
       "fullHash": "d0368fc41d61f1b1d5ff7479c7b8f6e9a91be80b",
