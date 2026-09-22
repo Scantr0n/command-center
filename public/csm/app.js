@@ -1429,6 +1429,9 @@
           av = at == null ? -1 : at; bv = bt == null ? -1 : bt;
           break;
         }
+        case 'touches':
+          av = touchCount(a); bv = touchCount(b);
+          break;
         case 'name':
         default:
           av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase();
@@ -1468,6 +1471,7 @@
       { key: 'channel', label: 'Channel' },
       { key: 'nextNudge', label: 'Next nudge' },
       { key: 'stalled', label: 'Time in stage' },
+      { key: 'touches', label: 'Touches' },
       { key: 'lastTouch', label: 'Last touch' }
     ];
     const headHtml = headers.map(h => {
@@ -1496,6 +1500,7 @@
             '">' + escapeHtml(fmtDate(p.nextNudgeDate)) + '</span>'
           : '<span class="board-list-unlogged">Not queued</span>') + '</td>' +
         '<td>' + (info ? info.days + 'd' + (info.isStale ? ' (stalled)' : '') : '<span class="board-list-unlogged">Unlogged</span>') + '</td>' +
+        '<td>' + (touchCount(p) > 0 ? touchCount(p) : '<span class="board-list-unlogged">0</span>') + '</td>' +
         '<td>' + (lastTouchDays != null ? lastTouchDays + 'd ago' : '<span class="board-list-unlogged">No touches logged</span>') + '</td>' +
         '</tr>';
     }).join('');
@@ -1510,7 +1515,7 @@
           listSortDir = listSortDir === 'asc' ? 'desc' : 'asc';
         } else {
           listSortKey = key;
-          listSortDir = (key === 'stalled' || key === 'lastTouch') ? 'desc' : 'asc';
+          listSortDir = (key === 'stalled' || key === 'lastTouch' || key === 'touches') ? 'desc' : 'asc';
         }
         syncUrl();
         renderBoardList(stages, prospects, allProspects, displayQuery, filtering);
@@ -1674,6 +1679,16 @@
     return daysSince(lastDate);
   }
 
+  // How many real touches have actually gone out, not just when the last
+  // one landed. Cold outreach research is consistent that a real reply
+  // typically takes several touches, not one attempt, so a board scanned at
+  // a glance should show effort-so-far as its own signal, not require
+  // opening the modal's outreach log to find out whether "silent" here
+  // means one email sent once or five real attempts over a month.
+  function touchCount(p) {
+    return (p.outreachLog || []).filter(e => e && isValidDateStr(e.date)).length;
+  }
+
   // Only the two tiers a person would actually act on today ('overdue' and
   // 'today') get a card badge, 'soon'/'later' stay in the Nudge Queue section
   // only, same reasoning as the research this session's improvement was
@@ -1696,8 +1711,10 @@
       ? '<span class="badge badge-category">' + escapeHtml(p.category).toUpperCase() + '</span>'
       : '';
     const lastTouchDays = daysSinceLastTouch(p);
+    const nTouches = touchCount(p);
     const touchBadge = lastTouchDays != null
-      ? '<span class="badge badge-touch">' + lastTouchDays + 'D SINCE LAST TOUCH</span>'
+      ? '<span class="badge badge-touch">' + nTouches + (nTouches === 1 ? ' TOUCH' : ' TOUCHES') +
+        ' &middot; ' + lastTouchDays + 'D SINCE LAST</span>'
       : '';
     // Surfaced directly on the card face, not just in the modal/nudge queue:
     // a due nudge date with no visible concrete next step is exactly the
