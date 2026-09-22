@@ -461,9 +461,9 @@
       const actionLine = p.nextAction
         ? '<span class="nudge-action">' + escapeHtml(p.nextAction) + '</span>'
         : (unqueued ? '' : '<span class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</span>');
-      const touchCount = (p.outreachLog || []).filter(e => e && e.date).length;
-      const touchLine = touchCount > 0
-        ? '<span class="nudge-touch-count font-mono">' + touchCount + ' touch' + (touchCount === 1 ? '' : 'es') +
+      const touches = touchCount(p);
+      const touchLine = touches > 0
+        ? '<span class="nudge-touch-count font-mono">' + touches + ' touch' + (touches === 1 ? '' : 'es') +
           ' logged so far</span>'
         : '';
       return '<button type="button" class="nudge-row nudge-' + urgency + (unqueued || badDate ? ' nudge-row-unqueued' : '') +
@@ -697,7 +697,7 @@
     const today = todayIso();
     const flagged = prospects
       .filter(p => p.stage === 'outreach-sent')
-      .map(p => ({ p, touches: (p.outreachLog || []).filter(e => e && e.date).length }))
+      .map(p => ({ p, touches: touchCount(p) }))
       .filter(x => x.touches >= COLD_TOUCH_THRESHOLD);
 
     const active = [];
@@ -2289,8 +2289,8 @@
       descLines.push(p.nextAction ? 'Next action: ' + p.nextAction : 'No next action logged yet.');
       const ns = p.nudgeSchedule || {};
       if (ns.doNotNudgeBefore) descLines.push('Do not nudge before ' + fmtDate(ns.doNotNudgeBefore) + '.');
-      const touchCount = (p.outreachLog || []).filter(e => e && e.date).length;
-      if (touchCount > 0) descLines.push(touchCount + ' outreach touch' + (touchCount === 1 ? '' : 'es') + ' logged so far.');
+      const touches = touchCount(p);
+      if (touches > 0) descLines.push(touches + ' outreach touch' + (touches === 1 ? '' : 'es') + ' logged so far.');
       descLines.push('CSM pipeline: ' + location.origin + '/csm/');
       const lines = [
         'BEGIN:VEVENT',
