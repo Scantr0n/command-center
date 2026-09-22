@@ -1257,11 +1257,16 @@ async function fetchVentureMetric(clusterId) {
       if (!r.ok) return { label: 'Card portfolio value', value: null, meta: 'Failed to load (HTTP ' + r.status + ')' };
       const data = await r.json();
       const cards = data.cards || [];
-      const total = cards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
+      // Same "what do I currently hold" filtering as CGT's own renderStats():
+      // a sold card stays in cards.json as a record but no longer belongs to
+      // a portfolio-value total, and the reserved example row isn't real.
+      const owned = cards.filter(c => c.id !== 'example-row-not-real' && c.soldDate == null);
+      const priced = owned.filter(c => c.estimatedValue != null);
+      const total = priced.reduce((sum, c) => sum + c.estimatedValue, 0);
       return {
         label: 'Card portfolio value',
         value: '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        meta: `${cards.length} real card${cards.length === 1 ? '' : 's'} priced (not sales revenue)`
+        meta: `${priced.length} real card${priced.length === 1 ? '' : 's'} priced (not sales revenue)`
       };
     }
     if (clusterId === 'garage') {
