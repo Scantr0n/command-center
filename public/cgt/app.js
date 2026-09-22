@@ -401,10 +401,21 @@ function daysSince(isoDate) {
   // daysBetween and the main dashboard's relativeTime: datePriced is logged
   // against Jack's own calendar day, so anchoring to UTC midnight instead
   // overstates the age by up to a day for anyone west of UTC.
-  const then = new Date(isoDate + 'T00:00:00').getTime();
-  if (Number.isNaN(then)) return null;
-  const now = Date.now();
-  return Math.floor((now - then) / 86400000);
+  const then = new Date(isoDate + 'T00:00:00');
+  if (Number.isNaN(then.getTime())) return null;
+  // Real Y/M/D-component subtraction, not a flat /86400000 divide: the main
+  // dashboard's own relativeTime/shortRelativeTime/isStale carried the exact
+  // same bug (fixed 4e02da2) -- a fixed 86400000ms divisor silently loses or
+  // gains the real DST-transition hour, making every date logged before the
+  // year's spring-forward read one calendar day "fresher" than real for the
+  // several months until fall-back (i.e. right now, since America/Chicago is
+  // currently in CDT). No real cards.json date predates this year's DST
+  // transition yet, so this hasn't visibly misfired here, but the function
+  // itself carried the same latent bug and would as soon as one did.
+  const now = new Date();
+  const thenMidnight = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((nowMidnight - thenMidnight) / 86400000);
 }
 
 // Real official verification tools, checked directly against each grader's
