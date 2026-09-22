@@ -146,6 +146,17 @@ function formatSignedUsd(n) {
   return (n >= 0 ? '+' : '-') + formatUsd(Math.abs(n));
 }
 
+// A submission logs its cost as one invoiced batch total (real, since that
+// is what actually gets paid) and cardCount separately, so nothing on the
+// page ever divided the two even though both were already sitting right
+// there. Null whenever either half is missing or cardCount is 0, same "no
+// value means no value" convention as the rest of this file, not a 0 or a
+// misleading average.
+function costPerCard(s) {
+  if (s.cost == null || !s.cardCount) return null;
+  return s.cost / s.cardCount;
+}
+
 // Gain/loss only exists to compute where both a real purchase price
 // (costBasis) and a real researched value (estimatedValue) are on record.
 // Neither field requires the other: plenty of cards will have a price
@@ -1687,6 +1698,7 @@ function openSubmissionModal(id) {
   body += field('Tracking number', s.trackingNumber, !s.trackingNumber);
   body += field('Returned date', s.returnedDate, !s.returnedDate);
   body += field('Cost (grading fee)', s.cost != null ? formatUsd(s.cost) : null, s.cost == null);
+  body += field('Cost per card', costPerCard(s) != null ? formatUsd(costPerCard(s)) : null, costPerCard(s) == null);
   const lookup = s.gradingCompany && ORDER_STATUS_LOOKUP[s.gradingCompany];
   if (lookup) {
     body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
@@ -1785,7 +1797,8 @@ function renderSubmissions() {
       s.gradingCompany,
       s.serviceLevel,
       s.cardCount != null ? s.cardCount + ' card' + (s.cardCount === 1 ? '' : 's') : null,
-      s.cost != null ? formatUsd(s.cost) + ' fee' : null
+      s.cost != null ? formatUsd(s.cost) + ' fee' : null,
+      costPerCard(s) != null ? formatUsd(costPerCard(s)) + '/card' : null
     ].filter(Boolean);
     // The tracking link below used to sit *inside* this same tabindex/
     // role="button" row, an interactive <a> nested inside another
@@ -3718,7 +3731,7 @@ const SUBMISSIONS_CSV_COLUMNS = [
   [s => s.trackingNumber, 'Tracking number'], [s => s.returnedDate, 'Returned date'],
   [s => s.status !== 'returned' ? daysSince(s.submittedDate) : null, 'Days in queue'],
   [s => computeTurnaroundDays(s), 'Actual turnaround (days)'],
-  [s => s.cost, 'Cost'], [s => s.notes, 'Notes']
+  [s => s.cost, 'Cost'], [s => costPerCard(s), 'Cost per card'], [s => s.notes, 'Notes']
 ];
 
 function buildAllSubmissionsSorted() {
