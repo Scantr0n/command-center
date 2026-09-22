@@ -955,7 +955,18 @@ function dataQualityHandler(hub) {
     // console.warn/console.error both write to stderr, not stdout, so both
     // streams have to be read to see the real warning/error lines, not just
     // the plain console.log "is valid" lines that land on stdout alone.
-    res.json(parseValidateCounts((result.stdout || '') + (result.stderr || '')));
+    const counts = parseValidateCounts((result.stdout || '') + (result.stderr || ''));
+    if (result.status !== 0 && counts.warnings === 0 && counts.errors === 0) {
+      // Exited non-zero but never printed a real "N warning(s)"/"N error(s)"
+      // line: a fatal crash before validation could even run (e.g. malformed
+      // JSON, see each validate.js's own "Failed to read/parse" catch), not
+      // a real clean reading. Reporting {0, 0} here would show a perfect
+      // score for a hub whose data file is currently unreadable, exactly
+      // the situation this panel exists to catch.
+      res.json({ warnings: 0, errors: 0, unavailable: true });
+      return;
+    }
+    res.json(counts);
   };
 }
 
