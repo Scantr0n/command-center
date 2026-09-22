@@ -20,6 +20,27 @@
       "linkedMetric": null,
       "status": "not-tracked",
       "note": "Not wired into tracking yet."
+    },
+    {
+      "id": "hacker-news",
+      "name": "Hacker News (Show HN)",
+      "linkedMetric": null,
+      "status": "not-tracked",
+      "note": "No Show HN post made yet. Norms researched below, not launched here."
+    },
+    {
+      "id": "r-sideproject",
+      "name": "r/SideProject",
+      "linkedMetric": null,
+      "status": "not-tracked",
+      "note": "No post made yet. Norms researched below, not launched here."
+    },
+    {
+      "id": "indie-hackers-milestones",
+      "name": "Indie Hackers (Milestones)",
+      "linkedMetric": null,
+      "status": "not-tracked",
+      "note": "No milestone post made yet. Norms researched below, not launched here."
     }
   ]
 }
