@@ -243,11 +243,13 @@
     const pinned = getPinned();
     const row = c => {
       const active = currentPathIsHub(c.link);
-      const color = STATUS_COLOR[c.status] || STATUS_COLOR.unknown;
+      const status = c.status || 'unknown';
+      const color = STATUS_COLOR[status] || STATUS_COLOR.unknown;
+      const statusLabel = status.toUpperCase();
       const isPinned = pinned.has(c.id);
       return `
         <div class="cc-sb-row-wrap">
-          <a class="cc-sb-row${active ? ' active' : ''}" href="${escapeHtml(c.link)}" title="${escapeHtml(c.name)}" ${active ? 'aria-current="page"' : ''}>
+          <a class="cc-sb-row${active ? ' active' : ''}" href="${escapeHtml(c.link)}" title="${escapeHtml(c.name)}, status: ${escapeHtml(statusLabel)}" aria-label="${escapeHtml(c.name)}, status: ${escapeHtml(statusLabel)}" ${active ? 'aria-current="page"' : ''}>
             <span class="cc-sb-dot" style="background:${color}" aria-hidden="true"></span>
             <span class="cc-sb-label">${escapeHtml(c.name)}</span>
           </a>
