@@ -3188,15 +3188,15 @@ function openModal(id) {
     }
     if (isListed(activeCard)) {
       body += field('Listed date', activeCard.listedDate, false);
-      let listedPriceDisplay = formatUsd(activeCard.listedPrice);
-      if (activeCard.estimatedValue > 0) {
+      let listedPriceDisplay = activeCard.listedPrice != null ? formatUsd(activeCard.listedPrice) : null;
+      if (activeCard.listedPrice != null && activeCard.estimatedValue > 0) {
         const ratio = activeCard.listedPrice / activeCard.estimatedValue;
         if (ratio >= 1.5 || ratio <= 0.5) {
           const pct = Math.round(Math.abs(ratio - 1) * 100);
           listedPriceDisplay += ' (' + pct + '% ' + (ratio >= 1.5 ? 'above' : 'below') + ' the researched estimate, worth a look)';
         }
       }
-      body += field('Listed price', listedPriceDisplay, false);
+      body += field('Listed price', listedPriceDisplay, activeCard.listedPrice == null);
     }
   }
   body += field('Comp note', activeCard.compNote, !activeCard.compNote);
