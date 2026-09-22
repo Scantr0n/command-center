@@ -17,6 +17,7 @@ const {
   estimateNetPayout, ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet,
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
+  poshmarkWeightTier, bundleNetComparison,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
 } = require('./garage-core.js');
 
@@ -146,4 +147,39 @@ test('relistGuidanceParts: nothing left to relist (sold on its only platform) is
   assert.equal(parts.length, 1);
   assert.equal(parts[0].tier, 'unknown');
   assert.equal(parts[0].text, 'nothing left to relist');
+});
+
+test('poshmarkWeightTier: stays free under 5 lb, steps up to the $11.49/$16.49 label past it', () => {
+  assert.equal(poshmarkWeightTier(5).sellerCost, 0);
+  assert.equal(poshmarkWeightTier(5.1).sellerCost, 5);
+  assert.equal(poshmarkWeightTier(5.1).labelCost, 11.49);
+  assert.equal(poshmarkWeightTier(10).labelCost, 11.49);
+  assert.equal(poshmarkWeightTier(10.1).sellerCost, 10);
+  assert.equal(poshmarkWeightTier(10.1).labelCost, 16.49);
+  assert.equal(poshmarkWeightTier(15).labelCost, 16.49);
+});
+
+test('poshmarkWeightTier: past all flat-rate tiers or an invalid weight returns null, not a guess', () => {
+  assert.equal(poshmarkWeightTier(15.1), null);
+  assert.equal(poshmarkWeightTier(-1), null);
+  assert.equal(poshmarkWeightTier(null), null);
+  assert.equal(poshmarkWeightTier(NaN), null);
+});
+
+test('bundleNetComparison: routes both legs through estimateNetPayout, discount only applies to the bundled leg', () => {
+  const r = bundleNetComparison('vinted', [40, 30], 0);
+  assert.equal(r.separateNet, 70);
+  assert.equal(r.bundledNet, 70);
+  assert.equal(r.swing, 0);
+  const discounted = bundleNetComparison('vinted', [40, 30], 10);
+  assert.equal(discounted.bundleTotal, 63);
+  assert.equal(discounted.bundledNet, 63);
+  assert.equal(discounted.swing, -7);
+});
+
+test('bundleNetComparison: an out-of-range discount clamps to 0-100 instead of inverting the math', () => {
+  const negative = bundleNetComparison('vinted', [50, 50], -20);
+  assert.equal(negative.bundleTotal, 100);
+  const over = bundleNetComparison('vinted', [50, 50], 150);
+  assert.equal(over.bundleTotal, 0);
 });

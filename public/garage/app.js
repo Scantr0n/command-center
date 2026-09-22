@@ -65,7 +65,8 @@ const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
   estimateNetPayout, minListingPriceForNet,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
-  remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts
+  remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
+  poshmarkWeightTier, bundleNetComparison
 } = GarageCore;
 
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
@@ -1705,14 +1706,10 @@ function renderBundle() {
   empty.hidden = true;
 
   const discountRaw = Number(discountInput.value);
-  const discountPct = Number.isNaN(discountRaw) ? 0 : Math.min(100, Math.max(0, discountRaw));
-  const bundleTotal = prices.reduce((s, p) => s + p, 0) * (1 - discountPct / 100);
+  const discountPct = Number.isNaN(discountRaw) ? 0 : discountRaw;
 
-  const rows = PAYOUT_PLATFORMS.filter(p => bundlePlatforms.has(p)).map(p => {
-    const separateNet = prices.reduce((s, price) => s + estimateNetPayout(p, price), 0);
-    const bundledNet = estimateNetPayout(p, bundleTotal);
-    return { p, separateNet, bundledNet, swing: bundledNet - separateNet };
-  });
+  const rows = PAYOUT_PLATFORMS.filter(p => bundlePlatforms.has(p))
+    .map(p => ({ p, ...bundleNetComparison(p, prices, discountPct) }));
 
   tbody.innerHTML = rows.map(r => `
     <tr>
@@ -1745,18 +1742,8 @@ function wireBundle() {
   renderBundle();
 }
 
-// Poshmark heavy-item shipping check: Poshmark's prepaid USPS Ground
-// Advantage label is a flat $6.49 buyer-paid rate only up to a 5 lb boxed
-// weight (current 2026 rate, see the bundle discount callout above); past
-// that the label steps up to $11.49 (5.1-10 lb) or $16.49 (10.1-15 lb) and
-// the seller absorbs the $5/$10 difference out of the sale. Boots are the
-// real risk case in this inventory, easy to misjudge without a scale.
-const POSHMARK_WEIGHT_TIERS = [
-  { max: 5, buyerRate: 6.49, sellerCost: 0 },
-  { max: 10, buyerRate: 6.49, sellerCost: 5, labelCost: 11.49 },
-  { max: 15, buyerRate: 6.49, sellerCost: 10, labelCost: 16.49 }
-];
-
+// Poshmark heavy-item shipping check: tier math lives in GarageCore's
+// poshmarkWeightTier (see its own comment there), this just renders it.
 function renderPoshWeightCheck() {
   const input = document.getElementById('poshWeightInput');
   const result = document.getElementById('poshWeightResult');
@@ -1769,7 +1756,7 @@ function renderPoshWeightCheck() {
     result.textContent = 'Enter a boxed weight above to check.';
     return;
   }
-  const tier = POSHMARK_WEIGHT_TIERS.find(t => weight <= t.max);
+  const tier = poshmarkWeightTier(weight);
   if (!tier) {
     result.textContent = `At ${weight} lb, this is past Poshmark's 15 lb flat-rate tiers entirely, check ` +
       `Poshmark's current large-item shipping options before listing, this calculator doesn't cover it.`;

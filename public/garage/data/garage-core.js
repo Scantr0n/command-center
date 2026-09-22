@@ -140,6 +140,41 @@
     return null;
   }
 
+  // Poshmark's prepaid USPS Ground Advantage label is a flat $6.49 buyer-paid
+  // rate only up to a 5 lb boxed weight (current 2026 rate); past that the
+  // label steps up to $11.49 (5.1-10 lb) or $16.49 (10.1-15 lb) and the
+  // seller absorbs the $5/$10 difference out of the sale. Boots are the real
+  // risk case in this inventory, easy to misjudge without a scale. This was
+  // inline-only in app.js's renderPoshWeightCheck, the same kind of untested
+  // real money math that already produced the bugs listed in this file's
+  // header comment, so it lives here now with the rest of that math.
+  const POSHMARK_WEIGHT_TIERS = [
+    { max: 5, buyerRate: 6.49, sellerCost: 0, labelCost: 6.49 },
+    { max: 10, buyerRate: 6.49, sellerCost: 5, labelCost: 11.49 },
+    { max: 15, buyerRate: 6.49, sellerCost: 10, labelCost: 16.49 }
+  ];
+
+  // Returns the matching tier, or null once a boxed weight is past all of
+  // Poshmark's flat-rate tiers (a real case this calculator doesn't cover,
+  // the caller should say so rather than guess).
+  function poshmarkWeightTier(weight) {
+    if (weight == null || Number.isNaN(weight) || weight < 0) return null;
+    return POSHMARK_WEIGHT_TIERS.find(t => weight <= t.max) || null;
+  }
+
+  // Pure bundle-discount math: separateNet is what each item would net
+  // listed on its own, bundledNet is the discounted total run through the
+  // same per-platform fee formula once, swing is the real difference. Both
+  // legs go through estimateNetPayout so a fee-schedule fix in one place
+  // never has to be re-applied here separately.
+  function bundleNetComparison(platform, prices, discountPct) {
+    const pct = Math.min(100, Math.max(0, discountPct || 0));
+    const bundleTotal = prices.reduce((s, p) => s + p, 0) * (1 - pct / 100);
+    const separateNet = prices.reduce((s, p) => s + estimateNetPayout(platform, p), 0);
+    const bundledNet = estimateNetPayout(platform, bundleTotal);
+    return { bundleTotal, separateNet, bundledNet, swing: bundledNet - separateNet };
+  }
+
   function remainingPlatforms(l) {
     const soldOn = l.soldOn || [];
     return (l.platforms || []).filter(p => !soldOn.includes(p));
@@ -192,9 +227,11 @@
 
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
+    POSHMARK_WEIGHT_TIERS,
     estimateNetPayout,
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
-    remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts
+    remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
+    poshmarkWeightTier, bundleNetComparison
   };
 });
