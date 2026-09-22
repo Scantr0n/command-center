@@ -301,6 +301,14 @@
   }
   .skip-link:focus { top: 12px; outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
 
+  /* Graph <-> Grid crossfade (see setView's document.startViewTransition
+     call). Same ease speed as the rest of the page's own 0.15-0.18s
+     transitions, not the browser's slower ~0.25s default. */
+  ::view-transition-old(root), ::view-transition-new(root) {
+    animation-duration: 0.18s;
+    animation-timing-function: ease;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .node-glow-active { animation: none; opacity: 0.7; }
     .skeleton-pulse { animation: none; opacity: 0.7; }
@@ -2390,17 +2398,32 @@ function renderGrid() {
 }
 
 function setView(view, persist = true) {
-  currentView = view;
-  document.getElementById('graphView').classList.toggle('hidden', view !== 'graph');
-  document.getElementById('clusterGrid').classList.toggle('hidden', view !== 'grid');
-  document.getElementById('gridSkeleton').classList.toggle('hidden', view !== 'grid' || firstLoadDone);
-  document.getElementById('gridToolbar').classList.toggle('hidden', view !== 'grid');
-  document.getElementById('gridToolbar').classList.toggle('flex', view === 'grid');
-  document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
-  document.getElementById('viewGridBtn').classList.toggle('active', view === 'grid');
-  document.getElementById('viewGraphBtn').setAttribute('aria-pressed', String(view === 'graph'));
-  document.getElementById('viewGridBtn').setAttribute('aria-pressed', String(view === 'grid'));
-  updateAttentionVisibility();
+  const changed = view !== currentView;
+  const applyDom = () => {
+    currentView = view;
+    document.getElementById('graphView').classList.toggle('hidden', view !== 'graph');
+    document.getElementById('clusterGrid').classList.toggle('hidden', view !== 'grid');
+    document.getElementById('gridSkeleton').classList.toggle('hidden', view !== 'grid' || firstLoadDone);
+    document.getElementById('gridToolbar').classList.toggle('hidden', view !== 'grid');
+    document.getElementById('gridToolbar').classList.toggle('flex', view === 'grid');
+    document.getElementById('viewGraphBtn').classList.toggle('active', view === 'graph');
+    document.getElementById('viewGridBtn').classList.toggle('active', view === 'grid');
+    document.getElementById('viewGraphBtn').setAttribute('aria-pressed', String(view === 'graph'));
+    document.getElementById('viewGridBtn').setAttribute('aria-pressed', String(view === 'grid'));
+    updateAttentionVisibility();
+  };
+  // Graph <-> Grid used to be a hard instant cut, the one view switch in the
+  // whole page with no transition at all. document.startViewTransition wraps
+  // the same DOM change in a native crossfade, same reduced-motion + feature
+  // detection guard as every other animation in this file (see the
+  // prefers-reduced-motion block above): falls straight back to the old
+  // instant swap on a browser without it, or when motion is disabled.
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (changed && !reduceMotion && document.startViewTransition) {
+    document.startViewTransition(applyDom);
+  } else {
+    applyDom();
+  }
   if (persist) {
     try { localStorage.setItem('ccView', view); } catch {}
   }
