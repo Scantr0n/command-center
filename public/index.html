@@ -1437,13 +1437,14 @@ async function renderVentureSnapshot() {
 // Every hub with a validate.js CLI script gets a pill here (see server.js's
 // dataQualityHandler comment - the subprocess approach only needs the real
 // "N warning(s)"/"N error(s)" print convention, not an exported function, so
-// this covers all 5 real hubs, not just the ones whose rules also happen to
+// this covers all 6 real hubs, not just the ones whose rules also happen to
 // be reusable elsewhere). clusterId is each hub's real id in
 // data/clusters/*.json, the same id openModal and every other clickable card
 // on this page already takes, confirmed directly against those files rather
 // than assumed from the hub's URL path (card-grading's hub folder is cgt,
 // but its cluster id is card-grading, not cgt).
 const DATA_QUALITY_HUBS = [
+  { hub: 'alpha', clusterId: 'alpha', name: 'Alpha' },
   { hub: 'cgt', clusterId: 'card-grading', name: 'CGT' },
   { hub: 'csm', clusterId: 'csm', name: 'CSM' },
   { hub: 'garage', clusterId: 'garage', name: 'Garage' },

@@ -959,6 +959,7 @@ function dataQualityHandler(hub) {
   };
 }
 
+app.get('/api/alpha/data-quality', dataQualityHandler('alpha'));
 app.get('/api/cgt/data-quality', dataQualityHandler('cgt'));
 app.get('/api/csm/data-quality', dataQualityHandler('csm'));
 app.get('/api/garage/data-quality', dataQualityHandler('garage'));
