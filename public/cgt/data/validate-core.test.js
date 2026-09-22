@@ -16,7 +16,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  isDateOrNull, findDuplicateGroups, findGradeLadderInversions, findListingPriceMismatches,
+  isDateOrNull, findDuplicateGroups, findDuplicateCertGroups, findGradeLadderInversions, findListingPriceMismatches,
   validateCards, validateSubmissions, validateCandidates
 } = require('./validate-core.js');
 
@@ -54,6 +54,32 @@ test('findDuplicateGroups skips rows missing cardName, gradingCompany, or grade 
     { id: 'b', cardName: null, year: 2015, gradingCompany: 'PSA', grade: '9' }
   ];
   assert.deepEqual(findDuplicateGroups(cards), []);
+});
+
+test('findDuplicateCertGroups flags the same grading company and cert number on two rows', () => {
+  const cards = [
+    { id: 'a', cardName: 'Connor McDavid Rookie', gradingCompany: 'PSA', certNumber: '12345678' },
+    { id: 'b', cardName: 'Different Name Entirely', gradingCompany: 'PSA', certNumber: '12345678' }
+  ];
+  const groups = findDuplicateCertGroups(cards);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].cards.map(c => c.id).sort(), ['a', 'b']);
+});
+
+test('findDuplicateCertGroups does not flag the same cert number at two different grading companies', () => {
+  const cards = [
+    { id: 'a', cardName: 'Connor McDavid Rookie', gradingCompany: 'PSA', certNumber: '12345678' },
+    { id: 'b', cardName: 'Connor McDavid Rookie', gradingCompany: 'BGS', certNumber: '12345678' }
+  ];
+  assert.deepEqual(findDuplicateCertGroups(cards), []);
+});
+
+test('findDuplicateCertGroups skips rows missing certNumber or gradingCompany rather than grouping on a blank key', () => {
+  const cards = [
+    { id: 'a', cardName: 'Connor McDavid Rookie', gradingCompany: 'PSA', certNumber: null },
+    { id: 'b', cardName: 'Connor McDavid Rookie', gradingCompany: 'PSA', certNumber: null }
+  ];
+  assert.deepEqual(findDuplicateCertGroups(cards), []);
 });
 
 test('findGradeLadderInversions flags a higher grade priced below a lower grade of the same card', () => {

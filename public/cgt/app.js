@@ -1962,12 +1962,19 @@ function renderStalePricing() {
   });
 }
 
-// Reuses the exact same duplicate-detection rule validate.js runs on the
-// command line (CGTValidateCore.findDuplicateGroups, shared so the two
-// never drift apart), just rendered as a clickable panel instead of a CLI
-// warning, so seeing "these two rows might be the same card" doesn't
-// require running a script. Excludes the example row like every other
-// real-data panel here.
+// Reuses the exact same duplicate-detection rules validate.js runs on the
+// command line (CGTValidateCore.findDuplicateGroups and, folded in below,
+// findDuplicateCertGroups, shared so the dashboard and the CLI never drift
+// apart), just rendered as a clickable panel instead of a CLI warning, so
+// seeing "these two rows might be the same card" doesn't require running a
+// script. Cert-number matches are a stronger, error-level signal (two rows
+// can only share a real cert if it's the same physical slab logged twice,
+// or a typo'd cert) than the name/year/grader/grade groups, which are only
+// warning-level in validate.js since a genuine second copy of the same
+// card is a real possibility; both are folded into one panel here rather
+// than two separate sections since they're the same "these rows might be
+// the same card" concern, just with different confidence. Excludes the
+// example row like every other real-data panel here.
 function renderDuplicates() {
   const section = document.getElementById('duplicatesSection');
   const list = document.getElementById('duplicatesList');
@@ -1975,18 +1982,23 @@ function renderDuplicates() {
     section.hidden = true;
     return;
   }
-  const groups = CGTValidateCore.findDuplicateGroups(cards.filter(c => !isExample(c)));
+  const realCards = cards.filter(c => !isExample(c));
+  const nameGroups = CGTValidateCore.findDuplicateGroups(realCards)
+    .map(g => ({ ...g, why: g.cards.length + ' ROWS MATCH ON NAME/YEAR/GRADER/GRADE' }));
+  const certGroups = CGTValidateCore.findDuplicateCertGroups(realCards)
+    .map(g => ({ ...g, why: 'SAME ' + escapeHtml(g.cards[0].gradingCompany) + ' CERT NUMBER LOGGED TWICE' }));
+  const groups = [...certGroups, ...nameGroups];
 
   if (!groups.length) {
     section.hidden = true;
     return;
   }
   section.hidden = false;
-  list.innerHTML = groups.map(({ cards: group }) => group.map(c => `
+  list.innerHTML = groups.map(({ cards: group, why }) => group.map(c => `
     <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
       <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</span>
       <span class="dq-meta">${escapeHtml([c.sport, c.gradingCompany, c.grade].filter(Boolean).join(' · '))}</span>
-      <span class="dq-why">${group.length} ROWS MATCH ON NAME/YEAR/GRADER/GRADE</span>
+      <span class="dq-why">${why}</span>
     </button>
   `).join('')).join('');
   list.querySelectorAll('.data-quality-row').forEach(row => {
@@ -2071,6 +2083,7 @@ function renderAttentionBar() {
   const dataQualityCount = buildDataQualityFlags().length;
   const stalePricingCount = buildStalePricingFlags().length;
   const duplicateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateGroups(realCards).length : 0;
+  const duplicateCertCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateCertGroups(realCards).length : 0;
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
   const listingPriceCount = window.CGTValidateCore ? CGTValidateCore.findListingPriceMismatches(realCards).length : 0;
   // A candidate still being weighed (no decision logged yet) but missing
@@ -2109,6 +2122,13 @@ function renderAttentionBar() {
   // an unlogged field.
   if (changelogDriftStatus && changelogDriftStatus.drifted) {
     items.push({ n: 1, tone: 'urgent', target: 'changelogFeed', label: 'data changelog out of sync with real git history' });
+  }
+  // Urgent, not the routine 'warn' tone duplicateCount below uses: an error
+  // in validate.js, not a warning, since two rows sharing a real cert
+  // number can only mean the same physical slab logged twice or a typo'd
+  // cert, not a coincidence like a name/year/grader/grade match could be.
+  if (duplicateCertCount) {
+    items.push({ n: duplicateCertCount, tone: 'urgent', target: 'duplicatesSection', label: duplicateCertCount === 1 ? 'cert number logged on two rows' : 'cert numbers logged on two rows' });
   }
   if (unpricedCount) {
     items.push({ n: unpricedCount, tone: 'warn', target: 'unpricedSection', label: unpricedCount === 1 ? 'card not priced yet' : 'cards not priced yet' });

@@ -104,6 +104,26 @@
       .map(([key, group]) => ({ key, cards: group }));
   }
 
+  // A stronger, more definitive signal than findDuplicateGroups above: two
+  // rows can only share a real cert number if they are the same physical
+  // slab logged twice, or one of them has a typo'd cert. validateCards
+  // already flags this as an error inline while it walks the array once;
+  // this is the same grouping pulled out standalone so the dashboard can
+  // render it as a clickable panel the same way findDuplicateGroups is
+  // rendered, without re-deriving the logic or drifting from the CLI rule.
+  function findDuplicateCertGroups(cards) {
+    const byCert = new Map();
+    (cards || []).forEach(c => {
+      if (!c.certNumber || !c.gradingCompany) return;
+      const key = c.gradingCompany + ':' + c.certNumber;
+      if (!byCert.has(key)) byCert.set(key, []);
+      byCert.get(key).push(c);
+    });
+    return [...byCert.entries()]
+      .filter(([, group]) => group.length > 1)
+      .map(([key, group]) => ({ key, cards: group }));
+  }
+
   function validateCards(cards) {
     const errors = [];
     const warnings = [];
@@ -585,8 +605,8 @@
   }
 
   return {
-    validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findGradeLadderInversions,
-    findListingPriceMismatches,
+    validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findDuplicateCertGroups,
+    findGradeLadderInversions, findListingPriceMismatches,
     isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
     SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };
