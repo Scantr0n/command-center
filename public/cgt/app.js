@@ -1359,15 +1359,23 @@ const CANDIDATE_VERDICT_META = {
 // sorted by expected dollar gain (highest first) so the most clear-cut "yes,
 // send this one" cases lead the list; a candidate missing one of the three
 // real inputs the math needs sorts last, same "unknown sinks to the bottom"
-// rule the main table's sortRows uses.
+// rule the main table's sortRows uses. Among candidates that all still lack
+// math (the common case: rawValue researched but expectedGradedValue isn't
+// yet), fall back to rawValue descending, so the raw cards with the most
+// real upside lead the "still needs graded-value research" queue instead of
+// sitting in arbitrary JSON order -- those are the ones most likely to
+// actually clear the 2x margin once researched, so worth researching first.
 function buildRankedCandidates() {
   return candidates
     .map(c => ({ c, math: computeGradingMath(c) }))
     .sort((a, b) => {
-      if (!a.math && !b.math) return 0;
-      if (!a.math) return 1;
-      if (!b.math) return -1;
-      return b.math.expectedGain - a.math.expectedGain;
+      if (a.math && b.math) return b.math.expectedGain - a.math.expectedGain;
+      if (a.math && !b.math) return -1;
+      if (!a.math && b.math) return 1;
+      if (a.c.rawValue == null && b.c.rawValue == null) return 0;
+      if (a.c.rawValue == null) return 1;
+      if (b.c.rawValue == null) return -1;
+      return b.c.rawValue - a.c.rawValue;
     });
 }
 
