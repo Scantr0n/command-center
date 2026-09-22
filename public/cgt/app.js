@@ -352,6 +352,19 @@ function publishedTurnaroundDays(gradingCompany, serviceLevel) {
 // before relying on this number," not that the price is wrong.
 const PRICE_STALE_AFTER_DAYS = 180;
 
+// The Grading service tiers reference table below is hand-researched prose,
+// not data-file driven, so nothing else in the app notices when it goes
+// stale -- the SGC $15->$50/card hike and the BGS-vs-SGC turnaround mixup
+// (see the 42b8f58/e0ab607 fixes) both shipped as silent inaccuracies until
+// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-17"
+// claim already made in that section's callout prose; keep the two in sync by
+// hand whenever the table is re-verified. 30 days, not the 180 used for card
+// prices above: grading-company fee/tier changes have moved multiple times
+// within weeks of each other this year, so this table goes stale far faster
+// than a book value does.
+const GRADING_REFERENCE_REVIEWED_ON = '2026-09-17';
+const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
+
 // Local calendar date as YYYY-MM-DD, same convention as daysSince above
 // (and CSM's/Sondrik's own todayIso): new Date().toISOString().slice(0, 10)
 // reads the UTC calendar date, which rolls over to tomorrow while it is
@@ -690,6 +703,21 @@ function renderFooterStatus() {
     clause(realSubsCount, 'submissions.json', 'submission') + '; ' +
     clause(realCandsCount, 'candidates.json', 'candidate') +
     '. Log more by hand (or Import CSV) as real cards get priced, batches go out, and raw cards get weighed.';
+}
+
+// Independent of cards/submissions/candidates load state (no fetch involved,
+// see GRADING_REFERENCE_REVIEWED_ON above), so this runs unconditionally at
+// page load rather than from inside loadCards()'s try/catch.
+function renderGradingReferenceFreshness() {
+  const el = document.getElementById('gradingReferenceFreshness');
+  if (!el) return;
+  const age = daysSince(GRADING_REFERENCE_REVIEWED_ON);
+  const stale = age != null && age > GRADING_REFERENCE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each grader\'s own site on ' + GRADING_REFERENCE_REVIEWED_ON + '.';
 }
 
 function renderStats() {
@@ -4121,5 +4149,7 @@ function updateOfflineBanner() {
 window.addEventListener('offline', updateOfflineBanner);
 window.addEventListener('online', updateOfflineBanner);
 updateOfflineBanner();
+
+renderGradingReferenceFreshness();
 
 loadCards();

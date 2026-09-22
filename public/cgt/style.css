@@ -293,6 +293,21 @@ header.page-head .sub {
   outline: 1px solid var(--hairlineHover);
   outline-offset: 3px;
 }
+/* Sentence-length freshness note, not a short tag like .badge's other
+   users (sport names, status words), so it skips .badge's pill/uppercase
+   treatment and just inherits the summary's own text-transform:none-free
+   sibling styling via normal case. Neutral/dim until the review date passes
+   GRADING_REFERENCE_STALE_AFTER_DAYS in app.js, then the same red tone as
+   .badge-stale so it reads as a real prompt to re-verify, not decoration. */
+.reference-freshness {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--dim);
+}
+.reference-freshness-stale { color: #E0503C; }
 
 /* Same "h2 + Export CSV" toolbar row as Sondrik's own .section-toolbar, for a
    section whose h2 needs an action button inline instead of standing alone. */
