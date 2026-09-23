@@ -36,6 +36,13 @@
     goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
   } = window.SondrikGoalsCore;
 
+  // Shared, unit-tested bugfix-checkin date math (release-core.js), same
+  // shared-core pattern as SondrikGoalsCore above: the exact function that
+  // has already produced two real bugs (a NaN-date crash, a silently
+  // dropped missed-checkpoint) now lives in one place a test suite can
+  // actually exercise. See release-core.js's own header for both bugs.
+  const { BUGFIX_CHECKPOINTS, bugfixCheckinStatus } = window.SondrikReleaseCore;
+
   printBtn.addEventListener('click', () => window.print());
 
   // "New since your last visit" is a per-browser convenience, not a second
@@ -428,83 +435,11 @@
   // since a feature release has no "did the bug stay fixed" question to
   // answer at those checkpoints. Shared by the release card and the next
   // steps checklist below so both agree on the same tier at the same time.
-  const BUGFIX_CHECKPOINTS = [7, 14];
-  const BUGFIX_CHECKPOINT_GRACE_DAYS = 3;
-  function bugfixCheckinStatus(release) {
-    if (!release || release.type !== 'bugfix' || !release.date) return null;
-    // A malformed release.date (a non-zero-padded "2026-9-5") makes
-    // daysBetween return NaN, and every `days < N` comparison below is
-    // always false for NaN, so both checkpoints fell into missedCheckpoints
-    // and rendered "day NaN" instead of erroring, the same date-guard bug
-    // goals-core.js's own header describes and computeGoalPaceStatus
-    // already guards against elsewhere in this file.
-    if (!isValidDateStr(release.date)) return null;
-    const days = daysBetween(release.date, todayIso());
-    if (days < 0) return null;
-
-    // A checkpoint whose grace window closes before the *next* checkpoint
-    // arrives (true for 7, since 7+3=10 is before 14) used to just fall
-    // through this loop unrecorded: past day 10 with no check-in logged,
-    // this jumped straight to treating the 14-day checkpoint as "upcoming"
-    // with no trace that the 7-day one was ever due, let alone missed.
-    // There's no persisted "confirmed" flag in releases.json (a check-in is
-    // just Jack looking and seeing nothing new), so the only honest signal
-    // available here is "its grace window closed without this function ever
-    // getting to report it as due" -- tracked in missedCheckpoints and
-    // surfaced instead of silently dropped.
-    const missedCheckpoints = [];
-    for (const checkpoint of BUGFIX_CHECKPOINTS) {
-      if (days < checkpoint) {
-        if (missedCheckpoints.length) {
-          return {
-            tier: 'missed',
-            text: 'Missed the ' + missedCheckpoints.join('- and ') + '-day check-in (day ' + days + '); next is the ' +
-              checkpoint + '-day check-in in ' + (checkpoint - days) + (checkpoint - days === 1 ? ' day' : ' days') +
-              ' (' + fmtDate(addDays(release.date, checkpoint)) + ')'
-          };
-        }
-        return {
-          tier: 'upcoming',
-          text: checkpoint + '-day check-in in ' + (checkpoint - days) + (checkpoint - days === 1 ? ' day' : ' days') +
-            ' (' + fmtDate(addDays(release.date, checkpoint)) + ')'
-        };
-      }
-      if (days < checkpoint + BUGFIX_CHECKPOINT_GRACE_DAYS) {
-        // An earlier checkpoint's own grace window can close before this
-        // one's due window even opens (true for 7: 7+3=10 is before 14),
-        // so missedCheckpoints can already be non-empty by the time this
-        // branch runs. Returning plain "due" here dropped that missed
-        // checkpoint the moment the next one's window opened, the same
-        // silent-drop this function's own comment above says never to do.
-        if (missedCheckpoints.length) {
-          return {
-            tier: 'missed',
-            text: 'Missed the ' + missedCheckpoints.join(' and ') + '-day check-in' + (missedCheckpoints.length > 1 ? 's' : '') +
-              ' (day ' + days + '); the ' + checkpoint + '-day check-in is also due now, confirm no new reports of the fixed bug'
-          };
-        }
-        return {
-          tier: 'due',
-          text: 'Past the ' + checkpoint + '-day check-in (day ' + days + '), confirm no new reports of the fixed bug'
-        };
-      }
-      missedCheckpoints.push(checkpoint);
-    }
-    if (missedCheckpoints.length) {
-      return {
-        tier: 'missed',
-        text: 'Missed the ' + missedCheckpoints.join(' and ') + '-day check-in' + (missedCheckpoints.length > 1 ? 's' : '') +
-          ' (day ' + days + ')'
-      };
-    }
-    return {
-      tier: 'passed',
-      text: 'Both the 7- and 14-day check-ins have passed (day ' + days + ')'
-    };
-  }
-
+  // The tier/text logic itself lives in release-core.js (imported above as
+  // bugfixCheckinStatus) so it can be unit-tested; this just supplies the
+  // live "today" and the page's own locale date formatter.
   function bugfixCheckinHtml(release) {
-    const status = bugfixCheckinStatus(release);
+    const status = bugfixCheckinStatus(release, todayIso(), fmtDate);
     if (!status) return '';
     return '<div class="bugfix-checkin bugfix-checkin-' + status.tier + ' font-mono">' +
       escapeHtml(status.text.toUpperCase()) + '</div>';
@@ -1152,7 +1087,7 @@
 
     const datedReleases = releases.filter(r => r.date).slice().sort((a, b) => b.date.localeCompare(a.date));
     if (datedReleases.length > 0) {
-      const checkinStatus = bugfixCheckinStatus(datedReleases[0]);
+      const checkinStatus = bugfixCheckinStatus(datedReleases[0], todayIso(), fmtDate);
       if (checkinStatus && (checkinStatus.tier === 'due' || checkinStatus.tier === 'missed')) {
         steps.push({
           urgent: true,
