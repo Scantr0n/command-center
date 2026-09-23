@@ -22,7 +22,7 @@ const {
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
-  csvField, icsEscapeText, icsFoldLine
+  csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -378,6 +378,7 @@ test('the real prospects.json on disk never produces a stall/stale false negativ
     stallInfo(p, byId);
     socialSnapshotsStaleInfo(p);
     reachedActiveExploration(p);
+    outreachReadinessWarnings(p);
   });
   computeStageVelocity(stages, prospects);
   computeColdSignal(prospects);
@@ -782,4 +783,21 @@ test('icsFoldLine never splits a multi-byte UTF-8 character across a fold bounda
     const bytes = Buffer.byteLength(i === 0 ? part : part.slice(1), 'utf8');
     assert.ok(bytes <= 75, 'segment ' + i + ' is ' + bytes + ' octets');
   });
+});
+
+test('outreachReadinessWarnings flags both a missing verifiedHook and a missing contact channel type', () => {
+  const warnings = outreachReadinessWarnings({});
+  assert.equal(warnings.length, 2);
+});
+
+test('outreachReadinessWarnings has nothing to say once both real fields are logged', () => {
+  const p = { verifiedHook: 'Runs a real expat community brand', contactChannel: { type: 'named-decision-maker' } };
+  assert.deepEqual(outreachReadinessWarnings(p), []);
+});
+
+test('outreachReadinessWarnings still flags a missing channel type when contactChannel exists but has no type', () => {
+  const p = { verifiedHook: 'Real hook', contactChannel: { detail: 'someone@example.com' } };
+  const warnings = outreachReadinessWarnings(p);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /contactChannel\.type/);
 });

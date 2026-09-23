@@ -12,7 +12,7 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
-    csvField, icsEscapeText, icsFoldLine
+    csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -2262,17 +2262,8 @@
   // (see the contact-channel callout in index.html). Warn right where
   // outreach is actually about to be logged as sent, not only after the
   // fact in the passive "Needs backfill" list further down the page.
-  function outreachReadinessWarnings(p) {
-    const warnings = [];
-    if (!p.verifiedHook) {
-      warnings.push('No verifiedHook logged yet for this prospect, the real reason this person/brand fits.');
-    }
-    if (!p.contactChannel || !p.contactChannel.type) {
-      warnings.push('contactChannel.type is not logged yet (named decision-maker vs. generic inbox), the single field most predictive of a real reply.');
-    }
-    return warnings;
-  }
-
+  // outreachReadinessWarnings now lives in csm-core.js, same
+  // shared-core-with-tests pattern as the other pure math above.
   function stageMoveGeneratorHtml() {
     return '<div class="inline-gen">' +
       '<div class="inline-gen-row">' +

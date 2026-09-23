@@ -523,6 +523,23 @@
     return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
   }
 
+  // Warnings shown before drafting a real outreach message (the "Copy
+  // outreach brief"/stage-move generators): missing the two fields most
+  // predictive of a real reply, so a message goes out without either ever
+  // being surfaced as a gap. Deliberately advisory, never blocking: this
+  // pipeline has no send step of its own to gate, only ever prepares text
+  // for a human to send elsewhere.
+  function outreachReadinessWarnings(p) {
+    const warnings = [];
+    if (!p.verifiedHook) {
+      warnings.push('No verifiedHook logged yet for this prospect, the real reason this person/brand fits.');
+    }
+    if (!p.contactChannel || !p.contactChannel.type) {
+      warnings.push('contactChannel.type is not logged yet (named decision-maker vs. generic inbox), the single field most predictive of a real reply.');
+    }
+    return warnings;
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
@@ -531,6 +548,7 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    computeStalled, hasNudgePlan, csvField, icsEscapeText, icsFoldLine
+    computeStalled, hasNudgePlan, csvField, icsEscapeText, icsFoldLine,
+    outreachReadinessWarnings
   };
 });
