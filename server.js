@@ -585,13 +585,26 @@ const ALPHA_CONN_HISTORY_DEBOUNCE_MS = 10000;
 // Same atomic temp-file-then-rename pattern as writeToggles above, for the
 // same reason: a write killed mid-save should never leave readers looking at
 // a truncated file.
-function appendAlphaConnHistory(at, connected) {
+//
+// `paused` rides along on the same entry as the connectivity check that
+// observed it, since it's the same /health response that already told us
+// `connected`: no separate poll, no separate file. It's `null` whenever
+// `connected` is false (the daemon wasn't reachable, so its kill-switch
+// state is genuinely unknown at that check, not "clear"). The debounce
+// below used to key only on `connected`, so a real paused flip landing
+// inside the same 10s window as an unrelated "still connected" heartbeat
+// would get silently dropped, exactly the kind of missed transition
+// killSwitchStateEvents/lastKillSwitchTriggerAt below depend on never
+// happening; it now also fires on a paused change even when connected
+// didn't move.
+function appendAlphaConnHistory(at, connected, paused) {
   const history = readAlphaConnHistory();
   const last = history[history.length - 1];
-  if (last && last.connected === connected && (new Date(at) - new Date(last.at)) < ALPHA_CONN_HISTORY_DEBOUNCE_MS) {
+  const pausedNow = connected ? !!paused : null;
+  if (last && last.connected === connected && last.paused === pausedNow && (new Date(at) - new Date(last.at)) < ALPHA_CONN_HISTORY_DEBOUNCE_MS) {
     return history.slice(-ALPHA_CONN_HISTORY_CAP);
   }
-  history.push({ at, connected });
+  history.push({ at, connected, paused: pausedNow });
   const capped = history.slice(-ALPHA_CONN_HISTORY_CAP);
   const tmpFile = `${ALPHA_CONN_HISTORY_FILE}.${process.pid}.tmp`;
   fs.writeFileSync(tmpFile, JSON.stringify(capped, null, 2));
@@ -711,6 +724,45 @@ function connectionStateEvents(history) {
   return events;
 }
 
+// Same real-transition-only rule as connectionStateEvents above, applied to
+// `paused` instead of `connected`. Only compares adjacent entries where both
+// sides have a known (non-null) paused reading, i.e. both checks actually
+// reached the daemon: a gap where the connection dropped and came back with
+// a different paused value is a real transition Alpha's own daemon made
+// while unobserved, not one this page watched happen, so it's deliberately
+// not reported as an event (same spirit as connectionStateEvents never
+// guessing what happened between two checks).
+function killSwitchStateEvents(history) {
+  const events = [];
+  for (let i = 1; i < history.length; i++) {
+    const prev = history[i - 1].paused;
+    const curr = history[i].paused;
+    if (prev == null || curr == null || prev === curr) continue;
+    events.push({
+      type: 'kill-switch',
+      tone: curr ? 'alert' : 'good',
+      label: curr ? 'Kill switch engaged' : 'Kill switch released',
+      at: history[i].at
+    });
+  }
+  return events;
+}
+
+// live.killSwitch.lastTriggeredAt was always sent as a hardcoded `null`
+// below, even while `engaged` read true, which rendered as the actively
+// contradictory "ENGAGED / Never triggered" on a real-money status page:
+// a real reading claiming no trigger ever happened while showing one in
+// progress. This derives a real answer the same honest way as every other
+// "since this server started observing" figure on this page (connection
+// uptime, regime distribution): the timestamp of the most recent real
+// false-to-true transition this server has actually recorded. Returns null,
+// same as before, until a real transition has actually been observed, never
+// a guess at what happened before this history started.
+function lastKillSwitchTriggerAt(history) {
+  const triggers = killSwitchStateEvents(history).filter(e => e.tone === 'alert');
+  return triggers.length ? triggers[triggers.length - 1].at : null;
+}
+
 app.get('/api/alpha/live', async (req, res) => {
   // Same skip-and-log guard as readLocalClusters/readToggles above: this read
   // sat outside the try block below, so a missing or malformed status.json
@@ -744,7 +796,7 @@ app.get('/api/alpha/live', async (req, res) => {
     // never hand-edited into the static fallback.
     const account = mapAccount(state.account);
     if (account) account.equityCurve = mapEquityCurve(equity.history);
-    const connHistory = appendAlphaConnHistory(now, true);
+    const connHistory = appendAlphaConnHistory(now, true, !!health.paused);
 
     res.json({
       system: fallback.system,
@@ -759,7 +811,7 @@ app.get('/api/alpha/live', async (req, res) => {
         regime: state.regime && state.regime.regime ? state.regime.regime : null,
         killSwitch: {
           engaged: !!health.paused,
-          lastTriggeredAt: null
+          lastTriggeredAt: lastKillSwitchTriggerAt(connHistory)
         },
         positionSizing: {
           activeMode: null,
@@ -788,6 +840,7 @@ app.get('/api/alpha/live', async (req, res) => {
       },
       events: [
         ...connectionStateEvents(connHistory),
+        ...killSwitchStateEvents(connHistory),
         ...evolutionEvents(history),
         ...(Array.isArray(anomalies.stuck) ? anomalies.stuck.map(a => ({
           type: 'anomaly', tone: 'alert', label: 'Stuck agent detected', detail: JSON.stringify(a), at: anomalies.checkedAt
@@ -813,6 +866,7 @@ app.get('/api/alpha/live', async (req, res) => {
       },
       events: [
         ...connectionStateEvents(connHistory),
+        ...killSwitchStateEvents(connHistory),
         ...(Array.isArray(fallback.events) ? fallback.events : [])
       ]
     });
