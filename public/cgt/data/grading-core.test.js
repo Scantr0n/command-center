@@ -11,7 +11,11 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { computeGradingMath, GRADING_RISK_MULTIPLE } = require('./grading-core.js');
+const {
+  computeGradingMath, GRADING_RISK_MULTIPLE,
+  classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
+  COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE
+} = require('./grading-core.js');
 
 test('missing rawValue, expectedGradedValue, or estimatedGradingCost returns null, never a guessed verdict', () => {
   assert.equal(computeGradingMath({ rawValue: null, expectedGradedValue: 50, estimatedGradingCost: 10 }), null);
@@ -63,5 +67,79 @@ test('the real candidates.json never crashes computeGradingMath on any row', () 
   const data = require('./candidates.json');
   for (const c of data.candidates || []) {
     assert.doesNotThrow(() => computeGradingMath(c), `candidate ${c.id} should not throw`);
+  }
+});
+
+test('isLongTermHolding/classifyHoldingPeriod return null when either date is missing or unparseable', () => {
+  assert.equal(isLongTermHolding(null, '2026-01-01'), null);
+  assert.equal(isLongTermHolding('2025-01-01', null), null);
+  assert.equal(isLongTermHolding('not-a-date', '2026-01-01'), null);
+  assert.equal(classifyHoldingPeriod(null, null), null);
+});
+
+test('a sale on the exact one-year anniversary is still short-term, not long-term', () => {
+  // IRS Pub. 550: the day acquired is excluded from the count, so "more than
+  // one year" requires at least one day past the anniversary date.
+  assert.equal(isLongTermHolding('2025-01-15', '2026-01-15'), false);
+  assert.equal(classifyHoldingPeriod('2025-01-15', '2026-01-15'), 'short-term');
+});
+
+test('a sale the day after the one-year anniversary is long-term', () => {
+  assert.equal(isLongTermHolding('2025-01-15', '2026-01-16'), true);
+  assert.equal(classifyHoldingPeriod('2025-01-15', '2026-01-16'), 'long-term');
+});
+
+test('holding period math handles a leap-day (Feb 29) acquisition without throwing or misdating', () => {
+  // 2024 is a leap year; 2025 is not, so "the anniversary of 2024-02-29" has
+  // no literal 2025-02-29 to land on. JS Date's own month/day rollover
+  // normalizes new Date(2025, 1, 29) to 2025-03-01, so that date (and
+  // anything before it) is still short-term, and only the day after,
+  // 2025-03-02, is long-term. A rare edge case, but a real one (leap-day
+  // acquisitions happen), and this is deterministic rather than throwing or
+  // silently misclassifying it.
+  assert.equal(classifyHoldingPeriod('2024-02-29', '2025-03-01'), 'short-term');
+  assert.equal(classifyHoldingPeriod('2024-02-29', '2025-03-02'), 'long-term');
+});
+
+test('a sale well under a year old is short-term', () => {
+  assert.equal(classifyHoldingPeriod('2026-06-01', '2026-08-01'), 'short-term');
+});
+
+test('estimateCollectiblesTax returns null for a missing, zero, or negative gain', () => {
+  assert.equal(estimateCollectiblesTax(null, '2024-01-01', '2026-01-01'), null);
+  assert.equal(estimateCollectiblesTax(0, '2024-01-01', '2026-01-01'), null);
+  assert.equal(estimateCollectiblesTax(-5, '2024-01-01', '2026-01-01'), null);
+});
+
+test('estimateCollectiblesTax returns null when the holding period can\'t be classified', () => {
+  assert.equal(estimateCollectiblesTax(100, null, '2026-01-01'), null);
+  assert.equal(estimateCollectiblesTax(100, '2024-01-01', null), null);
+});
+
+test('estimateCollectiblesTax caps a long-term gain at the documented 28% collectibles rate', () => {
+  const est = estimateCollectiblesTax(1000, '2024-01-01', '2026-01-02');
+  assert.equal(est.holding, 'long-term');
+  assert.equal(est.maxRate, COLLECTIBLES_LONG_TERM_MAX_RATE);
+  assert.equal(est.maxTax, 280);
+});
+
+test('estimateCollectiblesTax uses the top ordinary-income rate as a short-term ceiling', () => {
+  const est = estimateCollectiblesTax(1000, '2026-06-01', '2026-08-01');
+  assert.equal(est.holding, 'short-term');
+  assert.equal(est.maxRate, TOP_ORDINARY_INCOME_RATE);
+  assert.equal(est.maxTax, 370);
+});
+
+test('the documented collectibles rates have not silently drifted', () => {
+  assert.equal(COLLECTIBLES_LONG_TERM_MAX_RATE, 0.28);
+  assert.equal(TOP_ORDINARY_INCOME_RATE, 0.37);
+});
+
+test('the real cards.json never crashes estimateCollectiblesTax on any sold row', () => {
+  const data = require('./cards.json');
+  for (const c of data.cards || []) {
+    if (c.soldDate == null || c.soldPrice == null) continue;
+    const gain = c.costBasis != null ? c.soldPrice - c.costBasis : null;
+    assert.doesNotThrow(() => estimateCollectiblesTax(gain, c.acquisitionDate, c.soldDate), `card ${c.id} should not throw`);
   }
 });

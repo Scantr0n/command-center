@@ -101,6 +101,7 @@ const DATASETS = {
       { key: 'sourceNote', label: 'Source', aliases: ['sourcenote', 'source'] },
       { key: 'imageUrl', label: 'Photo URL', aliases: ['imageurl', 'image', 'photo', 'photourl', 'picture', 'img'] },
       { key: 'costBasis', label: 'Cost basis (what was paid)', aliases: ['costbasis', 'paid', 'pricepaid', 'cost'], type: 'number' },
+      { key: 'acquisitionDate', label: 'Acquisition date (when bought/acquired)', aliases: ['acquisitiondate', 'dateacquired', 'datebought', 'purchasedate', 'boughtdate'] },
       { key: 'datePriced', label: 'Date priced', aliases: ['datepriced', 'date'] },
       { key: 'soldDate', label: 'Sold date (blank if still owned)', aliases: ['solddate', 'datesold'] },
       { key: 'soldPrice', label: 'Sold price', aliases: ['soldprice', 'saleprice'], type: 'number' },

@@ -227,6 +227,21 @@ function computeRealizedGainLoss(c) {
   return { abs, pct };
 }
 
+// Wraps grading-core.js's estimateCollectiblesTax (see its own header
+// comment for the real 28%-long-term/ordinary-short-term rule this applies)
+// with the two real numbers only cards.json actually has: a realized
+// gain/loss (computeRealizedGainLoss above) and the card's own
+// acquisitionDate/soldDate. Only ever computed for a sold card with a real
+// positive realized gain and a real acquisitionDate on record; returns null
+// otherwise (never a guessed tax on a loss, an unsold card, or a sale with
+// no acquisitionDate logged to classify the holding period from).
+function estimateCardCollectiblesTax(c) {
+  if (!isSold(c)) return null;
+  const rgl = computeRealizedGainLoss(c);
+  if (!rgl) return null;
+  return estimateCollectiblesTax(rgl.abs, c.acquisitionDate, c.soldDate);
+}
+
 // priceHistory holds prior researched prices for a card, oldest first, logged
 // when a re-check changes the number instead of silently overwriting it. This
 // reads the most recent prior entry (regardless of what order it was actually
@@ -789,6 +804,19 @@ function renderStats() {
   const realizedGainLossPct = totalRealizedCostBasis > 0 ? (totalRealizedGainLoss / totalRealizedCostBasis) * 100 : null;
   const totalSoldProceeds = sold.reduce((s, c) => s + (c.soldPrice || 0), 0);
 
+  // Collectibles capital-gains ceiling (see grading-core.js's
+  // estimateCollectiblesTax for the real 28%-long-term/ordinary-short-term
+  // rule): only a real, positive realized gain owes anything, and only when
+  // acquisitionDate is on record to classify the sale's holding period.
+  // taxableGains is every sale that owes something in principle;
+  // taxableWithHolding is the subset this can actually be estimated for, so
+  // the tile can honestly say how many of the taxable sales are still
+  // missing the date needed to classify them, rather than silently under-
+  // counting a real total.
+  const taxableGains = soldWithGainLoss.filter(x => x.gl.abs > 0);
+  const taxEstimates = taxableGains.map(x => estimateCardCollectiblesTax(x.c)).filter(Boolean);
+  const totalMaxCollectiblesTax = taxEstimates.reduce((s, est) => s + est.maxTax, 0);
+
   // Only counts cardCount on active (non-returned, non-example) submissions,
   // same "real data only" rule as every other tile here: a submission with
   // no cardCount logged contributes 0 to the total but still counts toward
@@ -883,6 +911,15 @@ function renderStats() {
         ? soldWithGainLoss.length + ' sale(s) with cost basis logged' + (realizedGainLossPct != null ? ' · ' + (realizedGainLossPct >= 0 ? '+' : '') + realizedGainLossPct.toFixed(1) + '%' : '')
         : (sold.length ? 'no cost basis logged for sold cards yet' : 'nothing sold yet'),
       cls: soldWithGainLoss.length ? (totalRealizedGainLoss >= 0 ? 'positive' : 'negative') : null
+    },
+    {
+      value: taxEstimates.length ? formatUsd(totalMaxCollectiblesTax) : 'n/a',
+      label: 'Est. max collectibles tax',
+      sub: taxableGains.length
+        ? taxEstimates.length + ' of ' + taxableGains.length + ' taxable sale(s) with an acquisition date logged' +
+          (taxableGains.length > taxEstimates.length ? ', ' + (taxableGains.length - taxEstimates.length) + ' missing one' : '')
+        : (soldWithGainLoss.length ? 'no taxable gains yet' : 'nothing sold yet'),
+      cls: null
     },
     { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
     {
@@ -1410,8 +1447,11 @@ function isExampleCandidate(c) {
 // (grading-core.test.js) can exercise the real rule directly without loading
 // the rest of this DOM-touching file. Pulled into bare identifiers here so
 // every existing call site below (computeGradingMath(c), GRADING_RISK_MULTIPLE)
-// keeps working unchanged.
-const { computeGradingMath, GRADING_RISK_MULTIPLE } = window.CGTGradingCore;
+// keeps working unchanged. estimateCollectiblesTax is used by
+// estimateCardCollectiblesTax above (function declarations are hoisted, so
+// that earlier-in-file function body only actually runs later, well after
+// this line has executed).
+const { computeGradingMath, GRADING_RISK_MULTIPLE, estimateCollectiblesTax } = window.CGTGradingCore;
 
 const CANDIDATE_VERDICT_META = {
   'worth-grading': { label: 'Worth grading', cls: 'badge-worth' },
@@ -2811,8 +2851,9 @@ function cardEditFormHtml(c) {
     ceFieldRow('ceImageUrl', 'Photo URL (optional)', c.imageUrl) +
     '<div class="form-row-split">' +
     ceInputInner('ceCostBasis', 'Cost basis, USD', c.costBasis, 'number') +
-    ceInputInner('ceDatePriced', 'Date priced', c.datePriced, 'date') +
+    ceInputInner('ceAcquisitionDate', 'Acquisition date (when bought/acquired)', c.acquisitionDate, 'date') +
     '</div>' +
+    ceFieldRow('ceDatePriced', 'Date priced', c.datePriced, 'date') +
     '<div class="form-row-split">' +
     ceInputInner('ceSoldDate', 'Sold date (leave blank if still owned)', c.soldDate, 'date') +
     ceInputInner('ceSoldPrice', 'Sold price, USD', c.soldPrice, 'number') +
@@ -3125,6 +3166,7 @@ function wireCardEditForm(c) {
       sourceNote: ceVal('ceSourceNote'),
       imageUrl: ceVal('ceImageUrl'),
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
+      acquisitionDate: document.getElementById('ceAcquisitionDate').value || null,
       datePriced: document.getElementById('ceDatePriced').value || null,
       soldDate: document.getElementById('ceSoldDate').value || null,
       soldPrice: soldPriceRaw === '' ? null : Number(soldPriceRaw),
@@ -3269,12 +3311,31 @@ function openModal(id) {
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
   body += renderPriceHistoryField(activeCard);
   body += field('Cost basis (what was paid)', activeCard.costBasis != null ? formatUsd(activeCard.costBasis) : null, activeCard.costBasis == null);
+  body += field('Acquisition date (when bought/acquired)', activeCard.acquisitionDate, !activeCard.acquisitionDate);
   if (isSold(activeCard)) {
     body += field('Sold date', activeCard.soldDate, !activeCard.soldDate);
     body += field('Sold price', activeCard.soldPrice != null ? formatUsd(activeCard.soldPrice) : null, activeCard.soldPrice == null);
     const rgl = computeRealizedGainLoss(activeCard);
     if (rgl) {
       body += field('Realized gain / loss', formatSignedUsd(rgl.abs) + (rgl.pct != null ? ' (' + (rgl.pct >= 0 ? '+' : '') + rgl.pct.toFixed(1) + '%)' : ''), false);
+      if (rgl.abs > 0) {
+        const taxEst = estimateCardCollectiblesTax(activeCard);
+        if (taxEst) {
+          const holdingLabel = taxEst.holding === 'long-term' ? 'Long-term (held more than 1 year)' : 'Short-term (held 1 year or less)';
+          body += field('Collectibles holding period', holdingLabel, false);
+          body += `<div class="field-row">
+            <div class="field-label">Est. max federal tax on this gain</div>
+            <div class="field-value">${escapeHtml(formatUsd(taxEst.maxTax))}</div>
+            <div class="field-note">A ${Math.round(taxEst.maxRate * 100)}% ceiling${taxEst.holding === 'long-term' ? ', the collectibles cap on a long-term gain (26 U.S.C. 1(h)(5))' : ', the top 2026 ordinary-income bracket (no 28% cap applies to a short-term gain)'}, not a final tax bill. The real number depends on the whole return (total taxable income, filing status, state tax); this is not tax advice.</div>
+          </div>`;
+        } else if (!activeCard.acquisitionDate) {
+          body += `<div class="field-row">
+            <div class="field-label">Collectibles holding period</div>
+            <div class="field-value empty">not logged</div>
+            <div class="field-note">No "acquisitionDate" on record for this card, so this real gain can't be classified long-term vs. short-term for collectibles capital-gains tax purposes yet. Backfill when known.</div>
+          </div>`;
+        }
+      }
     }
   } else {
     const gl = computeGainLoss(activeCard);
@@ -3675,6 +3736,7 @@ const CSV_COLUMNS = [
   [c => c.valuationBasis, 'Valuation basis'], [c => c.compNote, 'Comp note'], [c => c.sourceNote, 'Source'],
   [c => c.imageUrl, 'Photo URL'],
   [c => c.costBasis, 'Cost basis'],
+  [c => c.acquisitionDate, 'Acquisition date'],
   [c => isSold(c) ? c.soldDate : null, 'Sold date'],
   [c => isSold(c) ? c.soldPrice : null, 'Sold price'],
   [c => !isSold(c) && isListed(c) ? c.listedDate : null, 'Listed date'],
@@ -3685,6 +3747,8 @@ const CSV_COLUMNS = [
   // read as the same kind of number.
   [c => isSold(c) ? (computeRealizedGainLoss(c)?.abs ?? null) : (computeGainLoss(c)?.abs ?? null), 'Gain/loss'],
   [c => isSold(c) ? 'Realized' : 'Unrealized', 'Gain/loss type'],
+  [c => estimateCardCollectiblesTax(c)?.holding ?? null, 'Collectibles holding period'],
+  [c => estimateCardCollectiblesTax(c)?.maxTax ?? null, 'Est. max collectibles tax'],
   [c => c.datePriced, 'Date priced'], [c => c.backlogBatch, 'Backlog batch'], [c => c.notes, 'Notes']
 ];
 
@@ -4034,6 +4098,7 @@ function initQuickLogTool() {
       sourceNote: document.getElementById('ncSourceNote').value.trim() || null,
       imageUrl: document.getElementById('ncImageUrl').value.trim() || null,
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
+      acquisitionDate: document.getElementById('ncAcquisitionDate').value || null,
       datePriced: document.getElementById('ncDatePriced').value || null,
       backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
       priceHistory: [],

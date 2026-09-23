@@ -138,6 +138,41 @@ test('validateCards requires soldDate and soldPrice together, not one without th
   assert.ok(missingPrice.errors.some(e => e.includes('soldPrice')));
 });
 
+test('validateCards rejects a bad acquisitionDate but accepts null', () => {
+  const bad = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', acquisitionDate: '2026-02-30' }]);
+  assert.ok(bad.errors.some(e => e.includes('acquisitionDate')));
+
+  const nullOk = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', acquisitionDate: null }]);
+  assert.deepEqual(nullOk.errors, []);
+});
+
+test('validateCards warns when costBasis is logged with no acquisitionDate to classify a future sale by', () => {
+  const { warnings } = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', costBasis: 20, acquisitionDate: null }]);
+  assert.ok(warnings.some(w => w.includes('acquisitionDate')));
+});
+
+test('validateCards does not warn about acquisitionDate when costBasis is not logged, or when both are logged', () => {
+  const noCostBasis = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', costBasis: null, acquisitionDate: null }]);
+  assert.ok(!noCostBasis.warnings.some(w => w.includes('acquisitionDate')));
+
+  const both = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', costBasis: 20, acquisitionDate: '2025-01-01' }]);
+  assert.ok(!both.warnings.some(w => w.includes('acquisitionDate')));
+});
+
+test('validateCards errors when soldDate is before acquisitionDate, a real impossibility', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', acquisitionDate: '2026-08-08', soldDate: '2026-01-01', soldPrice: 20
+  }]);
+  assert.ok(errors.some(e => e.includes('soldDate') && e.includes('acquisitionDate')));
+});
+
+test('validateCards passes a normal acquisitionDate-before-soldDate card clean', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', acquisitionDate: '2024-01-01', soldDate: '2026-01-01', soldPrice: 20
+  }]);
+  assert.deepEqual(errors, []);
+});
+
 test('validateCards requires listedDate and listedPrice together, not one without the other', () => {
   const missingDate = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', listedPrice: 20, listedDate: null }]);
   assert.ok(missingDate.errors.some(e => e.includes('listedDate')));
