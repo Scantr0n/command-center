@@ -11,7 +11,7 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    CHANNEL_EFF_MIN_N_FOR_RATE
+    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -472,14 +472,9 @@
   const stalledEl = document.getElementById('stalledList');
   const stalledSection = document.getElementById('stalledSection');
 
-  function computeStalled(stages, prospects) {
-    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
-    return prospects
-      .map(p => ({ p, info: stallInfo(p, stageById) }))
-      .filter(x => x.info && x.info.isStale)
-      .sort((a, b) => b.info.days - a.info.days);
-  }
-
+  // Pure stalled-prospect rollup math now lives in csm-core.js
+  // (computeStalled), same shared-core-with-tests pattern as the other
+  // pure math above.
   function renderStalled(stages, prospects) {
     const stalled = computeStalled(stages, prospects);
 

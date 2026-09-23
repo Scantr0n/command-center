@@ -21,7 +21,7 @@ const {
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-  CHANNEL_EFF_MIN_N_FOR_RATE
+  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -384,6 +384,7 @@ test('the real prospects.json on disk never produces a stall/stale false negativ
   computeSocialReach(prospects);
   computeChannelEffectiveness(prospects);
   computeCategoryEffectiveness(prospects);
+  computeStalled(stages, prospects);
 });
 
 test('computeColdSignal ignores a prospect below the touch threshold', () => {
@@ -656,4 +657,31 @@ test('computeCategoryEffectiveness sorts categories by contacted count descendin
 test('CHANNEL_EFF_MIN_N_FOR_RATE is the shared minimum sample size gate used by both effectiveness breakdowns', () => {
   assert.equal(typeof CHANNEL_EFF_MIN_N_FOR_RATE, 'number');
   assert.ok(CHANNEL_EFF_MIN_N_FOR_RATE > 0);
+});
+
+const STALL_STAGES = [{ id: 'outreach-sent', staleAfterDays: 10 }, { id: 'in-exploration', staleAfterDays: 30 }];
+
+test('computeStalled flags a prospect past its stage staleAfterDays threshold', () => {
+  const p = { name: 'Past due', stage: 'outreach-sent', stageEnteredDate: addDaysIso(todayIso(), -15) };
+  const results = computeStalled(STALL_STAGES, [p]);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].p, p);
+  assert.equal(results[0].info.isStale, true);
+});
+
+test('computeStalled leaves out a prospect still within its stage threshold', () => {
+  const p = { stage: 'outreach-sent', stageEnteredDate: addDaysIso(todayIso(), -2) };
+  assert.equal(computeStalled(STALL_STAGES, [p]).length, 0);
+});
+
+test('computeStalled leaves out a prospect with no stageEnteredDate logged, rather than treating it as stale', () => {
+  const p = { stage: 'outreach-sent', stageEnteredDate: null };
+  assert.equal(computeStalled(STALL_STAGES, [p]).length, 0);
+});
+
+test('computeStalled sorts worst (longest stalled) first', () => {
+  const barely = { name: 'Barely', stage: 'outreach-sent', stageEnteredDate: addDaysIso(todayIso(), -11) };
+  const way = { name: 'Way over', stage: 'outreach-sent', stageEnteredDate: addDaysIso(todayIso(), -40) };
+  const results = computeStalled(STALL_STAGES, [barely, way]);
+  assert.deepEqual(results.map(r => r.p.name), ['Way over', 'Barely']);
 });

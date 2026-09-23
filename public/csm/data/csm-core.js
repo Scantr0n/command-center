@@ -441,6 +441,18 @@
       .sort((a, b) => b.contacted - a.contacted || a.label.localeCompare(b.label));
   }
 
+  // Every prospect currently past its stage's real staleAfterDays threshold,
+  // worst (longest stalled) first. Thin wrapper over stallInfo across the
+  // whole pipeline, same board-wide-rollup role computeColdSignal and
+  // computeFunnel play over their own per-prospect primitives.
+  function computeStalled(stages, prospects) {
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    return prospects
+      .map(p => ({ p, info: stallInfo(p, stageById) }))
+      .filter(x => x.info && x.info.isStale)
+      .sort((a, b) => b.info.days - a.info.days);
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
@@ -448,6 +460,7 @@
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
-    computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness
+    computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
+    computeStalled
   };
 });
