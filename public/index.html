@@ -157,6 +157,25 @@
     #categoryFilterRow .tag-chip { flex-shrink: 0; }
   }
 
+  /* Fades the trailing edge of a horizontally-scrollable row so content cut
+     off at the visible edge reads as "scroll for more", not a stray
+     rendering bug. The category-chip row above gets away without this (a
+     chip's own rounded pill shape already reads as "cut off, more coming"
+     on its own), but a plain text label sliced mid-word, confirmed against
+     a real 390px-wide screenshot of #statsRow below ("NEEDS ATTENTIO" with
+     no ellipsis, "N" gone), reads as broken text instead. initEdgeFade (see
+     script below) clears the fade the moment a row's real content stops
+     overflowing or has been scrolled all the way to its real end, so this
+     never lies about content that's already fully visible. */
+  .edge-fade-x {
+    mask-image: linear-gradient(to right, black calc(100% - 22px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 22px), transparent 100%);
+  }
+  .edge-fade-x.edge-fade-x-none {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
   /* Atmosphere behind the graph: real dark-space gradient + radar grid.
      An earlier pass here added a 3-hue wash (green/purple/pink radial
      gradients) pulled from category colors already on screen, but real
@@ -519,7 +538,7 @@
           <span>Jump to</span>
           <kbd id="paletteBtnKbd" class="kbd-chip text-[10px]" style="color: var(--sub)" aria-hidden="true">&#8984;K</kbd>
         </button>
-        <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
+        <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right edge-fade-x"></div>
         <div id="driveStatusBadge" class="hidden items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border" style="color: #E0807A; background: #E04A4A1A; border-color: #E04A4A40"></div>
         <div id="viewToggleGroup" class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5" aria-pressed="true">Graph</button>
@@ -573,7 +592,7 @@
       <span>Same shape as each node's own status dot, not just color &middot; Closer to hub = higher priority &middot; Dashed ring = top priority &middot; Grouped by category</span>
     </div>
 
-    <div id="categoryFilterRow" class="flex flex-wrap items-center gap-2 mb-4" role="group" aria-label="Filter by category"></div>
+    <div id="categoryFilterRow" class="flex flex-wrap items-center gap-2 mb-4 edge-fade-x" role="group" aria-label="Filter by category"></div>
 
     <div id="noResultsMsg" class="hidden items-center justify-between gap-3 rounded-lg px-4 py-3 border hairline mb-4 text-sm" style="background: rgba(255,255,255,0.02); color: var(--sub)">
       <span id="noResultsText"></span>
@@ -1057,6 +1076,29 @@ window.addEventListener('afterprint', () => {
   renderActivityFeed();
 });
 
+// Pairs with the .edge-fade-x CSS rule above: clears the trailing-edge fade
+// the instant a horizontally-scrollable row's real content stops
+// overflowing its own box (most viewport widths, where flex-wrap wraps
+// instead of scrolling) or has actually been scrolled all the way to its
+// real end, so the fade never implies there's more to see when there isn't.
+// Self-registers its own scroll/resize listeners once per element (guarded
+// by dataset.edgeFadeWired) since renderStats/renderCategoryFilter rebuild
+// this same element's innerHTML on every poll, not just once on load.
+function updateEdgeFadeNow(el) {
+  if (!el) return;
+  const maxScroll = el.scrollWidth - el.clientWidth;
+  const atEnd = el.scrollLeft >= maxScroll - 1;
+  el.classList.toggle('edge-fade-x-none', maxScroll <= 1 || atEnd);
+}
+function initEdgeFade(el) {
+  if (!el) return;
+  updateEdgeFadeNow(el);
+  if (el.dataset.edgeFadeWired) return;
+  el.dataset.edgeFadeWired = '1';
+  el.addEventListener('scroll', () => updateEdgeFadeNow(el), { passive: true });
+  window.addEventListener('resize', () => updateEdgeFadeNow(el));
+}
+
 function renderStats() {
   const total = clusters.length;
   const active = clusters.filter(c => c.status === 'active').length;
@@ -1112,6 +1154,7 @@ function renderStats() {
       </div>
     </div>
   `;
+  initEdgeFade(document.getElementById('statsRow'));
 
   if (attention) {
     document.getElementById('attnStatBtn').addEventListener('click', () => {
@@ -2076,6 +2119,7 @@ function renderCategoryFilter() {
   row.querySelectorAll('.cat-filter-chip').forEach(el => {
     el.addEventListener('click', () => toggleCategoryFilter(el));
   });
+  initEdgeFade(row);
 }
 
 function applyFilters() {
