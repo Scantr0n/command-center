@@ -10,7 +10,7 @@
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
-    computeFunnel
+    computeFunnel, computeSocialReach
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -998,66 +998,10 @@
     }).join('');
   }
 
-  // Aggregates real socialSnapshots across every prospect into per-platform
-  // reach totals. Only the most recent asOfDate entry per prospect per
-  // platform counts, so logging a refresh snapshot never double-counts that
-  // same account's followers under the same platform. This is a rollup of
-  // one-time manual research pulls, never a live number, same honesty rule
-  // socialSnapshotStaleInfo already enforces per snapshot in the modal.
-  function computeSocialReach(prospects) {
-    const byPlatform = {};
-    const order = [];
-    function bucketFor(platform) {
-      if (!byPlatform[platform]) {
-        byPlatform[platform] = {
-          platform, prospectCount: 0, totalFollowers: 0, hasFollowers: false,
-          engagementSum: 0, engagementCount: 0, mostRecentAsOf: null, staleCount: 0
-        };
-        order.push(platform);
-      }
-      return byPlatform[platform];
-    }
-    prospects.forEach(p => {
-      const latestByPlatform = {};
-      (p.socialSnapshots || []).forEach(snap => {
-        if (!snap || !snap.platform) return;
-        const existing = latestByPlatform[snap.platform];
-        if (!existing || (snap.asOfDate || '') > (existing.asOfDate || '')) {
-          latestByPlatform[snap.platform] = snap;
-        }
-      });
-      Object.values(latestByPlatform).forEach(snap => {
-        const bucket = bucketFor(snap.platform);
-        bucket.prospectCount += 1;
-        // validate.js already rejects a non-numeric followers/engagementRate
-        // as a hard error, but that only runs from the CLI, not against
-        // whatever socialSnapshots data is actually live on disk right now.
-        // Without the Number.isFinite guard, one bad hand-edited value (a
-        // "12K" string, a typo) turned Number(snap.followers) into NaN,
-        // which then poisoned this whole platform's totalFollowers/
-        // engagementSum for every other prospect on that platform too, not
-        // just the bad entry, showing "NaN followers" for the whole bucket.
-        const followers = Number(snap.followers);
-        if (snap.followers != null && Number.isFinite(followers)) {
-          bucket.totalFollowers += followers;
-          bucket.hasFollowers = true;
-        }
-        const engagementRate = Number(snap.engagementRate);
-        if (snap.engagementRate != null && Number.isFinite(engagementRate)) {
-          bucket.engagementSum += engagementRate;
-          bucket.engagementCount += 1;
-        }
-        if (snap.asOfDate && (!bucket.mostRecentAsOf || snap.asOfDate > bucket.mostRecentAsOf)) {
-          bucket.mostRecentAsOf = snap.asOfDate;
-        }
-        if (socialSnapshotStaleInfo(snap)) bucket.staleCount += 1;
-      });
-    });
-    return order.map(key => byPlatform[key])
-      .sort((a, b) => b.totalFollowers - a.totalFollowers || b.prospectCount - a.prospectCount ||
-        a.platform.localeCompare(b.platform));
-  }
-
+  // Pure per-platform social reach rollup math now lives in csm-core.js
+  // (computeSocialReach), same shared-core-with-tests pattern as the other
+  // pure math above. Locks in regression coverage for the NaN-followers bug
+  // this function was previously patched for (see changelog).
   function renderSocialReach(prospects) {
     const results = computeSocialReach(prospects);
     if (results.length === 0) {

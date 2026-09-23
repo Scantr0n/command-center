@@ -20,7 +20,7 @@ const {
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
-  computeFunnel
+  computeFunnel, computeSocialReach
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -380,6 +380,7 @@ test('the real prospects.json on disk never produces a stall/stale false negativ
   computeStageVelocity(stages, prospects);
   computeColdSignal(prospects);
   computeFunnel(stages, prospects);
+  computeSocialReach(prospects);
 });
 
 test('computeColdSignal ignores a prospect below the touch threshold', () => {
@@ -527,4 +528,77 @@ test('computeFunnel computes a real percentage conversion between consecutive st
 test('computeFunnel leaves conversionFromPrev null rather than dividing by zero when the previous stage has no reach', () => {
   const results = computeFunnel(FUNNEL_STAGES, []);
   assert.ok(results.every(r => r.conversionFromPrev == null));
+});
+
+test('computeSocialReach sums real followers across prospects on the same platform', () => {
+  const prospects = [
+    { socialSnapshots: [{ platform: 'Douyin', followers: 1000, asOfDate: '2026-08-01' }] },
+    { socialSnapshots: [{ platform: 'Douyin', followers: 500, asOfDate: '2026-08-01' }] }
+  ];
+  const results = computeSocialReach(prospects);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].totalFollowers, 1500);
+  assert.equal(results[0].prospectCount, 2);
+});
+
+test('computeSocialReach counts only the most recent snapshot per prospect per platform, never double-counting a refresh', () => {
+  const p = {
+    socialSnapshots: [
+      { platform: 'Xiaohongshu', followers: 1000, asOfDate: '2026-06-01' },
+      { platform: 'Xiaohongshu', followers: 1200, asOfDate: '2026-08-01' }
+    ]
+  };
+  const results = computeSocialReach([p]);
+  assert.equal(results[0].prospectCount, 1);
+  assert.equal(results[0].totalFollowers, 1200);
+  assert.equal(results[0].mostRecentAsOf, '2026-08-01');
+});
+
+test('computeSocialReach does not let a bad hand-edited followers value (a non-numeric string) poison the rest of that platform bucket with NaN', () => {
+  // Regression test for the real "NaN followers display" bug this function
+  // was previously patched for (see changelog: CSM: fix NaN followers
+  // display and suppressed stage-sync warning).
+  const prospects = [
+    { socialSnapshots: [{ platform: 'Weibo', followers: '12K', asOfDate: '2026-08-01' }] },
+    { socialSnapshots: [{ platform: 'Weibo', followers: 800, asOfDate: '2026-08-01' }] }
+  ];
+  const results = computeSocialReach(prospects);
+  const weibo = results.find(r => r.platform === 'Weibo');
+  assert.equal(weibo.totalFollowers, 800);
+  assert.ok(Number.isFinite(weibo.totalFollowers));
+  assert.equal(weibo.prospectCount, 2);
+});
+
+test('computeSocialReach averages engagement rate only across snapshots that actually logged one', () => {
+  const prospects = [
+    { socialSnapshots: [{ platform: 'Bilibili', engagementRate: 4, asOfDate: '2026-08-01' }] },
+    { socialSnapshots: [{ platform: 'Bilibili', engagementRate: 8, asOfDate: '2026-08-01' }] },
+    { socialSnapshots: [{ platform: 'Bilibili', asOfDate: '2026-08-01' }] } // no engagementRate logged
+  ];
+  const results = computeSocialReach(prospects);
+  const bilibili = results.find(r => r.platform === 'Bilibili');
+  assert.equal(bilibili.engagementCount, 2);
+  assert.equal(bilibili.engagementSum, 12);
+  assert.equal(bilibili.prospectCount, 3);
+});
+
+test('computeSocialReach counts a snapshot toward staleCount once it is past the honesty window', () => {
+  const stale = { platform: 'Weibo', followers: 100, asOfDate: addDaysIso(todayIso(), -200) };
+  const fresh = { platform: 'Weibo', followers: 100, asOfDate: todayIso() };
+  const results = computeSocialReach([{ socialSnapshots: [stale] }, { socialSnapshots: [fresh] }]);
+  assert.equal(results[0].staleCount, 1);
+});
+
+test('computeSocialReach sorts platforms by total followers descending', () => {
+  const prospects = [
+    { socialSnapshots: [{ platform: 'Small', followers: 100, asOfDate: '2026-08-01' }] },
+    { socialSnapshots: [{ platform: 'Big', followers: 10000, asOfDate: '2026-08-01' }] }
+  ];
+  const results = computeSocialReach(prospects);
+  assert.deepEqual(results.map(r => r.platform), ['Big', 'Small']);
+});
+
+test('computeSocialReach ignores a snapshot with no platform logged', () => {
+  const results = computeSocialReach([{ socialSnapshots: [{ followers: 100, asOfDate: '2026-08-01' }] }]);
+  assert.equal(results.length, 0);
 });
