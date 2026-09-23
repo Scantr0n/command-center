@@ -64,6 +64,7 @@ function syncUrl() {
 const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
   estimateNetPayout, minListingPriceForNet,
+  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison
@@ -129,54 +130,6 @@ const ACQUISITION_SOURCE_LABELS = {
 // page: a count with no reorder point set yet can't be judged low or not.
 function isSupplyLowStock(s) {
   return s.qtyOnHand != null && s.reorderThreshold != null && s.qtyOnHand <= s.reorderThreshold;
-}
-
-// Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
-// Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
-// announced 2026-07-13 due to fuel prices (irs.gov/newsroom). Kept in sync
-// with the same table in data/validate.js. Only 2026 is a real published
-// rate right now, an expense dated outside it gets an honest "no rate known"
-// rather than reusing the wrong year's number.
-const MILEAGE_RATES_2026 = [
-  { from: '2026-01-01', to: '2026-06-30', rate: 0.725 },
-  { from: '2026-07-01', to: '2026-12-31', rate: 0.76 }
-];
-function irsMileageRateForDate(dateStr) {
-  if (!dateStr) return null;
-  const hit = MILEAGE_RATES_2026.find(r => dateStr >= r.from && dateStr <= r.to);
-  return hit ? hit.rate : null;
-}
-
-// A mileage expense with real miles and a real date but no computed amount
-// has two very different causes that otherwise render identically as "not
-// logged": a genuine backfill gap (no miles/date logged yet), or this table
-// itself being out of date (dated after MILEAGE_RATES_2026's last known
-// range, e.g. once 2027 starts and the IRS hasn't published or this table
-// hasn't been updated with next year's rate yet). Only the second one is
-// "the app's own fault, not a logging mistake", so it gets a distinct,
-// specific message instead of leaving the two indistinguishable.
-function mileageRateGapReason(e) {
-  if (e.amount != null || e.category !== 'mileage' || e.miles == null || !e.date) return null;
-  if (irsMileageRateForDate(e.date) != null) return null;
-  const lastKnown = MILEAGE_RATES_2026[MILEAGE_RATES_2026.length - 1].to;
-  if (e.date > lastKnown) {
-    return `No IRS rate known past ${lastKnown}, this tool's rate table only has 2026 rates in it. Log a real ` +
-      `manual amount, or add the newly published rate to MILEAGE_RATES_2026 once the IRS announces it.`;
-  }
-  return `No IRS rate known for ${e.date}, this tool's rate table only has 2026 rates in it. Log a real manual amount instead.`;
-}
-
-// A logged "amount" always wins (it's a real number someone entered), a
-// mileage entry with no amount falls back to computing one from real miles
-// at the real rate for its real date, everything else with no amount stays
-// honestly un-computable (null) rather than assumed $0.
-function computeExpenseAmount(e) {
-  if (e.amount != null) return e.amount;
-  if (e.category === 'mileage' && e.miles != null && e.date) {
-    const rate = irsMileageRateForDate(e.date);
-    return rate != null ? e.miles * rate : null;
-  }
-  return null;
 }
 
 // Looks up the eBay category of the listing a sale references, so a sold

@@ -46,6 +46,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible } = require('./validate-core.js');
+const { irsMileageRateForDate } = require('./garage-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -78,20 +79,6 @@ const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved
 const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
 const ITEM_SPECIFIC_KEYS = ['brand', 'size', 'color', 'condition'];
 const ACQUISITION_SOURCES = ['thrift-store', 'estate-sale', 'garage-sale', 'wholesale-lot', 'online-marketplace', 'personal-item', 'other'];
-// Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
-// Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
-// announced 2026-07-13 (irs.gov/newsroom: "IRS sets 2026 business standard
-// mileage rate at 72.5 cents per mile" and "IRS Increases Standard Mileage
-// Rate for Second Half of 2026"). Kept in sync with the same table in app.js.
-const MILEAGE_RATES_2026 = [
-  { from: '2026-01-01', to: '2026-06-30', rate: 0.725 },
-  { from: '2026-07-01', to: '2026-12-31', rate: 0.76 }
-];
-function irsMileageRateForDate(dateStr) {
-  if (!dateStr) return null;
-  const hit = MILEAGE_RATES_2026.find(r => dateStr >= r.from && dateStr <= r.to);
-  return hit ? hit.rate : null;
-}
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);

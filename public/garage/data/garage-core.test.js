@@ -18,6 +18,7 @@ const {
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
+  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
 } = require('./garage-core.js');
 
@@ -206,4 +207,40 @@ test('bundleNetComparison: an out-of-range discount clamps to 0-100 instead of i
   assert.equal(negative.bundleTotal, 100);
   const over = bundleNetComparison('vinted', [50, 50], 150);
   assert.equal(over.bundleTotal, 0);
+});
+
+test('irsMileageRateForDate: 72.5 cents Jan-Jun, 76 cents Jul-Dec, null outside 2026 or with no date', () => {
+  assert.equal(irsMileageRateForDate('2026-01-01'), 0.725);
+  assert.equal(irsMileageRateForDate('2026-06-30'), 0.725);
+  assert.equal(irsMileageRateForDate('2026-07-01'), 0.76);
+  assert.equal(irsMileageRateForDate('2026-12-31'), 0.76);
+  assert.equal(irsMileageRateForDate('2025-12-31'), null);
+  assert.equal(irsMileageRateForDate('2027-01-01'), null);
+  assert.equal(irsMileageRateForDate(null), null);
+});
+
+test('computeExpenseAmount: a logged amount always wins, otherwise mileage computes from miles x the real rate for its date', () => {
+  assert.equal(computeExpenseAmount({ amount: 12.5, category: 'mileage', miles: 999 }), 12.5);
+  assert.equal(computeExpenseAmount({ category: 'mileage', miles: 100, date: '2026-01-15' }), 72.5);
+  assert.equal(computeExpenseAmount({ category: 'mileage', miles: 100, date: '2026-08-01' }), 76);
+  // No amount, not mileage: honestly un-computable, never assumed $0.
+  assert.equal(computeExpenseAmount({ category: 'supplies' }), null);
+  // Mileage with no known rate for the date: also un-computable.
+  assert.equal(computeExpenseAmount({ category: 'mileage', miles: 100, date: '2025-01-01' }), null);
+});
+
+test('mileageRateGapReason: only fires for an uncomputed mileage expense with real miles/date but no known rate', () => {
+  // Already has an amount, category isn't mileage, or missing miles/date: no gap to report.
+  assert.equal(mileageRateGapReason({ amount: 10, category: 'mileage', miles: 100, date: '2025-01-01' }), null);
+  assert.equal(mileageRateGapReason({ category: 'supplies', miles: 100, date: '2025-01-01' }), null);
+  assert.equal(mileageRateGapReason({ category: 'mileage', date: '2025-01-01' }), null);
+  assert.equal(mileageRateGapReason({ category: 'mileage', miles: 100 }), null);
+  // A real rate exists for this date: no gap.
+  assert.equal(mileageRateGapReason({ category: 'mileage', miles: 100, date: '2026-03-01' }), null);
+  // Dated after the table's last known range: distinct "past" message naming the table itself.
+  const past = mileageRateGapReason({ category: 'mileage', miles: 100, date: '2027-01-01' });
+  assert.match(past, /No IRS rate known past 2026-12-31/);
+  // Dated before 2026 (or any other gap inside the table's span): the general message.
+  const before = mileageRateGapReason({ category: 'mileage', miles: 100, date: '2025-06-01' });
+  assert.match(before, /No IRS rate known for 2025-06-01/);
 });
