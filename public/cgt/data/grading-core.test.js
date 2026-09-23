@@ -14,7 +14,9 @@ const assert = require('node:assert/strict');
 const {
   computeGradingMath, GRADING_RISK_MULTIPLE,
   classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
-  COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE
+  COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
+  isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
+  estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend
 } = require('./grading-core.js');
 
 test('missing rawValue, expectedGradedValue, or estimatedGradingCost returns null, never a guessed verdict', () => {
@@ -141,5 +143,81 @@ test('the real cards.json never crashes estimateCollectiblesTax on any sold row'
     if (c.soldDate == null || c.soldPrice == null) continue;
     const gain = c.costBasis != null ? c.soldPrice - c.costBasis : null;
     assert.doesNotThrow(() => estimateCollectiblesTax(gain, c.acquisitionDate, c.soldDate), `card ${c.id} should not throw`);
+  }
+});
+
+test('isSold/isListed read soldDate/listedDate directly, independent of each other', () => {
+  assert.equal(isSold({ soldDate: '2026-01-01' }), true);
+  assert.equal(isSold({ soldDate: null }), false);
+  assert.equal(isListed({ listedDate: '2026-01-01' }), true);
+  assert.equal(isListed({ listedDate: null }), false);
+  // A sold card can still carry a stale listedDate (validate-core.js only
+  // warns, doesn't block), so the two are independent flags, not opposites.
+  assert.equal(isSold({ soldDate: '2026-01-01', listedDate: '2025-06-01' }), true);
+});
+
+test('costPerCard divides cost by cardCount, and returns null rather than a misleading average when either is missing', () => {
+  assert.equal(costPerCard({ cost: 45, cardCount: 12 }), 3.75);
+  assert.equal(costPerCard({ cost: null, cardCount: 12 }), null);
+  assert.equal(costPerCard({ cost: 45, cardCount: 0 }), null);
+  assert.equal(costPerCard({ cost: 45, cardCount: null }), null);
+});
+
+test('computeGainLoss requires both costBasis and estimatedValue, never guesses a missing side as zero', () => {
+  assert.equal(computeGainLoss({ costBasis: null, estimatedValue: 50 }), null);
+  assert.equal(computeGainLoss({ costBasis: 10, estimatedValue: null }), null);
+  const gl = computeGainLoss({ costBasis: 10, estimatedValue: 25 });
+  assert.equal(gl.abs, 15);
+  assert.equal(gl.pct, 150);
+});
+
+test('computeRealizedGainLoss only counts a card that is actually sold with both a real cost basis and sale price', () => {
+  assert.equal(computeRealizedGainLoss({ soldDate: null, costBasis: 10, soldPrice: 25 }), null, 'not sold');
+  assert.equal(computeRealizedGainLoss({ soldDate: '2026-01-01', costBasis: null, soldPrice: 25 }), null, 'no cost basis');
+  assert.equal(computeRealizedGainLoss({ soldDate: '2026-01-01', costBasis: 10, soldPrice: null }), null, 'no sale price');
+  const rgl = computeRealizedGainLoss({ soldDate: '2026-01-01', costBasis: 10, soldPrice: 30 });
+  assert.equal(rgl.abs, 20);
+  assert.equal(rgl.pct, 200);
+});
+
+test('estimateCardCollectiblesTax returns null for an unsold card, a loss, or a sale with no acquisitionDate', () => {
+  assert.equal(estimateCardCollectiblesTax({ soldDate: null }), null, 'unsold');
+  assert.equal(estimateCardCollectiblesTax({ soldDate: '2026-06-01', costBasis: 30, soldPrice: 10 }), null, 'a loss');
+  assert.equal(estimateCardCollectiblesTax({ soldDate: '2026-06-01', costBasis: 10, soldPrice: 30, acquisitionDate: null }), null, 'no acquisitionDate');
+});
+
+test('estimateCardCollectiblesTax computes a real long-term-vs-short-term estimate off a real realized gain', () => {
+  const est = estimateCardCollectiblesTax({
+    soldDate: '2026-06-01', acquisitionDate: '2024-01-01', costBasis: 100, soldPrice: 500
+  });
+  assert.equal(est.holding, 'long-term');
+  assert.equal(est.maxRate, COLLECTIBLES_LONG_TERM_MAX_RATE);
+  assert.equal(est.maxTax, 400 * COLLECTIBLES_LONG_TERM_MAX_RATE);
+});
+
+test('lastPriceHistoryEntry returns the most recent entry by date, regardless of array order', () => {
+  assert.equal(lastPriceHistoryEntry({ priceHistory: [] }), null);
+  assert.equal(lastPriceHistoryEntry({}), null);
+  const unsorted = [{ date: '2026-01-01', value: 10 }, { date: '2026-06-01', value: 25 }, { date: '2026-03-01', value: 15 }];
+  assert.deepEqual(lastPriceHistoryEntry({ priceHistory: unsorted }), { date: '2026-06-01', value: 25 });
+});
+
+test('computeValueTrend compares current estimatedValue against the most recent prior priceHistory entry', () => {
+  assert.equal(computeValueTrend({ priceHistory: [], estimatedValue: 50 }), null, 'no prior entry to compare against');
+  assert.equal(computeValueTrend({ priceHistory: [{ date: '2026-01-01', value: 10 }], estimatedValue: null }), null, 'no current value');
+  const trend = computeValueTrend({ priceHistory: [{ date: '2026-01-01', value: 10 }], estimatedValue: 15 });
+  assert.equal(trend.abs, 5);
+  assert.equal(trend.pct, 50);
+  assert.equal(trend.prevValue, 10);
+  assert.equal(trend.prevDate, '2026-01-01');
+});
+
+test('the real cards.json never crashes computeGainLoss/computeRealizedGainLoss/estimateCardCollectiblesTax/computeValueTrend on any row', () => {
+  const data = require('./cards.json');
+  for (const c of data.cards || []) {
+    assert.doesNotThrow(() => computeGainLoss(c), `card ${c.id} computeGainLoss should not throw`);
+    assert.doesNotThrow(() => computeRealizedGainLoss(c), `card ${c.id} computeRealizedGainLoss should not throw`);
+    assert.doesNotThrow(() => estimateCardCollectiblesTax(c), `card ${c.id} estimateCardCollectiblesTax should not throw`);
+    assert.doesNotThrow(() => computeValueTrend(c), `card ${c.id} computeValueTrend should not throw`);
   }
 });

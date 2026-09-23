@@ -3,12 +3,16 @@
  * from a Node test (grading-core.test.js) without loading the rest of the
  * dashboard's DOM-touching code. Same reasoning as validate-core.js in this
  * same folder: one copy of the real rule, usable from both the browser
- * (app.js, via window.CGTGradingCore) and a plain Node test. Two unrelated
+ * (app.js, via window.CGTGradingCore) and a plain Node test. Three unrelated
  * real questions live here for that same reason, not because they're the
  * same math: "is this raw card worth grading?" (computeGradingMath, the
- * original reason this file exists) and "roughly what would a realized sale
- * owe in federal collectibles tax?" (estimateCollectiblesTax, added once
- * cards.json grew an acquisitionDate to classify a sale's holding period).
+ * original reason this file exists), "roughly what would a realized sale
+ * owe in federal collectibles tax?" (estimateCollectiblesTax/
+ * estimateCardCollectiblesTax, added once cards.json grew an acquisitionDate
+ * to classify a sale's holding period), and "what is a card's own real
+ * gain/loss" (computeGainLoss/computeRealizedGainLoss/computeValueTrend and
+ * the isSold/isListed/costPerCard/lastPriceHistoryEntry helpers those are
+ * built from), which estimateCardCollectiblesTax itself depends on.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -103,9 +107,103 @@
     return { holding, maxRate, maxTax: gain * maxRate };
   }
 
+  // A card is sold once it has a real soldDate (validate-core.js requires
+  // soldPrice and soldDate together, so either field alone is enough to
+  // check here). Sold cards stay in cards.json as a permanent record of what
+  // was owned, but drop out of every "what do I currently hold" total
+  // (portfolio value, breakdowns, unrealized gain/loss, the insurance
+  // summary) the same way an unpriced card drops out of the priced total
+  // instead of counting as $0: no longer owning it isn't a $0 value, it's a
+  // different question.
+  function isSold(c) {
+    return c.soldDate != null;
+  }
+
+  // Same "either field alone is enough, validate-core.js requires both"
+  // logic as isSold above, for a card that's currently listed for sale but
+  // not yet sold. A sold card can still carry stale listing fields
+  // (validate-core.js only warns about it, doesn't block), so callers that
+  // care about "what's actively for sale right now" should also check
+  // !isSold(c).
+  function isListed(c) {
+    return c.listedDate != null;
+  }
+
+  // A submission logs its cost as one invoiced batch total (real, since that
+  // is what actually gets paid) and cardCount separately, so nothing on the
+  // page ever divided the two even though both were already sitting right
+  // there. Null whenever either half is missing or cardCount is 0, same "no
+  // value means no value" convention as the rest of this file, not a 0 or a
+  // misleading average.
+  function costPerCard(s) {
+    if (s.cost == null || !s.cardCount) return null;
+    return s.cost / s.cardCount;
+  }
+
+  // Gain/loss only exists to compute where both a real purchase price
+  // (costBasis) and a real researched value (estimatedValue) are on record.
+  // Neither field requires the other: plenty of cards will have a price
+  // logged with no memory of what was paid, or vice versa, so this returns
+  // null rather than treating a missing side as zero.
+  function computeGainLoss(c) {
+    if (c.costBasis == null || c.estimatedValue == null) return null;
+    const abs = c.estimatedValue - c.costBasis;
+    const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
+    return { abs, pct };
+  }
+
+  // Only counts when both a real purchase price and a real sale price are on
+  // record, same "never guess at a missing side" rule as computeGainLoss's
+  // unrealized version. A card sold with no logged costBasis has a real sale
+  // price but no real realized gain/loss to compute against.
+  function computeRealizedGainLoss(c) {
+    if (!isSold(c) || c.costBasis == null || c.soldPrice == null) return null;
+    const abs = c.soldPrice - c.costBasis;
+    const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
+    return { abs, pct };
+  }
+
+  // Wraps estimateCollectiblesTax above with the two real numbers only
+  // cards.json actually has: a realized gain/loss (computeRealizedGainLoss
+  // above) and the card's own acquisitionDate/soldDate. Only ever computed
+  // for a sold card with a real positive realized gain and a real
+  // acquisitionDate on record; returns null otherwise (never a guessed tax
+  // on a loss, an unsold card, or a sale with no acquisitionDate logged to
+  // classify the holding period from).
+  function estimateCardCollectiblesTax(c) {
+    if (!isSold(c)) return null;
+    const rgl = computeRealizedGainLoss(c);
+    if (!rgl) return null;
+    return estimateCollectiblesTax(rgl.abs, c.acquisitionDate, c.soldDate);
+  }
+
+  // priceHistory holds prior researched prices for a card, oldest first,
+  // logged when a re-check changes the number instead of silently
+  // overwriting it. This reads the most recent prior entry (regardless of
+  // what order it was actually written in the JSON) so a hand-edited file
+  // that didn't bother sorting the array still compares against the right
+  // one.
+  function lastPriceHistoryEntry(c) {
+    if (!c.priceHistory || !c.priceHistory.length) return null;
+    return c.priceHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).pop();
+  }
+
+  // Same "only compute when both real numbers exist" rule as
+  // computeGainLoss: a card with no priceHistory yet (priced exactly once)
+  // has no trend to show, not a 0% change.
+  function computeValueTrend(c) {
+    const prev = lastPriceHistoryEntry(c);
+    if (!prev || c.estimatedValue == null) return null;
+    const abs = c.estimatedValue - prev.value;
+    const pct = prev.value > 0 ? (abs / prev.value) * 100 : null;
+    return { abs, pct, prevValue: prev.value, prevDate: prev.date };
+  }
+
   return {
     computeGradingMath, GRADING_RISK_MULTIPLE,
     classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
-    COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE
+    COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
+    isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
+    estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend
   };
 });
