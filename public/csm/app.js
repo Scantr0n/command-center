@@ -9,7 +9,8 @@
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
-    reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD
+    reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
+    computeFunnel
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -816,28 +817,9 @@
       ' from ' + (data.generatedFrom || 'git log') + '.';
   }
 
-  // How many prospects have ever reached each stage, inferred from current
-  // stage alone: since the pipeline is a straight line (researched ->
-  // outreach-sent -> silent-replied -> in-exploration -> client), a prospect
-  // sitting at stage index i has necessarily already passed every stage
-  // before it, whether or not that move was ever logged in stageHistory.
-  // Unlike computeStageVelocity, this works from data every prospect already
-  // has (the required "stage" field), not only from optional history logs.
-  function computeFunnel(stages, prospects) {
-    const indexOfStage = Object.fromEntries(stages.map((s, i) => [s.id, i]));
-    const reached = stages.map(() => 0);
-    prospects.forEach(p => {
-      const idx = indexOfStage[p.stage];
-      if (idx == null) return;
-      for (let i = 0; i <= idx; i++) reached[i]++;
-    });
-    return stages.map((stage, i) => ({
-      stage,
-      reached: reached[i],
-      conversionFromPrev: i > 0 && reached[i - 1] > 0 ? Math.round((reached[i] / reached[i - 1]) * 100) : null
-    }));
-  }
-
+  // Pure funnel reach/conversion math now lives in csm-core.js
+  // (computeFunnel), same shared-core-with-tests pattern as the other pure
+  // math above.
   function renderFunnel(stages, prospects) {
     const results = computeFunnel(stages, prospects);
     const total = results.length ? results[0].reached : 0;

@@ -19,7 +19,8 @@ const {
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
-  reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD
+  reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
+  computeFunnel
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -378,6 +379,7 @@ test('the real prospects.json on disk never produces a stall/stale false negativ
   });
   computeStageVelocity(stages, prospects);
   computeColdSignal(prospects);
+  computeFunnel(stages, prospects);
 });
 
 test('computeColdSignal ignores a prospect below the touch threshold', () => {
@@ -484,4 +486,45 @@ test('computeColdSignal sorts the parked list by re-engagement date ascending, s
   const sooner = { name: 'Sooner', stage: 'outreach-sent', outreachLog: touches, nudgeSchedule: { doNotNudgeBefore: addDaysIso(todayIso(), 10) } };
   const { parked } = computeColdSignal([later, sooner]);
   assert.deepEqual(parked.map(x => x.p.name), ['Sooner', 'Later']);
+});
+
+const FUNNEL_STAGES = [
+  { id: 'researched' }, { id: 'outreach-sent' }, { id: 'silent-replied' },
+  { id: 'in-exploration' }, { id: 'client' }
+];
+
+test('computeFunnel counts a prospect as having reached every stage up to and including its current one', () => {
+  const results = computeFunnel(FUNNEL_STAGES, [{ stage: 'in-exploration' }]);
+  assert.equal(results.find(r => r.stage.id === 'researched').reached, 1);
+  assert.equal(results.find(r => r.stage.id === 'outreach-sent').reached, 1);
+  assert.equal(results.find(r => r.stage.id === 'silent-replied').reached, 1);
+  assert.equal(results.find(r => r.stage.id === 'in-exploration').reached, 1);
+  assert.equal(results.find(r => r.stage.id === 'client').reached, 0);
+});
+
+test('computeFunnel ignores a prospect whose stage id is not in the known stages list', () => {
+  const results = computeFunnel(FUNNEL_STAGES, [{ stage: 'not-a-real-stage' }]);
+  assert.ok(results.every(r => r.reached === 0));
+});
+
+test('computeFunnel leaves conversionFromPrev null for the first stage', () => {
+  const results = computeFunnel(FUNNEL_STAGES, [{ stage: 'researched' }]);
+  assert.equal(results[0].conversionFromPrev, null);
+});
+
+test('computeFunnel computes a real percentage conversion between consecutive stages', () => {
+  const prospects = [
+    { stage: 'outreach-sent' }, { stage: 'outreach-sent' },
+    { stage: 'outreach-sent' }, { stage: 'in-exploration' }
+  ];
+  const results = computeFunnel(FUNNEL_STAGES, prospects);
+  // All 4 reached researched and outreach-sent (100%), 1 of 4 reached silent-replied's
+  // next stage in-exploration by way of outreach-sent -> ... -> in-exploration.
+  assert.equal(results.find(r => r.stage.id === 'outreach-sent').conversionFromPrev, 100);
+  assert.equal(results.find(r => r.stage.id === 'in-exploration').reached, 1);
+});
+
+test('computeFunnel leaves conversionFromPrev null rather than dividing by zero when the previous stage has no reach', () => {
+  const results = computeFunnel(FUNNEL_STAGES, []);
+  assert.ok(results.every(r => r.conversionFromPrev == null));
 });

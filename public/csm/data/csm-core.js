@@ -300,12 +300,35 @@
     return { active, parked };
   }
 
+  // How many prospects have reached at least each stage, and the real
+  // conversion rate stepping into it from the stage before, from current
+  // stage alone: since the pipeline is a straight line (researched ->
+  // outreach-sent -> silent-replied -> in-exploration -> client), a prospect
+  // sitting at stage index i has necessarily already passed every stage
+  // before it, whether or not that move was ever logged in stageHistory.
+  // Unlike computeStageVelocity, this works from data every prospect already
+  // has (the required "stage" field), not only from optional history logs.
+  function computeFunnel(stages, prospects) {
+    const indexOfStage = Object.fromEntries(stages.map((s, i) => [s.id, i]));
+    const reached = stages.map(() => 0);
+    prospects.forEach(p => {
+      const idx = indexOfStage[p.stage];
+      if (idx == null) return;
+      for (let i = 0; i <= idx; i++) reached[i]++;
+    });
+    return stages.map((stage, i) => ({
+      stage,
+      reached: reached[i],
+      conversionFromPrev: i > 0 && reached[i - 1] > 0 ? Math.round((reached[i] / reached[i - 1]) * 100) : null
+    }));
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
-    reachedActiveExploration, computeStageVelocity, computeColdSignal
+    reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel
   };
 });
