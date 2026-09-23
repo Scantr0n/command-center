@@ -17,7 +17,7 @@ const assert = require('node:assert/strict');
 const {
   isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-  nudgeUrgencyLevel, computeNudgeRows, byUrgency,
+  nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
 } = require('./csm-core.js');
 
@@ -214,6 +214,39 @@ test('byUrgency falls back to name order, and satisfies the comparator contract,
   ];
   assert.equal(byUrgency(noDate[0], noDate[1]), -byUrgency(noDate[1], noDate[0]));
   assert.deepEqual(noDate.slice().sort(byUrgency).map(p => p.name), ['Amy', 'Zed']);
+});
+
+test('touchCount counts only outreachLog entries with a valid date', () => {
+  const p = {
+    outreachLog: [
+      { date: '2026-09-01', type: 'initial-send' },
+      { date: '2026-09-10', type: 'nudge' },
+      { date: '2026-9-15', type: 'nudge' }, // non-zero-padded, invalid
+      { type: 'nudge' } // no date at all
+    ]
+  };
+  assert.equal(touchCount(p), 2);
+});
+
+test('touchCount is 0 for no outreachLog, not a throw', () => {
+  assert.equal(touchCount({}), 0);
+  assert.equal(touchCount({ outreachLog: [] }), 0);
+});
+
+test('daysSinceLastTouch is null with no valid touches logged, never NaN', () => {
+  assert.equal(daysSinceLastTouch({}), null);
+  assert.equal(daysSinceLastTouch({ outreachLog: [{ date: '2026-9-1', type: 'initial-send' }] }), null);
+});
+
+test('daysSinceLastTouch uses the most recent of several logged touches, not the first', () => {
+  const p = {
+    outreachLog: [
+      { date: addDaysIso(todayIso(), -20), type: 'initial-send' },
+      { date: addDaysIso(todayIso(), -5), type: 'nudge' },
+      { date: addDaysIso(todayIso(), -12), type: 'nudge' }
+    ]
+  };
+  assert.equal(daysSinceLastTouch(p), 5);
 });
 
 test('the real prospects.json on disk never produces a stall/stale false negative from a null date', () => {

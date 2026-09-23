@@ -7,7 +7,7 @@
   const {
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-    nudgeUrgencyLevel, computeNudgeRows, byUrgency,
+    nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
   } = CSMCore;
 
@@ -1550,34 +1550,6 @@
       }
     });
     statsEl.innerHTML = parts.join('');
-  }
-
-  // Days since the most recent real outreach touch (initial send or nudge),
-  // separate from stallInfo's "days in stage": a prospect can sit in the
-  // same stage for a while yet have been touched recently (fresh), or be
-  // fresh into a stage yet have gone quiet on actual contact (neglected).
-  // Surfacing this on the card itself, not only inside the detail modal's
-  // outreach log, makes that distinction visible at a glance on the board.
-  function daysSinceLastTouch(p) {
-    // isValidDateStr, not just a truthy date: an invalid entry (bad
-    // hand-typed format) would otherwise make daysSince return NaN, and
-    // every caller here checks `!= null`, which NaN passes, so the card and
-    // list would render a literal "NaND SINCE LAST TOUCH" badge instead of
-    // just skipping the malformed entry.
-    const log = (p.outreachLog || []).filter(e => e && isValidDateStr(e.date));
-    if (log.length === 0) return null;
-    const lastDate = log.reduce((max, e) => (e.date > max ? e.date : max), log[0].date);
-    return daysSince(lastDate);
-  }
-
-  // How many real touches have actually gone out, not just when the last
-  // one landed. Cold outreach research is consistent that a real reply
-  // typically takes several touches, not one attempt, so a board scanned at
-  // a glance should show effort-so-far as its own signal, not require
-  // opening the modal's outreach log to find out whether "silent" here
-  // means one email sent once or five real attempts over a month.
-  function touchCount(p) {
-    return (p.outreachLog || []).filter(e => e && isValidDateStr(e.date)).length;
   }
 
   // Only the two tiers a person would actually act on today ('overdue' and

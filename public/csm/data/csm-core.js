@@ -173,6 +173,33 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // How many real touches have actually gone out, not just when the last
+  // one landed. Cold outreach research is consistent that a real reply
+  // typically takes several touches, not one attempt, so this is the count
+  // computeColdSignal in app.js compares against its threshold, and what a
+  // board scanned at a glance shows as effort-so-far. isValidDateStr, not
+  // just a truthy entry, since a malformed hand-typed date should not count
+  // as a real logged touch.
+  function touchCount(p) {
+    return (p.outreachLog || []).filter(e => e && isValidDateStr(e.date)).length;
+  }
+
+  // Days since the most recent real outreach touch (initial send or nudge),
+  // separate from stallInfo's "days in stage": a prospect can sit in the
+  // same stage for a while yet have been touched recently (fresh), or be
+  // fresh into a stage yet have gone quiet on actual contact (neglected).
+  // isValidDateStr, not just a truthy date: an invalid entry (bad
+  // hand-typed format) would otherwise make daysSince return NaN, and every
+  // caller checks `!= null`, which NaN passes, so a card or list would
+  // render a literal "NaND SINCE LAST TOUCH" badge instead of just skipping
+  // the malformed entry.
+  function daysSinceLastTouch(p) {
+    const log = (p.outreachLog || []).filter(e => e && isValidDateStr(e.date));
+    if (log.length === 0) return null;
+    const lastDate = log.reduce((max, e) => (e.date > max ? e.date : max), log[0].date);
+    return daysSince(lastDate);
+  }
+
   // Board column sort order: soonest real nextNudgeDate first, prospects
   // with no date logged pushed to the end, tied on name so the order is
   // deterministic either way. A prior version of this comparator returned 1
@@ -192,7 +219,7 @@
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-    nudgeUrgencyLevel, computeNudgeRows, byUrgency,
+    nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
   };
 });
