@@ -2038,8 +2038,8 @@
       if (!summary) blockers.push('A summary is required.');
       if (!date) blockers.push('Date logged is required.');
 
-      qlWarnings.textContent = blockers.join(' ');
       if (blockers.length) {
+        qlWarnings.textContent = blockers.join(' ');
         qlOutput.hidden = true;
         qlCopyBtn.hidden = true;
         return;
@@ -2060,6 +2060,19 @@
           note: null
         }
       };
+
+      // Same real-contact-logged-twice check the leads feed already flags
+      // inline (POSSIBLE DUPLICATE) and validate.js already warns on, run
+      // here too so it surfaces before a duplicate is even pasted into
+      // leads.json, not only after. Advisory, not a blocker: matching on
+      // channel + source detail is a strong signal, not certainty, the same
+      // reason validate.js treats it as a warning rather than a hard error.
+      const existingLeads = (leadsData && leadsData.leads) || [];
+      const dupGroups = SondrikValidateCore.findDuplicateLeads(existingLeads.concat([obj]));
+      const isDuplicate = dupGroups.some(group => group.indexOf(obj) !== -1);
+      qlWarnings.textContent = isDuplicate
+        ? 'This looks like it might be the same real contact as a lead already logged (same channel + source detail). Check leads.json before adding a second entry for the same person.'
+        : '';
 
       qlOutput.value = JSON.stringify(obj, null, 2) + ',';
       qlOutput.hidden = false;
