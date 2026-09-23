@@ -2319,6 +2319,7 @@ document.addEventListener('keydown', (e) => {
 // manual reload. Purely a re-fetch of the same read-only file, paused
 // while the tab is hidden so it never runs pointlessly in the background.
 const REFRESH_INTERVAL_MS = 30000;
+let nextAutoRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
 setInterval(() => {
   if (document.visibilityState === 'visible') {
     loadStatus();
@@ -2327,7 +2328,29 @@ setInterval(() => {
     // the same cadence rather than piggybacking on loadStatus succeeding.
     renderMarketStatus();
   }
+  nextAutoRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
 }, REFRESH_INTERVAL_MS);
+
+// Visible companion to the auto-refresh above: without it, the 30s poll is
+// invisible until a value happens to change, and there's no way to tell "the
+// page is quietly staying current" from "the page stopped updating". Plain
+// countdown text next to Refresh, real status-page convention. Reflects this
+// interval's real schedule (not reset by a manual click, since the interval
+// above isn't either) and goes blank whenever it wouldn't be true: tab
+// hidden (the tick above is skipped then, per the comment on it) or a manual
+// refresh already in flight.
+const nextRefreshEl = document.getElementById('connNextRefresh');
+function renderNextRefreshCountdown() {
+  if (!nextRefreshEl) return;
+  if (document.visibilityState !== 'visible' || refreshBtn.disabled) {
+    nextRefreshEl.textContent = '';
+    return;
+  }
+  const secs = Math.max(0, Math.ceil((nextAutoRefreshAt - Date.now()) / 1000));
+  nextRefreshEl.textContent = 'Next check in ' + secs + 's';
+}
+setInterval(renderNextRefreshCountdown, 1000);
+renderNextRefreshCountdown();
 
 // The interval above only fires while the tab is visible, so a tab left
 // hidden for a while (Jack tabs away, comes back) can show a reading up to

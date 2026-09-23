@@ -479,6 +479,18 @@ header.page-head .sub {
   fill: #3DDC84;
 }
 
+/* Companion to .conn-latency: a plain "Next check in Ns" countdown next to
+   the Refresh button, real status-page convention (Statuspage-style
+   dashboards) for making an invisible polling cadence visible at a glance.
+   aria-hidden since it's a decorative tick, not a state change worth a
+   screen reader announcing every second; the connection state itself is
+   still announced via #connStrip's role="status". */
+.conn-next-refresh {
+  font-size: 0.68rem;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+
 .refresh-btn {
   font-size: 0.72rem;
   color: var(--sub);
@@ -1447,7 +1459,7 @@ footer.page-foot {
      here rather than trying to preserve the color coding on paper. */
   .incident-ongoing .incident-duration { color: #111 !important; }
 
-  .sticky-critical-bar, .refresh-btn, .back-link, .schema-help,
+  .sticky-critical-bar, .refresh-btn, .conn-next-refresh, .back-link, .schema-help,
   .modal-overlay, .toast-container {
     display: none !important;
   }
