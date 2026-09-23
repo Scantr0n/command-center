@@ -453,6 +453,20 @@
       .sort((a, b) => b.info.days - a.info.days);
   }
 
+  // True once some forward-looking plan is on record for this prospect, by
+  // any of the three real ways one can be logged: a queued nextNudgeDate, a
+  // planned nudgeSchedule.nudgePoint, or a deliberate parked
+  // nudgeSchedule.doNotNudgeBefore (the same "on purpose, not neglected"
+  // signal computeColdSignal's parked list already treats as a real
+  // decision, not a gap).
+  function hasNudgePlan(p) {
+    if (p.nextNudgeDate && isValidDateStr(p.nextNudgeDate)) return true;
+    const ns = p.nudgeSchedule || {};
+    if (ns.nudgePoint && isValidDateStr(ns.nudgePoint)) return true;
+    if (ns.doNotNudgeBefore && isValidDateStr(ns.doNotNudgeBefore)) return true;
+    return false;
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
@@ -461,6 +475,6 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    computeStalled
+    computeStalled, hasNudgePlan
   };
 });

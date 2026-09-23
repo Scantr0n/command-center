@@ -11,7 +11,7 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled
+    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -609,20 +609,8 @@
     }
   }
 
-  // True once some forward-looking plan is on record for this prospect, by
-  // any of the three real ways one can be logged: a queued nextNudgeDate, a
-  // planned nudgeSchedule.nudgePoint, or a deliberate parked
-  // nudgeSchedule.doNotNudgeBefore (the same "on purpose, not neglected"
-  // signal the cold-signal parked list below already treats as a real
-  // decision, not a gap).
-  function hasNudgePlan(p) {
-    if (p.nextNudgeDate && isValidDateStr(p.nextNudgeDate)) return true;
-    const ns = p.nudgeSchedule || {};
-    if (ns.nudgePoint && isValidDateStr(ns.nudgePoint)) return true;
-    if (ns.doNotNudgeBefore && isValidDateStr(ns.doNotNudgeBefore)) return true;
-    return false;
-  }
-
+  // hasNudgePlan now lives in csm-core.js, same shared-core-with-tests
+  // pattern as the other pure math above.
   function computeDataQualityFlags(stages, prospects) {
     return prospects
       .map(p => {

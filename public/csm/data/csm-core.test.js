@@ -21,7 +21,7 @@ const {
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled
+  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -684,4 +684,27 @@ test('computeStalled sorts worst (longest stalled) first', () => {
   const way = { name: 'Way over', stage: 'outreach-sent', stageEnteredDate: addDaysIso(todayIso(), -40) };
   const results = computeStalled(STALL_STAGES, [barely, way]);
   assert.deepEqual(results.map(r => r.p.name), ['Way over', 'Barely']);
+});
+
+test('hasNudgePlan is true from a queued nextNudgeDate alone', () => {
+  assert.equal(hasNudgePlan({ nextNudgeDate: '2026-10-01' }), true);
+});
+
+test('hasNudgePlan is true from a planned nudgeSchedule.nudgePoint alone', () => {
+  assert.equal(hasNudgePlan({ nudgeSchedule: { nudgePoint: '2026-10-01' } }), true);
+});
+
+test('hasNudgePlan is true from a deliberate doNotNudgeBefore park date alone', () => {
+  assert.equal(hasNudgePlan({ nudgeSchedule: { doNotNudgeBefore: '2026-12-01' } }), true);
+});
+
+test('hasNudgePlan is false with no nudge fields logged at all', () => {
+  assert.equal(hasNudgePlan({}), false);
+  assert.equal(hasNudgePlan({ nudgeSchedule: {} }), false);
+});
+
+test('hasNudgePlan treats an invalid hand-typed date as not a real plan', () => {
+  assert.equal(hasNudgePlan({ nextNudgeDate: '2026-9-5' }), false);
+  assert.equal(hasNudgePlan({ nudgeSchedule: { nudgePoint: '2026-9-5' } }), false);
+  assert.equal(hasNudgePlan({ nudgeSchedule: { doNotNudgeBefore: '2026-9-5' } }), false);
 });
