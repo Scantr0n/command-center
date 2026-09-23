@@ -251,6 +251,19 @@ header.page-head .sub {
   margin-bottom: 14px;
 }
 .section-toolbar .section-title { margin: 0; }
+/* Applications section's own validate.js self-check result, same
+   "warning if real findings, silent if clean or unavailable" reading as
+   every other hub's identical .section-title-meta.warn pattern. */
+.section-title-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--dim);
+  margin-left: 8px;
+}
+.section-title-meta.warn { color: #E0A030; }
 .section-note {
   font-size: 0.78rem;
   color: var(--dim);
@@ -598,6 +611,10 @@ footer.page-foot code { overflow-wrap: anywhere; }
      earlier in source order, same real ambiguity hit on CGT's card-table
      header fix tonight, forced the same way rather than left unresolved. */
   .callout-warning strong { color: #111 !important; }
+  /* Same real print-contrast bug already found and fixed on the other 5
+     hubs' own .section-title-meta.warn: raw #E0A030 on white clears nowhere
+     near 4.5:1, darkened until it does, not an arbitrary pick. */
+  .section-title-meta.warn { color: #8a5a00; }
   .snapshot-chip, .lead-card, .criteria-item, .dealbreaker-item, .sub-list-item, .data-table-wrap {
     background: none;
     border: 1px solid #ccc;

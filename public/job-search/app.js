@@ -514,4 +514,52 @@
   window.addEventListener('offline', updateOfflineBanner);
   window.addEventListener('online', updateOfflineBanner);
   updateOfflineBanner();
+
+  // Surfaces this hub's own validate.js self-check (date sanity, em-dash
+  // scan, source-URL check, duplicate-application detection) on the page
+  // itself, via the same generic /api/<hub>/data-quality route every other
+  // hub already reads. server.js has exposed /api/job-search/data-quality
+  // since the route was added, but nothing on this page read it until now,
+  // so a hand-transcription mistake in applications.json previously only
+  // ever surfaced on the command line. "unavailable" (validate.js missing,
+  // node unreachable) is an environment gap, not a real finding, so it
+  // stays silent, same contract as every other hub's identical check.
+  function renderDataQuality(data) {
+    const meta = document.getElementById('dataQualityMeta');
+    const callout = document.getElementById('dataQualityCallout');
+    if (!meta || !callout) return;
+    meta.classList.remove('warn');
+    if (!data || data.unavailable) {
+      meta.textContent = '';
+      meta.title = '';
+      callout.innerHTML = '';
+      return;
+    }
+    const warnings = data.warnings || 0;
+    const errors = data.errors || 0;
+    if (!warnings && !errors) {
+      meta.textContent = 'Self-check: clean';
+      meta.title = 'This hub\'s own validate.js (date sanity, em-dash scan, source-URL check, duplicate-application detection) found nothing to flag.';
+      callout.innerHTML = '';
+      return;
+    }
+    meta.textContent = errors ? 'Self-check: ' + errors + ' error(s)' : 'Self-check: ' + warnings + ' warning(s)';
+    meta.classList.add('warn');
+    meta.title = 'Run node public/job-search/data/validate.js for the full detail.';
+    const counts = [errors ? errors + ' error(s)' : '', warnings ? warnings + ' warning(s)' : ''].filter(Boolean).join(', ');
+    callout.innerHTML = '<div class="callout callout-warning">' +
+      '<strong>' + (errors ? 'This hub\'s data-quality check found real errors.' : 'This hub\'s data-quality check found warnings.') + '</strong> ' +
+      escapeHtml(counts) + ' from public/job-search/data/validate.js (guards against a bad date, an untranscribed em dash, ' +
+      'a broken source link, and a duplicate application entry). Run <code>node public/job-search/data/validate.js</code> for the full detail.' +
+      '</div>';
+  }
+
+  // One-time on load, independent of the data-file fetches above: validate.js's
+  // result only changes when someone hand-edits and redeploys a data file,
+  // never on its own poll cadence (this page has none), so there's nothing to
+  // gain from re-fetching it later.
+  function loadDataQuality() {
+    fetch('/api/job-search/data-quality').then(r => r.ok ? r.json() : null).then(renderDataQuality).catch(() => renderDataQuality(null));
+  }
+  loadDataQuality();
 })();
