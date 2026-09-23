@@ -1,6 +1,6 @@
 /*
- * Pure date/urgency math shared between the dashboard itself
- * (public/csm/app.js) and this file's own regression test suite
+ * Pure date/urgency/export-formatting math shared between the dashboard
+ * itself (public/csm/app.js) and this file's own regression test suite
  * (csm-core.test.js). No DOM, no Node-only APIs, same shared-core pattern as
  * CSMValidateCore in this same directory and GarageCore/goals-core.js in the
  * other hubs, so the math that decides whether a real nudge is overdue, a
@@ -9,7 +9,10 @@
  * is exactly the kind of nudge-schedule math the CSM pipeline exists to get
  * right (a wrong "days until due" silently misses or double-nudges a real
  * contact), so it deserves the same test coverage the other hubs already
- * give their own date math.
+ * give their own date math. Also covers the CSV/ICS export string helpers
+ * (csvField's formula-injection guard, icsFoldLine's UTF-8 byte counting),
+ * since a silent regression there produces a corrupted or unsafe exported
+ * file with no error anywhere.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -467,6 +470,59 @@
     return false;
   }
 
+  // CSV/formula injection (OWASP): a hand-typed note starting with
+  // =, +, -, @, tab, or a carriage return is read as a live formula by
+  // Excel/Sheets when this export is opened there, not as plain text.
+  // A leading single quote is the standard mitigation both recommend.
+  function csvField(v) {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  // RFC 5545 (iCalendar) text escaping: backslash, comma, semicolon, and
+  // newline all need a backslash escape inside a property value.
+  function icsEscapeText(s) {
+    return String(s == null ? '' : s)
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\n/g, '\\n');
+  }
+
+  // Folds a single logical property line at 75 octets with a CRLF + single
+  // space continuation, per RFC 5545 section 3.1. Long SUMMARY/DESCRIPTION
+  // lines are common here (name + company, or a full next-action sentence),
+  // and unfolded lines are technically invalid even though most calendar
+  // apps tolerate them.
+  // RFC 5545 folds at 75 octets, not 75 characters, and a multi-byte UTF-8
+  // character must never be split across the fold. This pipeline logs real
+  // prospect names/notes for Chinese social platforms, so counting JS string
+  // length here (UTF-16 code units) instead of UTF-8 bytes would cut a
+  // non-ASCII character in half the moment a name or note pushed a line past
+  // 75 of those units, producing a line some calendar apps reject on import.
+  const icsEncoder = new TextEncoder();
+  function icsFoldLine(line) {
+    if (icsEncoder.encode(line).length <= 75) return line;
+    const segments = [];
+    let seg = '';
+    let segBytes = 0;
+    let budget = 75;
+    for (const ch of line) { // for...of walks by code point, never a lone surrogate half
+      const chBytes = icsEncoder.encode(ch).length;
+      if (segBytes + chBytes > budget) {
+        segments.push(seg);
+        seg = '';
+        segBytes = 0;
+        budget = 74; // continuation lines carry a leading space, counted separately below
+      }
+      seg += ch;
+      segBytes += chBytes;
+    }
+    if (seg) segments.push(seg);
+    return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
@@ -475,6 +531,6 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    computeStalled, hasNudgePlan
+    computeStalled, hasNudgePlan, csvField, icsEscapeText, icsFoldLine
   };
 });

@@ -11,7 +11,8 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan
+    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
+    csvField, icsEscapeText, icsFoldLine
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -1639,16 +1640,8 @@
     URL.revokeObjectURL(url);
   }
 
-  function csvField(v) {
-    let s = v == null ? '' : String(v);
-    // CSV/formula injection (OWASP): a hand-typed note starting with
-    // =, +, -, @, tab, or a carriage return is read as a live formula by
-    // Excel/Sheets when this export is opened there, not as plain text.
-    // A leading single quote is the standard mitigation both recommend.
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  }
-
+  // csvField now lives in csm-core.js, same shared-core-with-tests pattern
+  // as the other pure math above (locks in its formula-injection guard).
   const CSV_COLUMNS = [
     ['name', 'Name'], ['company', 'Company'], ['category', 'Category'],
     ['stage', 'Stage'], ['stageEnteredDate', 'Stage Entered'],
@@ -1918,49 +1911,9 @@
     downloadFile(JSON.stringify(backup, null, 2), 'csm-backup-' + todayIso() + '.json', 'application/json;charset=utf-8;');
   });
 
-  // RFC 5545 (iCalendar) text escaping: backslash, comma, semicolon, and
-  // newline all need a backslash escape inside a property value.
-  function icsEscapeText(s) {
-    return String(s == null ? '' : s)
-      .replace(/\\/g, '\\\\')
-      .replace(/;/g, '\\;')
-      .replace(/,/g, '\\,')
-      .replace(/\n/g, '\\n');
-  }
-
-  // Folds a single logical property line at 75 octets with a CRLF + single
-  // space continuation, per RFC 5545 section 3.1. Long SUMMARY/DESCRIPTION
-  // lines are common here (name + company, or a full next-action sentence),
-  // and unfolded lines are technically invalid even though most calendar
-  // apps tolerate them.
-  // RFC 5545 folds at 75 octets, not 75 characters, and a multi-byte UTF-8
-  // character must never be split across the fold. This pipeline logs real
-  // prospect names/notes for Chinese social platforms, so counting JS string
-  // length here (UTF-16 code units) instead of UTF-8 bytes would cut a
-  // non-ASCII character in half the moment a name or note pushed a line past
-  // 75 of those units, producing a line some calendar apps reject on import.
-  const icsEncoder = new TextEncoder();
-  function icsFoldLine(line) {
-    if (icsEncoder.encode(line).length <= 75) return line;
-    const segments = [];
-    let seg = '';
-    let segBytes = 0;
-    let budget = 75;
-    for (const ch of line) { // for...of walks by code point, never a lone surrogate half
-      const chBytes = icsEncoder.encode(ch).length;
-      if (segBytes + chBytes > budget) {
-        segments.push(seg);
-        seg = '';
-        segBytes = 0;
-        budget = 74; // continuation lines carry a leading space, counted separately below
-      }
-      seg += ch;
-      segBytes += chBytes;
-    }
-    if (seg) segments.push(seg);
-    return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
-  }
-
+  // icsEscapeText and icsFoldLine now live in csm-core.js, same
+  // shared-core-with-tests pattern as the other pure math above (locks in
+  // icsFoldLine's UTF-8-byte-not-UTF-16-unit fold-point math).
   // One all-day VEVENT per prospect with a real nextNudgeDate, meant to be
   // imported into a real calendar app so the "don't nudge before X, nudge by
   // Y" schedule becomes an actual reminder instead of only living on this

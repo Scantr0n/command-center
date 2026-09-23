@@ -21,7 +21,8 @@ const {
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan
+  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
+  csvField, icsEscapeText, icsFoldLine
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -707,4 +708,78 @@ test('hasNudgePlan treats an invalid hand-typed date as not a real plan', () => 
   assert.equal(hasNudgePlan({ nextNudgeDate: '2026-9-5' }), false);
   assert.equal(hasNudgePlan({ nudgeSchedule: { nudgePoint: '2026-9-5' } }), false);
   assert.equal(hasNudgePlan({ nudgeSchedule: { doNotNudgeBefore: '2026-9-5' } }), false);
+});
+
+test('csvField leaves an ordinary value untouched', () => {
+  assert.equal(csvField('City Bound'), 'City Bound');
+});
+
+test('csvField returns an empty string for null/undefined, never the literal "null"', () => {
+  assert.equal(csvField(null), '');
+  assert.equal(csvField(undefined), '');
+});
+
+test('csvField quotes a value containing a comma, quote, or newline, doubling embedded quotes', () => {
+  assert.equal(csvField('Fraga, David'), '"Fraga, David"');
+  assert.equal(csvField('say "hi"'), '"say ""hi"""');
+  assert.equal(csvField('line1\nline2'), '"line1\nline2"');
+});
+
+test('csvField prefixes a leading single quote onto a value that would otherwise be read as a live formula', () => {
+  // Real CSV/formula injection mitigation (OWASP): Excel/Sheets treats a
+  // cell starting with =, +, -, @, tab, or CR as a formula to execute, not
+  // plain text, when a hand-typed note or name happens to start with one.
+  assert.equal(csvField('=cmd|/c calc'), "'=cmd|/c calc");
+  assert.equal(csvField('+1234'), "'+1234");
+  assert.equal(csvField('-1234'), "'-1234");
+  assert.equal(csvField('@mention'), "'@mention");
+});
+
+test('csvField does not prefix a value that merely contains one of the formula characters mid-string', () => {
+  assert.equal(csvField('reply@company.com'), 'reply@company.com');
+});
+
+test('icsEscapeText backslash-escapes backslash, semicolon, comma, and newline per RFC 5545', () => {
+  assert.equal(icsEscapeText('a\\b;c,d\ne'), 'a\\\\b\\;c\\,d\\ne');
+});
+
+test('icsEscapeText returns an empty string for null/undefined', () => {
+  assert.equal(icsEscapeText(null), '');
+  assert.equal(icsEscapeText(undefined), '');
+});
+
+test('icsFoldLine leaves a short line (under 75 octets) unfolded', () => {
+  const line = 'SUMMARY:Short line';
+  assert.equal(icsFoldLine(line), line);
+});
+
+test('icsFoldLine folds a long ASCII line at 75 octets with a CRLF + single-space continuation', () => {
+  const line = 'DESCRIPTION:' + 'x'.repeat(100);
+  const folded = icsFoldLine(line);
+  const parts = folded.split('\r\n');
+  assert.ok(parts.length > 1);
+  parts.forEach((part, i) => {
+    const bytes = Buffer.byteLength(i === 0 ? part : part.slice(1), 'utf8');
+    assert.ok(bytes <= 75, 'segment ' + i + ' is ' + bytes + ' octets');
+  });
+  assert.ok(parts.slice(1).every(p => p.startsWith(' ')));
+});
+
+test('icsFoldLine never splits a multi-byte UTF-8 character across a fold boundary', () => {
+  // Real prospect names/notes for Chinese social platforms are the exact
+  // case this guards: counting UTF-16 code units instead of UTF-8 bytes
+  // here would cut a non-ASCII character in half mid-fold, and each 3-byte
+  // CJK character straddling a naive 75-unit cut is exactly how that would
+  // show up. Rejoining every fragment must reproduce the original line
+  // exactly, and every fragment must stay within the real 75-octet budget.
+  const line = 'SUMMARY:' + '中文名字'.repeat(20); // repeated CJK text, well past 75 octets
+  const folded = icsFoldLine(line);
+  const parts = folded.split('\r\n');
+  assert.ok(parts.length > 1);
+  const rejoined = parts.map((p, i) => (i === 0 ? p : p.slice(1))).join('');
+  assert.equal(rejoined, line);
+  parts.forEach((part, i) => {
+    const bytes = Buffer.byteLength(i === 0 ? part : part.slice(1), 'utf8');
+    assert.ok(bytes <= 75, 'segment ' + i + ' is ' + bytes + ' octets');
+  });
 });
