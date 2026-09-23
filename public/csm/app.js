@@ -9,7 +9,7 @@
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
-    reachedActiveExploration, computeStageVelocity
+    reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -566,44 +566,10 @@
   const coldSignalParkedWrap = document.getElementById('coldSignalParkedWrap');
   const coldSignalParkedEl = document.getElementById('coldSignalParkedList');
 
-  // Real signal from cold-outreach practice, not something invented for this
-  // board: a contact who has received several real touches (initial send +
-  // nudges, from the same outreachLog already used above) while still sitting
-  // in outreach-sent (no reply, no stage move) is a sign the hook or channel
-  // isn't landing, not just that another identical nudge is due. Distinct
-  // from "stalled" (which only looks at time sitting in a stage regardless of
-  // how many touches happened) and from "needs backfill" (missing fields):
-  // this looks at real touch count vs. real stage movement.
-  const COLD_TOUCH_THRESHOLD = 3;
-
-  // Flagging a cold prospect forever with no way to act on it is its own bad
-  // pattern: cold-outreach convention is to stop repeating the identical
-  // nudge after a few unanswered touches and deliberately park a real
-  // re-attempt months out, not nag on the same cadence or drop the lead.
-  // nudgeSchedule.doNotNudgeBefore already exists for exactly this, editable
-  // from this prospect's own edit form, so a future date there is read as
-  // "already decided, come back later" and split into its own list instead
-  // of sitting in the urgent one forever.
-  function computeColdSignal(prospects) {
-    const today = todayIso();
-    const flagged = prospects
-      .filter(p => p.stage === 'outreach-sent')
-      .map(p => ({ p, touches: touchCount(p) }))
-      .filter(x => x.touches >= COLD_TOUCH_THRESHOLD);
-
-    const active = [];
-    const parked = [];
-    flagged.forEach(x => {
-      const notBefore = x.p.nudgeSchedule && x.p.nudgeSchedule.doNotNudgeBefore;
-      if (notBefore && isValidDateStr(notBefore) && notBefore > today) parked.push(x);
-      else active.push(x);
-    });
-
-    active.sort((a, b) => b.touches - a.touches);
-    parked.sort((a, b) => a.p.nudgeSchedule.doNotNudgeBefore.localeCompare(b.p.nudgeSchedule.doNotNudgeBefore));
-    return { active, parked };
-  }
-
+  // Pure cold-outreach threshold/parking math now lives in csm-core.js
+  // (computeColdSignal), same shared-core-with-tests pattern as the other
+  // nudge/stall math above, so it has real regression coverage instead of
+  // only ever running live in a browser.
   function renderColdSignal(stages, prospects) {
     const { active, parked } = computeColdSignal(prospects);
     if (active.length === 0 && parked.length === 0) {

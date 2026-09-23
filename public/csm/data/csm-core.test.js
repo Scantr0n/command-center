@@ -19,7 +19,7 @@ const {
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
-  reachedActiveExploration, computeStageVelocity
+  reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -377,4 +377,111 @@ test('the real prospects.json on disk never produces a stall/stale false negativ
     reachedActiveExploration(p);
   });
   computeStageVelocity(stages, prospects);
+  computeColdSignal(prospects);
+});
+
+test('computeColdSignal ignores a prospect below the touch threshold', () => {
+  const p = { stage: 'outreach-sent', outreachLog: [{ date: '2026-08-01', type: 'initial-send' }, { date: '2026-08-10', type: 'nudge' }] };
+  const { active, parked } = computeColdSignal([p]);
+  assert.equal(active.length, 0);
+  assert.equal(parked.length, 0);
+});
+
+test('computeColdSignal flags a prospect at or above the touch threshold still sitting in outreach-sent', () => {
+  const p = {
+    stage: 'outreach-sent',
+    outreachLog: [
+      { date: '2026-08-01', type: 'initial-send' },
+      { date: '2026-08-10', type: 'nudge' },
+      { date: '2026-08-20', type: 'nudge' }
+    ]
+  };
+  assert.equal(touchCount(p), COLD_TOUCH_THRESHOLD);
+  const { active, parked } = computeColdSignal([p]);
+  assert.equal(active.length, 1);
+  assert.equal(active[0].touches, 3);
+  assert.equal(parked.length, 0);
+});
+
+test('computeColdSignal only looks at prospects currently in outreach-sent, not silent-replied or in-exploration', () => {
+  const touches = [
+    { date: '2026-08-01', type: 'initial-send' },
+    { date: '2026-08-10', type: 'nudge' },
+    { date: '2026-08-20', type: 'nudge' }
+  ];
+  const prospects = [
+    { stage: 'silent-replied', outreachLog: touches },
+    { stage: 'in-exploration', outreachLog: touches },
+    { stage: 'client', outreachLog: touches }
+  ];
+  const { active, parked } = computeColdSignal(prospects);
+  assert.equal(active.length, 0);
+  assert.equal(parked.length, 0);
+});
+
+test('computeColdSignal parks a flagged prospect with a future doNotNudgeBefore instead of leaving it active', () => {
+  const future = addDaysIso(todayIso(), 30);
+  const p = {
+    stage: 'outreach-sent',
+    outreachLog: [
+      { date: '2026-08-01', type: 'initial-send' },
+      { date: '2026-08-10', type: 'nudge' },
+      { date: '2026-08-20', type: 'nudge' }
+    ],
+    nudgeSchedule: { doNotNudgeBefore: future }
+  };
+  const { active, parked } = computeColdSignal([p]);
+  assert.equal(active.length, 0);
+  assert.equal(parked.length, 1);
+  assert.equal(parked[0].p, p);
+});
+
+test('computeColdSignal treats a past doNotNudgeBefore as no longer parked, back in the active list', () => {
+  const past = addDaysIso(todayIso(), -5);
+  const p = {
+    stage: 'outreach-sent',
+    outreachLog: [
+      { date: '2026-08-01', type: 'initial-send' },
+      { date: '2026-08-10', type: 'nudge' },
+      { date: '2026-08-20', type: 'nudge' }
+    ],
+    nudgeSchedule: { doNotNudgeBefore: past }
+  };
+  const { active, parked } = computeColdSignal([p]);
+  assert.equal(active.length, 1);
+  assert.equal(parked.length, 0);
+});
+
+test('computeColdSignal treats an invalid doNotNudgeBefore as not a real park decision', () => {
+  // Same isValidDateStr guard as the rest of csm-core: a malformed hand-typed
+  // date should not silently defer a flag that would otherwise be active.
+  const p = {
+    stage: 'outreach-sent',
+    outreachLog: [
+      { date: '2026-08-01', type: 'initial-send' },
+      { date: '2026-08-10', type: 'nudge' },
+      { date: '2026-08-20', type: 'nudge' }
+    ],
+    nudgeSchedule: { doNotNudgeBefore: '2026-9-5' }
+  };
+  const { active, parked } = computeColdSignal([p]);
+  assert.equal(active.length, 1);
+  assert.equal(parked.length, 0);
+});
+
+test('computeColdSignal sorts the active list by touch count descending, most-touched first', () => {
+  const threeTouches = [{ date: '2026-08-01' }, { date: '2026-08-05' }, { date: '2026-08-10' }];
+  const fiveTouches = threeTouches.concat([{ date: '2026-08-15' }, { date: '2026-08-20' }]);
+  const low = { name: 'Low', stage: 'outreach-sent', outreachLog: threeTouches };
+  const high = { name: 'High', stage: 'outreach-sent', outreachLog: fiveTouches };
+  const { active } = computeColdSignal([low, high]);
+  assert.deepEqual(active.map(x => x.p.name), ['High', 'Low']);
+});
+
+test('computeColdSignal sorts the parked list by re-engagement date ascending, soonest first', () => {
+  const touches = [{ date: '2026-08-01' }, { date: '2026-08-05' }, { date: '2026-08-10' }];
+  const later = { name: 'Later', stage: 'outreach-sent', outreachLog: touches, nudgeSchedule: { doNotNudgeBefore: addDaysIso(todayIso(), 60) } };
+  const sooner = { name: 'Sooner', stage: 'outreach-sent', outreachLog: touches, nudgeSchedule: { doNotNudgeBefore: addDaysIso(todayIso(), 10) } };
+  const { parked } = computeColdSignal([later, sooner]);
+  assert.deepEqual(parked.map(x => x.p.name), ['Sooner', 'Later']);
 });
