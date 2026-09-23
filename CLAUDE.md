@@ -15,7 +15,7 @@ Jack's unified dashboard — one hub, one cluster per project, radial node-graph
 - `npm run validate` — check every hub's real data files (`data/clusters/*.json` plus each hub's own `data/*.json`) against that hub's own field rules; run after hand-editing any of them, before trusting what the dashboard shows
 - `npm run test:sondrik` — Sondrik's own regression tests for its shared date-math (`goals-core.js`, `validate-core.js`); run after touching either file
 - `npm run test:cgt` — CGT's regression tests for its grading-ROI math (`grading-core.js`) and cards/submissions/candidates validation rules (`validate-core.js`); run after touching either file
-- `npm run test:alpha` — Alpha's regression tests for its account/position money math (`account-core.js`) and market-calendar/uptime date math (`dates-core.js`); run after touching either file
+- `npm run test:alpha` — Alpha's regression tests for its account/position money math (`account-core.js`), market-calendar/uptime date math (`dates-core.js`), and the server-side `/api/alpha/live` money math (`live-core.js`: drawdown %, account P&L, position/equity mapping); run after touching any of them
 - `npm run test:garage` — The Garage's regression tests for its platform fee/payout math and dispute/relist date math (`garage-core.js`); run after touching that file
 - `npm run test:csm` — CSM's regression tests for its duplicate-prospect and casing-drift rules (`validate-core.js`); run after touching that file
 - `npm run test:job-search` — Job Search's regression tests for its date/em-dash/URL and duplicate-application rules (`validate-core.js`); run after touching that file
