@@ -22,13 +22,18 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+// isIsoDatetimeOrNull, isFutureDatetime, emDashFields, and findForbiddenKeys
+// used to live here inline, no regression coverage of their own, only ever
+// exercised by hand-running this CLI. Moved to validate-core.js (no
+// fs/path/child_process, so it can be required from a plain node --test file
+// with no CLI side effects) so scanForForbiddenKeys in particular, the one
+// check standing between this page and a fabricated dollar figure showing up
+// on a real, live-money system, gets the same real test coverage every other
+// shared-math module in this hub already has. Same shared-core pattern
+// already proven at CGT's, Garage's, and CSM's own validate-core.js.
+const { isIsoDatetimeOrNull, isFutureDatetime, emDashFields, findForbiddenKeys } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
-const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-
-// Keys that would only legitimately appear here if real performance data
-// had been wired in, which it never has been from this sandbox.
-const FORBIDDEN_KEY_PATTERN = /pnl|profit|balance|equity|winrate|win_rate|winRate|tradecount|trade_count|tradeCount|dollaramount|returnpct|roi/i;
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
@@ -36,50 +41,11 @@ function loadJson(name) {
   return JSON.parse(raw);
 }
 
-function isIsoDatetimeOrNull(v) {
-  return v === null || v === undefined || (typeof v === 'string' && ISO_DATETIME_RE.test(v));
-}
-
-// Every real free-text field this page renders is written without em
-// dashes, so a hand-typed or pasted-in field that has one reads as coming
-// from somewhere else rather than this product's own voice. Same
-// emDashFields helper public/sondrik/data/validate.js already uses for this
-// reason. Warning-level only: an em dash never breaks anything rendered,
-// this is a style nudge, not a data error.
-function emDashFields(obj, fields) {
-  const hits = [];
-  if (!obj) return hits;
-  fields.forEach(f => {
-    const v = obj[f];
-    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
-  });
-  return hits;
-}
-
-// live.asOf and system.lastVerifiedAt drive every staleness signal this page
-// shows (freshnessClass's live/stale/down thresholds, the "last verified"
-// architecture trust label), so a mistyped year would otherwise silently
-// read as a fresh, trustworthy reading instead of the typo it actually is.
-// Same isFutureDate idea public/sondrik/data/validate.js and
-// data/clusters/validate.js already run on their own date fields, adapted
-// here for full ISO datetimes: a few minutes of tolerance for real clock
-// skew between whatever wrote this file and whatever validates it.
-const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
-function isFutureDatetime(v) {
-  if (!v || !ISO_DATETIME_RE.test(v)) return false;
-  return new Date(v).getTime() > Date.now() + CLOCK_SKEW_TOLERANCE_MS;
-}
-
 function scanForForbiddenKeys(obj, pathSoFar, errors) {
-  if (obj === null || typeof obj !== 'object') return;
-  for (const key of Object.keys(obj)) {
-    const where = pathSoFar ? pathSoFar + '.' + key : key;
-    if (FORBIDDEN_KEY_PATTERN.test(key)) {
-      errors.push(where + ': key looks like real performance data (P&L / balance / win rate / trade count). ' +
-        'This sandbox has no access to Alpha\'s real numbers, remove this field or confirm it is genuinely wired in.');
-    }
-    scanForForbiddenKeys(obj[key], where, errors);
-  }
+  findForbiddenKeys(obj, pathSoFar).forEach(where => {
+    errors.push(where + ': key looks like real performance data (P&L / balance / win rate / trade count). ' +
+      'This sandbox has no access to Alpha\'s real numbers, remove this field or confirm it is genuinely wired in.');
+  });
 }
 
 function main() {
