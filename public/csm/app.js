@@ -10,7 +10,8 @@
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
-    computeFunnel, computeSocialReach
+    computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
+    CHANNEL_EFF_MIN_N_FOR_RATE
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -867,63 +868,10 @@
     }).join('');
   }
 
-  // Counts, not rates, per contactChannel.type: how many prospects who have
-  // actually been contacted (stage past "researched") went on to reach real
-  // active exploration. "silent-replied" is deliberately excluded from the
-  // positive count, that stage covers both no-response and an unadvanced
-  // reply, so it cannot honestly be read as a signal either way. A minimum
-  // sample size gates showing a percentage at all, so a 1-of-1 record never
-  // renders as a misleading "100%".
-  const CHANNEL_EFF_MIN_N_FOR_RATE = 5;
-  function computeChannelEffectiveness(prospects) {
-    const order = ['named-decision-maker', 'generic-inbox', 'unlogged'];
-    const labels = {
-      'named-decision-maker': 'Named decision-maker',
-      'generic-inbox': 'Generic inbox',
-      'unlogged': 'Channel not logged'
-    };
-    const buckets = {};
-    order.forEach(key => { buckets[key] = { key, label: labels[key], contacted: 0, advanced: 0 }; });
-    prospects.forEach(p => {
-      if (p.stage === 'researched') return;
-      const rawType = p.contactChannel && p.contactChannel.type;
-      const key = buckets[rawType] ? rawType : 'unlogged';
-      buckets[key].contacted += 1;
-      if (reachedActiveExploration(p)) buckets[key].advanced += 1;
-    });
-    return order.map(key => buckets[key]);
-  }
-
-  // Same shape as channel effectiveness above, but grouped by category
-  // instead of contact channel: of prospects who have actually been
-  // contacted, how many reached real active exploration, per category.
-  // Category is the other real field this project tracks per prospect
-  // (alongside contact channel), so which verticals are actually worth the
-  // outreach effort is its own real signal, not folded into the channel
-  // breakdown above. Same "silent-replied" exclusion and minimum-sample
-  // gating as computeChannelEffectiveness, for the same reasons.
-  function computeCategoryEffectiveness(prospects) {
-    const buckets = {};
-    const order = [];
-    function bucketFor(category) {
-      const key = category || 'uncategorized';
-      if (!buckets[key]) {
-        buckets[key] = { key, label: category || 'No category logged', contacted: 0, advanced: 0 };
-        order.push(key);
-      }
-      return buckets[key];
-    }
-    prospects.forEach(p => {
-      if (p.stage === 'researched') return;
-      const bucket = bucketFor(p.category);
-      bucket.contacted += 1;
-      if (reachedActiveExploration(p)) bucket.advanced += 1;
-    });
-    return order
-      .map(key => buckets[key])
-      .sort((a, b) => b.contacted - a.contacted || a.label.localeCompare(b.label));
-  }
-
+  // Pure channel/category effectiveness math now lives in csm-core.js
+  // (computeChannelEffectiveness, computeCategoryEffectiveness,
+  // CHANNEL_EFF_MIN_N_FOR_RATE), same shared-core-with-tests pattern as the
+  // other pure math above.
   function renderCategoryEffectiveness(prospects) {
     const results = computeCategoryEffectiveness(prospects);
     const totalContacted = results.reduce((sum, r) => sum + r.contacted, 0);

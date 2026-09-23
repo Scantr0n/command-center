@@ -20,7 +20,8 @@ const {
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
-  computeFunnel, computeSocialReach
+  computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
+  CHANNEL_EFF_MIN_N_FOR_RATE
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -381,6 +382,8 @@ test('the real prospects.json on disk never produces a stall/stale false negativ
   computeColdSignal(prospects);
   computeFunnel(stages, prospects);
   computeSocialReach(prospects);
+  computeChannelEffectiveness(prospects);
+  computeCategoryEffectiveness(prospects);
 });
 
 test('computeColdSignal ignores a prospect below the touch threshold', () => {
@@ -601,4 +604,56 @@ test('computeSocialReach sorts platforms by total followers descending', () => {
 test('computeSocialReach ignores a snapshot with no platform logged', () => {
   const results = computeSocialReach([{ socialSnapshots: [{ followers: 100, asOfDate: '2026-08-01' }] }]);
   assert.equal(results.length, 0);
+});
+
+test('computeChannelEffectiveness excludes prospects still at "researched" (never actually contacted)', () => {
+  const results = computeChannelEffectiveness([{ stage: 'researched', contactChannel: { type: 'named-decision-maker' } }]);
+  assert.ok(results.every(r => r.contacted === 0));
+});
+
+test('computeChannelEffectiveness counts a contacted prospect that reached exploration as advanced', () => {
+  const p = { stage: 'in-exploration', contactChannel: { type: 'named-decision-maker' } };
+  const results = computeChannelEffectiveness([p]);
+  const bucket = results.find(r => r.key === 'named-decision-maker');
+  assert.equal(bucket.contacted, 1);
+  assert.equal(bucket.advanced, 1);
+});
+
+test('computeChannelEffectiveness does not count silent-replied as advanced, that stage is not a real signal either way', () => {
+  const p = { stage: 'silent-replied', contactChannel: { type: 'generic-inbox' } };
+  const results = computeChannelEffectiveness([p]);
+  const bucket = results.find(r => r.key === 'generic-inbox');
+  assert.equal(bucket.contacted, 1);
+  assert.equal(bucket.advanced, 0);
+});
+
+test('computeChannelEffectiveness buckets an unrecognized or missing channel type as unlogged', () => {
+  const results = computeChannelEffectiveness([
+    { stage: 'outreach-sent', contactChannel: { type: 'carrier-pigeon' } },
+    { stage: 'outreach-sent' }
+  ]);
+  const bucket = results.find(r => r.key === 'unlogged');
+  assert.equal(bucket.contacted, 2);
+});
+
+test('computeCategoryEffectiveness groups prospects with no category logged under uncategorized', () => {
+  const results = computeCategoryEffectiveness([{ stage: 'outreach-sent', category: null }]);
+  const bucket = results.find(r => r.key === 'uncategorized');
+  assert.equal(bucket.contacted, 1);
+  assert.equal(bucket.label, 'No category logged');
+});
+
+test('computeCategoryEffectiveness sorts categories by contacted count descending, then alphabetically', () => {
+  const prospects = [
+    { stage: 'outreach-sent', category: 'Beauty' },
+    { stage: 'outreach-sent', category: 'Fitness' },
+    { stage: 'outreach-sent', category: 'Fitness' }
+  ];
+  const results = computeCategoryEffectiveness(prospects);
+  assert.deepEqual(results.map(r => r.key), ['Fitness', 'Beauty']);
+});
+
+test('CHANNEL_EFF_MIN_N_FOR_RATE is the shared minimum sample size gate used by both effectiveness breakdowns', () => {
+  assert.equal(typeof CHANNEL_EFF_MIN_N_FOR_RATE, 'number');
+  assert.ok(CHANNEL_EFF_MIN_N_FOR_RATE > 0);
 });
