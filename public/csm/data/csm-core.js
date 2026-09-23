@@ -215,11 +215,59 @@
     return (a.name || '').localeCompare(b.name || '');
   }
 
+  // Shared "did this prospect ever reach real active exploration" check
+  // behind both channel-effectiveness and category-effectiveness in app.js:
+  // true either right now (stage is in-exploration/client) or at some point
+  // in the past (a stageHistory entry recorded reaching one of those two
+  // stages, even if the prospect has since moved, e.g. back to
+  // silent-replied). Was two separately hand-written copies of this exact
+  // condition; a future edit to one without the other would have silently
+  // made the two effectiveness breakdowns disagree on the same prospect.
+  function reachedActiveExploration(p) {
+    return p.stage === 'in-exploration' || p.stage === 'client' ||
+      (p.stageHistory || []).some(e => e && (e.stage === 'in-exploration' || e.stage === 'client'));
+  }
+
+  // Average real days spent in each stage, from completed moves only (a
+  // stageHistory entry into a stage followed by a later one out of it), not
+  // from prospects still sitting in a stage right now (that's stallInfo's
+  // job). Entries are sorted by date before pairing consecutive ones, since
+  // stageHistory is appended in edit order, not necessarily chronological
+  // order for a hand-edited record. A pair whose dwell computes negative
+  // (an out-of-order or duplicate-dated entry) is skipped rather than
+  // pulling the stage's average toward a fabricated negative duration.
+  function computeStageVelocity(stages, prospects) {
+    const sums = {};
+    const counts = {};
+    stages.forEach(s => { sums[s.id] = 0; counts[s.id] = 0; });
+    prospects.forEach(p => {
+      const history = (p.stageHistory || [])
+        .filter(e => e && e.date && e.stage && isValidDateStr(e.date))
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date));
+      for (let i = 0; i < history.length - 1; i++) {
+        const cur = history[i];
+        const next = history[i + 1];
+        if (!(cur.stage in sums)) continue;
+        const dwellDays = daysUntil(next.date) - daysUntil(cur.date);
+        if (dwellDays < 0) continue;
+        sums[cur.stage] += dwellDays;
+        counts[cur.stage] += 1;
+      }
+    });
+    return stages.map(s => ({
+      stage: s,
+      n: counts[s.id],
+      avgDays: counts[s.id] > 0 ? Math.round(sums[s.id] / counts[s.id]) : null
+    }));
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
-    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
+    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
+    reachedActiveExploration, computeStageVelocity
   };
 });

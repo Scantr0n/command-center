@@ -18,7 +18,8 @@ const {
   isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
-  todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
+  todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
+  reachedActiveExploration, computeStageVelocity
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -249,6 +250,118 @@ test('daysSinceLastTouch uses the most recent of several logged touches, not the
   assert.equal(daysSinceLastTouch(p), 5);
 });
 
+test('reachedActiveExploration is true for a prospect currently in-exploration or client', () => {
+  assert.equal(reachedActiveExploration({ stage: 'in-exploration' }), true);
+  assert.equal(reachedActiveExploration({ stage: 'client' }), true);
+});
+
+test('reachedActiveExploration is true from stageHistory even after moving back out of exploration', () => {
+  const p = {
+    stage: 'silent-replied',
+    stageHistory: [
+      { date: '2026-08-01', stage: 'outreach-sent' },
+      { date: '2026-08-15', stage: 'in-exploration' },
+      { date: '2026-09-01', stage: 'silent-replied' }
+    ]
+  };
+  assert.equal(reachedActiveExploration(p), true);
+});
+
+test('reachedActiveExploration is false with no current or historical exploration/client stage', () => {
+  assert.equal(reachedActiveExploration({ stage: 'outreach-sent' }), false);
+  assert.equal(reachedActiveExploration({ stage: 'silent-replied', stageHistory: [{ date: '2026-08-01', stage: 'outreach-sent' }] }), false);
+  assert.equal(reachedActiveExploration({ stage: 'researched' }), false);
+});
+
+const VELOCITY_STAGES = [
+  { id: 'researched', staleAfterDays: 14 },
+  { id: 'outreach-sent', staleAfterDays: 10 },
+  { id: 'in-exploration', staleAfterDays: 30 }
+];
+
+test('computeStageVelocity averages dwell time from completed moves only', () => {
+  const prospects = [
+    {
+      stageHistory: [
+        { date: '2026-08-01', stage: 'researched' },
+        { date: '2026-08-05', stage: 'outreach-sent' } // 4 days in researched
+      ]
+    },
+    {
+      stageHistory: [
+        { date: '2026-08-01', stage: 'researched' },
+        { date: '2026-08-11', stage: 'outreach-sent' } // 10 days in researched
+      ]
+    }
+  ];
+  const results = computeStageVelocity(VELOCITY_STAGES, prospects);
+  const researched = results.find(r => r.stage.id === 'researched');
+  assert.equal(researched.n, 2);
+  assert.equal(researched.avgDays, 7); // (4 + 10) / 2
+  const outreach = results.find(r => r.stage.id === 'outreach-sent');
+  assert.equal(outreach.n, 0);
+  assert.equal(outreach.avgDays, null);
+});
+
+test('computeStageVelocity sorts stageHistory by date before pairing, not by append order', () => {
+  const prospects = [{
+    stageHistory: [
+      { date: '2026-08-05', stage: 'outreach-sent' }, // logged first, but happened second
+      { date: '2026-08-01', stage: 'researched' }
+    ]
+  }];
+  const results = computeStageVelocity(VELOCITY_STAGES, prospects);
+  assert.equal(results.find(r => r.stage.id === 'researched').avgDays, 4);
+});
+
+test('computeStageVelocity skips entries with an invalid date instead of poisoning the average with NaN', () => {
+  const prospects = [{
+    stageHistory: [
+      { date: '2026-8-1', stage: 'researched' }, // non-zero-padded, invalid
+      { date: '2026-08-05', stage: 'outreach-sent' }
+    ]
+  }, {
+    stageHistory: [
+      { date: '2026-08-01', stage: 'researched' },
+      { date: '2026-08-05', stage: 'outreach-sent' }
+    ]
+  }];
+  const results = computeStageVelocity(VELOCITY_STAGES, prospects);
+  const researched = results.find(r => r.stage.id === 'researched');
+  assert.equal(researched.n, 1);
+  assert.equal(researched.avgDays, 4);
+  assert.ok(Number.isFinite(researched.avgDays));
+});
+
+test('computeStageVelocity skips a pair whose dwell would compute negative', () => {
+  const prospects = [{
+    stageHistory: [
+      { date: '2026-08-01', stage: 'researched' },
+      { date: '2026-08-01', stage: 'researched' } // duplicate date, same stage twice
+    ]
+  }];
+  const results = computeStageVelocity(VELOCITY_STAGES, prospects);
+  const researched = results.find(r => r.stage.id === 'researched');
+  assert.equal(researched.n, 1);
+  assert.equal(researched.avgDays, 0);
+});
+
+test('computeStageVelocity ignores a stage id not in the known stages list', () => {
+  const prospects = [{
+    stageHistory: [
+      { date: '2026-08-01', stage: 'client' }, // not in VELOCITY_STAGES
+      { date: '2026-08-05', stage: 'outreach-sent' }
+    ]
+  }];
+  const results = computeStageVelocity(VELOCITY_STAGES, prospects);
+  assert.ok(results.every(r => r.n === 0));
+});
+
+test('computeStageVelocity is all-null/zero for prospects with no completed moves', () => {
+  const results = computeStageVelocity(VELOCITY_STAGES, [{ stageHistory: [{ date: '2026-08-01', stage: 'researched' }] }]);
+  assert.ok(results.every(r => r.n === 0 && r.avgDays === null));
+});
+
 test('the real prospects.json on disk never produces a stall/stale false negative from a null date', () => {
   const dataPath = path.join(__dirname, 'prospects.json');
   const stagesPath = path.join(__dirname, 'stages.json');
@@ -261,5 +374,7 @@ test('the real prospects.json on disk never produces a stall/stale false negativ
   prospects.forEach(p => {
     stallInfo(p, byId);
     socialSnapshotsStaleInfo(p);
+    reachedActiveExploration(p);
   });
+  computeStageVelocity(stages, prospects);
 });

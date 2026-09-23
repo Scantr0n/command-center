@@ -8,7 +8,8 @@
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
-    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
+    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
+    reachedActiveExploration, computeStageVelocity
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -896,37 +897,6 @@
     }).join('');
   }
 
-  // Average time actually spent in each stage, computed only from completed
-  // moves in a prospect's own stageHistory (entering a stage, then later
-  // logging a move out of it). Deliberately separate from stallInfo(), which
-  // only looks at prospects still sitting in a stage right now, this is a
-  // pipeline-wide velocity signal from moves that already finished.
-  function computeStageVelocity(stages, prospects) {
-    const sums = {};
-    const counts = {};
-    stages.forEach(s => { sums[s.id] = 0; counts[s.id] = 0; });
-    prospects.forEach(p => {
-      const history = (p.stageHistory || [])
-        .filter(e => e && e.date && e.stage)
-        .slice()
-        .sort((a, b) => a.date.localeCompare(b.date));
-      for (let i = 0; i < history.length - 1; i++) {
-        const cur = history[i];
-        const next = history[i + 1];
-        if (!(cur.stage in sums)) continue;
-        const dwellDays = daysUntil(next.date) - daysUntil(cur.date);
-        if (dwellDays < 0) continue;
-        sums[cur.stage] += dwellDays;
-        counts[cur.stage] += 1;
-      }
-    });
-    return stages.map(s => ({
-      stage: s,
-      n: counts[s.id],
-      avgDays: counts[s.id] > 0 ? Math.round(sums[s.id] / counts[s.id]) : null
-    }));
-  }
-
   function renderStageVelocity(stages, prospects) {
     const results = computeStageVelocity(stages, prospects);
     const totalMoves = results.reduce((sum, r) => sum + r.n, 0);
@@ -971,9 +941,7 @@
       const rawType = p.contactChannel && p.contactChannel.type;
       const key = buckets[rawType] ? rawType : 'unlogged';
       buckets[key].contacted += 1;
-      const reachedExploration = p.stage === 'in-exploration' || p.stage === 'client' ||
-        (p.stageHistory || []).some(e => e && (e.stage === 'in-exploration' || e.stage === 'client'));
-      if (reachedExploration) buckets[key].advanced += 1;
+      if (reachedActiveExploration(p)) buckets[key].advanced += 1;
     });
     return order.map(key => buckets[key]);
   }
@@ -1001,9 +969,7 @@
       if (p.stage === 'researched') return;
       const bucket = bucketFor(p.category);
       bucket.contacted += 1;
-      const reachedExploration = p.stage === 'in-exploration' || p.stage === 'client' ||
-        (p.stageHistory || []).some(e => e && (e.stage === 'in-exploration' || e.stage === 'client'));
-      if (reachedExploration) bucket.advanced += 1;
+      if (reachedActiveExploration(p)) bucket.advanced += 1;
     });
     return order
       .map(key => buckets[key])
