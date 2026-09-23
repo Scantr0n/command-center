@@ -316,6 +316,41 @@
     return parts.length ? parts : [{ tier: 'unknown', text: 'nothing left to relist' }];
   }
 
+  // Real reseller counteroffer-ladder convention: accept a near-target offer
+  // outright, counter a good-but-low one once splitting the gap, and let a
+  // borderline offer's split depend on how long the item's actually been
+  // listed (reusing RELIST_FRESH_DAYS above, a stale listing has more to gain
+  // from finally moving than a fresh one does from holding the line). This
+  // was inline-only in app.js's renderOfferGuide, the exact same untested,
+  // branchy real-dollar shape as the bugs listed in this file's header
+  // comment (a wrong branch here would suggest a real dollar counteroffer to
+  // send a real buyer), so it lives here now with the rest of that math.
+  const OFFER_TIER_ACCEPT_PCT = 0.90;
+  const OFFER_TIER_COUNTER_PCT = 0.75;
+  const OFFER_TIER_BORDERLINE_PCT = 0.50;
+
+  function offerTier(pct) {
+    if (pct >= OFFER_TIER_ACCEPT_PCT) return 'accept';
+    if (pct >= OFFER_TIER_COUNTER_PCT) return 'counter';
+    if (pct >= OFFER_TIER_BORDERLINE_PCT) return 'borderline';
+    return 'decline';
+  }
+
+  // Returns the suggested counter dollar amount, or null for a tier with
+  // nothing to counter (accept it outright, or decline without countering).
+  // A borderline offer with no logged listing date defaults to the same
+  // firmer split as a genuinely fresh listing, never the stale-listing split,
+  // since there's no real evidence yet that it's actually been sitting.
+  function offerCounterAmount(tier, offer, asking, days) {
+    if (tier === 'counter') return offer + (asking - offer) * 0.5;
+    if (tier === 'borderline') {
+      return days != null && days >= RELIST_FRESH_DAYS
+        ? offer + (asking - offer) * 0.25
+        : offer + (asking - offer) * 0.75;
+    }
+    return null;
+  }
+
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
     POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
@@ -325,6 +360,8 @@
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
     remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
     poshmarkWeightTier, bundleNetComparison,
-    computePoshmarkShareStreak
+    computePoshmarkShareStreak,
+    OFFER_TIER_ACCEPT_PCT, OFFER_TIER_COUNTER_PCT, OFFER_TIER_BORDERLINE_PCT,
+    offerTier, offerCounterAmount
   };
 });

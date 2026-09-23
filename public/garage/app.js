@@ -67,7 +67,8 @@ const {
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
-  poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak
+  poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
+  offerTier, offerCounterAmount
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -1899,10 +1900,6 @@ function wirePromotedCalc() {
 let offerItemId = 'custom';
 let offerPlatform = null;
 
-const OFFER_TIER_ACCEPT_PCT = 0.90;
-const OFFER_TIER_COUNTER_PCT = 0.75;
-const OFFER_TIER_BORDERLINE_PCT = 0.50;
-
 function offerGuideSelectedListing() {
   return offerItemId !== 'custom' ? listings.find(l => l.id === offerItemId) || null : null;
 }
@@ -1959,13 +1956,6 @@ function renderOfferItemChips(currentListings) {
   onOfferItemChange();
 }
 
-function offerTier(pct) {
-  if (pct >= OFFER_TIER_ACCEPT_PCT) return 'accept';
-  if (pct >= OFFER_TIER_COUNTER_PCT) return 'counter';
-  if (pct >= OFFER_TIER_BORDERLINE_PCT) return 'borderline';
-  return 'decline';
-}
-
 // A copy-paste reply matching the ladder verdict above, same "Copy" pattern
 // as the buyer message templates below: the guide already computes the
 // right counter number, this is the last step from "what to do" to an
@@ -2017,15 +2007,14 @@ function renderOfferGuide() {
     actionText = `At ${pctLabel} of asking, this is close enough to target, common ladder guidance is to accept rather than risk losing the sale over a small gap.`;
   } else if (tier === 'counter') {
     tierLabel = 'Counter once'; badgeClass = 'badge-due';
-    counterAmount = Math.round(offer + (asking - offer) * 0.5);
+    counterAmount = Math.round(offerCounterAmount(tier, offer, asking, days));
     actionText = `At ${pctLabel} of asking, counter once rather than accept or decline outright, common ladder guidance splits the gap between the offer and asking.`;
   } else if (tier === 'borderline') {
     tierLabel = 'Borderline, use listing age'; badgeClass = 'badge-hold';
+    counterAmount = Math.round(offerCounterAmount(tier, offer, asking, days));
     if (days != null && days >= RELIST_FRESH_DAYS) {
-      counterAmount = Math.round(offer + (asking - offer) * 0.25);
       actionText = `At ${pctLabel} of asking and ${days} day(s) listed, past the ${RELIST_FRESH_DAYS}-day fresh window, common guidance leans toward accepting or countering close to their number, a stale listing has more to gain from finally moving than from holding the line.`;
     } else {
-      counterAmount = Math.round(offer + (asking - offer) * 0.75);
       actionText = days != null
         ? `At ${pctLabel} of asking and only ${days} day(s) listed, inside the ${RELIST_FRESH_DAYS}-day fresh window, common guidance is to counter firmly, closer to asking, since there's little pressure yet to move it.`
         : `At ${pctLabel} of asking with no listing date logged, defaulting to a firmer counter as if this were a fresh listing.`;

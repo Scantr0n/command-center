@@ -19,7 +19,7 @@ const {
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
-  computePoshmarkShareStreak,
+  computePoshmarkShareStreak, offerTier, offerCounterAmount,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
 } = require('./garage-core.js');
 
@@ -262,4 +262,39 @@ test('computePoshmarkShareStreak: today not logged yet still counts yesterday on
 test('computePoshmarkShareStreak: no logged days at all is a real zero, not a guess', () => {
   assert.equal(computePoshmarkShareStreak({}, '2026-09-23'), 0);
   assert.equal(computePoshmarkShareStreak({ '2026-09-10': 1 }, '2026-09-23'), 0);
+});
+
+test('offerTier: real counteroffer-ladder boundaries, each threshold is inclusive on its own tier', () => {
+  assert.equal(offerTier(1.0), 'accept');
+  assert.equal(offerTier(0.90), 'accept');
+  assert.equal(offerTier(0.899), 'counter');
+  assert.equal(offerTier(0.75), 'counter');
+  assert.equal(offerTier(0.749), 'borderline');
+  assert.equal(offerTier(0.50), 'borderline');
+  assert.equal(offerTier(0.499), 'decline');
+  assert.equal(offerTier(0), 'decline');
+});
+
+test('offerCounterAmount: accept/decline have nothing to counter', () => {
+  assert.equal(offerCounterAmount('accept', 90, 100, 10), null);
+  assert.equal(offerCounterAmount('decline', 40, 100, 10), null);
+});
+
+test('offerCounterAmount: counter tier always splits the gap 50/50, regardless of listing age', () => {
+  assert.equal(offerCounterAmount('counter', 80, 100, null), 90);
+  assert.equal(offerCounterAmount('counter', 80, 100, 5), 90);
+  assert.equal(offerCounterAmount('counter', 80, 100, 90), 90);
+});
+
+test('offerCounterAmount: borderline tier splits closer to the offer once past RELIST_FRESH_DAYS, a stale listing has more to gain from moving', () => {
+  assert.equal(offerCounterAmount('borderline', 60, 100, RELIST_FRESH_DAYS), 70);
+  assert.equal(offerCounterAmount('borderline', 60, 100, RELIST_FRESH_DAYS + 20), 70);
+});
+
+test('offerCounterAmount: borderline tier splits closer to asking while still fresh, or with no logged date at all', () => {
+  assert.equal(offerCounterAmount('borderline', 60, 100, RELIST_FRESH_DAYS - 1), 90);
+  assert.equal(offerCounterAmount('borderline', 60, 100, 0), 90);
+  // No listing date logged defaults to the same firmer split as a genuinely
+  // fresh listing, never the stale-listing split with no real evidence for it.
+  assert.equal(offerCounterAmount('borderline', 60, 100, null), 90);
 });
