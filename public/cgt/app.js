@@ -289,88 +289,20 @@ const ORDER_STATUS_LOOKUP = {
   PSA: { url: 'https://www.psacard.com/orderstatus', text: 'Check status on psacard.com' }
 };
 
-// Each grader's own published per-tier turnaround, business days, midpoint
-// of the range shown in the "Grading service tiers reference" section
-// (index.html), reviewed September 2026 -- see that section for sources and
-// caveats (PSA's Value tiers paused, Beckett's Base/Standard closed, SGC's
-// own published windows disagreeing across sources). This is only ever used
-// as a fallback estimate in renderSubmissions below, for a grader/company
-// with fewer than 2 real returned submissions logged to average from; once
-// real history exists, buildTurnaroundByGrader's own real average always
-// wins over this. "default" is used when serviceLevel doesn't match a known
-// tier name (including no serviceLevel logged at all).
-//
-// PSA renamed Walk-Through to Premier and Regular to Priority, and added a
-// new Standard tier, on 2026-09-14 (see the reference section). The old
-// "walk-through"/"regular" keys are kept alongside the new ones so a real
-// submission logged before that date under its then-current tier name still
-// resolves to the turnaround that was actually published for it at the
-// time, rather than getting silently reinterpreted under the new name.
-// PSA's "default" (no serviceLevel logged) is the rough average across its
-// currently open tiers (Premier/Super Express/Express/Priority/Standard),
-// not one specific tier's own number.
-const PUBLISHED_TURNAROUND_DAYS = {
-  PSA: { default: 43, tiers: {
-    'walk-through': 6, walkthrough: 6, premier: 9,
-    'super express': 13, express: 25,
-    regular: 35, priority: 75,
-    standard: 95,
-    'value max': 45, 'value plus': 70, 'value bulk': 150, value: 110
-  } },
-  BGS: { default: 45, tiers: { base: 75, standard: 45, express: 15, priority: 5 } },
-  CGC: { default: 20, tiers: { bulk: 40, economy: 20, standard: 10, express: 5, walkthrough: 2, 'walk-through': 2 } },
-  SGC: { default: 58, tiers: { entry: 58, standard: 58, expedited: 3 } }
-};
-
-// Business days -> calendar days, weekends only (no holiday calendar here),
-// same rough conversion used nowhere else in this file since every other
-// date math here already works in real calendar days from a real logged
-// date. Good enough for a "published estimate, not a guarantee" figure, not
-// meant to be exact to the day.
-function businessDaysToCalendarDays(businessDays) {
-  return Math.round(businessDays * 1.4);
-}
-
-// PSA's four Value tiers (Value, Value Plus, Value Max, Value Bulk) have
-// been closed to new submissions since 2026-06-02, tied to PSA's own public
-// backlog tracker falling to 5 million cards -- see the "Grading service
-// tiers reference" section (index.html) for the full writeup and sources.
-// That section is a static reference table, though, so a candidate someone
-// is actively weighing toward one of those tiers (Worth grading? below)
-// never actually surfaces the pause unless they scroll down and reread it.
-// This turns the same fact into a real per-candidate flag instead, same
-// normalized-tier matching as publishedTurnaroundDays above (PUBLISHED_
-// TURNAROUND_DAYS.PSA.tiers already carries the matching turnaround numbers
-// for these four keys). Flip PSA_VALUE_TIERS_PAUSED to false once PSA's
-// backlog tracker (psacard.com/info/backlog-tracker) shows the tiers
-// reopened -- do not leave this true past that date, it would misinform
-// every open candidate targeting a normal, open PSA tier.
-const PSA_VALUE_TIERS_PAUSED = true;
-const PSA_PAUSED_VALUE_TIER_NAMES = ['value', 'value plus', 'value max', 'value bulk'];
-function isPsaPausedValueTier(gradingCompany, serviceLevel) {
-  if (!PSA_VALUE_TIERS_PAUSED || gradingCompany !== 'PSA' || !serviceLevel) return false;
-  const norm = serviceLevel.toLowerCase().trim();
-  return PSA_PAUSED_VALUE_TIER_NAMES.some(tierName => norm === tierName || norm.includes(tierName) || tierName.includes(norm));
-}
-
-function publishedTurnaroundDays(gradingCompany, serviceLevel) {
-  const entry = gradingCompany && PUBLISHED_TURNAROUND_DAYS[gradingCompany];
-  if (!entry) return null;
-  if (serviceLevel) {
-    const norm = serviceLevel.toLowerCase().trim();
-    // Exact tier name first: PSA's "super express" and "value max"/"value
-    // plus"/"value bulk" each contain a shorter real tier name ("express",
-    // "value"), so a plain bidirectional substring match on those returns
-    // the wrong tier's turnaround for the shorter, more common one. Only
-    // fall back to substring matching for a serviceLevel that doesn't
-    // exactly match any known tier (e.g. minor wording variations).
-    if (Object.prototype.hasOwnProperty.call(entry.tiers, norm)) return entry.tiers[norm];
-    for (const [tierName, days] of Object.entries(entry.tiers)) {
-      if (norm.includes(tierName) || tierName.includes(norm)) return days;
-    }
-  }
-  return entry.default;
-}
+// The published per-tier turnaround table and its lookup, the PSA
+// paused-Value-tier flag, the business-days/calendar-days conversion, the
+// per-grader real-turnaround average, and the date math they're all built
+// from (addDaysIso/daysSince) now live in turnaround-core.js (loaded as
+// window.CGTTurnaroundCore by a script tag in index.html, same reason
+// grading-core.js/validate-core.js were split out: a plain Node test can
+// exercise the real rules directly, including their own real bug-fix
+// history -- daysSince's DST-divisor bug, addDaysIso's NaN-string bug).
+// Pulled into bare identifiers here so every existing call site below keeps
+// working unchanged.
+const {
+  isPsaPausedValueTier, addDaysIso, daysSince,
+  computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor
+} = window.CGTTurnaroundCore;
 
 // Card market prices drift over months, not days, so this is a much longer
 // window than the 7-day staleness check used elsewhere in Command Center
@@ -391,8 +323,8 @@ const PRICE_STALE_AFTER_DAYS = 180;
 const GRADING_REFERENCE_REVIEWED_ON = '2026-09-17';
 const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 
-// Local calendar date as YYYY-MM-DD, same convention as daysSince above
-// (and CSM's/Sondrik's own todayIso): new Date().toISOString().slice(0, 10)
+// Local calendar date as YYYY-MM-DD, same convention as turnaround-core.js's
+// daysSince (and CSM's/Sondrik's own todayIso): new Date().toISOString().slice(0, 10)
 // reads the UTC calendar date, which rolls over to tomorrow while it is
 // still today for anyone west of UTC, so a printed insurance document or a
 // CSV filename stamped that way can read one day ahead for the rest of the
@@ -400,48 +332,6 @@ const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 function todayIso() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-// Projects an ISO date forward by a whole number of days, local calendar
-// semantics (no time-of-day component), same "local calendar date" rule as
-// todayIso/daysSince below. Used to turn a grader's own average turnaround
-// into a real projected date rather than leaving Jack to do the day-math on
-// a "days in queue" figure himself.
-function addDaysIso(isoDate, days) {
-  const d = new Date(isoDate + 'T00:00:00');
-  // Unlike daysSince right below, this had no guard at all: a malformed
-  // isoDate (a hand-edit that skipped validate-core's own isDateOrNull, e.g.
-  // "2026-13-40") produces an Invalid Date, and every field pulled off it
-  // below is NaN, silently returning the literal string "NaN-NaN-NaN"
-  // instead of erroring. That string is truthy, so estimatedReturnFor's own
-  // `estReturnDate ?` checks never catch it, and it was reaching both the
-  // on-page "est. back ~" line and the exported .ics reminder's description.
-  if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + days);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-function daysSince(isoDate) {
-  if (!isoDate) return null;
-  // Local midnight, not UTC (no trailing Z), same convention as Sondrik's
-  // daysBetween and the main dashboard's relativeTime: datePriced is logged
-  // against Jack's own calendar day, so anchoring to UTC midnight instead
-  // overstates the age by up to a day for anyone west of UTC.
-  const then = new Date(isoDate + 'T00:00:00');
-  if (Number.isNaN(then.getTime())) return null;
-  // Real Y/M/D-component subtraction, not a flat /86400000 divide: the main
-  // dashboard's own relativeTime/shortRelativeTime/isStale carried the exact
-  // same bug (fixed 4e02da2) -- a fixed 86400000ms divisor silently loses or
-  // gains the real DST-transition hour, making every date logged before the
-  // year's spring-forward read one calendar day "fresher" than real for the
-  // several months until fall-back (i.e. right now, since America/Chicago is
-  // currently in CDT). No real cards.json date predates this year's DST
-  // transition yet, so this hasn't visibly misfired here, but the function
-  // itself carried the same latent bug and would as soon as one did.
-  const now = new Date();
-  const thenMidnight = new Date(then.getFullYear(), then.getMonth(), then.getDate());
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((nowMidnight - thenMidnight) / 86400000);
 }
 
 // Real official verification tools, checked directly against each grader's
@@ -1069,43 +959,14 @@ function renderBreakdownList(title, groups, opts) {
   `;
 }
 
-// Calendar days between a submission actually shipping out and actually
-// arriving back, only counted once both real dates are on record and the
-// batch is marked returned, so a submission still in queue never
-// contributes a partial number that would understate the real wait.
-function computeTurnaroundDays(s) {
-  if (s.status !== 'returned' || !s.submittedDate || !s.returnedDate) return null;
-  const start = new Date(s.submittedDate + 'T00:00:00').getTime();
-  const end = new Date(s.returnedDate + 'T00:00:00').getTime();
-  if (Number.isNaN(start) || Number.isNaN(end)) return null;
-  return Math.round((end - start) / 86400000);
-}
-
-// Averages real turnaround per grading company, which is the practical
-// question this data answers over time: which grader has actually been
-// fastest for cards Jack has sent, not a published/advertised turnaround
-// time. min/max are carried alongside the average since one outlier batch
-// (e.g. a holiday-season slowdown) can otherwise make an average look more
-// consistent than the real spread was.
-function buildTurnaroundByGrader() {
-  const byGrader = new Map();
-  submissions.forEach(s => {
-    if (isExampleSubmission(s)) return;
-    const days = computeTurnaroundDays(s);
-    if (days == null) return;
-    const key = s.gradingCompany || 'Unknown';
-    if (!byGrader.has(key)) byGrader.set(key, []);
-    byGrader.get(key).push(days);
-  });
-  return [...byGrader.entries()]
-    .map(([grader, list]) => ({
-      label: grader,
-      value: Math.round(list.reduce((a, b) => a + b, 0) / list.length),
-      count: list.length,
-      min: Math.min(...list),
-      max: Math.max(...list)
-    }))
-    .sort((a, b) => a.value - b.value);
+// computeTurnaroundDays/buildTurnaroundByGrader (calendar days between a
+// submission shipping out and arriving back, and the real per-grader
+// average built from those) now live in turnaround-core.js -- see this
+// file's earlier CGTTurnaroundCore destructure. buildTurnaroundByGrader
+// takes an already-filtered submissions array now, so every call site below
+// filters out the example row itself before calling it.
+function realSubmissions() {
+  return submissions.filter(s => !isExampleSubmission(s));
 }
 
 function renderValueBreakdown() {
@@ -1121,7 +982,7 @@ function renderValueBreakdown() {
     renderBreakdownList('By storage location', buildValueGroupsByStorageLocation(), {
       emptyText: 'No priced real cards with a storageLocation logged yet.'
     }) +
-    renderBreakdownList('Avg. grading turnaround', buildTurnaroundByGrader(), {
+    renderBreakdownList('Avg. grading turnaround', buildTurnaroundByGrader(realSubmissions()), {
       formatValue: g => g.value + 'd avg (' + g.min + '-' + g.max + 'd, ' + g.count + ' returned)',
       emptyText: 'No returned submissions with both dates logged yet.'
     });
@@ -1832,31 +1693,10 @@ function buildActiveSubmissions() {
     });
 }
 
-// Shared by renderSubmissions below (the on-page "est. back ~" label) and
-// buildSubmissionReturnReminders (the .ics export), so the two never drift:
-// same real-history-beats-published-estimate rule, same "no estimate once
-// it's already running long" cutoff.
-function estimatedReturnFor(s, turnaroundByGrader) {
-  const days = daysSince(s.submittedDate);
-  const graderStats = s.gradingCompany && turnaroundByGrader.get(s.gradingCompany);
-  const hasRealHistory = graderStats && graderStats.count >= 2;
-  const runningLong = days != null && hasRealHistory && days > graderStats.value;
-  const publishedDays = !hasRealHistory && s.gradingCompany ? publishedTurnaroundDays(s.gradingCompany, s.serviceLevel) : null;
-  // Computed regardless of runningLong: buildSubmissionReturnReminders below
-  // needs a real past date to detect and pin an overdue submission's
-  // reminder to today (its own comment documents that as the intent), which
-  // is impossible if runningLong forces this to null before it ever gets a
-  // chance to be in the past. renderSubmissions (the on-page label) is the
-  // one place that still wants this hidden once running long, so it checks
-  // runningLong itself now instead of relying on this being null.
-  const estReturnDate = (s.submittedDate && hasRealHistory)
-    ? addDaysIso(s.submittedDate, graderStats.value)
-    : (s.submittedDate && publishedDays != null)
-      ? addDaysIso(s.submittedDate, businessDaysToCalendarDays(publishedDays))
-      : null;
-  const estReturnIsPublished = estReturnDate != null && !hasRealHistory;
-  return { days, graderStats, hasRealHistory, runningLong, publishedDays, estReturnDate, estReturnIsPublished };
-}
+// estimatedReturnFor (shared by renderSubmissions' on-page "est. back ~"
+// label and buildSubmissionReturnReminders' .ics export, so the two never
+// drift) now lives in turnaround-core.js too -- see this file's earlier
+// CGTTurnaroundCore destructure.
 
 // A separate feed from Pricing activity above: this is the front of the
 // pipeline (cards shipped off, not graded yet) rather than the back of it
@@ -1890,7 +1730,7 @@ function renderSubmissions() {
   // that grader's own average gets flagged instead of just quietly aging in
   // the list. Requires at least 2 returned submissions from that grader
   // before trusting the average enough to flag anything against it.
-  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
 
   const rows = active.map(s => {
     const meta = SUBMISSION_STATUS_META[s.status] || { label: s.status, cls: 'badge-status-queue' };
@@ -2223,7 +2063,7 @@ function renderAttentionBar() {
   // submissions section. Same runningLong test, same real-history-only
   // gate (estimatedReturnFor only sets runningLong once that grader has at
   // least 2 real returned submissions to average).
-  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
   const overdueSubmissionsCount = buildActiveSubmissions()
     .filter(s => !isExampleSubmission(s) && estimatedReturnFor(s, turnaroundByGrader).runningLong).length;
   // Same targetsPausedTier test as renderCandidates' own badge below: a
@@ -3906,7 +3746,7 @@ function icsFoldLine(line) {
 // grader history/published schedule to estimate from (estimatedReturnFor
 // already returns null in that case, filtered out below).
 function buildSubmissionReturnReminders() {
-  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
   const today = todayIso();
   return buildActiveSubmissions().map(s => {
     const { estReturnDate, estReturnIsPublished, graderStats, publishedDays } = estimatedReturnFor(s, turnaroundByGrader);
