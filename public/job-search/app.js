@@ -25,6 +25,7 @@
   const digestExcludedNote = document.getElementById('digestExcludedNote');
   const digestSourcingNote = document.getElementById('digestSourcingNote');
   const printBtn = document.getElementById('printBtn');
+  const changelogFeedEl = document.getElementById('changelogFeed');
 
   printBtn.addEventListener('click', () => window.print());
 
@@ -606,4 +607,73 @@
     fetch('/api/job-search/data-quality').then(r => r.ok ? r.json() : null).then(renderDataQuality).catch(() => renderDataQuality(null));
   }
   loadDataQuality();
+
+  // Renders changelog.json, a file no one hand-edits: it's regenerated from
+  // this repo's real git history by public/job-search/data/changelog.js, so
+  // every hash, author, and date here is independently checkable against the
+  // repo instead of resting on a hand-typed claim. Missing the file entirely
+  // (never generated yet, or a fresh clone) is an honest empty state, not an
+  // error. driftStatus comes from /api/job-search/changelog-status, the same
+  // live drift check already exposed for the other 5 hubs: it compares
+  // changelog.json's recorded commit hashes for this hub's own data files
+  // against this repo's real git log, so a real drift shows up here on the
+  // live page instead of only when someone happens to run node
+  // public/job-search/data/changelog.js from the command line. "unavailable"
+  // (not a git checkout, shallow clone, etc) is an environment gap, not a
+  // data error, so it stays silent rather than showing a warning no one can
+  // act on. Same markup/classes as CSM's identical section.
+  function renderChangelog(data, driftStatus) {
+    if (!changelogFeedEl) return;
+    const driftWarning = (driftStatus && driftStatus.drifted)
+      ? '<div class="callout callout-warning"><strong>Changelog is out of sync.</strong> changelog.json records ' +
+        driftStatus.recordedCount + ' commit' + (driftStatus.recordedCount === 1 ? '' : 's') +
+        ' for this hub\'s data files, but this repo\'s real git history has ' + driftStatus.realCount +
+        '. Run <code>node public/job-search/data/changelog.js</code> to regenerate it.</div>'
+      : '';
+    const entries = (data && data.entries) || [];
+    if (entries.length === 0) {
+      changelogFeedEl.innerHTML = driftWarning + '<p class="changelog-empty">No changelog generated yet. Run ' +
+        '<code>node public/job-search/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
+      return;
+    }
+    const rowsHtml = entries.map(e => {
+      const files = (e.files || []).join(', ');
+      return '<div class="changelog-row' + (e.historyReset ? ' changelog-row-reset' : '') + '">' +
+        '<span class="changelog-date font-mono">' + escapeHtml(fmtDate(e.date)) + '</span>' +
+        '<span class="changelog-hash" title="' + escapeHtml(e.fullHash || e.hash) + '">' + escapeHtml(e.hash) + '</span>' +
+        '<span class="changelog-author">' + escapeHtml(e.author) + '</span>' +
+        '<span class="changelog-subject' + (e.historyReset ? ' changelog-subject-reset' : '') + '">' +
+        (e.historyReset ? '&#9888; ' : '') + escapeHtml(e.subject) + '</span>' +
+        (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
+        '</div>';
+    }).join('');
+    changelogFeedEl.innerHTML = driftWarning + rowsHtml;
+    let noteEl = changelogFeedEl.nextElementSibling;
+    if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
+      noteEl = document.createElement('p');
+      noteEl.className = 'section-note changelog-generated-note';
+      changelogFeedEl.after(noteEl);
+    }
+    noteEl.textContent = 'Generated ' + (fmtDate((data.generatedAt || '').slice(0, 10)) || 'at an unknown time') +
+      ' from ' + (data.generatedFrom || 'git log') + '.';
+  }
+
+  // One-time on load, same reasoning as loadDataQuality above: changelog.json
+  // only changes when someone commits a data-file edit and regenerates it,
+  // never on its own poll cadence. The drift check is a separate,
+  // best-effort fetch so an unavailable git checkout never blocks rendering
+  // the changelog entries that did load.
+  function loadChangelog() {
+    Promise.allSettled([
+      fetch('/job-search/data/changelog.json').then(r => {
+        if (!r.ok) throw new Error('changelog.json returned ' + r.status);
+        return r.json();
+      }),
+      fetch('/api/job-search/changelog-status').then(r => r.ok ? r.json() : null).catch(() => null)
+    ]).then(([changelogResult, driftResult]) => {
+      const driftStatus = driftResult.status === 'fulfilled' ? driftResult.value : null;
+      renderChangelog(changelogResult.status === 'fulfilled' ? changelogResult.value : { entries: [] }, driftStatus);
+    });
+  }
+  loadChangelog();
 })();

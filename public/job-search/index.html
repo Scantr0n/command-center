@@ -161,13 +161,22 @@
     </div>
   </details>
 
+  <section>
+    <h2 class="section-title">Data changelog</h2>
+    <p class="section-note">Real git commit history of the four data files above, not a hand-typed claim.
+      Each row is an actual commit hash, author, and date from this repo. Regenerate after new commits with
+      <code>node public/job-search/data/changelog.js</code>.</p>
+    <div id="changelogFeed" class="changelog-feed"><p class="changelog-empty">Loading...</p></div>
+  </section>
+
   </main>
 
   <footer class="page-foot font-mono">
     Data source: <code>/job-search/data/applications.json</code>, <code>/job-search/data/criteria.json</code>,
     <code>/job-search/data/next-up.json</code>, and <code>/job-search/data/digest-latest.json</code>, hand-transcribed
     from <code>Trackers/Job_Search_Tracker.md</code>. Run
-    <code>node public/job-search/data/validate.js</code> after any edit.
+    <code>node public/job-search/data/validate.js</code> after any edit, then
+    <code>node public/job-search/data/changelog.js</code> to refresh the data changelog from git.
   </footer>
 </div>
 

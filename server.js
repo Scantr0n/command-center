@@ -788,6 +788,9 @@ app.get('/api/garage/changelog-status', changelogStatusHandler('garage', [
   'listings.json', 'pipeline.json', 'activity.json', 'sales.json',
   'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
 ]));
+app.get('/api/job-search/changelog-status', changelogStatusHandler('job-search', [
+  'applications.json', 'criteria.json', 'next-up.json', 'digest-latest.json'
+]));
 
 // Real, unfilterable proof of recent work on the dashboard itself: the
 // repo's own git log, not a hand-maintained "what's new" note that can
