@@ -517,7 +517,7 @@
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">
           <span>Jump to</span>
-          <kbd class="kbd-chip text-[10px]" style="color: var(--sub)" aria-hidden="true">&#8984;K</kbd>
+          <kbd id="paletteBtnKbd" class="kbd-chip text-[10px]" style="color: var(--sub)" aria-hidden="true">&#8984;K</kbd>
         </button>
         <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
         <div id="driveStatusBadge" class="hidden items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border" style="color: #E0807A; background: #E04A4A1A; border-color: #E04A4A40"></div>
@@ -3285,6 +3285,15 @@ document.addEventListener('keydown', (e) => {
     openShortcuts();
   }
 });
+
+// Jack runs this from both a Mac and a PC (see CLAUDE.md's separate-OAuth-
+// client-per-machine note), so a badge that always shows the Mac glyph is
+// wrong on half his machines. The shortcuts overlay already lists both
+// bindings as options; this is the one persistent on-page hint, so it
+// should match whichever key the browser it's running in actually uses.
+if (!/mac|iphone|ipad|ipod/i.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent)) {
+  document.getElementById('paletteBtnKbd').textContent = 'Ctrl K';
+}
 
 loadClusters();
 let lastLoadAt = Date.now();
