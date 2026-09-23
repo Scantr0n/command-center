@@ -694,6 +694,41 @@ function wireTickTooltips(container) {
     });
   });
 }
+
+// The connectivity-check and daily-uptime strips each render up to 60/90
+// individually-focusable buttons (HISTORY_TICK_LIMIT / the daily-bucket
+// count), every one with the default implicit tabindex=0 a plain <button>
+// gets. A keyboard user tabbing through the page had to pass through every
+// single one just to get past these two strips, a real practical barrier,
+// not just a formal WCAG gap. Roving tabindex (APG toolbar pattern) fixes
+// it: only one tick is ever a real tab stop, arrow keys move within the
+// strip, so entering or leaving it costs exactly one Tab either way. Called
+// fresh on every re-render (the buttons are rebuilt each time, so there's
+// no stale state to preserve); the container's own keydown listener is
+// wired once (dataset guard) since the container element itself persists
+// across re-renders even though its children don't.
+function wireRovingTabindex(container) {
+  const items = () => Array.from(container.querySelectorAll('[data-tick-detail]'));
+  items().forEach((el, i) => el.setAttribute('tabindex', i === 0 ? '0' : '-1'));
+  if (container.dataset.rovingWired) return;
+  container.dataset.rovingWired = '1';
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return;
+    const els = items();
+    const currentIndex = els.indexOf(document.activeElement);
+    if (currentIndex === -1) return;
+    let nextIndex = currentIndex;
+    if (e.key === 'ArrowLeft') nextIndex = Math.max(0, currentIndex - 1);
+    else if (e.key === 'ArrowRight') nextIndex = Math.min(els.length - 1, currentIndex + 1);
+    else if (e.key === 'Home') nextIndex = 0;
+    else if (e.key === 'End') nextIndex = els.length - 1;
+    if (nextIndex === currentIndex) return;
+    e.preventDefault();
+    els[currentIndex].setAttribute('tabindex', '-1');
+    els[nextIndex].setAttribute('tabindex', '0');
+    els[nextIndex].focus();
+  });
+}
 document.addEventListener('click', (e) => {
   if (!e.target.closest('[data-tick-detail]')) hideTickTooltip();
 });
@@ -737,6 +772,7 @@ function renderConnectionHistory(data, clientHistory) {
     return `<button type="button" class="history-tick ${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-tick-detail="${escapeHtml(title)}"></button>`;
   }).join('');
   wireTickTooltips(strip);
+  wireRovingTabindex(strip);
 
   // A per-check tick strip shows the shape of recent history but not its
   // overall rate, exactly what a single "X% uptime" summary communicates at
@@ -856,6 +892,7 @@ function renderDailyUptime(data, clientHistory) {
 
   strip.innerHTML = buckets.map(dailyUptimeBarItem).join('');
   wireTickTooltips(strip);
+  wireRovingTabindex(strip);
 
   // Overall percentage across the covered days: real per-day up/total counts
   // summed first and divided once, never averaged day-to-day, same
