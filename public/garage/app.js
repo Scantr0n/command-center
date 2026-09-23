@@ -69,6 +69,37 @@ const {
   poshmarkWeightTier, bundleNetComparison
 } = GarageCore;
 
+// This is the exact reference that already drifted wrong twice on this page
+// (see the real-bug list in garage-core.js's header comment: a processing
+// fee eBay no longer even charges, then a "shoes" rate mixed up twice over),
+// both times silently, with nothing on the page saying the numbers might be
+// stale. This date is the "as of September 2026" claim already made in the
+// "Fee formulas used" callout above the payout table; keep the two in sync
+// by hand whenever the schedule is re-verified. 45 days, not CGT's 30: this
+// schedule has moved at least as fast in this file's own history, but it's
+// a smaller page surface (one combined table, not six graders' full tier
+// lists), so a slightly longer window before nagging is the right tradeoff.
+const FEE_SCHEDULE_REVIEWED_ON = '2026-09-23';
+const FEE_SCHEDULE_STALE_AFTER_DAYS = 45;
+
+// Independent of listings/sales/etc. load state (no fetch involved, the
+// review date is a hardcoded constant above), so this runs unconditionally
+// at page load rather than from inside loadData()'s try/catch, same
+// separation CGT's own renderGradingReferenceFreshness draws for the same
+// reason: a bad listings.json shouldn't also blank a freshness note that
+// has nothing to do with it.
+function renderFeeScheduleFreshness() {
+  const el = document.getElementById('feeScheduleFreshness');
+  if (!el) return;
+  const age = daysSincePublished(FEE_SCHEDULE_REVIEWED_ON);
+  const stale = age != null && age > FEE_SCHEDULE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published seller fee schedule on ' + FEE_SCHEDULE_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 const PAYOUT_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
@@ -4840,6 +4871,7 @@ wireQuickLogAcquisitionTool();
 wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
+renderFeeScheduleFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
