@@ -5,23 +5,25 @@ function escapeHtml(str) {
 }
 
 // Market-calendar and uptime/incident date math lives in dates-core.js,
-// loaded before this file (see index.html), so it can be unit-tested
-// outside the browser (dates-core.test.js) instead of only ever running
-// live on whatever day someone happens to load this page. See that file's
-// own comments for the real NYSE calendar source and the reasoning behind
-// each function.
+// regime-segment/distribution math lives in regime-core.js, both loaded
+// before this file (see index.html), so they can be unit-tested outside the
+// browser (dates-core.test.js, regime-core.test.js) instead of only ever
+// running live on whatever day, or whatever regime transitions, someone's
+// browser happens to have seen. See each file's own comments for the real
+// NYSE calendar source and the reasoning behind its functions.
 //
-// Both that script and account-core.js are loaded via plain <script> tags
-// before this one; if either one fails to load (a network blip on a first,
-// not-yet-cached visit, an ad blocker, a bad deploy that drops one file),
-// the destructure below throws and used to abort this entire script with no
-// visible sign of it, leaving the page stuck forever on its static
+// All three of those scripts and account-core.js are loaded via plain
+// <script> tags before this one; if any one fails to load (a network blip on
+// a first, not-yet-cached visit, an ad blocker, a bad deploy that drops one
+// file), the destructure below throws and used to abort this entire script
+// with no visible sign of it, leaving the page stuck forever on its static
 // "Loading..." placeholders, indistinguishable from a page that is merely
 // slow. This page's whole job is to be trusted at a glance, so a load
 // failure gets the same honest, visible treatment every other failure mode
 // here already gets, instead of silently reading as "still loading".
-if (typeof AlphaDatesCore === 'undefined' || typeof AlphaAccountCore === 'undefined') {
-  const missing = typeof AlphaDatesCore === 'undefined' ? 'dates-core.js' : 'account-core.js';
+if (typeof AlphaDatesCore === 'undefined' || typeof AlphaAccountCore === 'undefined' || typeof AlphaRegimeCore === 'undefined') {
+  const missing = typeof AlphaDatesCore === 'undefined' ? 'dates-core.js'
+    : typeof AlphaAccountCore === 'undefined' ? 'account-core.js' : 'regime-core.js';
   const bar = document.getElementById('stickyCriticalBar');
   if (bar) {
     bar.hidden = false;
@@ -48,6 +50,12 @@ const {
   computeDailyUptimeBuckets,
   dailyUptimeClass
 } = AlphaDatesCore;
+const {
+  regimeColor,
+  computeRegimeSegments,
+  regimeSegmentEndMs,
+  computeRegimeDistribution
+} = AlphaRegimeCore;
 const MARKET_CALENDAR_SOURCE_CHECKED_AT = '2026-09-17';
 
 function renderMarketStatus() {
@@ -512,41 +520,10 @@ function renderMeterSparkline(history, title) {
   `;
 }
 
-// Turns the flat transition log above into readable segments: each entry
-// marks when a regime started, so the segment it started runs until the
-// next entry's timestamp (or now, for the most recent one, which is still
-// current). history is oldest-first, same assumption the connection-history
-// helpers above make.
-//
-// frozenAsOf (real server-timestamp string, or falsy while connected) caps
-// the current segment's end instead of Date.now(): recordClientRegimeObservation
-// only appends while genuinely connected, so during a real outage nothing
-// confirms the regime hasn't changed in the meantime, yet the "current"
-// segment kept ticking its displayed duration up to now regardless, the one
-// place on this page that showed a frozen reading as though still live (see
-// the effectiveData comment in loadStatus, and renderLastKnownBanner, for
-// the same distinction made everywhere else).
-function computeRegimeSegments(history, frozenAsOf) {
-  if (!Array.isArray(history) || !history.length) return [];
-  return history.map((entry, i) => ({
-    regime: entry.regime,
-    start: entry.at,
-    end: i + 1 < history.length ? history[i + 1].at : null,
-    current: i === history.length - 1,
-    frozenAsOf: (i === history.length - 1 && frozenAsOf) ? frozenAsOf : null
-  }));
-}
-
-// Shared by regimeSegmentItem and computeRegimeDistribution below, which
-// used to each carry their own copy of this same rule: a fix or change to
-// how a segment's end is capped applied to only one copy would silently
-// desync the per-item duration shown in the regime history list from the
-// aggregated duration shown in the regime distribution totals, two
-// different totals for the same underlying data.
-function regimeSegmentEndMs(seg) {
-  if (!seg.current) return new Date(seg.end).getTime();
-  return seg.frozenAsOf ? new Date(seg.frozenAsOf).getTime() : Date.now();
-}
+// computeRegimeSegments and regimeSegmentEndMs now live in regime-core.js
+// (see AlphaRegimeCore above), so this segmenting math can be unit-tested
+// outside the browser instead of only ever running live against whatever
+// transitions this browser happens to have recorded.
 
 const REGIME_HISTORY_LIMIT = 10;
 
@@ -580,58 +557,10 @@ function renderRegimeHistory(clientRegimeHistory, frozenAsOf) {
   list.innerHTML = recent.map(regimeSegmentItem).join('');
 }
 
-// Real regime labels come from Alpha's own live feed as arbitrary strings
-// (see the live.regime schema-help row), never a fixed enum this page
-// controls, so there is no way to pre-assign a meaningful color per regime
-// the way, say, pl-good/pl-bad can for a known up/down axis. This instead
-// hashes each label to a stable index into a fixed, distinguishable palette,
-// so the same regime label always gets the same color across renders and
-// reloads (as long as the label spelling itself doesn't change), without
-// needing to know the real regime vocabulary in advance. Kept distinct from
-// the page's existing green/amber/red status hues (used everywhere else for
-// good/caution/critical) so a "trending" or "volatile" swatch here is never
-// mistaken for a status reading.
-const REGIME_PALETTE = ['#7CA8E0', '#3DDC84', '#E0A030', '#B892E0', '#5FD0C0', '#E0819A'];
-
-function hashStringToIndex(str, mod) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash * 31 + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash) % mod;
-}
-
-function regimeColor(label) {
-  return REGIME_PALETTE[hashStringToIndex(String(label), REGIME_PALETTE.length)];
-}
-
-// Aggregates the same real per-segment durations regimeSegmentItem already
-// renders chronologically (see computeRegimeSegments) into a total time spent
-// in each distinct regime label, real trading-dashboard "regime analytics"
-// UX (breakdown/explainability widgets pairing the current label with how
-// conditions have actually evolved) rather than only a moment-to-moment
-// transition log. Sorted by real total duration, longest first, so the
-// dominant regime this browser has actually observed leads. The current,
-// still-open segment's duration is measured up to now (or to seg.frozenAsOf
-// during a real outage, same reasoning as regimeSegmentItem), so the totals
-// stay accurate between polls rather than freezing at whenever the last
-// transition was recorded, but also never grow on a segment nothing has
-// actually reconfirmed since the connection dropped.
-function computeRegimeDistribution(segments) {
-  if (!Array.isArray(segments) || !segments.length) return { totalMs: 0, rows: [] };
-  const byLabel = new Map();
-  let totalMs = 0;
-  segments.forEach(seg => {
-    const endMs = regimeSegmentEndMs(seg);
-    const ms = Math.max(0, endMs - new Date(seg.start).getTime());
-    totalMs += ms;
-    byLabel.set(seg.regime, (byLabel.get(seg.regime) || 0) + ms);
-  });
-  const rows = [...byLabel.entries()]
-    .map(([regime, ms]) => ({ regime, ms, pct: totalMs > 0 ? (ms / totalMs) * 100 : 0 }))
-    .sort((a, b) => b.ms - a.ms);
-  return { totalMs, rows };
-}
+// regimeColor (and the hashStringToIndex it's built on) and
+// computeRegimeDistribution now live in regime-core.js (see AlphaRegimeCore
+// above), so the color-assignment and distribution-aggregation math can be
+// unit-tested outside the browser too.
 
 function renderRegimeDistribution(segments) {
   const wrap = document.getElementById('regimeDistWrap');
