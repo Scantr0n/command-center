@@ -1351,8 +1351,12 @@ function applyFiltersAndRender() {
   }
   empty.hidden = true;
 
+  // No aria-label here on purpose: this row's own real price/platform/date/
+  // location cells are the actual content a screen reader user needs the
+  // same way a sighted user reads them off the table, an aria-label reciting
+  // only the title would silently override all of that with just the name.
   tbody.innerHTML = filtered.map(l => `
-    <tr class="row-clickable" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="View details for ${escapeHtml(l.title || 'Untitled item')}">
+    <tr class="row-clickable" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button">
       <td>
         <div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div>
         ${l.notes ? `<div class="cell-card-meta">${escapeHtml(l.notes)}</div>` : ''}
@@ -3286,12 +3290,26 @@ function renderKanban(listings, pipelineData) {
       ? cards.reduce((s, l) => s + remainingPlatforms(l).length, 0)
       : cards.length;
     const moreCount = (typeof known === 'number' && known > loggedForCompare) ? known - loggedForCompare : 0;
-    const cardsHtml = cards.length ? cards.map(l => `
-      <div class="kanban-card" draggable="true" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="${escapeHtml(l.title || 'Untitled item')}, open to edit">
+    const cardsHtml = cards.length ? cards.map(l => {
+      const priceText = l.price != null ? formatUsd(l.price) : 'no price set';
+      const platformText = (l.platforms || []).length + ' platform' + ((l.platforms || []).length === 1 ? '' : 's');
+      // The aria-label used to say only "{title}, open to edit", dropping the
+      // real price/platform-count the card's own visible sub-line shows, an
+      // aria-label that doesn't contain a control's real visible text is a
+      // genuine WCAG 2.5.3 miss (confirmed via Lighthouse's accessibility
+      // audit), not just a style nit: it silently withholds real data a
+      // screen reader user would otherwise get. Built from the same
+      // priceText/platformText the visible sub-line renders below so the two
+      // can never drift; "open to edit" kept at the end since that's real
+      // added context (this is a drag target, but a plain click/Enter opens
+      // the edit form too) the visible text alone doesn't convey.
+      return `
+      <div class="kanban-card" draggable="true" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="${escapeHtml(l.title || 'Untitled item')}, ${escapeHtml(priceText)} &middot; ${escapeHtml(platformText)}, open to edit">
         <div class="kanban-card-title">${escapeHtml(l.title || 'Untitled item')}</div>
-        <div class="kanban-card-sub">${l.price != null ? formatUsd(l.price) : 'no price set'} &middot; ${(l.platforms || []).length} platform${(l.platforms || []).length === 1 ? '' : 's'}</div>
+        <div class="kanban-card-sub">${escapeHtml(priceText)} &middot; ${escapeHtml(platformText)}</div>
       </div>
-    `).join('') : '<div class="kanban-empty">No individually logged items in this stage.</div>';
+    `;
+    }).join('') : '<div class="kanban-empty">No individually logged items in this stage.</div>';
     const moreHtml = moreCount > 0
       ? `<div class="kanban-more-note">+${moreCount} more known from the real pipeline count, not individually logged yet</div>`
       : '';

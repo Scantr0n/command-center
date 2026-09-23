@@ -1619,8 +1619,18 @@ function renderCandidates() {
       c.expectedGradedValue != null ? 'est. graded ' + formatUsd(c.expectedGradedValue) + (c.expectedGrade ? ' (' + c.expectedGrade + ')' : '') : null,
       math ? 'costs ' + formatUsd(math.totalCost) : null
     ].filter(Boolean);
+    // No aria-label here on purpose (a real fix, not an omission): this row's
+    // own visible content already carries the real expected gain, verdict,
+    // decision, and cost/value meta, exactly the numbers a real grading
+    // decision runs on. An aria-label reciting only the card name would
+    // override all of that with the accessible-name computation, so a screen
+    // reader user would hear "Andrei Svechnikov" and nothing else, silently
+    // losing the same expected-gain/verdict data a sighted user reads off the
+    // row at a glance. Leaving the row nameless lets the browser fall back to
+    // its own real text content instead, the same rich summary everyone else
+    // gets. tabindex + role="button" already announce it as interactive.
     return `
-      <div class="submission-row candidate-row" tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled candidate')}${decisionLabel ? ', decision: ' + escapeHtml(decisionLabel) : ''}${targetsPausedTier ? ', PSA tier paused' : ''}" data-id="${escapeHtml(c.id)}">
+      <div class="submission-row candidate-row" tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
         <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         ${decisionLabel ? `<span class="badge badge-decided">${escapeHtml(decisionLabel)}</span>` : ''}
@@ -1902,9 +1912,14 @@ function renderSubmissions() {
     // interactive outer div instead: .submission-row-main keeps the exact
     // same flex/wrap/gap layout for the row's own click/keydown handling,
     // and the link is a sibling next to it, not a descendant.
+    //
+    // No aria-label on the inner row either, same real reason as the
+    // candidate-row above: this row's own real days-in-queue/verdict/cost
+    // meta would otherwise get silently dropped from what a screen reader
+    // user hears in favor of just the submission description.
     return `
       <div class="submission-row">
-        <div class="candidate-row submission-row-main" tabindex="0" role="button" aria-label="View details for ${escapeHtml(s.description || 'Untitled submission')}" data-id="${escapeHtml(s.id)}">
+        <div class="candidate-row submission-row-main" tabindex="0" role="button" data-id="${escapeHtml(s.id)}">
           <span class="submission-days font-mono${runningLong ? ' submission-days-late' : ''}">${escapeHtml(daysText)}</span>
           <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
           <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
@@ -2674,8 +2689,12 @@ function applyFiltersAndRender() {
   empty.hidden = true;
   renderTableFooter(filtered);
 
+  // Same real reason as the candidate-row/submission-row aria-labels removed
+  // above: this row's own real sport/grading/grade/value/date cells are the
+  // actual real content, an aria-label reciting only the card name would
+  // override all of that in what a screen reader user hears.
   tbody.innerHTML = filtered.map(c => `
-    <tr tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled card')}" data-id="${escapeHtml(c.id)}">
+    <tr tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
       <td>
         <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isBgsBlackLabel(c) ? ' <span class="badge badge-black-label" title="All four BGS subgrades are a perfect 10">black label</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}${!isSold(c) && isListed(c) ? ' <span class="badge badge-listed" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>' : ''}</div>
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
