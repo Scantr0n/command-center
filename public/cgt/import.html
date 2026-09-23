@@ -52,7 +52,7 @@
 
   <section class="import-step" id="stepLoadStatus">
     <h2 class="section-title">2. Existing data</h2>
-    <p class="import-status-line font-mono" id="existingStatus">Checking&hellip;</p>
+    <p class="import-status-line font-mono" id="existingStatus" role="status" aria-live="polite">Checking&hellip;</p>
   </section>
 
   <section class="import-step">
@@ -79,7 +79,7 @@
 
   <section class="import-step" id="previewStep" hidden>
     <h2 class="section-title">5. Preview</h2>
-    <p class="import-help" id="previewSummary"></p>
+    <p class="import-help" id="previewSummary" role="status" aria-live="polite"></p>
     <div class="table-wrap">
       <table class="card-table" id="previewTable">
         <thead><tr id="previewHead"></tr></thead>
@@ -93,12 +93,12 @@
     <p class="import-help">Runs the same rules as <code class="inline-code">validate.js</code> against your
       import combined with the existing real rows already on record (the example placeholder row is dropped
       automatically). Errors block the download below, warnings don't.</p>
-    <div id="validationResults"></div>
+    <div id="validationResults" role="status" aria-live="polite"></div>
   </section>
 
   <section class="import-step" id="downloadStep" hidden>
     <h2 class="section-title">7. Download</h2>
-    <p class="import-help" id="downloadSummary"></p>
+    <p class="import-help" id="downloadSummary" role="status" aria-live="polite"></p>
     <button type="button" id="downloadJsonBtn" class="print-btn font-mono import-primary-btn">Download JSON</button>
     <p class="import-help" id="downloadHelp"></p>
   </section>
