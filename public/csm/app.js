@@ -7,7 +7,7 @@
   const {
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-    nudgeUrgencyLevel, computeNudgeRows,
+    nudgeUrgencyLevel, computeNudgeRows, byUrgency,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
   } = CSMCore;
 
@@ -464,22 +464,6 @@
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
-  }
-
-  function byUrgency(a, b) {
-    // Two prospects sharing the exact same nextNudgeDate used to always
-    // return 1 (never 0), a comparator that claims every equal pair is
-    // "greater than" itself in both directions, which violates a real sort
-    // comparator's own contract (compare(a,b) and compare(b,a) can't both
-    // be positive) and leaves their relative order effectively arbitrary.
-    // Falls through to the same name-based tiebreak the "neither has a
-    // date" case below already uses, for a deterministic order either way.
-    if (a.nextNudgeDate && b.nextNudgeDate && a.nextNudgeDate !== b.nextNudgeDate) {
-      return a.nextNudgeDate < b.nextNudgeDate ? -1 : 1;
-    }
-    if (a.nextNudgeDate && !b.nextNudgeDate) return -1;
-    if (b.nextNudgeDate && !a.nextNudgeDate) return 1;
-    return (a.name || '').localeCompare(b.name || '');
   }
 
   const stalledEl = document.getElementById('stalledList');

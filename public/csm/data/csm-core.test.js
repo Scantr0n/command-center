@@ -17,7 +17,7 @@ const assert = require('node:assert/strict');
 const {
   isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-  nudgeUrgencyLevel, computeNudgeRows,
+  nudgeUrgencyLevel, computeNudgeRows, byUrgency,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
 } = require('./csm-core.js');
 
@@ -181,6 +181,39 @@ test('rollToWeekdayIso rolls a Saturday/Sunday forward to Monday and leaves a we
   assert.equal(rollToWeekdayIso('2026-09-26'), '2026-09-28'); // Saturday -> Monday
   assert.equal(rollToWeekdayIso('2026-09-27'), '2026-09-28'); // Sunday -> Monday
   assert.equal(rollToWeekdayIso('2026-09-23'), '2026-09-23'); // Wednesday, unchanged
+});
+
+test('byUrgency sorts a sooner nextNudgeDate before a later one', () => {
+  const a = { name: 'A', nextNudgeDate: '2026-10-05' };
+  const b = { name: 'B', nextNudgeDate: '2026-10-01' };
+  assert.ok(byUrgency(a, b) > 0);
+  assert.ok(byUrgency(b, a) < 0);
+});
+
+test('byUrgency puts a prospect with no nextNudgeDate after one that has it', () => {
+  const dated = { name: 'A', nextNudgeDate: '2026-10-01' };
+  const undated = { name: 'B', nextNudgeDate: null };
+  assert.ok(byUrgency(dated, undated) < 0);
+  assert.ok(byUrgency(undated, dated) > 0);
+});
+
+test('byUrgency falls back to name order, and satisfies the comparator contract, when dates match or are both missing', () => {
+  // A comparator that returns 1 for both orderings of an equal pair (the
+  // real bug this was extracted to guard against) claims a > b and b > a
+  // at once, which is impossible for a real ordering.
+  const sameDate = [
+    { name: 'Zed', nextNudgeDate: '2026-10-01' },
+    { name: 'Amy', nextNudgeDate: '2026-10-01' }
+  ];
+  assert.equal(byUrgency(sameDate[0], sameDate[1]), -byUrgency(sameDate[1], sameDate[0]));
+  assert.deepEqual(sameDate.slice().sort(byUrgency).map(p => p.name), ['Amy', 'Zed']);
+
+  const noDate = [
+    { name: 'Zed', nextNudgeDate: null },
+    { name: 'Amy', nextNudgeDate: null }
+  ];
+  assert.equal(byUrgency(noDate[0], noDate[1]), -byUrgency(noDate[1], noDate[0]));
+  assert.deepEqual(noDate.slice().sort(byUrgency).map(p => p.name), ['Amy', 'Zed']);
 });
 
 test('the real prospects.json on disk never produces a stall/stale false negative from a null date', () => {

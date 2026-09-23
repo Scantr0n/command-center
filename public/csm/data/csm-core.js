@@ -173,11 +173,26 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // Board column sort order: soonest real nextNudgeDate first, prospects
+  // with no date logged pushed to the end, tied on name so the order is
+  // deterministic either way. A prior version of this comparator returned 1
+  // (never 0) whenever both dates were equal, which violates a real sort
+  // comparator's own contract (compare(a,b) and compare(b,a) can't both be
+  // positive) and left same-date rows in effectively arbitrary order.
+  function byUrgency(a, b) {
+    if (a.nextNudgeDate && b.nextNudgeDate && a.nextNudgeDate !== b.nextNudgeDate) {
+      return a.nextNudgeDate < b.nextNudgeDate ? -1 : 1;
+    }
+    if (a.nextNudgeDate && !b.nextNudgeDate) return -1;
+    if (b.nextNudgeDate && !a.nextNudgeDate) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-    nudgeUrgencyLevel, computeNudgeRows,
+    nudgeUrgencyLevel, computeNudgeRows, byUrgency,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
   };
 });
