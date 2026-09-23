@@ -12,6 +12,7 @@
   const releasesCsvBtn = document.getElementById('releasesCsvBtn');
   const leadsCsvBtn = document.getElementById('leadsCsvBtn');
   const channelsCsvBtn = document.getElementById('channelsCsvBtn');
+  const goalsCsvBtn = document.getElementById('goalsCsvBtn');
   const downloadsBadgeBtn = document.getElementById('downloadsBadgeBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
   const copyPublicBtn = document.getElementById('copyPublicBtn');
@@ -1678,11 +1679,10 @@
   }
 
   // Same "real logged history only, one row per record" rule as
-  // exportDownloadsCsv above, just for the other two record types that had
+  // exportDownloadsCsv above, just for the other record types that had
   // no export at all: CGT, Garage, and CSM all already provide full-dataset
   // CSV export for every entity type they track, this closes the same gap
-  // here. Goals is left out: goals.json is currently empty, an export
-  // button for zero real goals has nothing to export yet.
+  // here.
   function exportReleasesCsv(releasesData) {
     const releases = (releasesData.releases || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const header = ['Version', 'Date', 'Type', 'Summary', 'Notes'].map(csvField).join(',');
@@ -1749,6 +1749,32 @@
     const a = document.createElement('a');
     a.href = url;
     a.download = 'sondrik-channels-' + todayIso() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // Same export pattern as releases/downloads/leads/channels above, closing
+  // the last real gap: goals.json now carries a real goal (set 2026-09-20,
+  // 150 downloads by end of year), the one record type left with no export
+  // button. currentCount/pct reuse the exact same helpers renderGoals calls,
+  // so the exported numbers can never drift from what the Goal card shows.
+  function exportGoalsCsv(goalsData, downloadsData, leadsData) {
+    const goals = goalsData.goals || [];
+    const header = ['Id', 'Label', 'Metric', 'Target', 'Current', 'Progress pct', 'Set date', 'Target date', 'Note'].map(csvField).join(',');
+    const lines = goals.map(g => {
+      const current = currentMetricValue(g.metric, downloadsData, leadsData);
+      const currentCount = current ? current.count : 0;
+      const pct = computeGoalProgressPct(g.target, currentCount);
+      return [g.id, g.label, g.metric, g.target, currentCount, pct, g.setDate, g.targetDate, g.note].map(csvField).join(',');
+    });
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sondrik-goals-' + todayIso() + '.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2295,9 +2321,11 @@
 
     if (goalsData) {
       renderGoals(goalsData, downloadsData, leadsData);
+      goalsCsvBtn.addEventListener('click', () => exportGoalsCsv(goalsData, downloadsData, leadsData));
     } else {
       goalsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load goal data: ' +
         escapeHtml(goalsResult.reason.message) + '</div>';
+      goalsCsvBtn.disabled = true;
     }
 
     if (channelsData) {
