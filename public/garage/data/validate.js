@@ -57,7 +57,11 @@ const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
 // & photo specs" reference on the Garage page itself for sourcing). Depop
 // has no published hard cap, only a soft mobile-truncation point, so it's
 // deliberately left out here rather than treated as a validation error.
-const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
+// Vinted is 100, not the 70 an earlier version of this constant (and the
+// matching one in app.js) had it at, which would have flagged a real
+// 71-100 char Vinted title as a validation error it was never actually
+// going to hit on the real site.
+const TITLE_HARD_LIMITS = { ebay: 80, vinted: 100, poshmark: 80 };
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
 // eBay category classifier. "shoes" drives real eBay fee math: Clothing,
 // Shoes & Accessories charges a 15.3% final value fee, not the 13.6%

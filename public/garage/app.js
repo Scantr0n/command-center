@@ -1037,11 +1037,35 @@ function renderAttentionBar() {
 // Real published title-length caps as of September 2026, sourced from each
 // platform's own seller/help documentation (see the "Title & photo specs"
 // details on the page). eBay and Poshmark share an 80-char hard cap, Vinted
-// is tighter at 70. Depop has no published hard cap, its mobile search UI
-// just visibly truncates around 50 chars, so that's a soft warning tier,
-// not a hard "over" like the other three.
-const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
+// is looser at 100 (an earlier version of this table had it at 70, which
+// undercounted Vinted's real cap and would have flagged a title as "over"
+// up to 30 characters before it actually was, the same class of reference
+// drift the fee schedule below has already produced twice, see
+// FEE_SCHEDULE_REVIEWED_ON's comment). Depop has no published hard cap, its
+// mobile search UI just visibly truncates around 50 chars, so that's a soft
+// warning tier, not a hard "over" like the other three.
+const TITLE_HARD_LIMITS = { ebay: 80, vinted: 100, poshmark: 80 };
 const DEPOP_SOFT_LIMIT = 50;
+
+// Same freshness-badge pattern as FEE_SCHEDULE_REVIEWED_ON below: this table
+// drives a real advisory/blocker on the pre-publish checklist and the photo
+// draft tool, not just a display table, so a stale cap is a real risk of a
+// missed rejection (or an over-cautious false warning, as the Vinted 70
+// bug above was) rather than just a cosmetic reference going out of date.
+const TITLE_SPECS_REVIEWED_ON = '2026-09-23';
+const TITLE_SPECS_STALE_AFTER_DAYS = 45;
+
+function renderTitleSpecsFreshness() {
+  const el = document.getElementById('titleSpecsFreshness');
+  if (!el) return;
+  const age = daysSincePublished(TITLE_SPECS_REVIEWED_ON);
+  const stale = age != null && age > TITLE_SPECS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published title/photo specs on ' + TITLE_SPECS_REVIEWED_ON + '.';
+}
 
 function titleFitCell(platform, title, platforms) {
   if (!(platforms || []).includes(platform)) {
@@ -4890,6 +4914,7 @@ wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
 renderFeeScheduleFreshness();
+renderTitleSpecsFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
