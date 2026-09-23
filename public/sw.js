@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v27';
+const CACHE_VERSION = 'v28';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -16,6 +16,7 @@ const SHELL_URLS = [
   '/vendor/d3-force-selection-zoom.min.js', '/sidebar.js',
   '/alpha/', '/alpha/index.html', '/alpha/app.js', '/alpha/style.css',
   '/alpha/data/account-core.js', '/alpha/data/dates-core.js', '/alpha/data/regime-core.js',
+  '/alpha/data/sparkline-core.js',
   '/cgt/', '/cgt/index.html', '/cgt/app.js', '/cgt/style.css',
   '/cgt/import.html', '/cgt/import.js', '/cgt/data/validate-core.js', '/cgt/data/grading-core.js',
   '/csm/', '/csm/index.html', '/csm/app.js', '/csm/style.css', '/csm/data/validate-core.js',

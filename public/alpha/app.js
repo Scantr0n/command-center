@@ -5,25 +5,33 @@ function escapeHtml(str) {
 }
 
 // Market-calendar and uptime/incident date math lives in dates-core.js,
-// regime-segment/distribution math lives in regime-core.js, both loaded
-// before this file (see index.html), so they can be unit-tested outside the
-// browser (dates-core.test.js, regime-core.test.js) instead of only ever
-// running live on whatever day, or whatever regime transitions, someone's
-// browser happens to have seen. See each file's own comments for the real
-// NYSE calendar source and the reasoning behind its functions.
+// regime-segment/distribution math lives in regime-core.js, sparkline
+// geometry and rolling-average math lives in sparkline-core.js, all three
+// loaded before this file (see index.html), so they can be unit-tested
+// outside the browser instead of only ever running live on whatever day, or
+// whatever regime transitions or latency readings, someone's browser
+// happens to have seen. See each file's own comments for the real NYSE
+// calendar source and the reasoning behind its functions.
 //
-// All three of those scripts and account-core.js are loaded via plain
-// <script> tags before this one; if any one fails to load (a network blip on
-// a first, not-yet-cached visit, an ad blocker, a bad deploy that drops one
-// file), the destructure below throws and used to abort this entire script
-// with no visible sign of it, leaving the page stuck forever on its static
-// "Loading..." placeholders, indistinguishable from a page that is merely
-// slow. This page's whole job is to be trusted at a glance, so a load
-// failure gets the same honest, visible treatment every other failure mode
-// here already gets, instead of silently reading as "still loading".
-if (typeof AlphaDatesCore === 'undefined' || typeof AlphaAccountCore === 'undefined' || typeof AlphaRegimeCore === 'undefined') {
-  const missing = typeof AlphaDatesCore === 'undefined' ? 'dates-core.js'
-    : typeof AlphaAccountCore === 'undefined' ? 'account-core.js' : 'regime-core.js';
+// All four of those scripts (this trio plus account-core.js) are loaded via
+// plain <script> tags before this one; if any one fails to load (a network
+// blip on a first, not-yet-cached visit, an ad blocker, a bad deploy that
+// drops one file), the destructure below throws and used to abort this
+// entire script with no visible sign of it, leaving the page stuck forever
+// on its static "Loading..." placeholders, indistinguishable from a page
+// that is merely slow. This page's whole job is to be trusted at a glance,
+// so a load failure gets the same honest, visible treatment every other
+// failure mode here already gets, instead of silently reading as "still
+// loading".
+const CORE_SCRIPTS = [
+  ['AlphaDatesCore', 'dates-core.js'],
+  ['AlphaAccountCore', 'account-core.js'],
+  ['AlphaRegimeCore', 'regime-core.js'],
+  ['AlphaSparklineCore', 'sparkline-core.js']
+];
+const missingCoreScript = CORE_SCRIPTS.find(([globalName]) => typeof window[globalName] === 'undefined');
+if (missingCoreScript) {
+  const missing = missingCoreScript[1];
   const bar = document.getElementById('stickyCriticalBar');
   if (bar) {
     bar.hidden = false;
@@ -56,6 +64,12 @@ const {
   regimeSegmentEndMs,
   computeRegimeDistribution
 } = AlphaRegimeCore;
+const {
+  SPARK_W,
+  SPARK_H,
+  computeSparklinePoints,
+  averageLatency
+} = AlphaSparklineCore;
 const MARKET_CALENDAR_SOURCE_CHECKED_AT = '2026-09-17';
 
 function renderMarketStatus() {
@@ -352,16 +366,9 @@ function recordClientLatency(ms) {
   return trimmed;
 }
 
-// Averaged over a small recent window rather than the full cap, since a
-// single-request spike (or a real, sustained slowdown) is more useful read
-// against "the last handful of checks" than against everything this browser
-// has ever recorded.
-function averageLatency(history) {
-  if (!history.length) return null;
-  const recent = history.slice(-LATENCY_AVG_WINDOW);
-  const sum = recent.reduce((s, e) => s + (typeof e.ms === 'number' ? e.ms : 0), 0);
-  return Math.round(sum / recent.length);
-}
+// averageLatency and computeSparklinePoints now live in sparkline-core.js
+// (see AlphaSparklineCore above), so this geometry and rolling-average math
+// can be unit-tested outside the browser.
 
 // The "Fetch Xms (avg Yms)" text next to the connection strip gives the
 // latest and average reading but not the shape between them, exactly what a
@@ -374,28 +381,6 @@ function averageLatency(history) {
 // estimated series. Returns '' (nothing rendered) with fewer than 2 points,
 // since a single point has no trend to show, same honest-empty-state rule as
 // every other section on this page.
-const SPARK_W = 56;
-const SPARK_H = 18;
-const SPARK_PAD = 2;
-
-// Shared geometry for every sparkline on this page (fetch latency here, the
-// drawdown/robustness meters below): maps a list of real numbers onto the
-// same fixed SPARK_W x SPARK_H box. A flat line through the middle when
-// every sample in the window is identical is a deliberate choice, not a
-// bug, it avoids a divide-by-zero and correctly shows "no movement" rather
-// than a fabricated slope.
-function computeSparklinePoints(values) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min;
-  const innerW = SPARK_W - SPARK_PAD * 2;
-  const innerH = SPARK_H - SPARK_PAD * 2;
-  return values.map((v, i) => {
-    const x = SPARK_PAD + (values.length === 1 ? 0 : (i / (values.length - 1)) * innerW);
-    const y = SPARK_PAD + (range === 0 ? innerH / 2 : innerH - ((v - min) / range) * innerH);
-    return [x, y];
-  });
-}
 
 function renderLatencySparkline(history) {
   const recent = (history || []).slice(-LATENCY_AVG_WINDOW).filter(e => typeof e.ms === 'number' && Number.isFinite(e.ms));
