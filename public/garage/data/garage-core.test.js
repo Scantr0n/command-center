@@ -21,15 +21,29 @@ const {
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
 } = require('./garage-core.js');
 
-test('estimateNetPayout: eBay charges 13.6% + the $0.30/$0.40 per-order step, never a shoes-specific rate', () => {
-  // A $30 sale nets 30 - (30*0.136 + 0.40) = 25.52, not the ~14.9% effective
-  // rate an earlier bug mistook for a category-specific percentage.
-  assert.equal(Math.round(estimateNetPayout('ebay', 30, 'shoes') * 100) / 100, 25.52);
+test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
+  // A $30 sale with no category nets 30 - (30*0.136 + 0.40) = 25.52, not the
+  // ~14.9% effective rate an earlier bug mistook for a category-specific
+  // percentage.
+  assert.equal(Math.round(estimateNetPayout('ebay', 30) * 100) / 100, 25.52);
   // At/under $10 the per-order fee is $0.30, not $0.40.
   assert.equal(Math.round(estimateNetPayout('ebay', 10) * 100) / 100, 8.34);
   // No leftover 2.9% + $0.30 card-processing surcharge on top of the
   // managed-payments final value fee (the real double-charge bug).
   assert.equal(estimateNetPayout('ebay', 100), 100 - (100 * 0.136 + 0.40));
+});
+
+test('estimateNetPayout: eBay charges the real 15.3% Clothing, Shoes & Accessories rate for category "shoes", not the 13.6% standard rate', () => {
+  // Both real live boots listings are category "shoes": a $30 sale there
+  // nets 30 - (30*0.153 + 0.40) = 25.01, not the 25.52 the 13.6% standard
+  // rate (or the debunked ~14.9% "shoes rate" from the earlier bug) would
+  // give. An earlier version of this file charged every category, shoes
+  // included, the 13.6% standard rate, undercounting both real listings.
+  assert.equal(Math.round(estimateNetPayout('ebay', 30, 'shoes') * 100) / 100, 25.01);
+  // Consumer Electronics is not a special-rate category, it still gets the
+  // 13.6% standard rate.
+  assert.equal(Math.round(estimateNetPayout('ebay', 95, 'electronics') * 100) / 100,
+    Math.round((95 - (95 * 0.136 + 0.40)) * 100) / 100);
 });
 
 test('estimateNetPayout: Vinted has no seller fee, Poshmark and Depop use their published formulas', () => {
@@ -50,6 +64,16 @@ test('minListingPriceForNet inverts estimateNetPayout for every platform', () =>
     const price = minListingPriceForNet(platform, targetNet, false);
     assert.ok(Math.abs(estimateNetPayout(platform, price) - targetNet) < 0.01, platform);
   }
+});
+
+test('minListingPriceForNet threads category through to eBay\'s real 15.3% shoes rate', () => {
+  const targetNet = 20;
+  const price = minListingPriceForNet('ebay', targetNet, false, 'shoes');
+  assert.ok(Math.abs(estimateNetPayout('ebay', price, 'shoes') - targetNet) < 0.01);
+  // The shoes-rate price should be strictly higher than the standard-rate
+  // price to clear the same target net, since 15.3% takes a bigger bite.
+  const standardPrice = minListingPriceForNet('ebay', targetNet, false);
+  assert.ok(price > standardPrice);
 });
 
 test('ebayMinPriceForNet picks the $0.30 branch only when it actually lands at/under $10', () => {

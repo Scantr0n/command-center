@@ -41,6 +41,30 @@
   const RELIST_FRESH_DAYS = 30;
   const POSHMARK_HOLD_DAYS = 60;
 
+  // eBay's final value fee is not one flat percentage across every
+  // category. Most categories, including Consumer Electronics, charge the
+  // 13.6% standard rate; Clothing, Shoes & Accessories charges 15.3%
+  // instead (eBay raised it from 15% to 15.3% during 2026, per eBay's own
+  // published seller fee schedule as of September 2026). Both real live
+  // boots listings are "shoes", so 15.3% is the rate that actually applies
+  // to them, not the standard one, an earlier version of this file charged
+  // them 13.6% and undercounted both listings' real net payout by it. This
+  // is a genuine eBay-published category rate, and a different number from
+  // the ~14.9% figure an earlier bug (fb89c3e, reverted at d1d3c45) briefly
+  // charged the "shoes" category: that number was never a real category
+  // rate at all, just a small sale's *effective* rate once the flat
+  // per-order fee gets folded in (13.6% + $0.40 on a $30 sale works out to
+  // ~14.9% of the total). The only other shoes-specific number on this page
+  // is the unrelated *lower* 8% rate for qualifying athletic shoes sold at
+  // $150+, which doesn't apply to either real boots listing here (both are
+  // under $150 and non-athletic).
+  const EBAY_STANDARD_RATE = 0.136;
+  const EBAY_CATEGORY_RATES = { shoes: 0.153 };
+
+  function ebayFinalValueRate(category) {
+    return EBAY_CATEGORY_RATES[category] || EBAY_STANDARD_RATE;
+  }
+
   // Standard published 2026 seller fee schedules, not a live account
   // connection. eBay moved to managed payments years ago: the final value
   // fee is one combined rate with no separate card-processing surcharge on
@@ -50,17 +74,8 @@
   function estimateNetPayout(platform, price, category) {
     if (price == null) return null;
     switch (platform) {
-      // Clothing, Shoes & Accessories is one of eBay's standard-rate
-      // categories, 13.6% same as most others, not a higher rate of its own
-      // (eBay's published seller fee schedule; the only shoes-specific
-      // exception is a *lower* 8% rate for qualifying athletic shoes sold at
-      // $150+, which doesn't apply to either real boots listing here). An
-      // earlier version of this charged the "shoes" category 14.9%, mixing
-      // up that flat rate with the effective rate a small sale gets once the
-      // fixed per-order fee is folded in (13.6% + $0.40 on a $30 sale really
-      // is ~14.9% of the total), which isn't a category-specific number.
       case 'ebay':
-        return price - (price * 0.136 + (price > 10 ? 0.40 : 0.30));
+        return price - (price * ebayFinalValueRate(category) + (price > 10 ? 0.40 : 0.30));
       case 'vinted': return price;
       case 'poshmark': return price < 15 ? price - 2.95 : price * 0.80;
       case 'depop': return price - (price * 0.033 + 0.45);
@@ -68,10 +83,11 @@
     }
   }
 
-  function ebayMinPriceForNet(targetNet) {
-    const lowStep = (targetNet + 0.30) / (1 - 0.136);
+  function ebayMinPriceForNet(targetNet, category) {
+    const rate = ebayFinalValueRate(category);
+    const lowStep = (targetNet + 0.30) / (1 - rate);
     if (lowStep <= 10) return lowStep;
-    return (targetNet + 0.40) / (1 - 0.136);
+    return (targetNet + 0.40) / (1 - rate);
   }
 
   function depopMinPriceForNet(targetNet, applyBoost) {
@@ -89,9 +105,9 @@
     return targetNet / 0.80;
   }
 
-  function minListingPriceForNet(platform, targetNet, applyBoost) {
+  function minListingPriceForNet(platform, targetNet, applyBoost, category) {
     switch (platform) {
-      case 'ebay': return ebayMinPriceForNet(targetNet);
+      case 'ebay': return ebayMinPriceForNet(targetNet, category);
       case 'vinted': return targetNet;
       case 'poshmark': return poshmarkMinPriceForNet(targetNet);
       case 'depop': return depopMinPriceForNet(targetNet, applyBoost);
@@ -227,8 +243,8 @@
 
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
-    POSHMARK_WEIGHT_TIERS,
-    estimateNetPayout,
+    POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
+    estimateNetPayout, ebayFinalValueRate,
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
     remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,

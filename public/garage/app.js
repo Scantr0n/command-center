@@ -1419,6 +1419,7 @@ function initTableScrollShadows() {
 // payout table above, just driven by a typed price instead of listings.json.
 const CALC_FEE_DESCRIPTIONS = {
   ebay: '13.6% final value fee + $0.30 ($0.40 over $10) per-order fee',
+  ebayShoes: '15.3% final value fee (Clothing, Shoes & Accessories) + $0.30 ($0.40 over $10) per-order fee',
   vinted: 'No seller fees',
   poshmark: 'Flat $2.95 under $15, otherwise 20% commission',
   depop: '3.3% + $0.45 payment processing, no commission'
@@ -1432,6 +1433,7 @@ const CALC_FEE_DESCRIPTIONS = {
 // seller is deciding whether boosting a new item is worth it.
 let calcPlatforms = new Set(PAYOUT_PLATFORMS);
 let includeDepopBoost = false;
+let includeEbayShoesRate = false;
 
 // Reads a positive-or-zero numeric input, treating blank as "not provided"
 // (null) rather than 0, since a real $0 cost and "haven't entered one yet"
@@ -1475,6 +1477,7 @@ function renderCalc() {
   const hasShipping = shipping != null && shipping !== undefined;
   const showProfit = hasCost || hasShipping;
   document.getElementById('calcDepopBoostWrap').hidden = !calcPlatforms.has('depop');
+  document.getElementById('calcEbayShoesWrap').hidden = !calcPlatforms.has('ebay');
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;
@@ -1489,11 +1492,13 @@ function renderCalc() {
   profitHead.hidden = !showProfit;
 
   const applyBoost = includeDepopBoost && calcPlatforms.has('depop');
+  const applyEbayShoesRate = includeEbayShoesRate && calcPlatforms.has('ebay');
+  const ebayCategory = applyEbayShoesRate ? 'shoes' : undefined;
 
   const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => {
     const net = p === 'depop' && applyBoost
       ? estimateNetPayout(p, price) - price * DEPOP_BOOST_FEE_PCT
-      : estimateNetPayout(p, price);
+      : estimateNetPayout(p, price, p === 'ebay' ? ebayCategory : undefined);
     return { p, net };
   });
   const bestNet = rows.length > 1 ? Math.max(...rows.map(r => r.net)) : null;
@@ -1504,7 +1509,9 @@ function renderCalc() {
     const profit = showProfit ? r.net - (hasCost ? cost : 0) - (hasShipping ? shipping : 0) : null;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
-      : CALC_FEE_DESCRIPTIONS[r.p];
+      : r.p === 'ebay' && applyEbayShoesRate
+        ? CALC_FEE_DESCRIPTIONS.ebayShoes
+        : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
       <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
@@ -1522,6 +1529,10 @@ function wireCalc() {
   document.getElementById('calcShippingInput').addEventListener('input', renderCalc);
   document.getElementById('calcDepopBoostInput').addEventListener('change', e => {
     includeDepopBoost = e.target.checked;
+    renderCalc();
+  });
+  document.getElementById('calcEbayShoesInput').addEventListener('change', e => {
+    includeEbayShoesRate = e.target.checked;
     renderCalc();
   });
   const container = document.getElementById('calcPlatformToggle');
@@ -1546,6 +1557,7 @@ function wireCalc() {
 // simple lookup once fees are a function of the unknown price.
 let beCalcPlatforms = new Set(PAYOUT_PLATFORMS);
 let beIncludeDepopBoost = false;
+let beIncludeEbayShoesRate = false;
 
 // eBay's per-order fee is a step function of price ($0.30 at/under $10, else
 // $0.40), so solve assuming the lower step first; the lower step is always
@@ -1582,6 +1594,7 @@ function renderBreakEven() {
   profitError.textContent = profitInvalid ? 'Enter a valid target profit of $0 or more, ignoring it for now.' : '';
 
   document.getElementById('beDepopBoostWrap').hidden = !beCalcPlatforms.has('depop');
+  document.getElementById('beEbayShoesWrap').hidden = !beCalcPlatforms.has('ebay');
 
   const hasCost = cost != null && cost !== undefined && cost > 0;
   const hasAnyInput = hasCost || (shipping != null && shipping !== undefined && shipping > 0) ||
@@ -1600,9 +1613,10 @@ function renderBreakEven() {
 
   const targetNet = (cost || 0) + (shipping || 0) + (profit || 0);
   const applyBoost = beIncludeDepopBoost && beCalcPlatforms.has('depop');
+  const applyEbayShoesRate = beIncludeEbayShoesRate && beCalcPlatforms.has('ebay');
 
   const rows = PAYOUT_PLATFORMS.filter(p => beCalcPlatforms.has(p)).map(p => {
-    const minPrice = minListingPriceForNet(p, targetNet, applyBoost);
+    const minPrice = minListingPriceForNet(p, targetNet, applyBoost, p === 'ebay' && applyEbayShoesRate ? 'shoes' : undefined);
     return { p, minPrice };
   });
   const lowest = rows.length > 1 ? Math.min(...rows.map(r => r.minPrice)) : null;
@@ -1612,7 +1626,9 @@ function renderBreakEven() {
     const isBest = lowest != null && !tiedForLowest && r.minPrice === lowest;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
-      : CALC_FEE_DESCRIPTIONS[r.p];
+      : r.p === 'ebay' && applyEbayShoesRate
+        ? CALC_FEE_DESCRIPTIONS.ebayShoes
+        : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
       <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
@@ -1629,6 +1645,10 @@ function wireBreakEven() {
   document.getElementById('beProfitInput').addEventListener('input', renderBreakEven);
   document.getElementById('beDepopBoostInput').addEventListener('change', e => {
     beIncludeDepopBoost = e.target.checked;
+    renderBreakEven();
+  });
+  document.getElementById('beEbayShoesInput').addEventListener('change', e => {
+    beIncludeEbayShoesRate = e.target.checked;
     renderBreakEven();
   });
   const container = document.getElementById('bePlatformToggle');

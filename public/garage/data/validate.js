@@ -59,14 +59,15 @@ const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
 // deliberately left out here rather than treated as a validation error.
 const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
-// eBay category classifier. Neither value changes eBay fee math (Clothing,
-// Shoes & Accessories and Consumer Electronics both charge the same 13.6%
-// final value fee, no special rate to model for either). What "shoes"
-// actually drives is which itemSpecifics fields get checked below (size and
-// color only matter for something you wear). "electronics" drives the real
-// Depop platform ban checked below instead (Depop prohibits battery-powered/
-// electronic items outright, see the Electronics & battery-item rules
-// reference on the page); everything else stays null.
+// eBay category classifier. "shoes" drives real eBay fee math: Clothing,
+// Shoes & Accessories charges a 15.3% final value fee, not the 13.6%
+// standard rate most other categories (including Consumer Electronics) get
+// (see EBAY_CATEGORY_RATES in garage-core.js). "shoes" also drives which
+// itemSpecifics fields get checked below (size and color only matter for
+// something you wear). "electronics" drives the real Depop platform ban
+// checked below instead (Depop prohibits battery-powered/electronic items
+// outright, see the Electronics & battery-item rules reference on the
+// page); everything else stays null.
 const LISTING_CATEGORIES = ['shoes', 'electronics'];
 const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
