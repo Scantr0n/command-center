@@ -199,6 +199,20 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  // Same Number.isFinite guard computeSocialReach already applies before
+  // summing followers into a platform total, so a hand-edited non-numeric
+  // value (a "12,000" or "12K" string, validate.js rejects it but only when
+  // someone remembers to run it before the data is live) doesn't reach
+  // Number(...).toLocaleString() and print "NaN followers" in the activity
+  // feed, the copyable outreach brief, or the prospect detail modal, the
+  // three other places this same field gets displayed.
+  function formatFollowers(snap) {
+    if (!snap || snap.followers == null) return null;
+    const followers = Number(snap.followers);
+    if (!Number.isFinite(followers)) return null;
+    return followers.toLocaleString() + ' followers';
+  }
+
   function channelBadge(channel) {
     if (!channel || !channel.type) {
       return '<span class="badge badge-unknown">CHANNEL NOT LOGGED</span>';
@@ -749,8 +763,9 @@
       // type here is keyed on.
       (p.socialSnapshots || []).forEach(snap => {
         if (!snap.asOfDate) return;
+        const followersLabel = formatFollowers(snap);
         const label = 'Logged ' + (snap.platform || 'platform not logged') + ' snapshot' +
-          (snap.followers != null ? ': ' + Number(snap.followers).toLocaleString() + ' followers' : '') +
+          (followersLabel ? ': ' + followersLabel : '') +
           (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '');
         events.push({ date: snap.asOfDate, type: 'snapshot', prospect: p, label });
       });
@@ -1976,7 +1991,8 @@
       snaps.forEach(snap => {
         const staleInfo = socialSnapshotStaleInfo(snap);
         const parts = [snap.platform || 'Platform not logged'];
-        if (snap.followers != null) parts.push(Number(snap.followers).toLocaleString() + ' followers');
+        const followersLabel = formatFollowers(snap);
+        if (followersLabel) parts.push(followersLabel);
         if (snap.engagementRate != null) parts.push(snap.engagementRate + '% engagement');
         const asOf = snap.asOfDate
           ? 'as of ' + fmtDate(snap.asOfDate) + (staleInfo ? ', ' + staleInfo.days + 'd old, DUE FOR REFRESH' : '')
@@ -2466,8 +2482,9 @@
     const snapsHtml = snaps.length
       ? '<ul class="ideas-list">' + snaps.map(snap => {
           const snapStale = socialSnapshotStaleInfo(snap);
+          const followersLabel = formatFollowers(snap);
           return '<li>' + escapeHtml(snap.platform || 'Platform not logged') +
-            (snap.followers != null ? ', ' + Number(snap.followers).toLocaleString() + ' followers' : '') +
+            (followersLabel ? ', ' + followersLabel : '') +
             (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '') +
             '<span class="snapshot-tag' + (snapStale ? ' snapshot-tag-stale' : '') + '">' +
             (snap.asOfDate ? 'AS OF ' + fmtDate(snap.asOfDate).toUpperCase() + ', ONE-TIME MANUAL SNAPSHOT, NOT LIVE' : 'NO SNAPSHOT DATE LOGGED') +
@@ -2639,7 +2656,8 @@
       const warnParts = [];
       if (last && last.date && date < last.date) {
         warnParts.push('This date is before the last logged move (' + last.date + '). stageHistory must stay sorted oldest first.');
-      } else if (stage !== p.stage) {
+      }
+      if (stage !== p.stage) {
         warnParts.push('This prospect’s own "stage" field is still "' + p.stage + '". If this move already really ' +
           'happened, also update this prospect’s "stage" and "stageEnteredDate" fields, not just stageHistory.');
       }
