@@ -74,6 +74,14 @@
     <div id="applicationsAsides"></div>
   </section>
 
+  <section id="duplicatesSection" hidden>
+    <h2 class="section-title">Possible duplicates</h2>
+    <p class="section-note">Same company and role logged on more than one entry. Could be a real second
+      application, or a tracker entry hand-transcribed twice under two different "#" numbers, the only
+      uniqueness check this table otherwise has.</p>
+    <div class="data-quality-list" id="duplicatesList"></div>
+  </section>
+
   <section id="criteriaSection">
     <h2 class="section-title">Standing criteria</h2>
     <p class="section-note">
@@ -171,6 +179,7 @@
   </div>
 </div>
 
+<script src="/job-search/data/validate-core.js"></script>
 <script src="/job-search/app.js"></script>
 <script src="/sidebar.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>

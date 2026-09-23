@@ -264,6 +264,58 @@ header.page-head .sub {
   margin-left: 8px;
 }
 .section-title-meta.warn { color: #E0A030; }
+
+/* "Possible duplicates" panel, same pattern and colors as CGT/CSM/Garage/
+   Sondrik's own duplicate-record panel: an amber list of clickable rows,
+   grouping logic shared with validate.js via JobSearchValidateCore. */
+.data-quality-list {
+  border: 1px solid rgba(224,160,48,0.3);
+  background: rgba(224,160,48,0.04);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 32px;
+}
+.data-quality-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(224,160,48,0.15);
+  font-size: 0.85rem;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.data-quality-row:first-of-type { border-top: none; }
+.data-quality-row:hover, .data-quality-row:focus-visible {
+  background: rgba(224,160,48,0.08);
+}
+.data-quality-row:focus-visible { outline: 1px solid rgba(224,160,48,0.5); outline-offset: -1px; }
+.data-quality-row .dq-why {
+  margin-left: auto;
+  color: #E0A030;
+  font-size: 0.72rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Clicking a duplicate row above jumps to and highlights the matching
+   applications-table row, same "you clicked through" confirmation as
+   .section-flash elsewhere on this page. Animates the cells, not the <tr>
+   itself: box-shadow does not render on a table row in most browsers. */
+.row-flash td {
+  animation: rowFlash 1.6s ease-out;
+}
+@keyframes rowFlash {
+  0% { background: rgba(224,160,48,0.16); }
+  100% { background: transparent; }
+}
 .section-note {
   font-size: 0.78rem;
   color: var(--dim);
@@ -614,7 +666,9 @@ footer.page-foot code { overflow-wrap: anywhere; }
   /* Same real print-contrast bug already found and fixed on the other 5
      hubs' own .section-title-meta.warn: raw #E0A030 on white clears nowhere
      near 4.5:1, darkened until it does, not an arbitrary pick. */
-  .section-title-meta.warn { color: #8a5a00; }
+  .section-title-meta.warn, .dq-why { color: #8a5a00; }
+  .data-quality-list { border-color: #d9b04a; background: none; }
+  .data-quality-row { border-top-color: #e8d6a8; }
   .snapshot-chip, .lead-card, .criteria-item, .dealbreaker-item, .sub-list-item, .data-table-wrap {
     background: none;
     border: 1px solid #ccc;

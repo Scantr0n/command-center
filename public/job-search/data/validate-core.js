@@ -1,12 +1,15 @@
 /*
  * Pure validation-support rules for the Job Search hub, with no Node-only
- * APIs (no fs/path), matching the shared-core pattern already used by every
- * other hub (CGT, CSM, Garage, Sondrik, Alpha): CLI validate.js requires this
- * file directly, and the pure date/text checks live here instead of inline
- * so they can carry their own regression tests, the same as every other
- * hub's validate-core.js. This hub's dashboard (app.js) has no editing UI of
- * its own to reuse these from (see index.html's "read-only reference" note),
- * so unlike the other hubs' validate-core.js this one is CLI-only for now.
+ * APIs (no fs/path), so the exact same rules run in two places: the CLI
+ * validator (public/job-search/data/validate.js, which requires this file
+ * directly) and the dashboard's own "Possible duplicates" panel
+ * (public/job-search/app.js), which needs the real application objects to
+ * render clickable rows, not just a pre-formatted warning string. Same
+ * shared-core pattern as CGT's, CSM's, Garage's, and Sondrik's own
+ * validate-core.js, so the two can never quietly drift apart. The date/URL/
+ * em-dash checks below have no dashboard consumer (this hub's page is a
+ * read-only reference, see index.html's own note), only findDuplicateApplications
+ * is shared both ways.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {

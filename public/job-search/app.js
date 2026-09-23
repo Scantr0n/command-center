@@ -212,7 +212,7 @@
         '<th>#</th><th>Role</th><th>Company</th><th>Location</th><th>Pay</th><th>Applied</th>' +
         '</tr></thead><tbody>' +
         apps.map(a =>
-          '<tr>' +
+          '<tr id="app-row-' + escapeHtml(String(a.num)) + '">' +
           '<td class="num-col" data-label="#">' + escapeHtml(String(a.num)) + '</td>' +
           '<td data-label="Role">' + escapeHtml(a.role) + '</td>' +
           '<td data-label="Company">' + escapeHtml(a.company) + '</td>' +
@@ -244,6 +244,49 @@
       );
     }
     applicationsAsides.innerHTML = asides.join('');
+  }
+
+  // Real risk this catches: applications.json's only existing uniqueness
+  // check is on "num" (an auto-incrementing counter, so it can't naturally
+  // collide except by mistake), so the same tracker entry hand-transcribed
+  // twice under two different "num" values would otherwise go completely
+  // undetected on this page, unlike CGT/CSM/Garage/Sondrik's own record
+  // lists, which all already show this same panel. Grouping logic lives in
+  // JobSearchValidateCore, shared with validate.js, same reasoning as every
+  // other hub's own validate-core.js.
+  let duplicateRowFlashTimer = null;
+  function jumpToApplicationRow(num) {
+    const row = document.getElementById('app-row-' + num);
+    if (!row) return;
+    row.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    clearTimeout(duplicateRowFlashTimer);
+    document.querySelectorAll('.row-flash').forEach(n => n.classList.remove('row-flash'));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      row.classList.add('row-flash');
+      duplicateRowFlashTimer = setTimeout(() => row.classList.remove('row-flash'), 1600);
+    }));
+  }
+
+  function renderDuplicates(applications) {
+    const section = document.getElementById('duplicatesSection');
+    const list = document.getElementById('duplicatesList');
+    if (!section || !list || typeof JobSearchValidateCore === 'undefined') return;
+    const groups = JobSearchValidateCore.findDuplicateApplications(applications);
+    if (!groups.length) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+    list.innerHTML = groups.map(group => group.map(a =>
+      '<button type="button" class="data-quality-row" data-num="' + escapeHtml(String(a.num)) + '">' +
+      '<strong>' + escapeHtml(a.company) + '</strong>' +
+      '<span style="color:var(--sub)">' + escapeHtml(a.role) + '</span>' +
+      '<span class="dq-why">#' + escapeHtml(String(a.num)) + ', ' + group.length + ' ENTRIES MATCH ON COMPANY + ROLE</span>' +
+      '</button>'
+    ).join('')).join('');
+    list.querySelectorAll('.data-quality-row').forEach(btn => {
+      btn.addEventListener('click', () => jumpToApplicationRow(btn.dataset.num));
+    });
   }
 
   function renderCriteria(data) {
@@ -370,6 +413,7 @@
 
     if (applicationsData) {
       renderApplications(applicationsData);
+      renderDuplicates(applicationsData.applications || []);
     } else {
       applicationsTableWrap.innerHTML = '<div class="empty-state" role="alert">Failed to load applications data: ' +
         escapeHtml(applicationsResult.reason.message) + '</div>';
