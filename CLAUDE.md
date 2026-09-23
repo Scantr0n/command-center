@@ -18,6 +18,7 @@ Jack's unified dashboard — one hub, one cluster per project, radial node-graph
 - `npm run test:alpha` — Alpha's regression tests for its account/position money math (`account-core.js`) and market-calendar/uptime date math (`dates-core.js`); run after touching either file
 - `npm run test:garage` — The Garage's regression tests for its platform fee/payout math and dispute/relist date math (`garage-core.js`); run after touching that file
 - `npm run test:csm` — CSM's regression tests for its duplicate-prospect and casing-drift rules (`validate-core.js`); run after touching that file
+- `npm run test:job-search` — Job Search's regression tests for its date/em-dash/URL and duplicate-application rules (`validate-core.js`); run after touching that file
 
 ## Structure
 - `data/clusters/*.json` — one file per project, the source of truth for cluster status/summary

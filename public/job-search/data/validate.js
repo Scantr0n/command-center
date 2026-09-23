@@ -17,54 +17,14 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
   const raw = fs.readFileSync(file, 'utf8');
   return JSON.parse(raw);
-}
-
-function isDateOrNull(v) {
-  if (v === null || v === undefined) return true;
-  if (typeof v !== 'string' || !DATE_RE.test(v)) return false;
-  const [y, m, d] = v.split('-').map(Number);
-  const parsed = new Date(y, m - 1, d);
-  return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
-}
-
-function isFutureDate(v) {
-  if (!v || !DATE_RE.test(v)) return false;
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  return new Date(v + 'T00:00:00') > tomorrow;
-}
-
-// Every real field on this page is transcribed straight out of the tracker
-// (see the file header above), so a hand-typed field with an em dash reads
-// as a paste-in from somewhere other than that source file, or a new claim
-// nobody actually verified against it. Warning-level only, matches Sondrik.
-function emDashFields(obj, fields) {
-  const hits = [];
-  if (!obj) return hits;
-  fields.forEach(f => {
-    const v = obj[f];
-    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
-  });
-  return hits;
-}
-
-// A source link is only ever real if it's an actual http(s) URL or a mailto:
-// (Curb Creations has no posting URL, only an email address to apply to).
-// Anything else hand-typed into sourceUrl (a bare "TBD", a placeholder) would
-// render as a broken or misleading link, so this is an error, not a warning.
-function isValidSourceUrlOrNull(v) {
-  if (v === null || v === undefined) return true;
-  if (typeof v !== 'string') return false;
-  return /^https?:\/\//.test(v) || /^mailto:/.test(v);
 }
 
 function main() {
@@ -122,6 +82,15 @@ function main() {
     const where = 'skipped[' + idx + ']';
     if (!s.company) errors.push(where + ': missing "company"');
     if (!s.reason) errors.push(where + ': missing "reason", a skipped application with no real reason logged reads as unexplained');
+  });
+  // Catches the same real risk every other hub's own duplicate check already
+  // guards against: applications.json's only uniqueness check above is on
+  // "num" (auto-incrementing, so it can't naturally collide except by
+  // mistake), so the same tracker entry hand-transcribed twice under two
+  // different "num" values would otherwise go undetected.
+  findDuplicateApplications(applicationsData.applications || []).forEach(group => {
+    warnings.push('applications: ' + group.length + ' entries match on company + role (' +
+      group.map(a => '#' + a.num).join(', ') + '), check for a duplicate transcription');
   });
   const savedCount = applicationsData.savedCount || {};
   if (typeof savedCount.count !== 'number' || savedCount.count < 0) {
