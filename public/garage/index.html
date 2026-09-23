@@ -1818,6 +1818,62 @@
     <div id="salesTotals" class="pace-result"></div>
   </section>
 
+  <section id="salesTaxSection">
+    <details class="section-details" id="salesTaxDetails">
+    <summary class="section-title">Sales tax: who actually collects it</summary>
+    <div class="callout">
+      <strong>Not tax advice.</strong> All four platforms are legally a "marketplace facilitator" in every US
+      state that charges a sales tax, which means the platform itself, not the seller, is required to
+      calculate, collect, and remit sales tax on a sale. That tax is added on top of the buyer's total at
+      checkout; it is never deducted from the seller's payout, so it never shows up in this dashboard's fee
+      math or net-payout figures, and it doesn't need to. This is separate from income tax: sales tax is the
+      buyer's cost of purchase, income tax on real profit is still owed regardless of the 1099-K threshold
+      below.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="salesTaxTable">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Sales tax</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>eBay</td>
+            <td>Collected &amp; remitted by eBay</td>
+            <td>Charged to the buyer at checkout on top of the item price and shipping</td>
+          </tr>
+          <tr>
+            <td>Poshmark</td>
+            <td>Collected &amp; remitted by Poshmark</td>
+            <td>Same, added to the buyer's order total, not taken from the seller's earnings</td>
+          </tr>
+          <tr>
+            <td>Depop</td>
+            <td>Collected &amp; remitted by Depop</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>Vinted</td>
+            <td>Collected &amp; remitted by Vinted</td>
+            <td>Same rule, worth a second look here since Vinted's US marketplace is newer than the other
+              three's</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      The one real edge case: a marketplace facilitator only has to collect in a state once it crosses that
+      state's own economic-nexus threshold, so a seller could in theory owe it themselves on a sale into a
+      state a platform hasn't reached yet. All four of these platforms already do enough national volume to
+      clear every state's threshold by a wide margin, so this isn't a live risk at this operation's size, only
+      worth knowing about if that ever changes.
+    </div>
+    </details>
+  </section>
+
   <section>
     <h2 class="section-title">Tax / 1099-K threshold tracker</h2>
     <div class="callout">
