@@ -441,6 +441,22 @@ header.page-head .sub {
   white-space: nowrap;
 }
 
+/* Tax / 1099-K threshold tracker: same two progress-bar-per-row layout as
+   the breakdown bars above, purple accent for consistency, amber for the
+   "met" status since #E0A030 is this page's established attention color
+   (badge-listed, callout-warn, the attention pills all use it already). */
+.tax-progress-row { display: flex; align-items: center; gap: 10px; min-width: 140px; }
+.tax-progress-track {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.04);
+  overflow: hidden;
+}
+.tax-progress-fill { display: block; height: 100%; border-radius: 5px; background: rgba(155,140,255,0.75); }
+.tax-progress-pct { font-size: 0.72rem; color: var(--sub); min-width: 2.8em; text-align: right; }
+.tax-status-met { color: #E0A030; font-weight: 500; }
+
 /* Portfolio value over time: one hand-rolled inline SVG line chart, styled to
    match the purple breakdown-bar-fill accent already used elsewhere on this
    page rather than introducing a second accent color for one chart. */
@@ -1409,6 +1425,10 @@ textarea.np-input { resize: vertical; }
   .attention-pill.attention-warn strong { color: #111 !important; }
   .attention-pill.attention-urgent strong { color: #111 !important; }
   .callout-warn strong { color: #111 !important; }
+  .tax-status-met { color: #111 !important; }
+  .tax-progress-track { background: none; border: 1px solid #ccc; }
+  .tax-progress-fill { background: #888 !important; }
+  .tax-progress-pct { color: #555 !important; }
 
   .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay {
     display: none !important;

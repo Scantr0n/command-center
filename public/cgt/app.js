@@ -670,6 +670,7 @@ async function loadCards() {
     renderCandidates();
     renderSubmissions();
     renderValueBreakdown();
+    renderTaxTracker();
     renderBiggestMovers();
     renderPortfolioValueTimeline();
     renderPricingActivity();
@@ -1087,6 +1088,59 @@ function renderValueBreakdown() {
       formatValue: g => g.value + 'd avg (' + g.min + '-' + g.max + 'd, ' + g.count + ' returned)',
       emptyText: 'No returned submissions with both dates logged yet.'
     });
+}
+
+const TAX_1099K_USD_THRESHOLD = 20000;
+const TAX_1099K_TXN_THRESHOLD = 200;
+
+// Federal 1099-K threshold as of the 2026 tax year: more than $20,000 in
+// gross payments AND more than 200 transactions, per platform, restored
+// permanently by the One Big Beautiful Bill Act (July 2025), no sunset date.
+// Same real threshold Garage's own tax tracker uses for its resale sales.
+// Only real cards.json rows count here, current calendar year only, since
+// the threshold resets each January and an undated sale can't honestly be
+// attributed to "this year". Unlike Garage's sales.json, validate-core.js
+// already requires soldDate whenever soldPrice is set (and vice versa), so
+// there's no undated-sale gap to call out separately here.
+//
+// Single row, not a per-platform breakdown like Garage's: every real sold
+// or listed card in cards.json so far names eBay as the marketplace (see
+// the "Currently listed on eBay" notes), so this assumes eBay until a card
+// sold somewhere else actually shows up, and says so in the callout rather
+// than fabricating a "platform" field cards.json doesn't have.
+function renderTaxTracker() {
+  const tbody = document.getElementById('taxTrackerBody');
+  const yearEl = document.getElementById('taxTrackerYear');
+  if (!tbody || !yearEl) return;
+  const year = todayIso().slice(0, 4);
+  yearEl.textContent = year;
+
+  const soldThisYear = cards.filter(c => !isExample(c) && isSold(c) && c.soldDate.slice(0, 4) === year);
+  const gross = soldThisYear.reduce((s, c) => s + (c.soldPrice || 0), 0);
+  const count = soldThisYear.length;
+  const grossPct = Math.min(100, (gross / TAX_1099K_USD_THRESHOLD) * 100);
+  const txnPct = Math.min(100, (count / TAX_1099K_TXN_THRESHOLD) * 100);
+  const met = gross > TAX_1099K_USD_THRESHOLD && count > TAX_1099K_TXN_THRESHOLD;
+
+  tbody.innerHTML = `
+    <tr>
+      <td><span class="badge badge-listed">eBay</span></td>
+      <td class="cell-value">${formatUsd(gross)} <span class="cell-muted">/ ${formatUsd(TAX_1099K_USD_THRESHOLD)}</span></td>
+      <td>
+        <div class="tax-progress-row">
+          <div class="tax-progress-track"><div class="tax-progress-fill" style="width:${grossPct}%"></div></div>
+          <span class="tax-progress-pct font-mono">${grossPct.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td class="cell-value">${count} <span class="cell-muted">/ ${TAX_1099K_TXN_THRESHOLD}</span></td>
+      <td>
+        <div class="tax-progress-row">
+          <div class="tax-progress-track"><div class="tax-progress-fill" style="width:${txnPct}%"></div></div>
+          <span class="tax-progress-pct font-mono">${txnPct.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td class="${met ? 'tax-status-met' : 'cell-muted'}">${met ? 'Meets both, expect a 1099-K' : 'Below threshold'}</td>
+    </tr>`;
 }
 
 // "Biggest gainers/losers" leaderboard, the feature real collectible-portfolio

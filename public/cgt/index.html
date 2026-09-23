@@ -664,6 +664,35 @@
     <div class="breakdown-grid" id="breakdownGrid"></div>
   </section>
 
+  <section>
+    <h2 class="section-title">Tax / 1099-K threshold tracker</h2>
+    <div class="callout">
+      <strong>Not tax advice.</strong> As of the 2026 tax year, the federal Form 1099-K reporting threshold is
+      back to <strong>more than $20,000 in gross payments AND more than 200 transactions</strong>, per platform,
+      restored permanently by the One Big Beautiful Bill Act (July 2025). A platform only has to send a 1099-K
+      once <em>both</em> numbers are crossed, but every dollar of real profit is taxable income regardless of
+      whether a form gets issued. This reads only real sold cards from <code class="inline-code">cards.json</code>
+      for the current calendar year, it does not estimate or project future sales. It assumes every sale runs
+      through eBay, the only marketplace any real card in this tracker has ever named -- if a card is ever sold
+      somewhere else, this row stops being accurate until cards.json can say where each sale happened.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="taxTrackerTable">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Gross sales, <span id="taxTrackerYear"></span></th>
+            <th>Toward $20,000</th>
+            <th>Transactions</th>
+            <th>Toward 200</th>
+            <th>1099-K status</th>
+          </tr>
+        </thead>
+        <tbody id="taxTrackerBody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="valueTimelineSection">
     <h2 class="section-title">Portfolio value over time</h2>
     <p class="section-subtitle">Real total value of the current (unsold, priced) collection, reconstructed from
