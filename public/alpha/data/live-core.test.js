@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 /*
- * Regression tests for live-core.js, the server-side money math behind
- * /api/alpha/live (real drawdown %, real account P&L, real position/equity
- * mapping). Previously lived inline in server.js with no test coverage at
- * all; see live-core.js's own header comment.
+ * Regression tests for live-core.js, the server-side money math and
+ * history-derived event logic behind /api/alpha/live (real drawdown %, real
+ * account P&L, real position/equity mapping, connection/kill-switch state
+ * transitions). Previously lived inline in server.js with no test coverage
+ * at all; see live-core.js's own header comment.
  *
  * Usage: node --test public/alpha/data/live-core.test.js
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { computeDrawdowns, mapPositions, mapAccount, mapEquityCurve, EQUITY_CURVE_POINT_CAP } = require('./live-core.js');
+const {
+  computeDrawdowns, mapPositions, mapAccount, mapEquityCurve, EQUITY_CURVE_POINT_CAP,
+  evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt
+} = require('./live-core.js');
 
 test('computeDrawdowns reports null/null for missing or empty history', () => {
   assert.deepEqual(computeDrawdowns(null), { currentDrawdownPct: null, maxDrawdownPct: null });
@@ -86,4 +90,75 @@ test('mapEquityCurve keeps only real finite numbers and caps to the most recent 
   const result = mapEquityCurve(long);
   assert.equal(result.length, EQUITY_CURVE_POINT_CAP);
   assert.equal(result[result.length - 1], long[long.length - 1].v, 'keeps the most recent points, not the oldest');
+});
+
+test('evolutionEvents describes real strategy switches, or a real no-switch count when none happened', () => {
+  const history = [
+    { interval: 'weekly', timestamp: '2026-01-01T00:00:00Z', agents: { a1: { switchedFrom: 'meanrev', strategy: 'momentum' } } },
+    { interval: 'weekly', timestamp: '2026-01-08T00:00:00Z', agents: { a1: { strategy: 'momentum' }, a2: { strategy: 'meanrev' } } }
+  ];
+  const events = evolutionEvents(history);
+  assert.equal(events.length, 2);
+  assert.equal(events[0].detail, 'a1: meanrev to momentum');
+  assert.equal(events[1].detail, '2 agents re-evolved, no strategy switches');
+  assert.equal(events[0].type, 'evolution');
+});
+
+test('connectionStateEvents only reports real connected/disconnected transitions, oldest first', () => {
+  const history = [
+    { at: 't1', connected: true },
+    { at: 't2', connected: true },
+    { at: 't3', connected: false },
+    { at: 't4', connected: false },
+    { at: 't5', connected: true }
+  ];
+  const events = connectionStateEvents(history);
+  assert.equal(events.length, 2);
+  assert.deepEqual(events[0], { type: 'connection', tone: 'alert', label: 'Connection lost', at: 't3' });
+  assert.deepEqual(events[1], { type: 'connection', tone: 'good', label: 'Connection restored', at: 't5' });
+});
+
+test('connectionStateEvents reports no events for a single entry or empty history', () => {
+  assert.deepEqual(connectionStateEvents([]), []);
+  assert.deepEqual(connectionStateEvents([{ at: 't1', connected: true }]), []);
+});
+
+test('killSwitchStateEvents only reports real paused-flag transitions where both sides were actually observed', () => {
+  const history = [
+    { at: 't1', connected: true, paused: false },
+    { at: 't2', connected: true, paused: true },
+    { at: 't3', connected: false, paused: null },
+    { at: 't4', connected: true, paused: false }
+  ];
+  const events = killSwitchStateEvents(history);
+  // t1 -> t2 is a real observed engage. t2 -> t3 is skipped (t3's paused is
+  // unobserved, connection was down), and t3 -> t4 is skipped too for the
+  // same reason even though a real release plausibly happened somewhere in
+  // that unobserved gap: per the file's own comment, a transition across an
+  // unobserved gap is never reported, so this is the one and only event.
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0], { type: 'kill-switch', tone: 'alert', label: 'Kill switch engaged', at: 't2' });
+});
+
+test('killSwitchStateEvents never fires on a null-to-null or unchanged reading', () => {
+  const history = [
+    { at: 't1', connected: false, paused: null },
+    { at: 't2', connected: false, paused: null },
+    { at: 't3', connected: true, paused: true },
+    { at: 't4', connected: true, paused: true }
+  ];
+  assert.deepEqual(killSwitchStateEvents(history), []);
+});
+
+test('lastKillSwitchTriggerAt returns the most recent real engage transition, null until one has happened', () => {
+  assert.equal(lastKillSwitchTriggerAt([]), null);
+  const neverTriggered = [{ at: 't1', connected: true, paused: false }, { at: 't2', connected: true, paused: false }];
+  assert.equal(lastKillSwitchTriggerAt(neverTriggered), null);
+  const triggeredTwice = [
+    { at: 't1', connected: true, paused: false },
+    { at: 't2', connected: true, paused: true },
+    { at: 't3', connected: true, paused: false },
+    { at: 't4', connected: true, paused: true }
+  ];
+  assert.equal(lastKillSwitchTriggerAt(triggeredTwice), 't4', 'the most recent engage, not the first');
 });
