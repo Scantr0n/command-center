@@ -946,10 +946,14 @@ header.page-head .sub {
 .column-toggle:hover, .column-toggle:focus-visible { color: var(--ink); border-color: var(--hairlineHover); }
 .column-collapsed { min-height: 0; }
 
+.card-wrap {
+  display: flex;
+  flex-direction: column;
+}
 .card {
   background: var(--panelLight);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 10px 10px 0 0;
   padding: 12px;
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.1s ease;
@@ -958,6 +962,28 @@ header.page-head .sub {
   color: inherit;
   font: inherit;
 }
+/* Keyboard/screen-reader equivalent of the drag-to-restage gesture above:
+   same card visual footprint, no border between the two so it reads as one
+   card, not two stacked elements. */
+.card-move-row {
+  border: 1px solid var(--hairline);
+  border-top: 1px dashed var(--hairline);
+  border-radius: 0 0 10px 10px;
+  background: var(--panelLight);
+  padding: 2px 12px 4px;
+}
+.card-move {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--sub);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.card-move:hover, .card-move:focus-visible { color: var(--ink); }
+.card-move option { background: var(--panel); color: var(--ink); }
 .card:hover, .card:focus-visible {
   border-color: var(--hairlineHover);
 }
@@ -1518,6 +1544,7 @@ footer.page-foot {
   }
   .card:hover { border-color: #ccc; }
   .card-company { color: #444; }
+  .card-move-row { display: none !important; }
 
   .badge { border-color: #999; background: none !important; }
   .badge-dm, .badge-generic, .badge-unknown, .badge-age, .badge-stale, .badge-touch,

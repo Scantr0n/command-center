@@ -1216,6 +1216,16 @@
     boardEl.querySelectorAll('[data-prospect-id]').forEach(el => {
       el.addEventListener('click', () => openModal(el.getAttribute('data-prospect-id')));
     });
+    boardEl.querySelectorAll('.card-move[data-move-prospect-id]').forEach(sel => {
+      sel.addEventListener('click', e => e.stopPropagation());
+      sel.addEventListener('change', () => {
+        const id = sel.getAttribute('data-move-prospect-id');
+        const targetStageId = sel.value;
+        sel.value = '';
+        if (!targetStageId) return;
+        openModalForStageMove(id, targetStageId);
+      });
+    });
     boardEl.querySelectorAll('.column-toggle').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1233,7 +1243,10 @@
   // logged anywhere. Instead a drop opens that prospect's own detail modal
   // with the existing stage-move generator pre-set to the target stage and
   // already generated, so the only thing dragging saves is the clicks to get
-  // there, never the honesty check on whether the move is real.
+  // there, never the honesty check on whether the move is real. Each card's
+  // own "Move to stage..." select (wired in renderBoard) reaches the exact
+  // same openModalForStageMove call, so a keyboard or screen-reader user
+  // gets that same shortcut without needing to drag anything.
   function wireCardDragAndDrop() {
     boardEl.querySelectorAll('.card[data-prospect-id]').forEach(card => {
       card.addEventListener('dragstart', e => {
@@ -1586,12 +1599,30 @@
     const nextActionLine = p.nextAction
       ? '<div class="card-next-action">' + escapeHtml(p.nextAction) + '</div>'
       : '';
-    return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" draggable="true" data-prospect-id="' + escapeHtml(p.id) + '">' +
+    // Dragging a card (wireCardDragAndDrop) has no keyboard equivalent of its
+    // own: a keyboard/screen-reader user could open the card's own detail
+    // modal and hunt inside it for the stage-move generator, but nothing on
+    // the card face offered the same one-step "prep this move" shortcut a
+    // mouse drag does. This select is that keyboard-operable equivalent,
+    // wired to the exact same openModalForStageMove a drop already calls.
+    const moveOptions = allStages.filter(s => s.id !== p.stage)
+      .map(s => '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.label) + '</option>')
+      .join('');
+    return '<div class="card-wrap">' +
+      '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" draggable="true" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
       '<div class="card-meta">' + nudgeCardBadge(p, nudgeUrgencyById) + categoryBadge + channelBadge(p.contactChannel) + stallBadge + touchBadge + '</div>' +
       nextActionLine +
-      '</button>';
+      '</button>' +
+      '<div class="card-move-row">' +
+      '<label class="sr-only" for="cardMove-' + escapeHtml(p.id) + '">Move ' + escapeHtml(p.name) + ' to a different stage (keyboard alternative to dragging)</label>' +
+      '<select class="card-move" id="cardMove-' + escapeHtml(p.id) + '" data-move-prospect-id="' + escapeHtml(p.id) + '">' +
+      '<option value="" selected>Move to stage&hellip;</option>' +
+      moveOptions +
+      '</select>' +
+      '</div>' +
+      '</div>';
   }
 
   let byId = {};
