@@ -67,7 +67,7 @@ const {
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
-  poshmarkWeightTier, bundleNetComparison
+  poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -639,22 +639,6 @@ function savePoshmarkShareLog(log) {
   }
 }
 
-// Consecutive days of at least one logged share, walking back from today
-// through the real logged dates only, never assuming an ungapped day was
-// actually shared. A day not logged yet stays inside the streak until it's
-// actually over, so opening this page in the morning before today's first
-// share doesn't read as a broken streak.
-function computePoshmarkShareStreak(log) {
-  let cursor = todayDateStr();
-  if (!log[cursor]) cursor = addDaysToDateStr(cursor, -1);
-  let streak = 0;
-  while (log[cursor]) {
-    streak++;
-    cursor = addDaysToDateStr(cursor, -1);
-  }
-  return streak;
-}
-
 // Only shows up when a real listing is actually on Poshmark, the tracker has
 // nothing to do otherwise. Purely a manual log, no live Poshmark connection
 // exists to confirm a share actually happened.
@@ -670,7 +654,7 @@ function renderPoshmarkShareTracker(listings) {
   const log = loadPoshmarkShareLog();
   const today = todayDateStr();
   const todayCount = log[today] || 0;
-  const streak = computePoshmarkShareStreak(log);
+  const streak = computePoshmarkShareStreak(log, today);
   const dayWord = streak === 1 ? 'day' : 'days';
 
   const result = document.getElementById('poshmarkShareResult');

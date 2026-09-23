@@ -19,6 +19,7 @@ const {
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
+  computePoshmarkShareStreak,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
 } = require('./garage-core.js');
 
@@ -243,4 +244,22 @@ test('mileageRateGapReason: only fires for an uncomputed mileage expense with re
   // Dated before 2026 (or any other gap inside the table's span): the general message.
   const before = mileageRateGapReason({ category: 'mileage', miles: 100, date: '2025-06-01' });
   assert.match(before, /No IRS rate known for 2025-06-01/);
+});
+
+test('computePoshmarkShareStreak: counts consecutive logged days walking back from today', () => {
+  const log = { '2026-09-21': 1, '2026-09-22': 1, '2026-09-23': 1 };
+  assert.equal(computePoshmarkShareStreak(log, '2026-09-23'), 3);
+  // A gap two days back stops the walk there.
+  const withGap = { '2026-09-20': 1, '2026-09-22': 1, '2026-09-23': 1 };
+  assert.equal(computePoshmarkShareStreak(withGap, '2026-09-23'), 2);
+});
+
+test('computePoshmarkShareStreak: today not logged yet still counts yesterday onward, not a broken streak', () => {
+  const log = { '2026-09-21': 1, '2026-09-22': 1 };
+  assert.equal(computePoshmarkShareStreak(log, '2026-09-23'), 2);
+});
+
+test('computePoshmarkShareStreak: no logged days at all is a real zero, not a guess', () => {
+  assert.equal(computePoshmarkShareStreak({}, '2026-09-23'), 0);
+  assert.equal(computePoshmarkShareStreak({ '2026-09-10': 1 }, '2026-09-23'), 0);
 });

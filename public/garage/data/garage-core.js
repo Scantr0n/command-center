@@ -105,6 +105,27 @@
     return targetNet / 0.80;
   }
 
+  // Consecutive days of at least one logged Poshmark share, walking back
+  // from today through the real logged dates only, never assuming an
+  // ungapped day was actually shared. A day not logged yet stays inside the
+  // streak until it's actually over, so opening this page in the morning
+  // before today's first share doesn't read as a broken streak. todayStr is
+  // passed in rather than read from the real clock here, the same reason
+  // every other date function in this file takes its "today" as an argument:
+  // a pure function of its inputs can actually be unit-tested against a
+  // fixed date instead of only ever running live against whatever day it
+  // happens to be.
+  function computePoshmarkShareStreak(log, todayStr) {
+    let cursor = todayStr;
+    if (!log[cursor]) cursor = addDaysToDateStr(cursor, -1);
+    let streak = 0;
+    while (log[cursor]) {
+      streak++;
+      cursor = addDaysToDateStr(cursor, -1);
+    }
+    return streak;
+  }
+
   function minListingPriceForNet(platform, targetNet, applyBoost, category) {
     switch (platform) {
       case 'ebay': return ebayMinPriceForNet(targetNet, category);
@@ -303,6 +324,7 @@
     MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
     remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
-    poshmarkWeightTier, bundleNetComparison
+    poshmarkWeightTier, bundleNetComparison,
+    computePoshmarkShareStreak
   };
 });
