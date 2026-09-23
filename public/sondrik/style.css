@@ -613,6 +613,15 @@ header.page-head .sub {
   overflow-wrap: anywhere;
 }
 
+/* The base -8px is tuned for a section-note sitting right under a heading
+   (see the changelog one). These two instead trail a dynamically-rendered
+   list/card block (Next steps' action cards, Traction's stat tile), whose
+   own bottom margin the -8px was eating into, so the note's text rendered
+   on top of the last real card/line instead of below it, confirmed by
+   screenshot at 1280px. Same fix already applied to
+   .changelog-generated-note for the same reason. */
+.next-steps-note, .traction-note { margin-top: 14px; }
+
 /* Spacing bumped from 36px: Jack's direct comparison was Granola/Spotify/
    Amazon, all of which give real content room to breathe rather than
    packing sections tight. Real vertical rhythm reads as intentional
