@@ -299,6 +299,16 @@
     </div>
   </div>
 
+  <button type="button" id="jumpNavBtn" class="jump-nav-fab font-mono" aria-label="Sections, jump to a section on this page">Sections</button>
+
+  <div class="modal-overlay" id="jumpNavOverlay" hidden>
+    <div class="modal" id="jumpNavModal" role="dialog" aria-modal="true" aria-labelledby="jumpNavTitle">
+      <button class="modal-close" id="jumpNavClose" aria-label="Close">&times;</button>
+      <h3 id="jumpNavTitle" class="font-display">Jump to section</h3>
+      <div class="jump-nav-list" id="jumpNavList"></div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer"></div>
 
   <footer class="page-foot font-mono">
