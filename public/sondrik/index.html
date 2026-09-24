@@ -432,7 +432,10 @@
     <code>node --test public/sondrik/data/release-core.test.js</code> after changing the bugfix check-in logic,
     it guards the NaN-date crash and the silently-dropped-missed-checkpoint bug that logic has already produced. Run
     <code>node --test public/sondrik/data/export-core.test.js</code> after changing the CSV/ICS export helpers, it
-    guards the CSV-formula-injection escape and the UTF-8-byte-aware ICS line folding.
+    guards the CSV-formula-injection escape and the UTF-8-byte-aware ICS line folding. Run
+    <code>node --test public/sondrik/data/next-steps-core.test.js</code> after changing the Next Steps
+    checklist logic, it guards which real gaps and overdue check-ins surface as an action item there and on the
+    header's attention pill.
   </footer>
 </div>
 
@@ -447,6 +450,7 @@
 <script src="/sondrik/data/validate-core.js"></script>
 <script src="/sondrik/data/goals-core.js"></script>
 <script src="/sondrik/data/release-core.js"></script>
+<script src="/sondrik/data/next-steps-core.js"></script>
 <script src="/sondrik/data/export-core.js"></script>
 <script src="/sondrik/app.js"></script>
 <script src="/sidebar.js"></script>
