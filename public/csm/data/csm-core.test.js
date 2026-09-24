@@ -22,7 +22,7 @@ const {
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
-  csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+  escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
@@ -753,6 +753,33 @@ test('hasNudgePlan treats an invalid hand-typed date as not a real plan', () => 
   assert.equal(hasNudgePlan({ nextNudgeDate: '2026-9-5' }), false);
   assert.equal(hasNudgePlan({ nudgeSchedule: { nudgePoint: '2026-9-5' } }), false);
   assert.equal(hasNudgePlan({ nudgeSchedule: { doNotNudgeBefore: '2026-9-5' } }), false);
+});
+
+test('escapeHtml leaves an ordinary value untouched', () => {
+  assert.equal(escapeHtml('City Bound'), 'City Bound');
+});
+
+test('escapeHtml returns an empty string for null/undefined, never the literal "null"', () => {
+  assert.equal(escapeHtml(null), '');
+  assert.equal(escapeHtml(undefined), '');
+});
+
+test('escapeHtml neutralizes a script tag rather than letting it render as live markup', () => {
+  // Real XSS guard (OWASP): this page renders hand-editable JSON field
+  // values straight into innerHTML, so a prospect name or note containing
+  // "<script>" has to come out as inert text.
+  assert.equal(escapeHtml('<script>alert(1)</script>'), '&lt;script&gt;alert(1)&lt;/script&gt;');
+});
+
+test('escapeHtml neutralizes an attribute-breakout attempt', () => {
+  assert.equal(
+    escapeHtml('"><img src=x onerror=alert(1)>'),
+    '&quot;&gt;&lt;img src=x onerror=alert(1)&gt;'
+  );
+});
+
+test('escapeHtml escapes each of the five reserved characters', () => {
+  assert.equal(escapeHtml('& < > " \''), '&amp; &lt; &gt; &quot; &#39;');
 });
 
 test('csvField leaves an ordinary value untouched', () => {

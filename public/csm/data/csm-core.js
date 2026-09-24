@@ -547,6 +547,18 @@
       .filter(x => x.reasons.length > 0);
   }
 
+  // Real XSS guard (OWASP): this page renders hand-editable JSON field
+  // values (a prospect's name, a note, a channel detail) straight into
+  // innerHTML, so a value containing "<script>" or an "onerror=" attribute
+  // has to come out as inert text rather than live markup. Ran untested in
+  // app.js since this hub's first version, same gap csvField below used to
+  // have before it moved into this file.
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
   // CSV/formula injection (OWASP): a hand-typed note starting with
   // =, +, -, @, tab, or a carriage return is read as a live formula by
   // Excel/Sheets when this export is opened there, not as plain text.
@@ -750,7 +762,7 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    computeStalled, hasNudgePlan, computeDataQualityFlags, csvField, icsEscapeText, icsFoldLine,
+    computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan

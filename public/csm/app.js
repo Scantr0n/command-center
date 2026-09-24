@@ -12,7 +12,7 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
-    csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+    escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
@@ -252,17 +252,6 @@
       return '<span class="badge badge-generic">GENERIC INBOX</span>';
     }
     return '<span class="badge badge-unknown">' + escapeHtml(channel.type).toUpperCase() + '</span>';
-  }
-
-  // div.textContent/innerHTML round-trip only escapes &amp;/&lt;/&gt; in text
-  // content, not quotes, so a hand-typed value with a " or ' in it (a stage
-  // color, a category name, an id) could break out of an attribute like
-  // style="..." or data-foo="...". Same regex-based escape CGT and Garage
-  // already use for exactly that reason.
-  function escapeHtml(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
   }
 
   // Lets the "Stalled in stage" and "Needs backfill" rows jump straight to the
