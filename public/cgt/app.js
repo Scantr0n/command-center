@@ -409,6 +409,20 @@ function isStale(c) {
   return age != null && age > PRICE_STALE_AFTER_DAYS;
 }
 
+// Same 180-day rule as isStale above, applied to a raw-card candidate
+// instead of an owned card: candidates.json has its own datePriced but no
+// single estimatedValue field (rawValue and expectedGradedValue are priced
+// separately, sometimes only one of the two is filled in yet), so this
+// checks either side rather than one named field. A candidate with neither
+// value logged yet is already caught by the "needs more data" verdict and
+// the attention bar's candidatesNeedingDataCount below, not this: staleness
+// only means something once there was a real researched number to go stale.
+function isCandidateStale(c) {
+  if ((c.rawValue == null && c.expectedGradedValue == null) || !c.datePriced) return false;
+  const age = daysSince(c.datePriced);
+  return age != null && age > PRICE_STALE_AFTER_DAYS;
+}
+
 // submissions.json is fetched alongside cards.json rather than treated as
 // optional, since the "Grading submissions" section always renders (even if
 // only to show its own empty state) instead of silently staying blank when
@@ -1399,6 +1413,7 @@ function renderCandidates() {
     // candidate already decided hold/sell-raw/pass was never going to hit
     // PSA's Value-tier pause since it isn't going to be submitted at all.
     const targetsPausedTier = (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel);
+    const stale = !isExampleCandidate(c) && isCandidateStale(c);
     const metaParts = [
       c.sport,
       c.targetGradingCompany,
@@ -1422,6 +1437,7 @@ function renderCandidates() {
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         ${decisionLabel ? `<span class="badge badge-decided">${escapeHtml(decisionLabel)}</span>` : ''}
         ${targetsPausedTier ? `<span class="badge badge-paused" title="PSA ${escapeHtml(c.targetServiceLevel)} is currently paused to new submissions">tier paused</span>` : ''}
+        ${stale ? `<span class="badge badge-stale" title="Priced more than 180 days ago, worth a re-check">stale</span>` : ''}
         <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
       </div>
@@ -2004,6 +2020,11 @@ function renderAttentionBar() {
   const pausedTierCandidatesCount = candidates
     .filter(c => !isExampleCandidate(c) && (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel))
     .length;
+  // Same isCandidateStale rule as the "stale" badge on each candidate row
+  // below, counted here so a re-check-worthy candidate shows up in the same
+  // top-of-page scan as every other real "needs a look" signal instead of
+  // only being visible after scrolling to and reading every row.
+  const staleCandidatesCount = candidates.filter(c => !isExampleCandidate(c) && isCandidateStale(c)).length;
 
   const items = [];
   // Same reasoning as CSM's own renderAttentionBar: a drifted changelog is
@@ -2067,6 +2088,16 @@ function renderAttentionBar() {
       label: pausedTierCandidatesCount === 1
         ? 'candidate targets a PSA Value tier currently paused to new submissions'
         : 'candidates target a PSA Value tier currently paused to new submissions'
+    });
+  }
+  if (staleCandidatesCount) {
+    items.push({
+      n: staleCandidatesCount,
+      tone: 'warn',
+      target: 'candidatesSection',
+      label: staleCandidatesCount === 1
+        ? 'candidate price is stale, worth a re-check'
+        : 'candidate prices are stale, worth a re-check'
     });
   }
 
