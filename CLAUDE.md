@@ -21,6 +21,7 @@ Jack's unified dashboard — one hub, one cluster per project, radial node-graph
 - `npm run test:job-search` — Job Search's regression tests for its date/em-dash/URL and duplicate-application rules (`validate-core.js`); run after touching that file
 - `npm run test:dashboard` — the hub page's own regression tests for its staleness/grid-sort math (`dashboard-core.js`) and graph layout/relation-curve collision math (`graph-core.js`); run after touching either file
 - `npm run test:server` — `server.js`'s own regression tests (`data/server-core.js`: chat-request validation, Anthropic error-shaping, and `parseValidateCounts`, the regex parser every hub's Data Quality badge depends on); run after touching `server.js`'s request-validation/error-handling logic
+- `npm run test:sidebar`: regression tests for `sidebar-core.js`'s `escapeHtml`, the one script shared and injected on every page (index + all six hubs); run after touching that file
 
 ## Structure
 - `data/clusters/*.json` — one file per project, the source of truth for cluster status/summary

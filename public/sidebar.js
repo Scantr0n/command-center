@@ -33,11 +33,10 @@
     try { localStorage.setItem(key, value); } catch { /* ignore */ }
   }
 
-  function escapeHtml(str) {
-    return String(str ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  // Shared, unit-tested XSS guard (sidebar-core.js): escapeHtml now has a
+  // real regression test instead of only ever running live in a browser,
+  // same shared-core pattern every hub's own escapeHtml already moved to.
+  const { escapeHtml } = window.SidebarCore;
 
   // Same status palette as the main dashboard's own statusColor() (see
   // index.html), copied by hand here since this file has no shared module
