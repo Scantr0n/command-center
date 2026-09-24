@@ -242,6 +242,15 @@ header.page-head .sub {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem;
 }
+/* One field-reference row (cards.json's four BGS subgrade fields) names all
+   four in a single comma-joined header instead of one word. Left on the
+   default nowrap above, that unbreakable string forces auto table layout to
+   size the whole name column to fit it on one line -- on a narrow viewport
+   that squeezes every other row's description into a sliver and pushes the
+   table past the screen edge, found scrolling this page at a 390px width. */
+.schema-table th.wrap {
+  white-space: normal;
+}
 .schema-example {
   background: var(--panelLight);
   border: 1px solid var(--hairline);
