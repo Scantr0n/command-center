@@ -97,9 +97,12 @@
     .cc-sb-row-wrap { position: relative; }
     .cc-sb-pin {
       display: none;
-      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
       align-items: center; justify-content: center;
-      width: 20px; height: 20px; padding: 0; border: none; border-radius: 5px;
+      /* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a pointer target needs
+         at least 24x24 CSS px. This was 20x20, the icon itself stays 11x11,
+         only the clickable area grows. */
+      width: 24px; height: 24px; padding: 0; border: none; border-radius: 6px;
       background: transparent; color: #565B64; cursor: pointer;
       opacity: 0; transition: opacity 0.1s ease, color 0.1s ease;
     }

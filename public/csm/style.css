@@ -966,7 +966,9 @@ header.page-head .sub {
   border: 1px solid var(--hairline);
   color: var(--dim);
   border-radius: 999px;
-  width: 18px; height: 18px;
+  /* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a pointer target needs at
+     least 24x24 CSS px. This was 18x18. */
+  width: 24px; height: 24px;
   line-height: 1;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
