@@ -477,6 +477,12 @@
       opacity: 1 !important;
     }
 
+    /* #attnCards is forced open above regardless of currentView (a
+       screen-only concern), but it now lives inside #alertsSection - a
+       display:none parent hides every descendant regardless of the
+       descendant's own forced display, so the wrapper needs the same
+       print-time force applied, same reasoning as #attnCards itself. */
+    #alertsSection { display: block !important; }
     #attnCards { display: flex !important; }
     .attn-card { break-inside: avoid; }
 
@@ -613,8 +619,15 @@
       <div id="recentCommitsList" class="flex flex-col gap-1 mt-2"></div>
     </details>
 
-    <div id="attnCompact" class="hidden flex-wrap items-center gap-2 mb-4"></div>
-    <div id="attnCards" class="hidden flex-col gap-2 mb-6"></div>
+    <div id="alertsSection" class="hidden mb-6">
+      <h2 class="text-[10px] font-mono tracking-wide mb-2 flex items-center gap-2" style="color:var(--faint)">
+        <span aria-hidden="true" style="width:3px; height:11px; background:#E35959; border-radius:1px; display:inline-block"></span>
+        ALERTS
+      </h2>
+      <div id="attnCompact" class="hidden flex-wrap items-center gap-2 mb-2"></div>
+      <div id="attnCards" class="hidden flex-col gap-2 mb-2"></div>
+      <div id="dataQualityCompact" class="hidden flex-wrap items-center gap-2"></div>
+    </div>
 
     <details id="ventureSnapshotSection" class="collapsible-section mb-3 rounded-lg border hairline p-3" style="background: var(--panel)">
       <summary class="text-[10px] font-mono tracking-wide flex items-center gap-2" style="color:var(--faint)">
@@ -625,8 +638,6 @@
       <div id="ventureSnapshotGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3"></div>
       <p class="text-[10px] font-mono mt-2" style="color: var(--faint)">Real numbers fetched live from each venture's own data, never estimated. A blank field means that venture genuinely hasn't logged it yet, not that it was skipped.</p>
     </details>
-
-    <div id="dataQualityCompact" class="hidden flex-wrap items-center gap-2 mb-6"></div>
 
     <div id="statusLegend" class="flex items-center gap-4 text-[10px] font-mono mb-2 flex-wrap" style="color: var(--faint)">
       <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full inline-block" style="background:#3DDC84"></span>Active</span>
@@ -1285,6 +1296,7 @@ function renderAttention() {
   if (!flagged.length) {
     compact.classList.add('hidden'); compact.classList.remove('flex'); compact.innerHTML = '';
     cards.classList.add('hidden'); cards.classList.remove('flex'); cards.innerHTML = '';
+    updateAlertsSectionVisibility();
     return;
   }
 
@@ -1643,6 +1655,7 @@ async function renderDataQuality() {
   if (!flagged.length) {
     compact.removeAttribute('role');
     compact.removeAttribute('aria-live');
+    updateAlertsSectionVisibility();
     return;
   }
 
@@ -1670,17 +1683,41 @@ async function renderDataQuality() {
   });
   compact.removeAttribute('role');
   compact.removeAttribute('aria-live');
+  updateAlertsSectionVisibility();
+}
+
+// Needs Attention and Data Quality used to be two separately-labeled
+// strips (no shared header, not even adjacent in the DOM) - a real
+// research finding (dashboard progressive-disclosure/dense-card-grid
+// patterns: Linear/Vercel surface build failures as one compact
+// indicator, not several separate always-on banners) is that this reads
+// as two disconnected widgets instead of one coherent "here's what's
+// wrong" signal. This wraps both under one #alertsSection with a shared
+// header, shown only when either has real content - each sub-block's own
+// render/visibility logic (attnCompact vs attnCards toggling on
+// Graph/Grid view, dataQualityCompact's independent async load) is left
+// completely untouched, this only toggles the shared wrapper around them.
+function updateAlertsSectionVisibility() {
+  const section = document.getElementById('alertsSection');
+  const attnCompact = document.getElementById('attnCompact');
+  const attnCards = document.getElementById('attnCards');
+  const dq = document.getElementById('dataQualityCompact');
+  const hasContent = !attnCompact.classList.contains('hidden')
+    || !attnCards.classList.contains('hidden')
+    || !dq.classList.contains('hidden');
+  section.classList.toggle('hidden', !hasContent);
 }
 
 function updateAttentionVisibility() {
   const flagged = clusters.some(c => c.status === 'stalled' || c.status === 'broken');
   const compact = document.getElementById('attnCompact');
   const cards = document.getElementById('attnCards');
-  if (!flagged) return;
+  if (!flagged) { updateAlertsSectionVisibility(); return; }
   compact.classList.toggle('hidden', currentView !== 'graph');
   compact.classList.toggle('flex', currentView === 'graph');
   cards.classList.toggle('hidden', currentView !== 'grid');
   cards.classList.toggle('flex', currentView === 'grid');
+  updateAlertsSectionVisibility();
 }
 
 function truncateLabel(name, max = 16) {
