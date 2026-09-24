@@ -353,6 +353,23 @@ section { margin-bottom: 36px; }
   text-transform: uppercase;
   font-weight: 500;
 }
+.data-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+.data-table thead th.sortable:hover,
+.data-table thead th.sortable:focus-visible {
+  color: var(--ink);
+}
+.data-table thead th.sortable:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: -2px; }
+.data-table thead th.sortable::after {
+  content: '';
+  margin-left: 5px;
+  opacity: 0.35;
+}
+.data-table thead th.sortable[aria-sort="ascending"]::after { content: '\2191'; opacity: 1; color: var(--ink); }
+.data-table thead th.sortable[aria-sort="descending"]::after { content: '\2193'; opacity: 1; color: var(--ink); }
 .data-table tbody tr:hover { background: rgba(255,255,255,0.02); }
 .data-table td.num-col { color: var(--dim); font-family: 'JetBrains Mono', monospace; width: 1%; white-space: nowrap; }
 .data-table td.pay-col { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }

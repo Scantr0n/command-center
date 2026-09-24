@@ -105,6 +105,29 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  // Click-to-sort Applications table, same aria-sort/tabindex pattern CGT's
+  // card table and Garage's listings table already use, just never shipped
+  // on this hub's own table. Defaults to "num" ascending, the order the
+  // tracker already lists them in.
+  let appSortKey = 'num';
+  let appSortDir = 'asc';
+
+  function applicationSortValue(a, key) {
+    if (key === 'num') return a.num;
+    if (key === 'applied') return a.appliedDate || '';
+    return a[key];
+  }
+
+  function sortApplications(apps, key, dir) {
+    const mult = dir === 'desc' ? -1 : 1;
+    return apps.slice().sort((a, b) => {
+      const av = applicationSortValue(a, key);
+      const bv = applicationSortValue(b, key);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mult;
+      return String(av ?? '').localeCompare(String(bv ?? '')) * mult;
+    });
+  }
+
   // ISO "YYYY-MM-DD" strings compare correctly with plain >, so this finds
   // the real most-recent appliedDate rather than assuming applications.json
   // is always hand-edited in chronological append order (a backfilled entry
@@ -203,27 +226,59 @@
     });
   }
 
+  const APPLICATION_SORT_COLUMNS = [
+    { key: 'num', label: '#' },
+    { key: 'role', label: 'Role' },
+    { key: 'company', label: 'Company' },
+    { key: 'location', label: 'Location' },
+    { key: 'pay', label: 'Pay' },
+    { key: 'applied', label: 'Applied' }
+  ];
+
   function renderApplications(data) {
     const apps = data.applications || [];
     if (!apps.length) {
       applicationsTableWrap.innerHTML = '<div class="empty-state">No applications logged yet.</div>';
-    } else {
-      applicationsTableWrap.innerHTML =
-        '<div class="data-table-wrap"><table class="data-table"><thead><tr>' +
-        '<th>#</th><th>Role</th><th>Company</th><th>Location</th><th>Pay</th><th>Applied</th>' +
-        '</tr></thead><tbody>' +
-        apps.map(a =>
-          '<tr id="app-row-' + escapeHtml(String(a.num)) + '">' +
-          '<td class="num-col" data-label="#">' + escapeHtml(String(a.num)) + '</td>' +
-          '<td data-label="Role">' + escapeHtml(a.role) + '</td>' +
-          '<td data-label="Company">' + escapeHtml(a.company) + '</td>' +
-          '<td data-label="Location">' + escapeHtml(a.location) + '</td>' +
-          '<td class="pay-col" data-label="Pay">' + escapeHtml(a.pay) + '</td>' +
-          '<td data-label="Applied">' + escapeHtml(fmtDate(a.appliedDate) || 'undated') + '</td>' +
-          '</tr>'
-        ).join('') +
-        '</tbody></table></div>';
+      return;
     }
+
+    const sorted = sortApplications(apps, appSortKey, appSortDir);
+    const headHtml = APPLICATION_SORT_COLUMNS.map(col => {
+      const ariaSort = col.key === appSortKey ? (appSortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      return '<th class="sortable" data-sort="' + col.key + '" tabindex="0" aria-sort="' + ariaSort + '">' +
+        escapeHtml(col.label) + '</th>';
+    }).join('');
+
+    applicationsTableWrap.innerHTML =
+      '<div class="data-table-wrap"><table class="data-table"><thead><tr>' + headHtml + '</tr></thead><tbody>' +
+      sorted.map(a =>
+        '<tr id="app-row-' + escapeHtml(String(a.num)) + '">' +
+        '<td class="num-col" data-label="#">' + escapeHtml(String(a.num)) + '</td>' +
+        '<td data-label="Role">' + escapeHtml(a.role) + '</td>' +
+        '<td data-label="Company">' + escapeHtml(a.company) + '</td>' +
+        '<td data-label="Location">' + escapeHtml(a.location) + '</td>' +
+        '<td class="pay-col" data-label="Pay">' + escapeHtml(a.pay) + '</td>' +
+        '<td data-label="Applied">' + escapeHtml(fmtDate(a.appliedDate) || 'undated') + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div>';
+
+    applicationsTableWrap.querySelectorAll('th.sortable').forEach(th => {
+      const activate = () => {
+        const key = th.getAttribute('data-sort');
+        if (appSortKey === key) {
+          appSortDir = appSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          appSortKey = key;
+          appSortDir = 'asc';
+        }
+        renderApplications(data);
+      };
+      th.addEventListener('click', activate);
+      th.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+      });
+    });
 
     const asides = [];
     const dropped = data.dropped || [];
