@@ -313,11 +313,10 @@ function disputeResponseInfo(d) {
   return null;
 }
 
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
+// Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+// regression test instead of only ever running live in a browser, same
+// shared-core pattern already used for csvField (see GarageExportCore).
+const escapeHtml = GarageHtmlCore.escapeHtml;
 
 // A net payout can go negative on a cheap Poshmark listing (its flat $2.95
 // fee under $15 exceeds the price), and '$' + (-1.95) renders as the
