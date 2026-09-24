@@ -236,6 +236,28 @@ function renderElectronicsRulesFreshness() {
   el.title = 'Last hand-verified against each platform\'s own electronics/dangerous-goods policy and USPS Publication 52 on ' + ELECTRONICS_RULES_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. This table's own
+// callout already frames the Poshmark row as "the same class of
+// silent-failure risk as the eBay return-policy bug", so it gets the same
+// tracking. Re-verified 2026-09-24: Poshmark's Ground Advantage-only,
+// no-Priority-Mail-packaging rule (with the Post Office refusing or
+// charging a $5 fee for Priority boxes) took effect 2025-09-12 and is
+// still the live policy, no change to confirm here beyond that.
+const PACKAGING_RULES_REVIEWED_ON = '2026-09-24';
+const PACKAGING_RULES_STALE_AFTER_DAYS = 45;
+
+function renderPackagingRulesFreshness() {
+  const el = document.getElementById('packagingRulesFreshness');
+  if (!el) return;
+  const age = daysSincePublished(PACKAGING_RULES_REVIEWED_ON);
+  const stale = age != null && age > PACKAGING_RULES_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own shipping/seller documentation on ' + PACKAGING_RULES_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5014,6 +5036,7 @@ renderScamPatternsFreshness();
 renderSellerStandardsFreshness();
 renderTaxTrackerFreshness();
 renderElectronicsRulesFreshness();
+renderPackagingRulesFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
