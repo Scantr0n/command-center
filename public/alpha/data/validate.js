@@ -62,6 +62,32 @@ function main() {
 
   scanForForbiddenKeys(data, '', errors);
 
+  // live.account and live.positions are documented (index.html's schema
+  // table) as populated only by the live daemon proxy in server.js at
+  // request time, never hand-edited into this static fallback, since this
+  // file has no legitimate way to know a real balance or a real position's
+  // price. scanForForbiddenKeys above only catches a hand-added field whose
+  // *name* matches the forbidden pattern (pnl/profit/balance/equity/etc),
+  // which misses plenty of real-looking dollar fields these two objects'
+  // own documented shapes actually use: a position's entryPrice/
+  // currentPrice/marketValue, or an account's cash/buyingPower/dayChange,
+  // none of which match that pattern. Confirmed by hand: a hand-added
+  // live.positions entry with a fake entryPrice/currentPrice/marketValue,
+  // or a live.account with cash/buyingPower/dayChange and no literal
+  // "equity"/"balance" substring, both passed this validator clean before
+  // this check existed. These two explicit shape checks close that gap
+  // directly instead of trying to grow the name-pattern regex to cover
+  // every dollar-shaped field name that might ever appear.
+  if (data.live && data.live.account != null) {
+    errors.push('live.account: must be null in this static fallback file. It is only ever populated by the live ' +
+      'daemon proxy in server.js at request time, since this file has no legitimate way to know a real balance.');
+  }
+  if (data.live && data.live.positions != null && !(Array.isArray(data.live.positions) && data.live.positions.length === 0)) {
+    errors.push('live.positions: must be an empty array (or omitted) in this static fallback file. It is only ' +
+      'ever populated by the live daemon proxy in server.js at request time, since this file has no legitimate ' +
+      'way to know a real open position.');
+  }
+
   const live = data.live || {};
   const anyLiveValueSet =
     live.regime != null ||
