@@ -204,7 +204,10 @@
       <div class="conn-history-range font-mono" id="dailyUptimeRange"></div>
     </div>
     <div class="incident-list-wrap">
-      <div class="incident-list-label font-mono">RECENT INCIDENTS</div>
+      <div class="section-toolbar">
+        <div class="incident-list-label font-mono">RECENT INCIDENTS</div>
+        <button type="button" id="incidentsCsvBtn" class="refresh-btn font-mono" disabled title="No incidents recorded yet.">Export CSV</button>
+      </div>
       <ol class="incident-list" id="incidentList"></ol>
     </div>
   </section>
