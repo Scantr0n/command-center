@@ -155,6 +155,36 @@ function renderScamPatternsFreshness() {
   el.title = 'Last hand-verified against each platform\'s own published fraud/protection documentation on ' + SCAM_PATTERNS_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above: this one gates the
+// highest-stakes numbers on the page (the exact eBay Top Rated Seller and
+// Depop Top Seller thresholds "Real progress" is computed against below),
+// and the callout above it says this matters "now, before the 48-draft
+// Depop backlog goes live", so a stale threshold here is a real risk of
+// Jack tracking progress against the wrong bar. Re-verified 2026-09-24
+// against eBay's own seller-standards policy page (the 90-day/100-
+// transaction/$1,000/0.5%/0.3%/3%/95% figures) and Depop's own Top Seller
+// program page and third-party coverage of it (the $1,000/month, 4.5-star,
+// 90%-in-5-days, and under-5%-refund figures); secondary sources disagree
+// on whether Depop also requires a minimum live-listing count and whether
+// that's sustained for 3 or 4 months, so that's deliberately left off this
+// table rather than guessed at. Vinted and Poshmark rows are reference-only
+// prose with no hard numbers pinned down, so re-verifying those isn't the
+// same kind of drift risk as the two computed-progress rows are.
+const SELLER_STANDARDS_REVIEWED_ON = '2026-09-24';
+const SELLER_STANDARDS_STALE_AFTER_DAYS = 45;
+
+function renderSellerStandardsFreshness() {
+  const el = document.getElementById('sellerStandardsFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SELLER_STANDARDS_REVIEWED_ON);
+  const stale = age != null && age > SELLER_STANDARDS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published seller-status documentation on ' + SELLER_STANDARDS_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -4930,6 +4960,7 @@ renderFeeScheduleFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
+renderSellerStandardsFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
