@@ -12,7 +12,8 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
-    csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings
+    csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+    channelSortRank, listComparator
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -1103,53 +1104,10 @@
   // nudge across the whole pipeline", which a column-grouped board can't
   // answer without scanning every column. Real, well-documented CRM UX
   // pattern (e.g. Pipeline CRM, HubSpot), not invented for this project.
-  function channelSortRank(channel) {
-    const type = channel && channel.type;
-    if (type === 'named-decision-maker') return 0;
-    if (type === 'generic-inbox') return 1;
-    return 2;
-  }
-
-  function listComparator(key, dir, stageById, stageOrderIndex) {
-    const mul = dir === 'desc' ? -1 : 1;
-    return (a, b) => {
-      let av, bv;
-      switch (key) {
-        case 'stage':
-          av = stageOrderIndex[a.stage]; bv = stageOrderIndex[b.stage];
-          av = av == null ? 999 : av; bv = bv == null ? 999 : bv;
-          break;
-        case 'category':
-          av = (a.category || '').toLowerCase(); bv = (b.category || '').toLowerCase();
-          break;
-        case 'channel':
-          av = channelSortRank(a.contactChannel); bv = channelSortRank(b.contactChannel);
-          break;
-        case 'nextNudge':
-          av = a.nextNudgeDate || '9999-99-99'; bv = b.nextNudgeDate || '9999-99-99';
-          break;
-        case 'stalled': {
-          const ai = stallInfo(a, stageById), bi = stallInfo(b, stageById);
-          av = ai ? ai.days : -1; bv = bi ? bi.days : -1;
-          break;
-        }
-        case 'lastTouch': {
-          const at = daysSinceLastTouch(a), bt = daysSinceLastTouch(b);
-          av = at == null ? -1 : at; bv = bt == null ? -1 : bt;
-          break;
-        }
-        case 'touches':
-          av = touchCount(a); bv = touchCount(b);
-          break;
-        case 'name':
-        default:
-          av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase();
-      }
-      if (av < bv) return -1 * mul;
-      if (av > bv) return 1 * mul;
-      return (a.name || '').localeCompare(b.name || '');
-    };
-  }
+  // channelSortRank/listComparator now live in csm-core.js, the same reason
+  // touchCount/stallInfo etc. were split out: a plain Node test can exercise
+  // the real multi-key sort (and its deliberate missing-value placeholders)
+  // directly.
 
   let listSortKey = 'nextNudge';
   let listSortDir = 'asc';

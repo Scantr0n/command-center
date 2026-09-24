@@ -540,6 +540,69 @@
     return warnings;
   }
 
+  // Table alternative to the kanban board: same filtered prospects, but
+  // sortable across every stage at once instead of grouped into columns.
+  // A named decision-maker contact is real, verified outreach leverage a
+  // generic inbox isn't, so it sorts ahead of one, which sorts ahead of no
+  // channel logged at all yet.
+  function channelSortRank(channel) {
+    const type = channel && channel.type;
+    if (type === 'named-decision-maker') return 0;
+    if (type === 'generic-inbox') return 1;
+    return 2;
+  }
+
+  // Multi-key sort behind the flat prospect list's own column headers. Every
+  // "missing value sorts last" placeholder here is deliberate, not a
+  // fallback afterthought: stage 999 (a prospect whose stage id no longer
+  // matches any real stage), nextNudgeDate '9999-99-99' (no plan logged yet
+  // is the real worst case for "soonest nudge due", never treated as
+  // already-overdue by sorting it first), stalled/lastTouch -1 (a prospect
+  // that isn't actually stalled, or has no logged touch at all, ranks below
+  // every prospect with a real number). Ties always break by name, so a
+  // resort with an unchanged key set never reorders equal rows for no
+  // visible reason.
+  function listComparator(key, dir, stageById, stageOrderIndex) {
+    const mul = dir === 'desc' ? -1 : 1;
+    return (a, b) => {
+      let av, bv;
+      switch (key) {
+        case 'stage':
+          av = stageOrderIndex[a.stage]; bv = stageOrderIndex[b.stage];
+          av = av == null ? 999 : av; bv = bv == null ? 999 : bv;
+          break;
+        case 'category':
+          av = (a.category || '').toLowerCase(); bv = (b.category || '').toLowerCase();
+          break;
+        case 'channel':
+          av = channelSortRank(a.contactChannel); bv = channelSortRank(b.contactChannel);
+          break;
+        case 'nextNudge':
+          av = a.nextNudgeDate || '9999-99-99'; bv = b.nextNudgeDate || '9999-99-99';
+          break;
+        case 'stalled': {
+          const ai = stallInfo(a, stageById), bi = stallInfo(b, stageById);
+          av = ai ? ai.days : -1; bv = bi ? bi.days : -1;
+          break;
+        }
+        case 'lastTouch': {
+          const at = daysSinceLastTouch(a), bt = daysSinceLastTouch(b);
+          av = at == null ? -1 : at; bv = bt == null ? -1 : bt;
+          break;
+        }
+        case 'touches':
+          av = touchCount(a); bv = touchCount(b);
+          break;
+        case 'name':
+        default:
+          av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase();
+      }
+      if (av < bv) return -1 * mul;
+      if (av > bv) return 1 * mul;
+      return (a.name || '').localeCompare(b.name || '');
+    };
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
@@ -549,6 +612,6 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, csvField, icsEscapeText, icsFoldLine,
-    outreachReadinessWarnings
+    outreachReadinessWarnings, channelSortRank, listComparator
   };
 });

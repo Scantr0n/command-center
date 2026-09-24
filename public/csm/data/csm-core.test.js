@@ -22,7 +22,8 @@ const {
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
-  csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings
+  csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+  channelSortRank, listComparator
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -800,4 +801,99 @@ test('outreachReadinessWarnings still flags a missing channel type when contactC
   const warnings = outreachReadinessWarnings(p);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /contactChannel\.type/);
+});
+
+test('channelSortRank ranks a named decision-maker ahead of a generic inbox, ahead of no channel logged', () => {
+  assert.equal(channelSortRank({ type: 'named-decision-maker' }), 0);
+  assert.equal(channelSortRank({ type: 'generic-inbox' }), 1);
+  assert.equal(channelSortRank({ type: 'something-else' }), 2);
+  assert.equal(channelSortRank(null), 2);
+  assert.equal(channelSortRank(undefined), 2);
+});
+
+const listStageById = {
+  'in-exploration': { id: 'in-exploration', staleAfterDays: 30 },
+  client: { id: 'client', staleAfterDays: null }
+};
+const listStageOrderIndex = { 'in-exploration': 0, negotiating: 1, client: 2 };
+
+test('listComparator sorts by name ascending/descending, case-insensitively', () => {
+  const rows = [{ name: 'charlie' }, { name: 'Alice' }, { name: 'bob' }];
+  const asc = rows.slice().sort(listComparator('name', 'asc', listStageById, listStageOrderIndex));
+  assert.deepEqual(asc.map(r => r.name), ['Alice', 'bob', 'charlie']);
+  const desc = rows.slice().sort(listComparator('name', 'desc', listStageById, listStageOrderIndex));
+  assert.deepEqual(desc.map(r => r.name), ['charlie', 'bob', 'Alice']);
+});
+
+test('listComparator by stage sorts unrecognized stage ids last (999), never first or crashing', () => {
+  const rows = [
+    { name: 'z', stage: 'unknown-stage-id' },
+    { name: 'a', stage: 'client' },
+    { name: 'm', stage: 'in-exploration' }
+  ];
+  const sorted = rows.slice().sort(listComparator('stage', 'asc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['m', 'a', 'z']);
+});
+
+test('listComparator by nextNudge treats no nudge date logged as the real worst case, sorting it last', () => {
+  const rows = [
+    { name: 'no-plan' },
+    { name: 'due-soon', nextNudgeDate: '2026-01-01' },
+    { name: 'due-later', nextNudgeDate: '2026-06-01' }
+  ];
+  const sorted = rows.slice().sort(listComparator('nextNudge', 'asc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['due-soon', 'due-later', 'no-plan']);
+});
+
+test('listComparator by channel ranks a named decision-maker ahead of a generic inbox, ahead of none logged', () => {
+  const rows = [
+    { name: 'none' },
+    { name: 'generic', contactChannel: { type: 'generic-inbox' } },
+    { name: 'named', contactChannel: { type: 'named-decision-maker' } }
+  ];
+  const sorted = rows.slice().sort(listComparator('channel', 'asc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['named', 'generic', 'none']);
+});
+
+test('listComparator by stalled sorts a non-stalled/no-stage-data prospect (-1) below every real stalled day count', () => {
+  const rows = [
+    { name: 'no-stage-data', stage: 'client' }, // staleAfterDays null -> stallInfo null -> -1
+    { name: 'stalled-a-lot', stage: 'in-exploration', stageEnteredDate: addDaysIso(todayIso(), -60) },
+    { name: 'stalled-a-little', stage: 'in-exploration', stageEnteredDate: addDaysIso(todayIso(), -35) }
+  ];
+  const sorted = rows.slice().sort(listComparator('stalled', 'desc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['stalled-a-lot', 'stalled-a-little', 'no-stage-data']);
+});
+
+test('listComparator by lastTouch sorts a prospect with no real touches (-1) below one with a real touch, even a very old one', () => {
+  const rows = [
+    { name: 'never-touched', outreachLog: [] },
+    { name: 'touched-long-ago', outreachLog: [{ date: addDaysIso(todayIso(), -200) }] }
+  ];
+  const sorted = rows.slice().sort(listComparator('lastTouch', 'desc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['touched-long-ago', 'never-touched']);
+});
+
+test('listComparator by touches counts only real valid-date outreachLog entries', () => {
+  const rows = [
+    { name: 'few', outreachLog: [{ date: '2026-01-01' }] },
+    { name: 'many', outreachLog: [{ date: '2026-01-01' }, { date: '2026-02-01' }, { date: 'not-a-date' }] }
+  ];
+  const sorted = rows.slice().sort(listComparator('touches', 'desc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['many', 'few'], 'many has 2 real touches (the malformed date is not counted), few has 1');
+});
+
+test('listComparator ties break by real name, never leaving equal rows in an arbitrary order', () => {
+  const rows = [
+    { name: 'zeta', category: 'beauty' },
+    { name: 'alpha', category: 'beauty' }
+  ];
+  const sorted = rows.slice().sort(listComparator('category', 'asc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['alpha', 'zeta'], 'same category, so the tie-break falls to name');
+});
+
+test('listComparator falls back to name sort for an unrecognized key, the same as the explicit default case', () => {
+  const rows = [{ name: 'charlie' }, { name: 'alice' }];
+  const sorted = rows.slice().sort(listComparator('not-a-real-key', 'asc', listStageById, listStageOrderIndex));
+  assert.deepEqual(sorted.map(r => r.name), ['alice', 'charlie']);
 });
