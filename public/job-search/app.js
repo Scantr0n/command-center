@@ -83,14 +83,10 @@
     URL.revokeObjectURL(url);
   });
 
-  // div.textContent round-trips escape &amp;/&lt;/&gt; but not quotes, so a
-  // hand-typed value with a " or ' could break out of an attribute. Same
-  // regex-based escape Sondrik/CGT/Garage all use for exactly that reason.
-  function escapeHtml(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  // Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+  // regression test instead of only ever running live in a browser, same
+  // shared-core pattern used for csvField above.
+  const { escapeHtml } = window.JobSearchHtmlCore;
 
   function fmtDate(iso) {
     if (!iso) return null;
