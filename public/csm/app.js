@@ -406,6 +406,15 @@
     const coldSignalCount = computeColdSignal(prospects).active.length;
     const backfillCount = computeDataQualityFlags(stages, prospects).length;
     const duplicateCount = CSMValidateCore.findDuplicateProspects(prospects).length;
+    // Casing drift has its own section (casingDriftSection) with the same
+    // "silently fragments filtering/grouping" real-world impact as a
+    // duplicate prospect, but was never counted up here, so it could sit
+    // fully populated at the bottom of the page with nothing above the fold
+    // ever pointing at it. Same CSMValidateCore.findCasingDrift call
+    // renderCasingDrift itself already makes for each of the two fields it
+    // checks (category, social platform).
+    const casingDriftCount = CSMValidateCore.findCasingDrift(prospects, p => [p.category]).length +
+      CSMValidateCore.findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform)).length;
 
     const items = [];
     // Same reasoning as Sondrik's own Next Steps widget: a drifted changelog
@@ -447,6 +456,12 @@
       items.push({
         n: duplicateCount, tone: 'warn', target: 'duplicatesList',
         label: duplicateCount === 1 ? 'possible duplicate' : 'possible duplicates'
+      });
+    }
+    if (casingDriftCount) {
+      items.push({
+        n: casingDriftCount, tone: 'warn', target: 'casingDriftList',
+        label: casingDriftCount === 1 ? 'spelling inconsistency across prospects' : 'spelling inconsistencies across prospects'
       });
     }
 
