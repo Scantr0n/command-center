@@ -145,18 +145,17 @@ async function getDriveCache() {
   }
 }
 
-// A missing credentials/token file (ENOENT, from getAuthClient's own
-// fs.readFileSync calls) means Drive was never set up on this machine at
-// all - a normal state (see CLAUDE.md: each machine needs its own OAuth
-// client) that's never worth alarming Jack over. Anything else means Drive
-// WAS working here and is now actually failing (a real invalid_grant, a
-// network drop, a revoked token) - a real, actionable gap worth surfacing,
-// not something to keep silently swallowing forever.
-function classifyDriveError(err) {
-  if (!err) return null;
-  if (err.code === 'ENOENT') return { state: 'not-configured' };
-  return { state: 'error', message: err.message };
-}
+// Real request-validation/error-shaping/data-quality-parsing logic, moved out
+// to data/server-core.js so it gets the same regression-test coverage as
+// every hub's own *-core.js and Alpha's live-core.js: this was the one
+// remaining file in that pattern still running its real logic (including
+// parseValidateCounts, which every hub's on-page Data Quality badge depends
+// on) with zero test coverage anywhere. See data/server-core.js's own header
+// comment.
+const {
+  classifyDriveError, validateChatMessages, anthropicErrorMessage, parseValidateCounts,
+  MAX_CHAT_MESSAGES, MAX_CHAT_MESSAGE_LENGTH
+} = require('./data/server-core.js');
 
 // Merges in live Drive snapshots where they exist, falls back to local-only
 // silently if Drive is unreachable (auth not set up yet, network down, etc.)
@@ -263,32 +262,6 @@ app.post('/api/toggles/:toggleId', async (req, res) => {
   }
 });
 
-// Real chat history from the modal is always a short back-and-forth of
-// plain strings, so anything else (missing/malformed body, an unbounded
-// message count, one absurdly long message) is either a broken client or a
-// stuck retry loop, not a real conversation. Rejected here, before ever
-// reaching the Anthropic API, so a bad request fails fast and free instead
-// of spending a real API call to get the same rejection back from Anthropic.
-const MAX_CHAT_MESSAGES = 40;
-const MAX_CHAT_MESSAGE_LENGTH = 4000;
-
-function validateChatMessages(messages) {
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return 'messages must be a non-empty array';
-  }
-  if (messages.length > MAX_CHAT_MESSAGES) {
-    return `messages must not exceed ${MAX_CHAT_MESSAGES} entries`;
-  }
-  for (const m of messages) {
-    if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string' || !m.content.trim()) {
-      return 'each message needs a role of "user" or "assistant" and non-empty string content';
-    }
-    if (m.content.length > MAX_CHAT_MESSAGE_LENGTH) {
-      return `message content must not exceed ${MAX_CHAT_MESSAGE_LENGTH} characters`;
-    }
-  }
-  return null;
-}
 
 // Every message in the array above still passes through to a real, billed
 // api.anthropic.com call, so the array-shape checks alone don't bound how
@@ -343,20 +316,6 @@ const isChatRateLimited = createRateLimiter(CHAT_RATE_LIMIT, CHAT_RATE_WINDOW_MS
 const DRAFT_RATE_LIMIT = 8;
 const DRAFT_RATE_WINDOW_MS = 10 * 60 * 1000;
 const isDraftRateLimited = createRateLimiter(DRAFT_RATE_LIMIT, DRAFT_RATE_WINDOW_MS);
-
-// Anthropic's own error responses are shaped {type: 'error', error: {type,
-// message}}, one level deeper than every other error this server returns (a
-// plain {error: '...'} string). Both proxy routes below used to forward that
-// raw shape straight through as the whole "error" field, so the real,
-// specific, actionable reason (a rate limit, an invalid key, a content-safety
-// block) never actually reached Jack: new Error(thatWholeObject) stringifies
-// to the literal, useless text "[object Object]" wherever a frontend tried
-// to read it as a plain message, exactly what the Garage draft form did.
-function anthropicErrorMessage(data) {
-  if (data && data.error && typeof data.error.message === 'string') return data.error.message;
-  if (typeof data === 'string') return data;
-  return 'Anthropic API error';
-}
 
 app.post('/api/clusters/:id/chat', async (req, res) => {
   try {
@@ -835,33 +794,6 @@ app.get('/api/recent-commits', (req, res) => {
   }
 });
 
-// Every hub's validate.js CLI script (run every cycle via `npm run validate`)
-// already knows the real, hub-specific rules for what counts as a real
-// backfill gap - not just presence/absence, but things like "has an
-// estimatedValue but no valuationBasis" or "missing eBay item specifics that
-// Cassini search actually excludes on". CGT's own rules alone are 300+ lines.
-// Reimplementing any of that here to show a number on the dashboard would
-// either drift from the real rules over time or duplicate them outright.
-// Running the actual CLI script as a subprocess and reading its own
-// already-trusted "N warning(s)"/"N error(s)" output reuses the real rules
-// with no duplication at all, the same principle as changelogStatusHandler
-// above reading real git history instead of guessing. This only needs every
-// validate.js to print that one conventional line, nothing about whether its
-// rules happen to also be exported as a reusable function (CGT's are, for
-// its own CSV importer's sake; CSM/Garage/Sondrik/job-search's aren't, and
-// don't need to be for this to work) - confirmed job-search's real output
-// matches the same convention before wiring its route up below.
-function parseValidateCounts(text) {
-  const sum = (re) => {
-    let match, total = 0;
-    while ((match = re.exec(text))) total += Number(match[1]);
-    return total;
-  };
-  return {
-    warnings: sum(/(\d+)\s+warning\(s\)/g),
-    errors: sum(/(\d+)\s+error\(s\)/g)
-  };
-}
 
 function dataQualityHandler(hub) {
   const validateScript = path.join(__dirname, 'public', hub, 'data', 'validate.js');
