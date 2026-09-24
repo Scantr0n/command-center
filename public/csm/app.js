@@ -14,7 +14,7 @@
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
     csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
     channelSortRank, listComparator, computeDataQualityFlags,
-    slugifyProspectId, nextAvailableId,
+    slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
   } = CSMCore;
 
@@ -3053,8 +3053,7 @@
           'more readable (a romanized version of the name works well) before pasting this in.');
       }
       const nameKey = name.trim().toLowerCase() + '|' + (company || '').trim().toLowerCase();
-      const existingMatch = allProspects.find(x => x.name &&
-        x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === nameKey);
+      const existingMatch = findProspectByNameCompany(name, company, allProspects);
       if (existingMatch) {
         warnings.push('An existing entry already has this same name and company ("' + existingMatch.name +
           (existingMatch.company ? ', ' + existingMatch.company : '') + '", id "' + existingMatch.id +
@@ -3064,14 +3063,10 @@
           (company ? ', ' + company : '') + '"). If this is really the same person, remove the duplicate row.');
       }
       seenKeysThisBatch.set(nameKey, id);
-      if (category) {
-        const norm = category.trim().toLowerCase();
-        const existingCats = allProspects.map(x => x.category).filter(Boolean);
-        const clash = existingCats.find(c => c.trim().toLowerCase() === norm && c !== category);
-        if (clash) {
-          warnings.push('Category "' + category + '" differs in casing/spacing from existing category "' + clash +
-            '", they would render as separate filter chips. Pick one spelling.');
-        }
+      const categoryClash = findCategoryCasingClash(category, allProspects);
+      if (categoryClash) {
+        warnings.push('Category "' + category + '" differs in casing/spacing from existing category "' + categoryClash +
+          '", they would render as separate filter chips. Pick one spelling.');
       }
 
       const p = {
@@ -3188,24 +3183,16 @@
           'which platform this snapshot is for, these numbers cannot be attributed to anything without it.');
       }
     });
-    if (p.category) {
-      const norm = p.category.trim().toLowerCase();
-      const existing = allProspects.map(x => x.category).filter(Boolean);
-      const clash = existing.find(c => c.trim().toLowerCase() === norm && c !== p.category);
-      if (clash) {
-        warnings.push('Category "' + p.category + '" differs in casing/spacing from existing category "' + clash +
-          '", they would render as separate filter chips. Pick one spelling.');
-      }
+    const categoryClash = findCategoryCasingClash(p.category, allProspects);
+    if (categoryClash) {
+      warnings.push('Category "' + p.category + '" differs in casing/spacing from existing category "' + categoryClash +
+        '", they would render as separate filter chips. Pick one spelling.');
     }
-    if (p.name) {
-      const nameKey = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
-      const match = allProspects.find(x => x.name &&
-        x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === nameKey);
-      if (match) {
-        warnings.push('An existing entry already has this same name and company ("' + match.name +
-          (match.company ? ', ' + match.company : '') + '", id "' + match.id + '"). If this is really the same ' +
-          'person, edit that entry instead of adding a second one.');
-      }
+    const nameMatch = findProspectByNameCompany(p.name, p.company, allProspects);
+    if (nameMatch) {
+      warnings.push('An existing entry already has this same name and company ("' + nameMatch.name +
+        (nameMatch.company ? ', ' + nameMatch.company : '') + '", id "' + nameMatch.id + '"). If this is really the same ' +
+        'person, edit that entry instead of adding a second one.');
     }
     return warnings;
   }

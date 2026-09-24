@@ -636,6 +636,32 @@
     return { id, isDuplicateId: true };
   }
 
+  // Whether a candidate category collides, case/whitespace-insensitively,
+  // with a different-cased spelling an existing prospect already uses (the
+  // same fragmentation CSMValidateCore.findCasingDrift catches across a
+  // whole saved prospects array, checked here before the new category is
+  // even added, so the "Log new prospect" generator can warn about it
+  // before it ever gets pasted in). Returns the other real spelling to
+  // point at, or null if there is no clash.
+  function findCategoryCasingClash(category, existingProspects) {
+    if (!category) return null;
+    const norm = category.trim().toLowerCase();
+    const existing = existingProspects.map(x => x.category).filter(Boolean);
+    return existing.find(c => c.trim().toLowerCase() === norm && c !== category) || null;
+  }
+
+  // Whether a candidate name+company already matches a real, existing
+  // prospect (the same "same person logged twice" case
+  // CSMValidateCore.findDuplicateProspects catches across a whole saved
+  // prospects array, checked here before the new entry is even added).
+  // Returns the matching prospect, or null.
+  function findProspectByNameCompany(name, company, existingProspects) {
+    if (!name) return null;
+    const key = name.trim().toLowerCase() + '|' + (company || '').trim().toLowerCase();
+    return existingProspects.find(x => x.name &&
+      x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === key) || null;
+  }
+
   // Warnings shown before drafting a real outreach message (the "Copy
   // outreach brief"/stage-move generators): missing the two fields most
   // predictive of a real reply, so a message goes out without either ever
@@ -726,7 +752,7 @@
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, channelSortRank, listComparator,
-    slugifyProspectId, nextAvailableId,
+    slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
   };
 });

@@ -24,6 +24,7 @@ const {
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
   csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
+  findCategoryCasingClash, findProspectByNameCompany,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
 } = require('./csm-core.js');
 
@@ -1049,6 +1050,34 @@ test('nextAvailableId lets a batch of same-named rows each get their own suffix 
   seen.add(second.id);
   assert.equal(first.id, 'jane-doe-2');
   assert.equal(second.id, 'jane-doe-3');
+});
+
+test('findCategoryCasingClash finds a differently-cased existing category', () => {
+  const existing = [{ category: 'Lifestyle' }, { category: 'Fitness' }];
+  assert.equal(findCategoryCasingClash('lifestyle', existing), 'Lifestyle');
+});
+
+test('findCategoryCasingClash returns null for the exact same spelling already in use', () => {
+  const existing = [{ category: 'Lifestyle' }];
+  assert.equal(findCategoryCasingClash('Lifestyle', existing), null);
+});
+
+test('findCategoryCasingClash returns null for a genuinely new category and for no category at all', () => {
+  const existing = [{ category: 'Lifestyle' }];
+  assert.equal(findCategoryCasingClash('Travel', existing), null);
+  assert.equal(findCategoryCasingClash(null, existing), null);
+});
+
+test('findProspectByNameCompany matches case/whitespace-insensitively on name and company', () => {
+  const existing = [{ id: 'city-bound-david-fraga', name: 'David Fraga', company: 'City Bound' }];
+  const match = findProspectByNameCompany('  david fraga ', 'CITY BOUND', existing);
+  assert.equal(match.id, 'city-bound-david-fraga');
+});
+
+test('findProspectByNameCompany returns null when nothing real matches, or when there is no name to match on', () => {
+  const existing = [{ id: 'city-bound-david-fraga', name: 'David Fraga', company: 'City Bound' }];
+  assert.equal(findProspectByNameCompany('David Fraga', 'A Different Company', existing), null);
+  assert.equal(findProspectByNameCompany(null, null, existing), null);
 });
 
 test('missingContactChannelType is false while still researched, true once past it with nothing logged', () => {
