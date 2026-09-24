@@ -131,6 +131,30 @@ function renderReturnDisputeFreshness() {
   el.title = 'Last hand-verified against each platform\'s own published return/dispute documentation on ' + RETURN_DISPUTE_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as RETURN_DISPUTE_REVIEWED_ON above: the scam
+// patterns this table warns about (eBay INAD return fraud and the $750
+// signature-confirmation threshold, off-platform payment requests on
+// Vinted/Poshmark, Depop Resolution Center miscategorization) are real,
+// checkable claims sitting right next to the dispute-mechanics table this
+// pattern was built for, with the same silent-drift risk if left untracked.
+// Re-verified 2026-09-24 against eBay's own seller-protection policy page
+// (the $750 threshold) and Vinted's own Buyer Protection help page (payment
+// must go through Vinted's checkout); Poshmark and Depop rows unchanged.
+const SCAM_PATTERNS_REVIEWED_ON = '2026-09-24';
+const SCAM_PATTERNS_STALE_AFTER_DAYS = 45;
+
+function renderScamPatternsFreshness() {
+  const el = document.getElementById('scamPatternsFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SCAM_PATTERNS_REVIEWED_ON);
+  const stale = age != null && age > SCAM_PATTERNS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published fraud/protection documentation on ' + SCAM_PATTERNS_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -4905,6 +4929,7 @@ renderSeasonalCalendarHighlight();
 renderFeeScheduleFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
+renderScamPatternsFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
