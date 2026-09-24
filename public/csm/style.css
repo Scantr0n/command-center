@@ -129,6 +129,29 @@ header.page-head .sub {
 }
 .offline-banner strong { color: #F2D9B0; }
 
+/* Whether the last fetch of stages.json/prospects.json actually succeeded, a
+   different question from .offline-banner above (this device can be fully
+   online and still get a real load failure, e.g. a syntax error from hand-
+   editing prospects.json, the documented way this data gets updated until a
+   real backend exists). Placed at the very top of the page rather than only
+   as a note inside the board, since the At a glance tiles and attention bar
+   below both silently read as "0, nothing flagged" once prospects.json (or
+   stages.json) fails to load, indistinguishable from a real empty pipeline
+   unless this is impossible to miss. Same #E5484D accent as
+   .snapshot-chip-attention, this is that same severity, just surfaced at
+   the top of the page instead of only in one tile. */
+.data-error-banner {
+  border: 1px solid rgba(229,72,77,0.4);
+  background: rgba(229,72,77,0.08);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 0.8rem;
+  color: #F2B4B6;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.data-error-banner strong { color: #FBD3D4; }
+
 .callout {
   border: 1px solid var(--hairline);
   background: rgba(255,255,255,0.02);
@@ -296,6 +319,14 @@ header.page-head .sub {
 .snapshot-chip-prospects { --chip-accent: #4F9FD9; }
 .snapshot-chip-nudges { --chip-accent: #D9A441; }
 .snapshot-chip-attention { --chip-accent: #E5484D; }
+/* Overrides whichever --chip-accent above applies when the file that tile's
+   count depends on failed to load (see renderSnapshot's loadStatus param):
+   a real "0" and an unrecoverable "unknown" both render as a numeral-shaped
+   chip otherwise, so this has to out-rank the kind-specific color above to
+   read as the same severity as .snapshot-chip-attention. Declared after
+   those three so equal-specificity single-class rules resolve in its favor. */
+.snapshot-chip-unknown { --chip-accent: #E5484D; }
+.snapshot-chip-unknown .snapshot-chip-number { font-size: 1.1rem; }
 .snapshot-chip-icon {
   width: 30px;
   height: 30px;
@@ -1551,6 +1582,13 @@ footer.page-foot {
      WCAG AA. */
   .offline-banner { color: #6B4A00; }
   .offline-banner strong { color: #4A3300; }
+
+  /* Same too-light-for-paper problem as .offline-banner above, and worth
+     keeping for the same reason: printing mid-failure is real context about
+     which numbers on the page below are stale or missing rather than a
+     genuine empty pipeline. */
+  .data-error-banner { border-color: #b5424a; color: #7a1f26; }
+  .data-error-banner strong { color: #5c1015; }
 
   .board-toolbar { margin-bottom: 10px; }
   .stats-bar, .stats-bar strong { color: #333; }
