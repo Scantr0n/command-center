@@ -57,6 +57,11 @@
   // had a regression test.
   const { computeNextSteps: computeNextStepsCore } = window.SondrikNextStepsCore;
 
+  // Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+  // regression test instead of only ever running live in a browser, same
+  // shared-core pattern as the four destructures above.
+  const { escapeHtml } = window.SondrikHtmlCore;
+
   printBtn.addEventListener('click', () => window.print());
 
   // "New since your last visit" is a per-browser convenience, not a second
@@ -129,16 +134,6 @@
     return DOWNLOAD_MILESTONES.filter(m => m > lowerBound && m <= count);
   }
 
-  // div.textContent/innerHTML round-trip only escapes &amp;/&lt;/&gt; in text
-  // content, not quotes, so a hand-typed value with a " or ' in it (a channel
-  // id, a lead field) could break out of an attribute like value="..." or
-  // data-foo="...". Same regex-based escape CGT and Garage already use for
-  // exactly that reason.
-  function escapeHtml(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
 
   function fmtDate(iso) {
     if (!iso) return null;
