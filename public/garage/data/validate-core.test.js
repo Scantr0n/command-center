@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /*
- * Regression tests for validate-core.js, the shared duplicate-listing,
- * suspicious-return-policy, and missing-item-specifics rules the CLI
- * validator (validate.js) and the dashboard's own "Possible duplicates"
- * panel (app.js) both rely on. No test framework or dependency: node:test
- * and node:assert ship with Node itself, matching this repo's own
+ * Regression tests for validate-core.js: the shared platform list and
+ * title-length caps, plus the duplicate-listing, suspicious-return-policy,
+ * and missing-item-specifics rules, that the CLI validator (validate.js) and
+ * the dashboard (app.js) both rely on. No test framework or dependency:
+ * node:test and node:assert ship with Node itself, matching this repo's own
  * no-extra-dependency convention (see public/cgt/data/validate-core.test.js
  * and public/csm/data/validate-core.test.js for the same pattern).
  *
@@ -13,12 +13,24 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  PLATFORMS,
+  TITLE_HARD_LIMITS,
+  DEPOP_TITLE_SOFT_LIMIT,
   findDuplicateListings,
   isSuspiciousEbayReturnPolicy,
   requiredItemSpecificFields,
   missingItemSpecifics,
   isDepopIneligible
 } = require('./validate-core.js');
+
+test('PLATFORMS is the real 4-platform list, the single source validate.js and app.js both read', () => {
+  assert.deepEqual(PLATFORMS, ['ebay', 'vinted', 'poshmark', 'depop']);
+});
+
+test('TITLE_HARD_LIMITS: Vinted is really 100, not the 70 that once drifted into two separate copies (a1fd471)', () => {
+  assert.deepEqual(TITLE_HARD_LIMITS, { ebay: 80, vinted: 100, poshmark: 80 });
+  assert.equal(DEPOP_TITLE_SOFT_LIMIT, 50);
+});
 
 test('findDuplicateListings flags two live listings with the same title and price', () => {
   const listings = [

@@ -242,6 +242,15 @@ header.page-head .sub {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem;
 }
+/* One field-reference row (cards.json's four BGS subgrade fields) names all
+   four in a single comma-joined header instead of one word. Left on the
+   default nowrap above, that unbreakable string forces auto table layout to
+   size the whole name column to fit it on one line -- on a narrow viewport
+   that squeezes every other row's description into a sliver and pushes the
+   table past the screen edge, found scrolling this page at a 390px width. */
+.schema-table th.wrap {
+  white-space: normal;
+}
 .schema-example {
   background: var(--panelLight);
   border: 1px solid var(--hairline);
@@ -1382,6 +1391,39 @@ textarea.np-input { resize: vertical; }
   max-height: 300px;
 }
 
+/* Jump-to-section FAB, same markup/classes/behavior as Garage/Sondrik's:
+   this page runs 20 real sections including two long references and the
+   changelog, with no sticky header, so this is the one way back to a
+   specific section without scrolling blind. */
+.jump-nav-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  background: var(--panel);
+  color: var(--sub);
+  border: 1px solid var(--hairlineHover);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.jump-nav-fab:hover, .jump-nav-fab:focus-visible { color: var(--ink); border-color: var(--accent); }
+.jump-nav-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.jump-nav-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 60vh; overflow-y: auto; }
+.jump-nav-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--sub);
+  text-decoration: none;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.jump-nav-link:hover, .jump-nav-link:focus-visible { background: var(--panelLight); color: var(--ink); border-color: var(--hairline); }
+
 /* Same precedent as CSM's style.css: every hover/focus transition on this
    page, even without a real keyframe animation behind it, still triggers
    vestibular discomfort for someone who has set this preference, so cut
@@ -1430,7 +1472,7 @@ textarea.np-input { resize: vertical; }
   .tax-progress-fill { background: #888 !important; }
   .tax-progress-pct { color: #555 !important; }
 
-  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay {
+  .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .jump-nav-fab {
     display: none !important;
   }
   .card-table thead th.sortable::after { content: none !important; }

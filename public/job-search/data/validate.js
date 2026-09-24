@@ -17,54 +17,16 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
+const { isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CHANGELOG_TRACKED_FILES = ['applications.json', 'criteria.json', 'next-up.json', 'digest-latest.json'];
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
   const raw = fs.readFileSync(file, 'utf8');
   return JSON.parse(raw);
-}
-
-function isDateOrNull(v) {
-  if (v === null || v === undefined) return true;
-  if (typeof v !== 'string' || !DATE_RE.test(v)) return false;
-  const [y, m, d] = v.split('-').map(Number);
-  const parsed = new Date(y, m - 1, d);
-  return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
-}
-
-function isFutureDate(v) {
-  if (!v || !DATE_RE.test(v)) return false;
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  return new Date(v + 'T00:00:00') > tomorrow;
-}
-
-// Every real field on this page is transcribed straight out of the tracker
-// (see the file header above), so a hand-typed field with an em dash reads
-// as a paste-in from somewhere other than that source file, or a new claim
-// nobody actually verified against it. Warning-level only, matches Sondrik.
-function emDashFields(obj, fields) {
-  const hits = [];
-  if (!obj) return hits;
-  fields.forEach(f => {
-    const v = obj[f];
-    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
-  });
-  return hits;
-}
-
-// A source link is only ever real if it's an actual http(s) URL or a mailto:
-// (Curb Creations has no posting URL, only an email address to apply to).
-// Anything else hand-typed into sourceUrl (a bare "TBD", a placeholder) would
-// render as a broken or misleading link, so this is an error, not a warning.
-function isValidSourceUrlOrNull(v) {
-  if (v === null || v === undefined) return true;
-  if (typeof v !== 'string') return false;
-  return /^https?:\/\//.test(v) || /^mailto:/.test(v);
 }
 
 function main() {
@@ -122,6 +84,15 @@ function main() {
     const where = 'skipped[' + idx + ']';
     if (!s.company) errors.push(where + ': missing "company"');
     if (!s.reason) errors.push(where + ': missing "reason", a skipped application with no real reason logged reads as unexplained');
+  });
+  // Catches the same real risk every other hub's own duplicate check already
+  // guards against: applications.json's only uniqueness check above is on
+  // "num" (auto-incrementing, so it can't naturally collide except by
+  // mistake), so the same tracker entry hand-transcribed twice under two
+  // different "num" values would otherwise go undetected.
+  findDuplicateApplications(applicationsData.applications || []).forEach(group => {
+    warnings.push('applications: ' + group.length + ' entries match on company + role (' +
+      group.map(a => '#' + a.num).join(', ') + '), check for a duplicate transcription');
   });
   const savedCount = applicationsData.savedCount || {};
   if (typeof savedCount.count !== 'number' || savedCount.count < 0) {
@@ -214,6 +185,8 @@ function main() {
       'against the source tracker before trusting either number.');
   }
 
+  checkChangelogFreshness(warnings);
+
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');
     warnings.forEach(w => console.warn('  - ' + w));
@@ -229,6 +202,50 @@ function main() {
     (criteriaData.standingCriteria || []).length + ' standing criteria, ' + (db.items || []).length + ' dealbreaker item(s), ' +
     (nextUpData.standouts || []).length + ' next-up standout(s), ' + itemizedCount + ' latest-digest lead(s)).');
   process.exit(0);
+}
+
+// changelog.json is generated, not hand-edited (see changelog.js), so it
+// can't have the typo-style errors above, only a drift failure mode: it
+// silently falls behind the real commit history, or keeps entries from
+// before a history rewrite that are no longer reachable from any branch.
+// Comparing the full recorded commit list against this repo's actual commit
+// list for these same files, not just the latest hash, is what catches a
+// corrupted middle of the list, not only a stale head; git itself is the
+// source of truth here, same as changelog.js. Same check already in place
+// on CSM/Sondrik/Alpha/CGT/Garage's own validate.js for the same reason.
+function checkChangelogFreshness(warnings) {
+  try {
+    // A shallow clone's `git log` for these files only ever sees the commits
+    // fetched, which is not the same thing as "these files have no earlier
+    // history": comparing that truncated list against a changelog.json
+    // generated from a real full clone reports a "drift" that isn't real
+    // (this bit CGT and Sondrik for real on 2026-09-19). Skipped the same as
+    // "not a git checkout" below, an environment gap, not a data error.
+    if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: DATA_DIR, encoding: 'utf8' }).trim() === 'true') return;
+    const realHashesRaw = execFileSync('git', [
+      'log', '--format=%H', '--',
+      ...CHANGELOG_TRACKED_FILES
+    ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
+    const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
+    let changelogData = null;
+    try {
+      changelogData = loadJson('changelog.json');
+    } catch (e) {
+      warnings.push('changelog.json is missing or unreadable (' + e.message + '), run node public/job-search/data/changelog.js');
+      return;
+    }
+    const recordedHashes = (changelogData.entries || []).map(e => e.fullHash);
+    if (recordedHashes.join(',') !== realHashes.join(',')) {
+      warnings.push('changelog.json does not match this repo\'s actual commit history for these data files ' +
+        '(' + recordedHashes.length + ' entr' + (recordedHashes.length === 1 ? 'y' : 'ies') + ' recorded vs ' +
+        realHashes.length + ' real commit' + (realHashes.length === 1 ? '' : 's') + '), run ' +
+        'node public/job-search/data/changelog.js to refresh it');
+    }
+  } catch (e) {
+    // Not a git checkout, or git isn't on PATH: can't check changelog
+    // freshness, but that's an environment gap, not a data error, so this
+    // stays silent rather than adding a warning no one can act on.
+  }
 }
 
 main();

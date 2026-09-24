@@ -145,18 +145,17 @@ async function getDriveCache() {
   }
 }
 
-// A missing credentials/token file (ENOENT, from getAuthClient's own
-// fs.readFileSync calls) means Drive was never set up on this machine at
-// all - a normal state (see CLAUDE.md: each machine needs its own OAuth
-// client) that's never worth alarming Jack over. Anything else means Drive
-// WAS working here and is now actually failing (a real invalid_grant, a
-// network drop, a revoked token) - a real, actionable gap worth surfacing,
-// not something to keep silently swallowing forever.
-function classifyDriveError(err) {
-  if (!err) return null;
-  if (err.code === 'ENOENT') return { state: 'not-configured' };
-  return { state: 'error', message: err.message };
-}
+// Real request-validation/error-shaping/data-quality-parsing logic, moved out
+// to data/server-core.js so it gets the same regression-test coverage as
+// every hub's own *-core.js and Alpha's live-core.js: this was the one
+// remaining file in that pattern still running its real logic (including
+// parseValidateCounts, which every hub's on-page Data Quality badge depends
+// on) with zero test coverage anywhere. See data/server-core.js's own header
+// comment.
+const {
+  classifyDriveError, validateChatMessages, anthropicErrorMessage, parseValidateCounts,
+  MAX_CHAT_MESSAGES, MAX_CHAT_MESSAGE_LENGTH
+} = require('./data/server-core.js');
 
 // Merges in live Drive snapshots where they exist, falls back to local-only
 // silently if Drive is unreachable (auth not set up yet, network down, etc.)
@@ -263,32 +262,6 @@ app.post('/api/toggles/:toggleId', async (req, res) => {
   }
 });
 
-// Real chat history from the modal is always a short back-and-forth of
-// plain strings, so anything else (missing/malformed body, an unbounded
-// message count, one absurdly long message) is either a broken client or a
-// stuck retry loop, not a real conversation. Rejected here, before ever
-// reaching the Anthropic API, so a bad request fails fast and free instead
-// of spending a real API call to get the same rejection back from Anthropic.
-const MAX_CHAT_MESSAGES = 40;
-const MAX_CHAT_MESSAGE_LENGTH = 4000;
-
-function validateChatMessages(messages) {
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return 'messages must be a non-empty array';
-  }
-  if (messages.length > MAX_CHAT_MESSAGES) {
-    return `messages must not exceed ${MAX_CHAT_MESSAGES} entries`;
-  }
-  for (const m of messages) {
-    if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string' || !m.content.trim()) {
-      return 'each message needs a role of "user" or "assistant" and non-empty string content';
-    }
-    if (m.content.length > MAX_CHAT_MESSAGE_LENGTH) {
-      return `message content must not exceed ${MAX_CHAT_MESSAGE_LENGTH} characters`;
-    }
-  }
-  return null;
-}
 
 // Every message in the array above still passes through to a real, billed
 // api.anthropic.com call, so the array-shape checks alone don't bound how
@@ -344,20 +317,6 @@ const DRAFT_RATE_LIMIT = 8;
 const DRAFT_RATE_WINDOW_MS = 10 * 60 * 1000;
 const isDraftRateLimited = createRateLimiter(DRAFT_RATE_LIMIT, DRAFT_RATE_WINDOW_MS);
 
-// Anthropic's own error responses are shaped {type: 'error', error: {type,
-// message}}, one level deeper than every other error this server returns (a
-// plain {error: '...'} string). Both proxy routes below used to forward that
-// raw shape straight through as the whole "error" field, so the real,
-// specific, actionable reason (a rate limit, an invalid key, a content-safety
-// block) never actually reached Jack: new Error(thatWholeObject) stringifies
-// to the literal, useless text "[object Object]" wherever a frontend tried
-// to read it as a plain message, exactly what the Garage draft form did.
-function anthropicErrorMessage(data) {
-  if (data && data.error && typeof data.error.message === 'string') return data.error.message;
-  if (typeof data === 'string') return data;
-  return 'Anthropic API error';
-}
-
 app.post('/api/clusters/:id/chat', async (req, res) => {
   try {
     if (isChatRateLimited(req.ip)) {
@@ -396,7 +355,15 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
     });
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json({ error: anthropicErrorMessage(data) });
-    res.json({ text: data.content[0].text });
+    // A 200 response is no guarantee content[0] exists or is a text block
+    // (a refusal stop_reason, a future API change) - the same class of
+    // response-shape issue the draft-listing proxy below already guards
+    // against with its own text-block filter. Unguarded, this threw a raw
+    // TypeError that fell into the generic catch and surfaced as an opaque
+    // 500 instead of a real, readable error.
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    if (!textBlock) return res.status(502).json({ error: 'Model returned no text response' });
+    res.json({ text: textBlock.text });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -585,13 +552,26 @@ const ALPHA_CONN_HISTORY_DEBOUNCE_MS = 10000;
 // Same atomic temp-file-then-rename pattern as writeToggles above, for the
 // same reason: a write killed mid-save should never leave readers looking at
 // a truncated file.
-function appendAlphaConnHistory(at, connected) {
+//
+// `paused` rides along on the same entry as the connectivity check that
+// observed it, since it's the same /health response that already told us
+// `connected`: no separate poll, no separate file. It's `null` whenever
+// `connected` is false (the daemon wasn't reachable, so its kill-switch
+// state is genuinely unknown at that check, not "clear"). The debounce
+// below used to key only on `connected`, so a real paused flip landing
+// inside the same 10s window as an unrelated "still connected" heartbeat
+// would get silently dropped, exactly the kind of missed transition
+// killSwitchStateEvents/lastKillSwitchTriggerAt below depend on never
+// happening; it now also fires on a paused change even when connected
+// didn't move.
+function appendAlphaConnHistory(at, connected, paused) {
   const history = readAlphaConnHistory();
   const last = history[history.length - 1];
-  if (last && last.connected === connected && (new Date(at) - new Date(last.at)) < ALPHA_CONN_HISTORY_DEBOUNCE_MS) {
+  const pausedNow = connected ? !!paused : null;
+  if (last && last.connected === connected && last.paused === pausedNow && (new Date(at) - new Date(last.at)) < ALPHA_CONN_HISTORY_DEBOUNCE_MS) {
     return history.slice(-ALPHA_CONN_HISTORY_CAP);
   }
-  history.push({ at, connected });
+  history.push({ at, connected, paused: pausedNow });
   const capped = history.slice(-ALPHA_CONN_HISTORY_CAP);
   const tmpFile = `${ALPHA_CONN_HISTORY_FILE}.${process.pid}.tmp`;
   fs.writeFileSync(tmpFile, JSON.stringify(capped, null, 2));
@@ -599,117 +579,19 @@ function appendAlphaConnHistory(at, connected) {
   return capped;
 }
 
-// Real peak-to-trough drawdown, computed from the daemon's actual equity
-// curve (never estimated): walks the real history tracking the running
-// peak, and returns how far the latest point sits below the running peak at
-// that moment (current) plus the deepest such gap ever seen (max). Standard
-// drawdown definition, nothing invented, mirrors what Alpha's own sizing
-// logic already reacts to internally.
-function computeDrawdowns(history) {
-  if (!Array.isArray(history) || !history.length) return { currentDrawdownPct: null, maxDrawdownPct: null };
-  let peak = history[0].v;
-  let maxDrawdownPct = 0;
-  for (const point of history) {
-    if (point.v > peak) peak = point.v;
-    const dd = peak > 0 ? ((peak - point.v) / peak) * 100 : 0;
-    if (dd > maxDrawdownPct) maxDrawdownPct = dd;
-  }
-  const latest = history[history.length - 1].v;
-  const currentDrawdownPct = peak > 0 ? ((peak - latest) / peak) * 100 : 0;
-  return {
-    currentDrawdownPct: Math.round(currentDrawdownPct * 100) / 100,
-    maxDrawdownPct: Math.round(maxDrawdownPct * 100) / 100
-  };
-}
-
-// Alpaca's real position/account payloads carry every internal margin and
-// ID field the broker tracks; only pulls the subset a glance-at-status page
-// actually needs; converts Alpaca's string numbers to real numbers once
-// here rather than in every render function.
-function mapPositions(rawPositions) {
-  return Object.values(rawPositions || {}).map(p => ({
-    symbol: p.symbol,
-    side: p.side,
-    qty: Number(p.qty),
-    avgEntryPrice: Number(p.avg_entry_price),
-    currentPrice: Number(p.current_price),
-    marketValue: Number(p.market_value),
-    unrealizedPl: Number(p.unrealized_pl),
-    unrealizedPlPct: Number(p.unrealized_plpc) * 100
-  })).sort((a, b) => b.marketValue - a.marketValue);
-}
-
-function mapAccount(rawAccount) {
-  if (!rawAccount) return null;
-  const equity = Number(rawAccount.equity);
-  const lastEquity = Number(rawAccount.last_equity);
-  return {
-    equity,
-    cash: Number(rawAccount.cash),
-    buyingPower: Number(rawAccount.buying_power),
-    portfolioValue: Number(rawAccount.portfolio_value),
-    dayChangeDollar: Number.isFinite(equity) && Number.isFinite(lastEquity) ? equity - lastEquity : null,
-    dayChangePct: Number.isFinite(equity) && Number.isFinite(lastEquity) && lastEquity !== 0
-      ? ((equity - lastEquity) / lastEquity) * 100 : null
-  };
-}
-
-// The daemon's /equity-history is already fetched for computeDrawdowns above,
-// which only ever reads point.v, then the rest of each point was discarded.
-// This maps the same already-trusted field into a plain number series so the
-// page can show a real equity trend instead of just today's single derived
-// drawdown percentage. Defensive and capped like every other real-feed mapper
-// here; no timestamp field is read, since only .v is a field this codebase
-// has ever actually verified against the daemon's real response.
-const EQUITY_CURVE_POINT_CAP = 200;
-function mapEquityCurve(history) {
-  if (!Array.isArray(history)) return [];
-  return history
-    .map(p => Number(p && p.v))
-    .filter(v => Number.isFinite(v))
-    .slice(-EQUITY_CURVE_POINT_CAP);
-}
-
-// Turns the daemon's real evolution-history entries into the honest
-// activity-log shape the Alpha page already renders. Only ever built from
-// fields the daemon actually returned, never invented.
-function evolutionEvents(history) {
-  return history.map(entry => {
-    const agents = entry.agents || {};
-    const switches = Object.entries(agents).filter(([, a]) => a.switchedFrom);
-    const detail = switches.length
-      ? switches.map(([id, a]) => `${id}: ${a.switchedFrom} to ${a.strategy}`).join(', ')
-      : `${Object.keys(agents).length} agents re-evolved, no strategy switches`;
-    return {
-      type: 'evolution',
-      tone: 'neutral',
-      label: `Weekly evolution run (${entry.interval || 'unknown interval'})`,
-      detail,
-      at: entry.timestamp
-    };
-  });
-}
-
-// The Activity log's own empty state already promises "connection state
-// changes" alongside kill-switch triggers and regime changes, but nothing
-// ever populated that, since connection.history above only started
-// persisting real checks just now. This turns that same real, just-persisted
-// history into real events the moment the state actually flips between
-// consecutive checks, oldest first; never a separate guess, just a diff over
-// data already being recorded for the connectivity strip.
-function connectionStateEvents(history) {
-  const events = [];
-  for (let i = 1; i < history.length; i++) {
-    if (history[i].connected === history[i - 1].connected) continue;
-    events.push({
-      type: 'connection',
-      tone: history[i].connected ? 'good' : 'alert',
-      label: history[i].connected ? 'Connection restored' : 'Connection lost',
-      at: history[i].at
-    });
-  }
-  return events;
-}
+// Real money math and history-derived event detection (drawdown %, account
+// P&L, position/equity mapping, connection/kill-switch state transitions),
+// moved out to public/alpha/data/live-core.js so it gets the same
+// regression-test coverage as every other hub's own *-core.js: this was the
+// one hub whose real dollar figures and event-transition logic were computed
+// entirely inline in server.js with zero test coverage anywhere, the exact
+// gap account-core.js's own header comment already flags for the
+// client-side half of this same feed.
+const {
+  computeDrawdowns, mapPositions, mapAccount, mapEquityCurve,
+  evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt,
+  mapAnomalies
+} = require('./public/alpha/data/live-core.js');
 
 app.get('/api/alpha/live', async (req, res) => {
   // Same skip-and-log guard as readLocalClusters/readToggles above: this read
@@ -729,7 +611,11 @@ app.get('/api/alpha/live', async (req, res) => {
     const [state, evoHistory, anomalies, debates, equity] = await Promise.all([
       fetchAlpha('/state'),
       fetchAlpha('/evolution-history').catch(() => ({ history: [] })),
-      fetchAlpha('/anomalies').catch(() => ({ stuck: [] })),
+      // Falls back to `stuck: null`, not `stuck: []`, when this one
+      // subrequest fails while /health and /state still succeed: mapAnomalies
+      // below treats null as a genuinely unknown reading, never a guessed
+      // "0 stuck agents" standing in for a check that never actually ran.
+      fetchAlpha('/anomalies').catch(() => ({ stuck: null })),
       fetchAlpha('/debates').catch(() => ({ enabled: false })),
       fetchAlpha('/equity-history').catch(() => ({ history: [] }))
     ]);
@@ -744,7 +630,7 @@ app.get('/api/alpha/live', async (req, res) => {
     // never hand-edited into the static fallback.
     const account = mapAccount(state.account);
     if (account) account.equityCurve = mapEquityCurve(equity.history);
-    const connHistory = appendAlphaConnHistory(now, true);
+    const connHistory = appendAlphaConnHistory(now, true, !!health.paused);
 
     res.json({
       system: fallback.system,
@@ -759,7 +645,7 @@ app.get('/api/alpha/live', async (req, res) => {
         regime: state.regime && state.regime.regime ? state.regime.regime : null,
         killSwitch: {
           engaged: !!health.paused,
-          lastTriggeredAt: null
+          lastTriggeredAt: lastKillSwitchTriggerAt(connHistory)
         },
         positionSizing: {
           activeMode: null,
@@ -770,6 +656,7 @@ app.get('/api/alpha/live', async (req, res) => {
           active: !!debates.enabled,
           blockedOn: debates.enabled ? null : 'API key'
         },
+        anomalies: mapAnomalies(anomalies, now),
         account,
         positions: mapPositions(state.positions),
         genealogy: {
@@ -788,6 +675,7 @@ app.get('/api/alpha/live', async (req, res) => {
       },
       events: [
         ...connectionStateEvents(connHistory),
+        ...killSwitchStateEvents(connHistory),
         ...evolutionEvents(history),
         ...(Array.isArray(anomalies.stuck) ? anomalies.stuck.map(a => ({
           type: 'anomaly', tone: 'alert', label: 'Stuck agent detected', detail: JSON.stringify(a), at: anomalies.checkedAt
@@ -813,6 +701,7 @@ app.get('/api/alpha/live', async (req, res) => {
       },
       events: [
         ...connectionStateEvents(connHistory),
+        ...killSwitchStateEvents(connHistory),
         ...(Array.isArray(fallback.events) ? fallback.events : [])
       ]
     });
@@ -872,6 +761,9 @@ app.get('/api/garage/changelog-status', changelogStatusHandler('garage', [
   'listings.json', 'pipeline.json', 'activity.json', 'sales.json',
   'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
 ]));
+app.get('/api/job-search/changelog-status', changelogStatusHandler('job-search', [
+  'applications.json', 'criteria.json', 'next-up.json', 'digest-latest.json'
+]));
 
 // Real, unfilterable proof of recent work on the dashboard itself: the
 // repo's own git log, not a hand-maintained "what's new" note that can
@@ -902,33 +794,6 @@ app.get('/api/recent-commits', (req, res) => {
   }
 });
 
-// Every hub's validate.js CLI script (run every cycle via `npm run validate`)
-// already knows the real, hub-specific rules for what counts as a real
-// backfill gap - not just presence/absence, but things like "has an
-// estimatedValue but no valuationBasis" or "missing eBay item specifics that
-// Cassini search actually excludes on". CGT's own rules alone are 300+ lines.
-// Reimplementing any of that here to show a number on the dashboard would
-// either drift from the real rules over time or duplicate them outright.
-// Running the actual CLI script as a subprocess and reading its own
-// already-trusted "N warning(s)"/"N error(s)" output reuses the real rules
-// with no duplication at all, the same principle as changelogStatusHandler
-// above reading real git history instead of guessing. This only needs every
-// validate.js to print that one conventional line, nothing about whether its
-// rules happen to also be exported as a reusable function (CGT's are, for
-// its own CSV importer's sake; CSM/Garage/Sondrik/job-search's aren't, and
-// don't need to be for this to work) - confirmed job-search's real output
-// matches the same convention before wiring its route up below.
-function parseValidateCounts(text) {
-  const sum = (re) => {
-    let match, total = 0;
-    while ((match = re.exec(text))) total += Number(match[1]);
-    return total;
-  };
-  return {
-    warnings: sum(/(\d+)\s+warning\(s\)/g),
-    errors: sum(/(\d+)\s+error\(s\)/g)
-  };
-}
 
 function dataQualityHandler(hub) {
   const validateScript = path.join(__dirname, 'public', hub, 'data', 'validate.js');

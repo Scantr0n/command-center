@@ -58,7 +58,7 @@
           <tr><th>title</th><td>Item name as it appears in the listing</td></tr>
           <tr><th>price</th><td>USD asking price, a number or <code>null</code></td></tr>
           <tr><th>costBasis</th><td>USD cost of actually acquiring this item (what it was paid for), a non-negative number or <code>null</code>. Drives real profit figures separate from the fee-only payout estimates below, leave <code>null</code> until you have the real number, never guess it.</td></tr>
-          <tr><th>category</th><td>Optional eBay category classifier, either <code>"shoes"</code> or omitted/<code>null</code>. Clothing, Shoes &amp; Accessories is one of eBay's standard-rate categories (13.6%, same as most others), so this doesn't change any fee math; it only controls which <code>itemSpecifics</code> fields are checked in "Needs backfill" below, since <code>size</code> and <code>color</code> only matter for something you actually wear.</td></tr>
+          <tr><th>category</th><td>Optional eBay category classifier, either <code>"shoes"</code>, <code>"electronics"</code>, or omitted/<code>null</code>. <code>"shoes"</code> switches every eBay fee calculation on this page to the real 15.3% Clothing, Shoes &amp; Accessories final value fee instead of the 13.6% standard rate, and controls which <code>itemSpecifics</code> fields are checked in "Needs backfill" below, since <code>size</code> and <code>color</code> only matter for something you actually wear.</td></tr>
           <tr><th>platforms</th><td>Array of any of: <code>ebay</code>, <code>vinted</code>, <code>poshmark</code>, <code>depop</code></td></tr>
           <tr><th>soldOn</th><td>Array, subset of <code>platforms</code>, marking which of them the item has actually sold on so it can be manually delisted from the rest. Leave <code>[]</code> until a real sale happens on one platform while the item is still live on others.</td></tr>
           <tr><th>listingUrls</th><td>Optional object keyed by platform (each key a subset of <code>platforms</code>), value the real live listing URL as a string once it's been copied over, or <code>null</code> until logged. Powers a direct "View listing" link per platform in the item detail view, never invent a URL, leave it <code>null</code> rather than guess.</td></tr>
@@ -482,7 +482,9 @@
   </section>
 
   <section>
-    <h2 class="section-title">Title fit by platform</h2>
+    <h2 class="section-title">Title fit by platform
+      <span class="reference-freshness" id="titleSpecsFreshness"></span>
+    </h2>
     <div class="callout">
       Real published title-length caps per platform, sourced from each platform's own seller/help documentation
       as of September 2026. eBay silently truncates a title past its cap at publish, Vinted and Poshmark reject
@@ -496,7 +498,7 @@
         <table class="schema-table">
           <tbody>
             <tr><th>eBay</th><td>Title: 80-character hard cap. Photos: up to 24 free, 500px minimum on the longest side (1600px+ enables zoom), no watermarks/text/borders, must be the actual item (no stock photos on used goods).</td></tr>
-            <tr><th>Vinted</th><td>Title: 70-character hard cap. Photos: square-cropped thumbnail in feed/search, a non-square upload gets center-cropped.</td></tr>
+            <tr><th>Vinted</th><td>Title: 100-character hard cap. Photos: square-cropped thumbnail in feed/search, a non-square upload gets center-cropped.</td></tr>
             <tr><th>Poshmark</th><td>Title: 80-character hard cap. Photos: up to 16, square-cropped cover thumbnail.</td></tr>
             <tr><th>Depop</th><td>Title: no published hard cap, but mobile search visibly truncates around 50 characters, so front-load brand and item type. Photos: 1280px recommended, square cover crop.</td></tr>
           </tbody>
@@ -638,14 +640,21 @@
 
   <section id="sellerStandardsSection">
     <details class="section-details" id="sellerStandardsDetails">
-    <summary class="section-title">Seller status &amp; standards, by platform</summary>
+    <summary class="section-title">Seller status &amp; standards, by platform
+      <span class="reference-freshness" id="sellerStandardsFreshness"></span>
+    </summary>
     <div class="callout">
       Real account-health thresholds each platform gates extra reach or trust signals behind, sourced from each
       platform's own current seller documentation and reseller-community benchmarking as of September 2026. Worth
       knowing now, before the 48-draft Depop backlog goes live and volume changes fast: several of these track
       real shipping speed and buyer rating behavior starting from the very first sale, not just abstract volume
-      further down the road. Reference only, not computed from any logged data here, there's no live account
-      connection to read a real standing from.
+      further down the road. eBay's and Depop's transaction-count/dollar-volume requirements, plus a case-outcome
+      rate proxy, are computed live in the "Real progress" column below from actual <code>sales.json</code> and
+      <code>disputes.json</code> rows, since that's just arithmetic over data already tracked elsewhere on this
+      page. Vinted's and Poshmark's tiers key off a star rating and review count this dashboard has no data
+      source for, and no platform's shipping-speed/defect-rate requirement is computed either since none of
+      those are logged here, so those cells stay reference-only, there's no live account connection to read a
+      real standing from.
     </div>
     <div class="table-wrap">
       <table class="card-table">
@@ -655,6 +664,7 @@
             <th>Status tier</th>
             <th>Real requirements</th>
             <th>What it actually unlocks</th>
+            <th>Real progress</th>
           </tr>
         </thead>
         <tbody>
@@ -667,6 +677,7 @@
               transactions</td>
             <td>A Best Match search ranking boost, roughly 5-15 positions above an otherwise-equal non-TRS
               listing, plus a discount on the final value fee under Top Rated Plus</td>
+            <td id="ebayTrsProgressCell" class="seller-standards-progress"></td>
           </tr>
           <tr>
             <td>Vinted</td>
@@ -677,6 +688,8 @@
             <td>Reseller-community benchmarking puts 4.5+ stars with 20+ reviews at roughly a 94% successful-
               transaction rate, with higher-value items in practice needing 4.8+ stars and 50+ reviews to sell
               smoothly; shipping on time, every time, is the one lever that actually protects this</td>
+            <td class="cell-muted">Not computed, this dashboard has no data source for Vinted's real star
+              rating or review count</td>
           </tr>
           <tr>
             <td>Poshmark</td>
@@ -686,6 +699,9 @@
               sellers' listings</td>
             <td>A profile badge, algorithmic recommendation to new users, Posh Party hosting eligibility, and
               other program perks</td>
+            <td class="cell-muted">Not computed here, this dashboard has no data source for Posh Ambassador's
+              real sales-count or Love Notes criteria (see the sharing streak tracker above for the one Poshmark
+              stat this page does track)</td>
           </tr>
           <tr>
             <td>Depop</td>
@@ -694,6 +710,7 @@
               days, and a refund rate under 5%</td>
             <td>A Top Seller badge on the profile and listings, one of the few visible trust signals that matters
               given Depop's own inconsistent reputation (roughly 3/5 on Trustpilot as of 2026)</td>
+            <td id="depopTopSellerProgressCell" class="seller-standards-progress"></td>
           </tr>
         </tbody>
       </table>
@@ -767,7 +784,9 @@
 
   <section id="packagingRulesSection">
     <details class="section-details" id="packagingRulesDetails">
-    <summary class="section-title">Packaging &amp; shipping rules by platform</summary>
+    <summary class="section-title">Packaging &amp; shipping rules by platform
+      <span class="reference-freshness" id="packagingRulesFreshness"></span>
+    </summary>
     <div class="callout">
       Real per-platform packaging requirements, sourced from each platform's own shipping/seller documentation as
       of September 2026. The Poshmark rule below is the same class of silent-failure risk as the eBay
@@ -978,7 +997,9 @@
 
   <section id="electronicsRulesSection">
     <details class="section-details" id="electronicsRulesDetails">
-    <summary class="section-title">Electronics &amp; battery-item rules by platform</summary>
+    <summary class="section-title">Electronics &amp; battery-item rules by platform
+      <span class="reference-freshness" id="electronicsRulesFreshness"></span>
+    </summary>
     <div class="callout">
       Relevant to the softball swing analyzer, the one battery-powered item actually live right now, sourced from
       each platform's own current electronics/dangerous-goods policy and USPS's lithium battery mailing rules as of
@@ -1002,8 +1023,9 @@
               differently from a loose spare: installed is mailable via air or ground in limited quantity, a loose
               spare battery not packed with its device is Ground-only. A pre-owned electronic containing a lithium
               battery is restricted to Ground Advantage, Retail Ground, or Parcel Select, no air/Priority service,
-              and needs the current lithium battery mark on the label; the older mark without a phone number retires
-              December 31, 2026</td>
+              and needs the current lithium battery mark on the label; the older mark, which includes a phone
+              number, retires December 31, 2026, the newer mark drops the phone number and is required starting
+              January 1, 2027</td>
           </tr>
           <tr>
             <td>Vinted</td>
@@ -1121,7 +1143,9 @@
   </section>
 
   <section>
-    <h2 class="section-title">Est. net payout by platform</h2>
+    <h2 class="section-title">Est. net payout by platform
+      <span class="reference-freshness" id="feeScheduleFreshness"></span>
+    </h2>
     <div class="callout">
       <strong>Estimates only, not a live account connection.</strong> Computed from each platform's standard
       published 2026 seller fee schedule against the asking price above. Actual payout can differ by item
@@ -1135,7 +1159,7 @@
       <div class="schema-help-body">
         <table class="schema-table">
           <tbody>
-            <tr><th>eBay</th><td>13.6% final value fee, same rate for Clothing, Shoes &amp; Accessories as most other categories, + $0.30 per-order fee, $0.40 on orders over $10</td></tr>
+            <tr><th>eBay</th><td>13.6% final value fee for most categories, 15.3% for Clothing, Shoes &amp; Accessories (both real boots listings), + $0.30 per-order fee, $0.40 on orders over $10</td></tr>
             <tr><th>Vinted</th><td>No seller fees, buyer pays a separate buyer protection fee</td></tr>
             <tr><th>Poshmark</th><td>Flat $2.95 on sales under $15, otherwise 20% commission</td></tr>
             <tr><th>Depop</th><td>3.3% + $0.45 Depop Payments processing fee, no seller commission (US/UK). An optional 12% Boosted Listings fee applies only if you choose to boost that specific listing and it sells through the boost (eligible new listings, since Mar 23, 2026), not included in this table, see the calculator below to model it.</td></tr>
@@ -1227,6 +1251,10 @@
         <button type="button" class="chip" data-platform="depop" aria-pressed="true">Depop</button>
       </div>
     </div>
+    <label class="quick-log-checkbox calc-boost-toggle" id="calcEbayShoesWrap" hidden>
+      <input type="checkbox" id="calcEbayShoesInput">
+      This is Clothing, Shoes &amp; Accessories on eBay (15.3% final value fee, not the 13.6% standard rate)
+    </label>
     <label class="quick-log-checkbox calc-boost-toggle" id="calcDepopBoostWrap" hidden>
       <input type="checkbox" id="calcDepopBoostInput">
       Include Depop's optional 12% Boosted Listings fee (opt-in per item, eligible new listings since Mar 2026)
@@ -1308,6 +1336,10 @@
         <button type="button" class="chip" data-platform="depop" aria-pressed="true">Depop</button>
       </div>
     </div>
+    <label class="quick-log-checkbox calc-boost-toggle" id="beEbayShoesWrap" hidden>
+      <input type="checkbox" id="beEbayShoesInput">
+      This is Clothing, Shoes &amp; Accessories on eBay (15.3% final value fee, not the 13.6% standard rate)
+    </label>
     <label class="quick-log-checkbox calc-boost-toggle" id="beDepopBoostWrap" hidden>
       <input type="checkbox" id="beDepopBoostInput">
       Include Depop's optional 12% Boosted Listings fee (opt-in per item, eligible new listings since Mar 2026)
@@ -1342,8 +1374,9 @@
       separate ones, but Vinted charges the seller no fee at all, so a Vinted bundle discount is pure shipping
       convenience for the buyer, not a seller fee saving. <strong>eBay</strong>: nothing applies by itself, a
       seller sets Combined Shipping Discount rules under Shipping preferences that cut shipping cost on a
-      multi-item order from one buyer; the same 13.6% final value fee documented above still applies per item,
-      only the one $0.30/$0.40 per-order fee is shared once instead of paid per listing. <strong>Depop</strong>
+      multi-item order from one buyer; the same per-category final value fee documented above (13.6% standard,
+      15.3% for Clothing, Shoes &amp; Accessories) still applies per item, only the one $0.30/$0.40 per-order fee
+      is shared once instead of paid per listing. <strong>Depop</strong>
       has no native checkout bundle at all, a bundle there is the manual "Bundle / combined shipping request"
       message template above, priced and closed out by hand. This calculator models the one real lever that's
       actually about seller net, not shipping: paying the fixed per-order fee once on a combined sale instead of
@@ -1500,7 +1533,9 @@
 
   <section id="disputeGuideSection">
     <details class="section-details" id="disputeGuideDetails">
-    <summary class="section-title">Return &amp; dispute handling, by platform</summary>
+    <summary class="section-title">Return &amp; dispute handling, by platform
+      <span class="reference-freshness" id="returnDisputeFreshness"></span>
+    </summary>
     <div class="callout">
       Real per-platform return/dispute mechanics, sourced from each platform's own help-center documentation as
       of September 2026. This is what actually happens after a buyer opens a return or dispute, separate from
@@ -1552,7 +1587,9 @@
 
   <section id="scamPatternsSection">
     <details class="section-details" id="scamPatternsDetails">
-    <summary class="section-title">Common seller scam patterns, by platform</summary>
+    <summary class="section-title">Common seller scam patterns, by platform
+      <span class="reference-freshness" id="scamPatternsFreshness"></span>
+    </summary>
     <div class="callout">
       Real fraud patterns actually documented in each platform's own help center or reported widely enough by
       sellers to be worth watching for, sourced as of September 2026. This is what to watch for before and
@@ -1818,8 +1855,66 @@
     <div id="salesTotals" class="pace-result"></div>
   </section>
 
+  <section id="salesTaxSection">
+    <details class="section-details" id="salesTaxDetails">
+    <summary class="section-title">Sales tax: who actually collects it</summary>
+    <div class="callout">
+      <strong>Not tax advice.</strong> All four platforms are legally a "marketplace facilitator" in every US
+      state that charges a sales tax, which means the platform itself, not the seller, is required to
+      calculate, collect, and remit sales tax on a sale. That tax is added on top of the buyer's total at
+      checkout; it is never deducted from the seller's payout, so it never shows up in this dashboard's fee
+      math or net-payout figures, and it doesn't need to. This is separate from income tax: sales tax is the
+      buyer's cost of purchase, income tax on real profit is still owed regardless of the 1099-K threshold
+      below.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="salesTaxTable">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Sales tax</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>eBay</td>
+            <td>Collected &amp; remitted by eBay</td>
+            <td>Charged to the buyer at checkout on top of the item price and shipping</td>
+          </tr>
+          <tr>
+            <td>Poshmark</td>
+            <td>Collected &amp; remitted by Poshmark</td>
+            <td>Same, added to the buyer's order total, not taken from the seller's earnings</td>
+          </tr>
+          <tr>
+            <td>Depop</td>
+            <td>Collected &amp; remitted by Depop</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>Vinted</td>
+            <td>Collected &amp; remitted by Vinted</td>
+            <td>Same rule, worth a second look here since Vinted's US marketplace is newer than the other
+              three's</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      The one real edge case: a marketplace facilitator only has to collect in a state once it crosses that
+      state's own economic-nexus threshold, so a seller could in theory owe it themselves on a sale into a
+      state a platform hasn't reached yet. All four of these platforms already do enough national volume to
+      clear every state's threshold by a wide margin, so this isn't a live risk at this operation's size, only
+      worth knowing about if that ever changes.
+    </div>
+    </details>
+  </section>
+
   <section>
-    <h2 class="section-title">Tax / 1099-K threshold tracker</h2>
+    <h2 class="section-title">Tax / 1099-K threshold tracker
+      <span class="reference-freshness" id="taxTrackerFreshness"></span>
+    </h2>
     <div class="callout">
       <strong>Not tax advice.</strong> As of the 2026 tax year, the federal Form 1099-K reporting threshold is
       back to <strong>more than $20,000 in gross payments AND more than 200 transactions</strong>, per platform,
@@ -2137,7 +2232,13 @@
   </footer>
 </div>
 
-<button type="button" id="jumpNavBtn" class="jump-nav-fab font-mono" aria-label="Jump to a section on this page">Sections</button>
+<!-- aria-label kept literally starting with the button's own visible text
+     ("Sections") rather than the old paraphrase ("Jump to a section on this
+     page", singular "section", no "Sections" substring at all): a real WCAG
+     2.5.3 Label in Name miss confirmed via Lighthouse's accessibility audit,
+     the kind of mismatch that breaks voice-control software trying to
+     activate a button by reading its visible text back to it. -->
+<button type="button" id="jumpNavBtn" class="jump-nav-fab font-mono" aria-label="Sections, jump to a section on this page">Sections</button>
 
 <div class="modal-overlay" id="modalOverlay" hidden>
   <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">

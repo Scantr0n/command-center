@@ -68,9 +68,18 @@
   </section>
 
   <section id="applicationsSection">
-    <h2 class="section-title">Applications submitted</h2>
+    <h2 class="section-title">Applications submitted <span class="section-title-meta" id="dataQualityMeta"></span></h2>
+    <div id="dataQualityCallout"></div>
     <div id="applicationsTableWrap"></div>
     <div id="applicationsAsides"></div>
+  </section>
+
+  <section id="duplicatesSection" hidden>
+    <h2 class="section-title">Possible duplicates</h2>
+    <p class="section-note">Same company and role logged on more than one entry. Could be a real second
+      application, or a tracker entry hand-transcribed twice under two different "#" numbers, the only
+      uniqueness check this table otherwise has.</p>
+    <div class="data-quality-list" id="duplicatesList"></div>
   </section>
 
   <section id="criteriaSection">
@@ -152,13 +161,22 @@
     </div>
   </details>
 
+  <section>
+    <h2 class="section-title">Data changelog</h2>
+    <p class="section-note">Real git commit history of the four data files above, not a hand-typed claim.
+      Each row is an actual commit hash, author, and date from this repo. Regenerate after new commits with
+      <code>node public/job-search/data/changelog.js</code>.</p>
+    <div id="changelogFeed" class="changelog-feed"><p class="changelog-empty">Loading...</p></div>
+  </section>
+
   </main>
 
   <footer class="page-foot font-mono">
     Data source: <code>/job-search/data/applications.json</code>, <code>/job-search/data/criteria.json</code>,
     <code>/job-search/data/next-up.json</code>, and <code>/job-search/data/digest-latest.json</code>, hand-transcribed
     from <code>Trackers/Job_Search_Tracker.md</code>. Run
-    <code>node public/job-search/data/validate.js</code> after any edit.
+    <code>node public/job-search/data/validate.js</code> after any edit, then
+    <code>node public/job-search/data/changelog.js</code> to refresh the data changelog from git.
   </footer>
 </div>
 
@@ -170,6 +188,17 @@
   </div>
 </div>
 
+<button type="button" id="jumpNavBtn" class="jump-nav-fab font-mono" aria-label="Sections, jump to a section on this page">Sections</button>
+
+<div class="modal-overlay" id="jumpNavOverlay" hidden>
+  <div class="modal" id="jumpNavModal" role="dialog" aria-modal="true" aria-labelledby="jumpNavTitle">
+    <button class="modal-close" id="jumpNavClose" aria-label="Close">&times;</button>
+    <h3 id="jumpNavTitle" class="font-display">Jump to section</h3>
+    <div class="jump-nav-list" id="jumpNavList"></div>
+  </div>
+</div>
+
+<script src="/job-search/data/validate-core.js"></script>
 <script src="/job-search/app.js"></script>
 <script src="/sidebar.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>

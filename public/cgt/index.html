@@ -91,7 +91,7 @@
           <tr><th>sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
           <tr><th>gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
           <tr><th>grade</th><td>The grade as shown on the slab label, e.g. <code>"10"</code> or <code>"9.5"</code></td></tr>
-          <tr><th>subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
+          <tr><th class="wrap">subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
           <tr><th>certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
           <tr><th>storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
           <tr><th>estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
@@ -100,8 +100,9 @@
           <tr><th>sourceNote</th><td>Where the price came from, e.g. <code>"eBay sold listings, 3 comps, Aug 2026"</code></td></tr>
           <tr><th>imageUrl</th><td>Optional URL to a real photo of this exact card, for the detail view and the insurance/appraisal print summary. Real collectibles-insurance guidance treats photos plus cert numbers as the core of an insurance file, so this is worth filling in once a card actually has a photo somewhere reachable by URL. Leave <code>null</code> until a real photo exists, never a stock/placeholder image.</td></tr>
           <tr><th>costBasis</th><td>USD number, what was actually paid for the card. Optional and independent of <code>estimatedValue</code>: log it when known, leave <code>null</code> when not. Powers the "Unrealized gain / loss" summary tile and the detail view, only computed for cards where both this and <code>estimatedValue</code> are on record.</td></tr>
+          <tr><th>acquisitionDate</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually bought/acquired. Optional and independent of <code>datePriced</code> (when it was researched) and <code>costBasis</code> (what was paid); log it when known, leave <code>null</code> when not. This is what lets a later real sale be classified long-term (held more than one year, federal collectibles gains capped at 28% under 26 U.S.C. 1(h)(5)) vs. short-term (ordinary income rates, no cap) in the detail view's "Est. max federal tax on this gain" and the "Est. max collectibles tax" summary tile -- without it, a sold card with a real gain just shows as unclassified rather than guessing which one it was.</td></tr>
           <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
-          <tr><th>soldDate</th><td>ISO date this card was actually sold. Leave <code>null</code> while still owned. Once set, the card counts as sold: it drops out of the portfolio value, breakdowns, and insurance summary (nothing left to insure), but stays in the file as a permanent record. <strong>Required together with <code>soldPrice</code></strong>, one without the other is a validation error.</td></tr>
+          <tr><th>soldDate</th><td>ISO date this card was actually sold. Leave <code>null</code> while still owned. Once set, the card counts as sold: it drops out of the portfolio value, breakdowns, and insurance summary (nothing left to insure), but stays in the file as a permanent record. <strong>Required together with <code>soldPrice</code></strong>, one without the other is a validation error. Must not be before <code>acquisitionDate</code> when both are set, a card can't be sold before it was acquired.</td></tr>
           <tr><th>soldPrice</th><td>USD number, what the card actually sold for. <strong>Required together with <code>soldDate</code>.</strong> Independent of <code>estimatedValue</code> (the last researched estimate before the sale) and <code>costBasis</code> (what was paid); logging both <code>costBasis</code> and <code>soldPrice</code> is what powers the "Realized gain / loss" summary tile and the detail view.</td></tr>
           <tr><th>listedDate</th><td>ISO date this card actually went up for sale somewhere (eBay, etc), while still unsold. Leave <code>null</code> when not currently listed. <strong>Required together with <code>listedPrice</code></strong>, one without the other is a validation error. Clear both once the card actually sells, that's what <code>soldDate</code>/<code>soldPrice</code> are for.</td></tr>
           <tr><th>listedPrice</th><td>USD number, the real current asking price. <strong>Required together with <code>listedDate</code>.</strong> Independent of <code>estimatedValue</code> (the researched number, not the ask); a listing 50%+ off the card's own <code>estimatedValue</code> in either direction shows up on the dashboard under "Listing price check" as a nudge to double-check the ask, not an error.</td></tr>
@@ -129,6 +130,7 @@
   "sourceNote": null,
   "imageUrl": null,
   "costBasis": null,
+  "acquisitionDate": null,
   "datePriced": null,
   "soldDate": null,
   "soldPrice": null,
@@ -213,6 +215,8 @@
           <input class="quick-log-input" type="url" id="ncImageUrl" placeholder="e.g. https://...">
           <label class="quick-log-label" for="ncCostBasis">Cost basis, USD (optional)</label>
           <input class="quick-log-input" type="number" id="ncCostBasis" min="0" step="0.01">
+          <label class="quick-log-label" for="ncAcquisitionDate">Acquisition date, when bought/acquired (optional)</label>
+          <input class="quick-log-input" type="date" id="ncAcquisitionDate">
           <label class="quick-log-label" for="ncDatePriced">Date priced (leave blank if not priced yet)</label>
           <input class="quick-log-input" type="date" id="ncDatePriced">
           <label class="quick-log-label" for="ncBacklogBatch">Backlog batch (optional)</label>
@@ -882,8 +886,19 @@
   </div>
 </div>
 
+<button type="button" id="jumpNavBtn" class="jump-nav-fab font-mono" aria-label="Sections, jump to a section on this page">Sections</button>
+
+<div class="modal-overlay" id="jumpNavOverlay" hidden>
+  <div class="modal" id="jumpNavModal" role="dialog" aria-modal="true" aria-labelledby="jumpNavTitle">
+    <button class="modal-close" id="jumpNavClose" aria-label="Close">&times;</button>
+    <h3 id="jumpNavTitle" class="font-display">Jump to section</h3>
+    <div class="jump-nav-list" id="jumpNavList"></div>
+  </div>
+</div>
+
 <script src="/cgt/data/validate-core.js"></script>
 <script src="/cgt/data/grading-core.js"></script>
+<script src="/cgt/data/turnaround-core.js"></script>
 <script src="/cgt/app.js"></script>
 <script src="/sidebar.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>

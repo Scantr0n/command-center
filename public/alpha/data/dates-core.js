@@ -174,6 +174,41 @@
     return 'down';
   }
 
+  // The one glance-first signal at the very top of the page, above every
+  // detailed section. Derived entirely from fields the page already has
+  // (connection state, reading freshness, kill-switch state), never from
+  // anything invented. Kill switch engaged always wins: it is the one state
+  // Jack would want to see even from across the room, current or last known.
+  // isLastKnown marks that `data.live` has been substituted with a cached
+  // last-known-connected reading (see app.js's own loadLastKnown); the
+  // headline must say so explicitly rather than let a stale reading pass as
+  // current. `now` defaults to Date.now(), same testability convention as
+  // timeAgo/freshnessClass above, since this branches on the exact same
+  // freshness boundaries.
+  function computeHeadline(data, isLastKnown, now) {
+    const live = data.live || {};
+    const asOf = live.asOf;
+    const killEngaged = live.killSwitch && live.killSwitch.engaged;
+
+    if (killEngaged === true) {
+      return {
+        level: 'critical',
+        text: isLastKnown ? 'KILL SWITCH ENGAGED (last known, now disconnected)' : 'KILL SWITCH ENGAGED',
+        asOf
+      };
+    }
+    if (isLastKnown) {
+      return { level: 'lastknown', text: 'Disconnected - showing last known state from ' + (timeAgo(asOf, now) || 'earlier'), asOf };
+    }
+    if (!data.connection.connected || !asOf) {
+      return { level: 'awaiting', text: 'Awaiting live connection', asOf };
+    }
+    const cls = freshnessClass(asOf, now);
+    if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale', asOf };
+    if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging', asOf };
+    return { level: 'good', text: 'Connected', asOf };
+  }
+
   function formatDuration(ms) {
     if (!Number.isFinite(ms) || ms < 0) return null;
     const mins = Math.floor(ms / 60000);
@@ -282,6 +317,7 @@
     computeMarketStatus,
     timeAgo,
     freshnessClass,
+    computeHeadline,
     formatDuration,
     mostRecentConnectedAt,
     currentStateStartedAt,

@@ -211,6 +211,29 @@
         }
       }
 
+      // acquisitionDate (when the card was actually bought/acquired) is what
+      // lets grading-core.js's estimateCollectiblesTax tell a long-term sale
+      // (held more than a year, federal collectibles gain capped at 28% per
+      // 26 U.S.C. 1(h)(5)) apart from a short-term one (ordinary income
+      // rates, no cap) once it sells. A card can have a costBasis with no
+      // acquisitionDate (the amount paid is known, the exact date isn't), so
+      // this is a warning, not an error, same "backfill when known" framing
+      // as datePriced above.
+      if (!isDateOrNull(c.acquisitionDate)) {
+        errors.push(where + ': "acquisitionDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.acquisitionDate));
+      }
+      if (c.costBasis != null && !c.acquisitionDate) {
+        warnings.push(where + ': has a "costBasis" but no "acquisitionDate". Backfill when known, without it a ' +
+          'realized sale on this card can\'t be classified long-term vs. short-term for collectibles tax purposes.');
+      }
+      // A card cannot be sold before it was acquired; unlike the soldDate-vs-
+      // datePriced check above (a real "priced before bought" ordering,
+      // warning-only), this ordering is never legitimate, so it is an error.
+      if (c.acquisitionDate && c.soldDate && c.soldDate < c.acquisitionDate) {
+        errors.push(where + ': "soldDate" (' + c.soldDate + ') is before "acquisitionDate" (' + c.acquisitionDate +
+          '). A card can\'t be sold before it was acquired, check the two dates were not swapped or mistyped.');
+      }
+
       // storageLocation feeds the insurance/appraisal print view (see
       // public/cgt/app.js's "field" calls into that document) as free text.
       // Every other field that document renders is type-checked before it

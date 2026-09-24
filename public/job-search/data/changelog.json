@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-09-23T20:43:14.703Z",
+  "generatedFrom": "git log over public/job-search/data/{applications.json,criteria.json,next-up.json,digest-latest.json}, run node public/job-search/data/changelog.js to refresh",
+  "entries": [
+    {
+      "hash": "8340d8d",
+      "fullHash": "8340d8d897fb460b7676c3cf4068128a0b3e5269",
+      "date": "2026-09-20",
+      "author": "Jack Scanlon",
+      "subject": "Job Search: verify a real lead's link still works, flag it doesn't quite",
+      "historyReset": false,
+      "files": [
+        "next-up.json"
+      ]
+    },
+    {
+      "hash": "d5e1151",
+      "fullHash": "d5e115137c7059fe89a196caa8a78b79d023313e",
+      "date": "2026-09-19",
+      "author": "Jack Scanlon",
+      "subject": "Add Job Search dedicated hub, pilot for the nested-dashboard redesign",
+      "historyReset": false,
+      "files": [
+        "applications.json",
+        "criteria.json",
+        "digest-latest.json",
+        "next-up.json"
+      ]
+    }
+  ]
+}

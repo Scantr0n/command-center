@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-22T15:54:54.319Z",
+  "generatedAt": "2026-09-24T04:01:12.383Z",
   "generatedFrom": "git log over public/alpha/data/{status.json}, run node public/alpha/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "a335b6e",
+      "fullHash": "a335b6e6cbf68aed2936c1f983da810bfe2d6fd5",
+      "date": "2026-09-24",
+      "author": "Claude",
+      "subject": "Alpha: surface stuck-agent count from the real anomalies feed as a Summary tile",
+      "historyReset": false,
+      "files": [
+        "status.json"
+      ]
+    },
     {
       "hash": "1760243",
       "fullHash": "1760243b799d8cac266521f53fb938d78adb4e98",

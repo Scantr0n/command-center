@@ -146,28 +146,10 @@ function formatSignedUsd(n) {
   return (n >= 0 ? '+' : '-') + formatUsd(Math.abs(n));
 }
 
-// A submission logs its cost as one invoiced batch total (real, since that
-// is what actually gets paid) and cardCount separately, so nothing on the
-// page ever divided the two even though both were already sitting right
-// there. Null whenever either half is missing or cardCount is 0, same "no
-// value means no value" convention as the rest of this file, not a 0 or a
-// misleading average.
-function costPerCard(s) {
-  if (s.cost == null || !s.cardCount) return null;
-  return s.cost / s.cardCount;
-}
-
-// Gain/loss only exists to compute where both a real purchase price
-// (costBasis) and a real researched value (estimatedValue) are on record.
-// Neither field requires the other: plenty of cards will have a price
-// logged with no memory of what was paid, or vice versa, so this returns
-// null rather than treating a missing side as zero.
-function computeGainLoss(c) {
-  if (c.costBasis == null || c.estimatedValue == null) return null;
-  const abs = c.estimatedValue - c.costBasis;
-  const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
-  return { abs, pct };
-}
+// costPerCard/computeGainLoss now live in grading-core.js -- see this file's
+// later CGTGradingCore destructure (kept where the tax-math one already was,
+// since estimateCardCollectiblesTax there depends on isSold/
+// computeRealizedGainLoss, also moved).
 
 function isExample(c) {
   return c.id === 'example-row-not-real';
@@ -196,57 +178,9 @@ function isBgsBlackLabel(c) {
   return c.gradingCompany === 'BGS' && SUBGRADE_LABELS.every(([f]) => c[f] === 10);
 }
 
-// A card is sold once it has a real soldDate (validate-core.js requires
-// soldPrice and soldDate together, so either field alone is enough to check
-// here). Sold cards stay in cards.json as a permanent record of what was
-// owned, but drop out of every "what do I currently hold" total (portfolio
-// value, breakdowns, unrealized gain/loss, the insurance summary) the same
-// way an unpriced card drops out of the priced total instead of counting as
-// $0: no longer owning it isn't a $0 value, it's a different question.
-function isSold(c) {
-  return c.soldDate != null;
-}
-
-// Same "either field alone is enough, validate-core.js requires both" logic
-// as isSold above, for a card that's currently listed for sale but not yet
-// sold. A sold card can still carry stale listing fields (validate-core.js
-// only warns about it, doesn't block), so callers that care about "what's
-// actively for sale right now" should also check !isSold(c).
-function isListed(c) {
-  return c.listedDate != null;
-}
-
-// Only counts when both a real purchase price and a real sale price are on
-// record, same "never guess at a missing side" rule as computeGainLoss's
-// unrealized version. A card sold with no logged costBasis has a real sale
-// price but no real realized gain/loss to compute against.
-function computeRealizedGainLoss(c) {
-  if (!isSold(c) || c.costBasis == null || c.soldPrice == null) return null;
-  const abs = c.soldPrice - c.costBasis;
-  const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
-  return { abs, pct };
-}
-
-// priceHistory holds prior researched prices for a card, oldest first, logged
-// when a re-check changes the number instead of silently overwriting it. This
-// reads the most recent prior entry (regardless of what order it was actually
-// written in the JSON) so a hand-edited file that didn't bother sorting the
-// array still compares against the right one.
-function lastPriceHistoryEntry(c) {
-  if (!c.priceHistory || !c.priceHistory.length) return null;
-  return c.priceHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).pop();
-}
-
-// Same "only compute when both real numbers exist" rule as computeGainLoss:
-// a card with no priceHistory yet (priced exactly once) has no trend to show,
-// not a 0% change.
-function computeValueTrend(c) {
-  const prev = lastPriceHistoryEntry(c);
-  if (!prev || c.estimatedValue == null) return null;
-  const abs = c.estimatedValue - prev.value;
-  const pct = prev.value > 0 ? (abs / prev.value) * 100 : null;
-  return { abs, pct, prevValue: prev.value, prevDate: prev.date };
-}
+// isSold/isListed/computeRealizedGainLoss/estimateCardCollectiblesTax/
+// lastPriceHistoryEntry/computeValueTrend now live in grading-core.js too --
+// see this file's later CGTGradingCore destructure.
 
 function isExampleSubmission(s) {
   return s.id === 'example-submission-not-real';
@@ -274,88 +208,56 @@ const ORDER_STATUS_LOOKUP = {
   PSA: { url: 'https://www.psacard.com/orderstatus', text: 'Check status on psacard.com' }
 };
 
-// Each grader's own published per-tier turnaround, business days, midpoint
-// of the range shown in the "Grading service tiers reference" section
-// (index.html), reviewed September 2026 -- see that section for sources and
-// caveats (PSA's Value tiers paused, Beckett's Base/Standard closed, SGC's
-// own published windows disagreeing across sources). This is only ever used
-// as a fallback estimate in renderSubmissions below, for a grader/company
-// with fewer than 2 real returned submissions logged to average from; once
-// real history exists, buildTurnaroundByGrader's own real average always
-// wins over this. "default" is used when serviceLevel doesn't match a known
-// tier name (including no serviceLevel logged at all).
-//
-// PSA renamed Walk-Through to Premier and Regular to Priority, and added a
-// new Standard tier, on 2026-09-14 (see the reference section). The old
-// "walk-through"/"regular" keys are kept alongside the new ones so a real
-// submission logged before that date under its then-current tier name still
-// resolves to the turnaround that was actually published for it at the
-// time, rather than getting silently reinterpreted under the new name.
-// PSA's "default" (no serviceLevel logged) is the rough average across its
-// currently open tiers (Premier/Super Express/Express/Priority/Standard),
-// not one specific tier's own number.
-const PUBLISHED_TURNAROUND_DAYS = {
-  PSA: { default: 43, tiers: {
-    'walk-through': 6, walkthrough: 6, premier: 9,
-    'super express': 13, express: 25,
-    regular: 35, priority: 75,
-    standard: 95,
-    'value max': 45, 'value plus': 70, 'value bulk': 150, value: 110
-  } },
-  BGS: { default: 45, tiers: { base: 75, standard: 45, express: 15, priority: 5 } },
-  CGC: { default: 20, tiers: { bulk: 40, economy: 20, standard: 10, express: 5, walkthrough: 2, 'walk-through': 2 } },
-  SGC: { default: 58, tiers: { entry: 58, standard: 58, expedited: 3 } }
-};
-
-// Business days -> calendar days, weekends only (no holiday calendar here),
-// same rough conversion used nowhere else in this file since every other
-// date math here already works in real calendar days from a real logged
-// date. Good enough for a "published estimate, not a guarantee" figure, not
-// meant to be exact to the day.
-function businessDaysToCalendarDays(businessDays) {
-  return Math.round(businessDays * 1.4);
-}
-
-// PSA's four Value tiers (Value, Value Plus, Value Max, Value Bulk) have
-// been closed to new submissions since 2026-06-02, tied to PSA's own public
-// backlog tracker falling to 5 million cards -- see the "Grading service
-// tiers reference" section (index.html) for the full writeup and sources.
-// That section is a static reference table, though, so a candidate someone
-// is actively weighing toward one of those tiers (Worth grading? below)
-// never actually surfaces the pause unless they scroll down and reread it.
-// This turns the same fact into a real per-candidate flag instead, same
-// normalized-tier matching as publishedTurnaroundDays above (PUBLISHED_
-// TURNAROUND_DAYS.PSA.tiers already carries the matching turnaround numbers
-// for these four keys). Flip PSA_VALUE_TIERS_PAUSED to false once PSA's
-// backlog tracker (psacard.com/info/backlog-tracker) shows the tiers
-// reopened -- do not leave this true past that date, it would misinform
-// every open candidate targeting a normal, open PSA tier.
-const PSA_VALUE_TIERS_PAUSED = true;
-const PSA_PAUSED_VALUE_TIER_NAMES = ['value', 'value plus', 'value max', 'value bulk'];
-function isPsaPausedValueTier(gradingCompany, serviceLevel) {
-  if (!PSA_VALUE_TIERS_PAUSED || gradingCompany !== 'PSA' || !serviceLevel) return false;
-  const norm = serviceLevel.toLowerCase().trim();
-  return PSA_PAUSED_VALUE_TIER_NAMES.some(tierName => norm === tierName || norm.includes(tierName) || tierName.includes(norm));
-}
-
-function publishedTurnaroundDays(gradingCompany, serviceLevel) {
-  const entry = gradingCompany && PUBLISHED_TURNAROUND_DAYS[gradingCompany];
-  if (!entry) return null;
-  if (serviceLevel) {
-    const norm = serviceLevel.toLowerCase().trim();
-    // Exact tier name first: PSA's "super express" and "value max"/"value
-    // plus"/"value bulk" each contain a shorter real tier name ("express",
-    // "value"), so a plain bidirectional substring match on those returns
-    // the wrong tier's turnaround for the shorter, more common one. Only
-    // fall back to substring matching for a serviceLevel that doesn't
-    // exactly match any known tier (e.g. minor wording variations).
-    if (Object.prototype.hasOwnProperty.call(entry.tiers, norm)) return entry.tiers[norm];
-    for (const [tierName, days] of Object.entries(entry.tiers)) {
-      if (norm.includes(tierName) || tierName.includes(norm)) return days;
-    }
+// A submission's "trackingNumber" is the shipping carrier's own number for
+// the box in transit (did it actually arrive at PSA, did it actually leave
+// on the way back), a different real question from ORDER_STATUS_LOOKUP above
+// (has the grader started/finished grading it). No "carrier" field exists on
+// a submission, so this is detected from the tracking number's own format,
+// which real carriers document as distinctive enough to trust for UPS's
+// "1Z" prefix and FedEx's 12/15-digit lengths (USPS uses neither). A 20- or
+// 22-digit all-numeric number is genuinely ambiguous, though: both USPS and
+// FedEx Ground/SmartPost issue numbers in that exact length range, so rather
+// than silently guess one and risk sending Jack to a "not found" page with
+// no explanation, both carriers' links are offered and labeled as a guess.
+// USPS's less common 20/22-digit international "CP" formats and UPS's rarer
+// 9-digit/26-digit/T-prefixed formats aren't covered, real but unlikely to
+// be what a grading-company shipment actually uses. [Source: USPS "go/
+// TrackConfirmAction" and FedEx "fedextrack" query-param formats, UPS's
+// "1Z" prefix format, and real tracking-number length ranges per carrier,
+// checked 2026-09-24]
+function shippingCarrierLinks(trackingNumber) {
+  const t = (trackingNumber || '').replace(/[\s-]/g, '').toUpperCase();
+  if (!t) return [];
+  const usps = { url: 'https://tools.usps.com/go/TrackConfirmAction?tLabels=' + encodeURIComponent(t), text: 'Track on USPS.com' };
+  const ups = { url: 'https://www.ups.com/track?loc=en_US&tracknum=' + encodeURIComponent(t), text: 'Track on UPS.com' };
+  const fedex = { url: 'https://www.fedex.com/fedextrack/?trknbr=' + encodeURIComponent(t), text: 'Track on FedEx.com' };
+  if (/^1Z[0-9A-Z]{16}$/.test(t)) return [ups];
+  if (/^[A-Z]{2}[0-9]{9}US$/.test(t)) return [usps];
+  if (/^(92|93|94|95)[0-9]{18,20}$/.test(t)) return [usps];
+  if (/^[0-9]{12}$/.test(t) || /^[0-9]{15}$/.test(t)) return [fedex];
+  if (/^[0-9]{20}$/.test(t) || /^[0-9]{22}$/.test(t)) {
+    return [
+      { url: usps.url, text: 'Track on USPS.com (guess -- this length also matches FedEx)' },
+      { url: fedex.url, text: 'Track on FedEx.com (guess -- this length also matches USPS)' }
+    ];
   }
-  return entry.default;
+  return [];
 }
+
+// The published per-tier turnaround table and its lookup, the PSA
+// paused-Value-tier flag, the business-days/calendar-days conversion, the
+// per-grader real-turnaround average, and the date math they're all built
+// from (addDaysIso/daysSince) now live in turnaround-core.js (loaded as
+// window.CGTTurnaroundCore by a script tag in index.html, same reason
+// grading-core.js/validate-core.js were split out: a plain Node test can
+// exercise the real rules directly, including their own real bug-fix
+// history -- daysSince's DST-divisor bug, addDaysIso's NaN-string bug).
+// Pulled into bare identifiers here so every existing call site below keeps
+// working unchanged.
+const {
+  isPsaPausedValueTier, addDaysIso, daysSince,
+  computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor
+} = window.CGTTurnaroundCore;
 
 // Card market prices drift over months, not days, so this is a much longer
 // window than the 7-day staleness check used elsewhere in Command Center
@@ -376,8 +278,8 @@ const PRICE_STALE_AFTER_DAYS = 180;
 const GRADING_REFERENCE_REVIEWED_ON = '2026-09-17';
 const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 
-// Local calendar date as YYYY-MM-DD, same convention as daysSince above
-// (and CSM's/Sondrik's own todayIso): new Date().toISOString().slice(0, 10)
+// Local calendar date as YYYY-MM-DD, same convention as turnaround-core.js's
+// daysSince (and CSM's/Sondrik's own todayIso): new Date().toISOString().slice(0, 10)
 // reads the UTC calendar date, which rolls over to tomorrow while it is
 // still today for anyone west of UTC, so a printed insurance document or a
 // CSV filename stamped that way can read one day ahead for the rest of the
@@ -385,48 +287,6 @@ const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 function todayIso() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-// Projects an ISO date forward by a whole number of days, local calendar
-// semantics (no time-of-day component), same "local calendar date" rule as
-// todayIso/daysSince below. Used to turn a grader's own average turnaround
-// into a real projected date rather than leaving Jack to do the day-math on
-// a "days in queue" figure himself.
-function addDaysIso(isoDate, days) {
-  const d = new Date(isoDate + 'T00:00:00');
-  // Unlike daysSince right below, this had no guard at all: a malformed
-  // isoDate (a hand-edit that skipped validate-core's own isDateOrNull, e.g.
-  // "2026-13-40") produces an Invalid Date, and every field pulled off it
-  // below is NaN, silently returning the literal string "NaN-NaN-NaN"
-  // instead of erroring. That string is truthy, so estimatedReturnFor's own
-  // `estReturnDate ?` checks never catch it, and it was reaching both the
-  // on-page "est. back ~" line and the exported .ics reminder's description.
-  if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + days);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-function daysSince(isoDate) {
-  if (!isoDate) return null;
-  // Local midnight, not UTC (no trailing Z), same convention as Sondrik's
-  // daysBetween and the main dashboard's relativeTime: datePriced is logged
-  // against Jack's own calendar day, so anchoring to UTC midnight instead
-  // overstates the age by up to a day for anyone west of UTC.
-  const then = new Date(isoDate + 'T00:00:00');
-  if (Number.isNaN(then.getTime())) return null;
-  // Real Y/M/D-component subtraction, not a flat /86400000 divide: the main
-  // dashboard's own relativeTime/shortRelativeTime/isStale carried the exact
-  // same bug (fixed 4e02da2) -- a fixed 86400000ms divisor silently loses or
-  // gains the real DST-transition hour, making every date logged before the
-  // year's spring-forward read one calendar day "fresher" than real for the
-  // several months until fall-back (i.e. right now, since America/Chicago is
-  // currently in CDT). No real cards.json date predates this year's DST
-  // transition yet, so this hasn't visibly misfired here, but the function
-  // itself carried the same latent bug and would as soon as one did.
-  const now = new Date();
-  const thenMidnight = new Date(then.getFullYear(), then.getMonth(), then.getDate());
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((nowMidnight - thenMidnight) / 86400000);
 }
 
 // Real official verification tools, checked directly against each grader's
@@ -545,6 +405,20 @@ function bookValueSearchLink(c) {
 
 function isStale(c) {
   if (c.estimatedValue == null || !c.datePriced) return false;
+  const age = daysSince(c.datePriced);
+  return age != null && age > PRICE_STALE_AFTER_DAYS;
+}
+
+// Same 180-day rule as isStale above, applied to a raw-card candidate
+// instead of an owned card: candidates.json has its own datePriced but no
+// single estimatedValue field (rawValue and expectedGradedValue are priced
+// separately, sometimes only one of the two is filled in yet), so this
+// checks either side rather than one named field. A candidate with neither
+// value logged yet is already caught by the "needs more data" verdict and
+// the attention bar's candidatesNeedingDataCount below, not this: staleness
+// only means something once there was a real researched number to go stale.
+function isCandidateStale(c) {
+  if ((c.rawValue == null && c.expectedGradedValue == null) || !c.datePriced) return false;
   const age = daysSince(c.datePriced);
   return age != null && age > PRICE_STALE_AFTER_DAYS;
 }
@@ -789,6 +663,19 @@ function renderStats() {
   const realizedGainLossPct = totalRealizedCostBasis > 0 ? (totalRealizedGainLoss / totalRealizedCostBasis) * 100 : null;
   const totalSoldProceeds = sold.reduce((s, c) => s + (c.soldPrice || 0), 0);
 
+  // Collectibles capital-gains ceiling (see grading-core.js's
+  // estimateCollectiblesTax for the real 28%-long-term/ordinary-short-term
+  // rule): only a real, positive realized gain owes anything, and only when
+  // acquisitionDate is on record to classify the sale's holding period.
+  // taxableGains is every sale that owes something in principle;
+  // taxableWithHolding is the subset this can actually be estimated for, so
+  // the tile can honestly say how many of the taxable sales are still
+  // missing the date needed to classify them, rather than silently under-
+  // counting a real total.
+  const taxableGains = soldWithGainLoss.filter(x => x.gl.abs > 0);
+  const taxEstimates = taxableGains.map(x => estimateCardCollectiblesTax(x.c)).filter(Boolean);
+  const totalMaxCollectiblesTax = taxEstimates.reduce((s, est) => s + est.maxTax, 0);
+
   // Only counts cardCount on active (non-returned, non-example) submissions,
   // same "real data only" rule as every other tile here: a submission with
   // no cardCount logged contributes 0 to the total but still counts toward
@@ -883,6 +770,15 @@ function renderStats() {
         ? soldWithGainLoss.length + ' sale(s) with cost basis logged' + (realizedGainLossPct != null ? ' · ' + (realizedGainLossPct >= 0 ? '+' : '') + realizedGainLossPct.toFixed(1) + '%' : '')
         : (sold.length ? 'no cost basis logged for sold cards yet' : 'nothing sold yet'),
       cls: soldWithGainLoss.length ? (totalRealizedGainLoss >= 0 ? 'positive' : 'negative') : null
+    },
+    {
+      value: taxEstimates.length ? formatUsd(totalMaxCollectiblesTax) : 'n/a',
+      label: 'Est. max collectibles tax',
+      sub: taxableGains.length
+        ? taxEstimates.length + ' of ' + taxableGains.length + ' taxable sale(s) with an acquisition date logged' +
+          (taxableGains.length > taxEstimates.length ? ', ' + (taxableGains.length - taxEstimates.length) + ' missing one' : '')
+        : (soldWithGainLoss.length ? 'no taxable gains yet' : 'nothing sold yet'),
+      cls: null
     },
     { value: stale, label: 'Priced 180+ days ago', sub: stale ? 'worth a re-check' : null },
     {
@@ -1032,43 +928,14 @@ function renderBreakdownList(title, groups, opts) {
   `;
 }
 
-// Calendar days between a submission actually shipping out and actually
-// arriving back, only counted once both real dates are on record and the
-// batch is marked returned, so a submission still in queue never
-// contributes a partial number that would understate the real wait.
-function computeTurnaroundDays(s) {
-  if (s.status !== 'returned' || !s.submittedDate || !s.returnedDate) return null;
-  const start = new Date(s.submittedDate + 'T00:00:00').getTime();
-  const end = new Date(s.returnedDate + 'T00:00:00').getTime();
-  if (Number.isNaN(start) || Number.isNaN(end)) return null;
-  return Math.round((end - start) / 86400000);
-}
-
-// Averages real turnaround per grading company, which is the practical
-// question this data answers over time: which grader has actually been
-// fastest for cards Jack has sent, not a published/advertised turnaround
-// time. min/max are carried alongside the average since one outlier batch
-// (e.g. a holiday-season slowdown) can otherwise make an average look more
-// consistent than the real spread was.
-function buildTurnaroundByGrader() {
-  const byGrader = new Map();
-  submissions.forEach(s => {
-    if (isExampleSubmission(s)) return;
-    const days = computeTurnaroundDays(s);
-    if (days == null) return;
-    const key = s.gradingCompany || 'Unknown';
-    if (!byGrader.has(key)) byGrader.set(key, []);
-    byGrader.get(key).push(days);
-  });
-  return [...byGrader.entries()]
-    .map(([grader, list]) => ({
-      label: grader,
-      value: Math.round(list.reduce((a, b) => a + b, 0) / list.length),
-      count: list.length,
-      min: Math.min(...list),
-      max: Math.max(...list)
-    }))
-    .sort((a, b) => a.value - b.value);
+// computeTurnaroundDays/buildTurnaroundByGrader (calendar days between a
+// submission shipping out and arriving back, and the real per-grader
+// average built from those) now live in turnaround-core.js -- see this
+// file's earlier CGTTurnaroundCore destructure. buildTurnaroundByGrader
+// takes an already-filtered submissions array now, so every call site below
+// filters out the example row itself before calling it.
+function realSubmissions() {
+  return submissions.filter(s => !isExampleSubmission(s));
 }
 
 function renderValueBreakdown() {
@@ -1084,7 +951,7 @@ function renderValueBreakdown() {
     renderBreakdownList('By storage location', buildValueGroupsByStorageLocation(), {
       emptyText: 'No priced real cards with a storageLocation logged yet.'
     }) +
-    renderBreakdownList('Avg. grading turnaround', buildTurnaroundByGrader(), {
+    renderBreakdownList('Avg. grading turnaround', buildTurnaroundByGrader(realSubmissions()), {
       formatValue: g => g.value + 'd avg (' + g.min + '-' + g.max + 'd, ' + g.count + ' returned)',
       emptyText: 'No returned submissions with both dates logged yet.'
     });
@@ -1197,48 +1064,15 @@ function renderBiggestMovers() {
 // null when fewer than two distinct real dates exist across the whole
 // collection, since one shared date (or none) is not a trend, it is
 // everything having been priced once on the same day.
+// The real algorithm (forward-walking two-pointer merge across dates and
+// each card's own sorted price points) now lives in grading-core.js, the
+// same reason isSold/computeValueTrend/etc. were split out: a plain Node
+// test (grading-core.test.js) can exercise the real dedup/date-cutoff edge
+// cases directly. This wrapper just supplies the one thing that's a
+// presentation concern, not a real card-data rule: excluding the seeded
+// example row, which the core function deliberately doesn't know about.
 function buildPortfolioValueTimeline() {
-  const perCard = cards
-    .filter(c => !isExample(c) && c.estimatedValue != null && c.datePriced)
-    .map(c => {
-      const points = (c.priceHistory || [])
-        .filter(p => p.date && p.value != null)
-        .map(p => ({ date: p.date, value: p.value }));
-      points.push({ date: c.datePriced, value: c.estimatedValue });
-      points.sort((a, b) => a.date.localeCompare(b.date));
-      return { card: c, points };
-    });
-  if (!perCard.length) return null;
-
-  const allDates = new Set();
-  perCard.forEach(({ points }) => points.forEach(p => allDates.add(p.date)));
-  const sortedDates = [...allDates].sort();
-  if (sortedDates.length < 2) return null;
-
-  // Was one full points.filter() per (card, date) pair, O(dates x cards x
-  // points), re-scanning every card's whole price history from scratch at
-  // every single date. Harmless with 3 cards, but the same "recompute over
-  // everything on every render" shape the 13x-candidate-list-rebuild and
-  // O(n^2) photo-audit-grid perf fixes already caught elsewhere on this hub.
-  // Since both sortedDates and each card's own points are already ascending,
-  // a single forward-walking pointer per card finds the same "latest point
-  // on or before this date" value without re-scanning: dates and a card's
-  // points only ever move forward together, never backward.
-  const totals = sortedDates.map(date => ({ date, total: 0, countedCards: 0 }));
-  perCard.forEach(({ card, points }) => {
-    let pointIdx = -1;
-    for (let i = 0; i < sortedDates.length; i++) {
-      const date = sortedDates[i];
-      // soldDate <= date only ever gets truer as date increases, so once a
-      // card drops out here it stays out for every later date too.
-      if (isSold(card) && card.soldDate && card.soldDate <= date) break;
-      while (pointIdx + 1 < points.length && points[pointIdx + 1].date <= date) pointIdx++;
-      if (pointIdx < 0) continue;
-      totals[i].total += points[pointIdx].value;
-      totals[i].countedCards++;
-    }
-  });
-  return totals;
+  return buildPortfolioValueTimelineCore(cards.filter(c => !isExample(c)));
 }
 
 // Each timeline dot's real per-point data (exact date, dollar total, card
@@ -1404,14 +1238,21 @@ function isExampleCandidate(c) {
   return c.id === 'example-candidate-not-real';
 }
 
-// The "worth grading?" 2x-margin math now lives in grading-core.js (loaded
-// as window.CGTGradingCore by a script tag in index.html right before this
-// file's own), the same reason validate-core.js was split out: a plain Node test
-// (grading-core.test.js) can exercise the real rule directly without loading
-// the rest of this DOM-touching file. Pulled into bare identifiers here so
-// every existing call site below (computeGradingMath(c), GRADING_RISK_MULTIPLE)
-// keeps working unchanged.
-const { computeGradingMath, GRADING_RISK_MULTIPLE } = window.CGTGradingCore;
+// The "worth grading?" 2x-margin math, the collectibles-tax math, and the
+// card value/gain-loss math (isSold/isListed/costPerCard/computeGainLoss/
+// computeRealizedGainLoss/estimateCardCollectiblesTax/lastPriceHistoryEntry/
+// computeValueTrend) all now live in grading-core.js (loaded as
+// window.CGTGradingCore by a script tag in index.html right before this
+// file's own), the same reason validate-core.js was split out: a plain Node
+// test (grading-core.test.js) can exercise the real rules directly without
+// loading the rest of this DOM-touching file. Pulled into bare identifiers
+// here so every existing call site below keeps working unchanged.
+const {
+  computeGradingMath, GRADING_RISK_MULTIPLE,
+  isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
+  estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
+  buildPortfolioValueTimeline: buildPortfolioValueTimelineCore
+} = window.CGTGradingCore;
 
 const CANDIDATE_VERDICT_META = {
   'worth-grading': { label: 'Worth grading', cls: 'badge-worth' },
@@ -1572,6 +1413,7 @@ function renderCandidates() {
     // candidate already decided hold/sell-raw/pass was never going to hit
     // PSA's Value-tier pause since it isn't going to be submitted at all.
     const targetsPausedTier = (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel);
+    const stale = !isExampleCandidate(c) && isCandidateStale(c);
     const metaParts = [
       c.sport,
       c.targetGradingCompany,
@@ -1579,12 +1421,23 @@ function renderCandidates() {
       c.expectedGradedValue != null ? 'est. graded ' + formatUsd(c.expectedGradedValue) + (c.expectedGrade ? ' (' + c.expectedGrade + ')' : '') : null,
       math ? 'costs ' + formatUsd(math.totalCost) : null
     ].filter(Boolean);
+    // No aria-label here on purpose (a real fix, not an omission): this row's
+    // own visible content already carries the real expected gain, verdict,
+    // decision, and cost/value meta, exactly the numbers a real grading
+    // decision runs on. An aria-label reciting only the card name would
+    // override all of that with the accessible-name computation, so a screen
+    // reader user would hear "Andrei Svechnikov" and nothing else, silently
+    // losing the same expected-gain/verdict data a sighted user reads off the
+    // row at a glance. Leaving the row nameless lets the browser fall back to
+    // its own real text content instead, the same rich summary everyone else
+    // gets. tabindex + role="button" already announce it as interactive.
     return `
-      <div class="submission-row candidate-row" tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled candidate')}${decisionLabel ? ', decision: ' + escapeHtml(decisionLabel) : ''}${targetsPausedTier ? ', PSA tier paused' : ''}" data-id="${escapeHtml(c.id)}">
+      <div class="submission-row candidate-row" tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
         <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         ${decisionLabel ? `<span class="badge badge-decided">${escapeHtml(decisionLabel)}</span>` : ''}
         ${targetsPausedTier ? `<span class="badge badge-paused" title="PSA ${escapeHtml(c.targetServiceLevel)} is currently paused to new submissions">tier paused</span>` : ''}
+        ${stale ? `<span class="badge badge-stale" title="Priced more than 180 days ago, worth a re-check">stale</span>` : ''}
         <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
       </div>
@@ -1750,6 +1603,9 @@ function openSubmissionModal(id) {
   body += field('Card count', s.cardCount != null ? String(s.cardCount) : null, s.cardCount == null);
   body += field('Submitted date', s.submittedDate, !s.submittedDate);
   body += field('Tracking number', s.trackingNumber, !s.trackingNumber);
+  for (const link of shippingCarrierLinks(s.trackingNumber)) {
+    body += `<div class="field-row"><a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(link.text)} &rarr;</a></div>`;
+  }
   body += field('Returned date', s.returnedDate, !s.returnedDate);
   body += field('Cost (grading fee)', s.cost != null ? formatUsd(s.cost) : null, s.cost == null);
   body += field('Cost per card', costPerCard(s) != null ? formatUsd(costPerCard(s)) : null, costPerCard(s) == null);
@@ -1782,31 +1638,10 @@ function buildActiveSubmissions() {
     });
 }
 
-// Shared by renderSubmissions below (the on-page "est. back ~" label) and
-// buildSubmissionReturnReminders (the .ics export), so the two never drift:
-// same real-history-beats-published-estimate rule, same "no estimate once
-// it's already running long" cutoff.
-function estimatedReturnFor(s, turnaroundByGrader) {
-  const days = daysSince(s.submittedDate);
-  const graderStats = s.gradingCompany && turnaroundByGrader.get(s.gradingCompany);
-  const hasRealHistory = graderStats && graderStats.count >= 2;
-  const runningLong = days != null && hasRealHistory && days > graderStats.value;
-  const publishedDays = !hasRealHistory && s.gradingCompany ? publishedTurnaroundDays(s.gradingCompany, s.serviceLevel) : null;
-  // Computed regardless of runningLong: buildSubmissionReturnReminders below
-  // needs a real past date to detect and pin an overdue submission's
-  // reminder to today (its own comment documents that as the intent), which
-  // is impossible if runningLong forces this to null before it ever gets a
-  // chance to be in the past. renderSubmissions (the on-page label) is the
-  // one place that still wants this hidden once running long, so it checks
-  // runningLong itself now instead of relying on this being null.
-  const estReturnDate = (s.submittedDate && hasRealHistory)
-    ? addDaysIso(s.submittedDate, graderStats.value)
-    : (s.submittedDate && publishedDays != null)
-      ? addDaysIso(s.submittedDate, businessDaysToCalendarDays(publishedDays))
-      : null;
-  const estReturnIsPublished = estReturnDate != null && !hasRealHistory;
-  return { days, graderStats, hasRealHistory, runningLong, publishedDays, estReturnDate, estReturnIsPublished };
-}
+// estimatedReturnFor (shared by renderSubmissions' on-page "est. back ~"
+// label and buildSubmissionReturnReminders' .ics export, so the two never
+// drift) now lives in turnaround-core.js too -- see this file's earlier
+// CGTTurnaroundCore destructure.
 
 // A separate feed from Pricing activity above: this is the front of the
 // pipeline (cards shipped off, not graded yet) rather than the back of it
@@ -1840,7 +1675,7 @@ function renderSubmissions() {
   // that grader's own average gets flagged instead of just quietly aging in
   // the list. Requires at least 2 returned submissions from that grader
   // before trusting the average enough to flag anything against it.
-  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
 
   const rows = active.map(s => {
     const meta = SUBMISSION_STATUS_META[s.status] || { label: s.status, cls: 'badge-status-queue' };
@@ -1862,9 +1697,14 @@ function renderSubmissions() {
     // interactive outer div instead: .submission-row-main keeps the exact
     // same flex/wrap/gap layout for the row's own click/keydown handling,
     // and the link is a sibling next to it, not a descendant.
+    //
+    // No aria-label on the inner row either, same real reason as the
+    // candidate-row above: this row's own real days-in-queue/verdict/cost
+    // meta would otherwise get silently dropped from what a screen reader
+    // user hears in favor of just the submission description.
     return `
       <div class="submission-row">
-        <div class="candidate-row submission-row-main" tabindex="0" role="button" aria-label="View details for ${escapeHtml(s.description || 'Untitled submission')}" data-id="${escapeHtml(s.id)}">
+        <div class="candidate-row submission-row-main" tabindex="0" role="button" data-id="${escapeHtml(s.id)}">
           <span class="submission-days font-mono${runningLong ? ' submission-days-late' : ''}">${escapeHtml(daysText)}</span>
           <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
           <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
@@ -2168,7 +2008,7 @@ function renderAttentionBar() {
   // submissions section. Same runningLong test, same real-history-only
   // gate (estimatedReturnFor only sets runningLong once that grader has at
   // least 2 real returned submissions to average).
-  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
   const overdueSubmissionsCount = buildActiveSubmissions()
     .filter(s => !isExampleSubmission(s) && estimatedReturnFor(s, turnaroundByGrader).runningLong).length;
   // Same targetsPausedTier test as renderCandidates' own badge below: a
@@ -2180,6 +2020,11 @@ function renderAttentionBar() {
   const pausedTierCandidatesCount = candidates
     .filter(c => !isExampleCandidate(c) && (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel))
     .length;
+  // Same isCandidateStale rule as the "stale" badge on each candidate row
+  // below, counted here so a re-check-worthy candidate shows up in the same
+  // top-of-page scan as every other real "needs a look" signal instead of
+  // only being visible after scrolling to and reading every row.
+  const staleCandidatesCount = candidates.filter(c => !isExampleCandidate(c) && isCandidateStale(c)).length;
 
   const items = [];
   // Same reasoning as CSM's own renderAttentionBar: a drifted changelog is
@@ -2243,6 +2088,16 @@ function renderAttentionBar() {
       label: pausedTierCandidatesCount === 1
         ? 'candidate targets a PSA Value tier currently paused to new submissions'
         : 'candidates target a PSA Value tier currently paused to new submissions'
+    });
+  }
+  if (staleCandidatesCount) {
+    items.push({
+      n: staleCandidatesCount,
+      tone: 'warn',
+      target: 'candidatesSection',
+      label: staleCandidatesCount === 1
+        ? 'candidate price is stale, worth a re-check'
+        : 'candidate prices are stale, worth a re-check'
     });
   }
 
@@ -2634,8 +2489,12 @@ function applyFiltersAndRender() {
   empty.hidden = true;
   renderTableFooter(filtered);
 
+  // Same real reason as the candidate-row/submission-row aria-labels removed
+  // above: this row's own real sport/grading/grade/value/date cells are the
+  // actual real content, an aria-label reciting only the card name would
+  // override all of that in what a screen reader user hears.
   tbody.innerHTML = filtered.map(c => `
-    <tr tabindex="0" role="button" aria-label="View details for ${escapeHtml(c.cardName || 'Untitled card')}" data-id="${escapeHtml(c.id)}">
+    <tr tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
       <td>
         <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isBgsBlackLabel(c) ? ' <span class="badge badge-black-label" title="All four BGS subgrades are a perfect 10">black label</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}${!isSold(c) && isListed(c) ? ' <span class="badge badge-listed" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>' : ''}</div>
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
@@ -2811,8 +2670,9 @@ function cardEditFormHtml(c) {
     ceFieldRow('ceImageUrl', 'Photo URL (optional)', c.imageUrl) +
     '<div class="form-row-split">' +
     ceInputInner('ceCostBasis', 'Cost basis, USD', c.costBasis, 'number') +
-    ceInputInner('ceDatePriced', 'Date priced', c.datePriced, 'date') +
+    ceInputInner('ceAcquisitionDate', 'Acquisition date (when bought/acquired)', c.acquisitionDate, 'date') +
     '</div>' +
+    ceFieldRow('ceDatePriced', 'Date priced', c.datePriced, 'date') +
     '<div class="form-row-split">' +
     ceInputInner('ceSoldDate', 'Sold date (leave blank if still owned)', c.soldDate, 'date') +
     ceInputInner('ceSoldPrice', 'Sold price, USD', c.soldPrice, 'number') +
@@ -3125,6 +2985,7 @@ function wireCardEditForm(c) {
       sourceNote: ceVal('ceSourceNote'),
       imageUrl: ceVal('ceImageUrl'),
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
+      acquisitionDate: document.getElementById('ceAcquisitionDate').value || null,
       datePriced: document.getElementById('ceDatePriced').value || null,
       soldDate: document.getElementById('ceSoldDate').value || null,
       soldPrice: soldPriceRaw === '' ? null : Number(soldPriceRaw),
@@ -3269,12 +3130,31 @@ function openModal(id) {
   body += field('Valuation basis', activeCard.valuationBasis === 'recent-sale' ? 'Recent sale' : activeCard.valuationBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !activeCard.valuationBasis);
   body += renderPriceHistoryField(activeCard);
   body += field('Cost basis (what was paid)', activeCard.costBasis != null ? formatUsd(activeCard.costBasis) : null, activeCard.costBasis == null);
+  body += field('Acquisition date (when bought/acquired)', activeCard.acquisitionDate, !activeCard.acquisitionDate);
   if (isSold(activeCard)) {
     body += field('Sold date', activeCard.soldDate, !activeCard.soldDate);
     body += field('Sold price', activeCard.soldPrice != null ? formatUsd(activeCard.soldPrice) : null, activeCard.soldPrice == null);
     const rgl = computeRealizedGainLoss(activeCard);
     if (rgl) {
       body += field('Realized gain / loss', formatSignedUsd(rgl.abs) + (rgl.pct != null ? ' (' + (rgl.pct >= 0 ? '+' : '') + rgl.pct.toFixed(1) + '%)' : ''), false);
+      if (rgl.abs > 0) {
+        const taxEst = estimateCardCollectiblesTax(activeCard);
+        if (taxEst) {
+          const holdingLabel = taxEst.holding === 'long-term' ? 'Long-term (held more than 1 year)' : 'Short-term (held 1 year or less)';
+          body += field('Collectibles holding period', holdingLabel, false);
+          body += `<div class="field-row">
+            <div class="field-label">Est. max federal tax on this gain</div>
+            <div class="field-value">${escapeHtml(formatUsd(taxEst.maxTax))}</div>
+            <div class="field-note">A ${Math.round(taxEst.maxRate * 100)}% ceiling${taxEst.holding === 'long-term' ? ', the collectibles cap on a long-term gain (26 U.S.C. 1(h)(5))' : ', the top 2026 ordinary-income bracket (no 28% cap applies to a short-term gain)'}, not a final tax bill. The real number depends on the whole return (total taxable income, filing status, state tax); this is not tax advice.</div>
+          </div>`;
+        } else if (!activeCard.acquisitionDate) {
+          body += `<div class="field-row">
+            <div class="field-label">Collectibles holding period</div>
+            <div class="field-value empty">not logged</div>
+            <div class="field-note">No "acquisitionDate" on record for this card, so this real gain can't be classified long-term vs. short-term for collectibles capital-gains tax purposes yet. Backfill when known.</div>
+          </div>`;
+        }
+      }
     }
   } else {
     const gl = computeGainLoss(activeCard);
@@ -3456,12 +3336,117 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== '?') return;
   const modalOpen = !document.getElementById('modalOverlay').hidden;
-  if (modalOpen || shortcutsOpen) return;
+  if (modalOpen || shortcutsOpen || jumpNavOpen) return;
   const active = document.activeElement;
   const tag = active && active.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
   e.preventDefault();
   openShortcuts();
+});
+
+// Jump-to-section nav, same markup/behavior as Garage/Sondrik's: this page
+// runs 20 real sections including two long references and the changelog,
+// with no sticky header, so this is the one way back to a specific section
+// without scrolling blind. Built from the real on-page section titles at
+// load time, no separate list to keep in sync by hand as sections get added.
+let jumpNavOpen = false;
+let jumpNavLastFocusedEl = null;
+
+function collectJumpSections() {
+  const usedIds = new Set();
+  return Array.from(document.querySelectorAll('main > section')).map((section) => {
+    if (section.hidden) return null;
+    const titleEl = section.querySelector('h2.section-title, summary.section-title');
+    if (!titleEl) return null;
+    // Strip the "Grading service tiers reference" summary's own nested
+    // freshness badge ("Reviewed N days ago") so the label stays a stable
+    // section name instead of picking up that badge's ever-changing text,
+    // same reason Sondrik's own jump nav strips its .section-title-meta.
+    const clone = titleEl.cloneNode(true);
+    clone.querySelectorAll('.reference-freshness').forEach(el => el.remove());
+    const label = clone.textContent.replace(/\s+/g, ' ').trim();
+    if (!label) return null;
+    if (!section.id) {
+      let slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'section';
+      let candidate = 'jump-' + slug;
+      let n = 2;
+      while (usedIds.has(candidate) || document.getElementById(candidate)) {
+        candidate = 'jump-' + slug + '-' + n;
+        n++;
+      }
+      section.id = candidate;
+    }
+    usedIds.add(section.id);
+    return { id: section.id, label };
+  }).filter(Boolean);
+}
+
+function renderJumpNavList() {
+  const sections = collectJumpSections();
+  document.getElementById('jumpNavList').innerHTML = sections.map(s => `
+    <a class="jump-nav-link" href="#${s.id}" data-jump-target="${s.id}">${escapeHtml(s.label)}</a>
+  `).join('');
+}
+
+function getJumpNavFocusable() {
+  return Array.from(document.getElementById('jumpNavModal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function openJumpNav() {
+  if (jumpNavOpen) return;
+  jumpNavOpen = true;
+  jumpNavLastFocusedEl = document.activeElement;
+  renderJumpNavList();
+  document.getElementById('jumpNavOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('jumpNavClose').focus();
+}
+
+function closeJumpNav() {
+  if (!jumpNavOpen) return;
+  jumpNavOpen = false;
+  document.getElementById('jumpNavOverlay').hidden = true;
+  unlockBodyScroll();
+  if (jumpNavLastFocusedEl && typeof jumpNavLastFocusedEl.focus === 'function') jumpNavLastFocusedEl.focus();
+  jumpNavLastFocusedEl = null;
+}
+
+document.getElementById('jumpNavBtn').addEventListener('click', openJumpNav);
+document.getElementById('jumpNavClose').addEventListener('click', closeJumpNav);
+document.getElementById('jumpNavOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'jumpNavOverlay') closeJumpNav();
+});
+document.getElementById('jumpNavList').addEventListener('click', (e) => {
+  const link = e.target.closest('.jump-nav-link');
+  if (!link) return;
+  e.preventDefault();
+  const target = document.getElementById(link.dataset.jumpTarget);
+  closeJumpNav();
+  if (target) {
+    // The scroll-lock release above needs a frame to settle, starting the
+    // smooth scroll before that clobbers it.
+    requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!jumpNavOpen) return;
+  if (e.key === 'Escape') { closeJumpNav(); return; }
+  if (e.key === 'Tab') {
+    const focusable = getJumpNavFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 });
 
 function wireChipGroup(containerId, dataAttr, setter, render) {
@@ -3675,6 +3660,7 @@ const CSV_COLUMNS = [
   [c => c.valuationBasis, 'Valuation basis'], [c => c.compNote, 'Comp note'], [c => c.sourceNote, 'Source'],
   [c => c.imageUrl, 'Photo URL'],
   [c => c.costBasis, 'Cost basis'],
+  [c => c.acquisitionDate, 'Acquisition date'],
   [c => isSold(c) ? c.soldDate : null, 'Sold date'],
   [c => isSold(c) ? c.soldPrice : null, 'Sold price'],
   [c => !isSold(c) && isListed(c) ? c.listedDate : null, 'Listed date'],
@@ -3685,6 +3671,8 @@ const CSV_COLUMNS = [
   // read as the same kind of number.
   [c => isSold(c) ? (computeRealizedGainLoss(c)?.abs ?? null) : (computeGainLoss(c)?.abs ?? null), 'Gain/loss'],
   [c => isSold(c) ? 'Realized' : 'Unrealized', 'Gain/loss type'],
+  [c => estimateCardCollectiblesTax(c)?.holding ?? null, 'Collectibles holding period'],
+  [c => estimateCardCollectiblesTax(c)?.maxTax ?? null, 'Est. max collectibles tax'],
   [c => c.datePriced, 'Date priced'], [c => c.backlogBatch, 'Backlog batch'], [c => c.notes, 'Notes']
 ];
 
@@ -3823,7 +3811,7 @@ function icsFoldLine(line) {
 // grader history/published schedule to estimate from (estimatedReturnFor
 // already returns null in that case, filtered out below).
 function buildSubmissionReturnReminders() {
-  const turnaroundByGrader = new Map(buildTurnaroundByGrader().map(g => [g.label, g]));
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
   const today = todayIso();
   return buildActiveSubmissions().map(s => {
     const { estReturnDate, estReturnIsPublished, graderStats, publishedDays } = estimatedReturnFor(s, turnaroundByGrader);
@@ -4034,6 +4022,7 @@ function initQuickLogTool() {
       sourceNote: document.getElementById('ncSourceNote').value.trim() || null,
       imageUrl: document.getElementById('ncImageUrl').value.trim() || null,
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
+      acquisitionDate: document.getElementById('ncAcquisitionDate').value || null,
       datePriced: document.getElementById('ncDatePriced').value || null,
       backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
       priceHistory: [],

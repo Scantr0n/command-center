@@ -1,10 +1,11 @@
 /*
- * Pure validation-support rules for the Garage listings array, with no
- * Node-only APIs (no fs/path), so the exact same rule runs in two places: the
- * CLI validator (public/garage/data/validate.js, which reads listings.json
- * off disk and calls this) and the dashboard's own "Possible duplicates"
- * panel (public/garage/app.js), which needs the real listing objects to
- * render clickable rows, not just a pre-formatted warning string. Same
+ * Pure validation-support rules and constants for the Garage listings array,
+ * with no Node-only APIs (no fs/path), so the exact same rule runs in two
+ * places: the CLI validator (public/garage/data/validate.js, which reads
+ * listings.json off disk and calls this) and the dashboard itself
+ * (public/garage/app.js), which needs the real listing objects to render
+ * clickable rows, not just a pre-formatted warning string, plus the same
+ * platform list and title-length caps the CLI validator checks against. Same
  * shared-core pattern as CGT's and CSM's own validate-core.js, so the two
  * can never quietly drift apart.
  */
@@ -15,6 +16,25 @@
     root.GarageValidateCore = factory();
   }
 })(typeof self !== 'undefined' ? self : this, function () {
+  // The canonical platform list, previously defined independently four times
+  // (validate.js's own PLATFORMS, plus app.js's VALID_PLATFORMS and
+  // PAYOUT_PLATFORMS, which were really the same array under two different
+  // names). One shared source instead, so a fifth platform ever being added
+  // can't miss one of the four copies silently.
+  const PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+
+  // Real published title-length hard caps as of September 2026 (see the
+  // "Title & photo specs" reference on the Garage page for sourcing). Depop
+  // has no published hard cap, only a soft mobile-truncation point, so it's
+  // a separate DEPOP_TITLE_SOFT_LIMIT below rather than a hard cap here.
+  // This constant used to be defined separately in validate.js and app.js;
+  // the two drifted apart once already (Vinted wrongly at 70 in both copies
+  // at the same time, fixed in a1fd471), and having two independently
+  // hand-maintained copies of the same table is exactly the shape of risk
+  // that already caused, so there is now only one.
+  const TITLE_HARD_LIMITS = { ebay: 80, vinted: 100, poshmark: 80 };
+  const DEPOP_TITLE_SOFT_LIMIT = 50;
+
   // Groups live listings by a normalized key of the fields that actually
   // identify the same physical item, title + price, and flags any group with
   // more than one member. The real risk this catches: re-adding an item
@@ -84,6 +104,9 @@
   }
 
   return {
+    PLATFORMS,
+    TITLE_HARD_LIMITS,
+    DEPOP_TITLE_SOFT_LIMIT,
     findDuplicateListings,
     isSuspiciousEbayReturnPolicy,
     ITEM_SPECIFIC_LABELS,

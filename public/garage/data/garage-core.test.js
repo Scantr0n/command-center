@@ -18,18 +18,35 @@ const {
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
+  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
+  computePoshmarkShareStreak, offerTier, offerCounterAmount,
+  ebayTrsProgress, depopTopSellerProgress,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
 } = require('./garage-core.js');
 
-test('estimateNetPayout: eBay charges 13.6% + the $0.30/$0.40 per-order step, never a shoes-specific rate', () => {
-  // A $30 sale nets 30 - (30*0.136 + 0.40) = 25.52, not the ~14.9% effective
-  // rate an earlier bug mistook for a category-specific percentage.
-  assert.equal(Math.round(estimateNetPayout('ebay', 30, 'shoes') * 100) / 100, 25.52);
+test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
+  // A $30 sale with no category nets 30 - (30*0.136 + 0.40) = 25.52, not the
+  // ~14.9% effective rate an earlier bug mistook for a category-specific
+  // percentage.
+  assert.equal(Math.round(estimateNetPayout('ebay', 30) * 100) / 100, 25.52);
   // At/under $10 the per-order fee is $0.30, not $0.40.
   assert.equal(Math.round(estimateNetPayout('ebay', 10) * 100) / 100, 8.34);
   // No leftover 2.9% + $0.30 card-processing surcharge on top of the
   // managed-payments final value fee (the real double-charge bug).
   assert.equal(estimateNetPayout('ebay', 100), 100 - (100 * 0.136 + 0.40));
+});
+
+test('estimateNetPayout: eBay charges the real 15.3% Clothing, Shoes & Accessories rate for category "shoes", not the 13.6% standard rate', () => {
+  // Both real live boots listings are category "shoes": a $30 sale there
+  // nets 30 - (30*0.153 + 0.40) = 25.01, not the 25.52 the 13.6% standard
+  // rate (or the debunked ~14.9% "shoes rate" from the earlier bug) would
+  // give. An earlier version of this file charged every category, shoes
+  // included, the 13.6% standard rate, undercounting both real listings.
+  assert.equal(Math.round(estimateNetPayout('ebay', 30, 'shoes') * 100) / 100, 25.01);
+  // Consumer Electronics is not a special-rate category, it still gets the
+  // 13.6% standard rate.
+  assert.equal(Math.round(estimateNetPayout('ebay', 95, 'electronics') * 100) / 100,
+    Math.round((95 - (95 * 0.136 + 0.40)) * 100) / 100);
 });
 
 test('estimateNetPayout: Vinted has no seller fee, Poshmark and Depop use their published formulas', () => {
@@ -50,6 +67,16 @@ test('minListingPriceForNet inverts estimateNetPayout for every platform', () =>
     const price = minListingPriceForNet(platform, targetNet, false);
     assert.ok(Math.abs(estimateNetPayout(platform, price) - targetNet) < 0.01, platform);
   }
+});
+
+test('minListingPriceForNet threads category through to eBay\'s real 15.3% shoes rate', () => {
+  const targetNet = 20;
+  const price = minListingPriceForNet('ebay', targetNet, false, 'shoes');
+  assert.ok(Math.abs(estimateNetPayout('ebay', price, 'shoes') - targetNet) < 0.01);
+  // The shoes-rate price should be strictly higher than the standard-rate
+  // price to clear the same target net, since 15.3% takes a bigger bite.
+  const standardPrice = minListingPriceForNet('ebay', targetNet, false);
+  assert.ok(price > standardPrice);
 });
 
 test('ebayMinPriceForNet picks the $0.30 branch only when it actually lands at/under $10', () => {
@@ -182,4 +209,148 @@ test('bundleNetComparison: an out-of-range discount clamps to 0-100 instead of i
   assert.equal(negative.bundleTotal, 100);
   const over = bundleNetComparison('vinted', [50, 50], 150);
   assert.equal(over.bundleTotal, 0);
+});
+
+test('irsMileageRateForDate: 72.5 cents Jan-Jun, 76 cents Jul-Dec, null outside 2026 or with no date', () => {
+  assert.equal(irsMileageRateForDate('2026-01-01'), 0.725);
+  assert.equal(irsMileageRateForDate('2026-06-30'), 0.725);
+  assert.equal(irsMileageRateForDate('2026-07-01'), 0.76);
+  assert.equal(irsMileageRateForDate('2026-12-31'), 0.76);
+  assert.equal(irsMileageRateForDate('2025-12-31'), null);
+  assert.equal(irsMileageRateForDate('2027-01-01'), null);
+  assert.equal(irsMileageRateForDate(null), null);
+});
+
+test('computeExpenseAmount: a logged amount always wins, otherwise mileage computes from miles x the real rate for its date', () => {
+  assert.equal(computeExpenseAmount({ amount: 12.5, category: 'mileage', miles: 999 }), 12.5);
+  assert.equal(computeExpenseAmount({ category: 'mileage', miles: 100, date: '2026-01-15' }), 72.5);
+  assert.equal(computeExpenseAmount({ category: 'mileage', miles: 100, date: '2026-08-01' }), 76);
+  // No amount, not mileage: honestly un-computable, never assumed $0.
+  assert.equal(computeExpenseAmount({ category: 'supplies' }), null);
+  // Mileage with no known rate for the date: also un-computable.
+  assert.equal(computeExpenseAmount({ category: 'mileage', miles: 100, date: '2025-01-01' }), null);
+});
+
+test('mileageRateGapReason: only fires for an uncomputed mileage expense with real miles/date but no known rate', () => {
+  // Already has an amount, category isn't mileage, or missing miles/date: no gap to report.
+  assert.equal(mileageRateGapReason({ amount: 10, category: 'mileage', miles: 100, date: '2025-01-01' }), null);
+  assert.equal(mileageRateGapReason({ category: 'supplies', miles: 100, date: '2025-01-01' }), null);
+  assert.equal(mileageRateGapReason({ category: 'mileage', date: '2025-01-01' }), null);
+  assert.equal(mileageRateGapReason({ category: 'mileage', miles: 100 }), null);
+  // A real rate exists for this date: no gap.
+  assert.equal(mileageRateGapReason({ category: 'mileage', miles: 100, date: '2026-03-01' }), null);
+  // Dated after the table's last known range: distinct "past" message naming the table itself.
+  const past = mileageRateGapReason({ category: 'mileage', miles: 100, date: '2027-01-01' });
+  assert.match(past, /No IRS rate known past 2026-12-31/);
+  // Dated before 2026 (or any other gap inside the table's span): the general message.
+  const before = mileageRateGapReason({ category: 'mileage', miles: 100, date: '2025-06-01' });
+  assert.match(before, /No IRS rate known for 2025-06-01/);
+});
+
+test('computePoshmarkShareStreak: counts consecutive logged days walking back from today', () => {
+  const log = { '2026-09-21': 1, '2026-09-22': 1, '2026-09-23': 1 };
+  assert.equal(computePoshmarkShareStreak(log, '2026-09-23'), 3);
+  // A gap two days back stops the walk there.
+  const withGap = { '2026-09-20': 1, '2026-09-22': 1, '2026-09-23': 1 };
+  assert.equal(computePoshmarkShareStreak(withGap, '2026-09-23'), 2);
+});
+
+test('computePoshmarkShareStreak: today not logged yet still counts yesterday onward, not a broken streak', () => {
+  const log = { '2026-09-21': 1, '2026-09-22': 1 };
+  assert.equal(computePoshmarkShareStreak(log, '2026-09-23'), 2);
+});
+
+test('computePoshmarkShareStreak: no logged days at all is a real zero, not a guess', () => {
+  assert.equal(computePoshmarkShareStreak({}, '2026-09-23'), 0);
+  assert.equal(computePoshmarkShareStreak({ '2026-09-10': 1 }, '2026-09-23'), 0);
+});
+
+test('offerTier: real counteroffer-ladder boundaries, each threshold is inclusive on its own tier', () => {
+  assert.equal(offerTier(1.0), 'accept');
+  assert.equal(offerTier(0.90), 'accept');
+  assert.equal(offerTier(0.899), 'counter');
+  assert.equal(offerTier(0.75), 'counter');
+  assert.equal(offerTier(0.749), 'borderline');
+  assert.equal(offerTier(0.50), 'borderline');
+  assert.equal(offerTier(0.499), 'decline');
+  assert.equal(offerTier(0), 'decline');
+});
+
+test('offerCounterAmount: accept/decline have nothing to counter', () => {
+  assert.equal(offerCounterAmount('accept', 90, 100, 10), null);
+  assert.equal(offerCounterAmount('decline', 40, 100, 10), null);
+});
+
+test('offerCounterAmount: counter tier always splits the gap 50/50, regardless of listing age', () => {
+  assert.equal(offerCounterAmount('counter', 80, 100, null), 90);
+  assert.equal(offerCounterAmount('counter', 80, 100, 5), 90);
+  assert.equal(offerCounterAmount('counter', 80, 100, 90), 90);
+});
+
+test('offerCounterAmount: borderline tier splits closer to the offer once past RELIST_FRESH_DAYS, a stale listing has more to gain from moving', () => {
+  assert.equal(offerCounterAmount('borderline', 60, 100, RELIST_FRESH_DAYS), 70);
+  assert.equal(offerCounterAmount('borderline', 60, 100, RELIST_FRESH_DAYS + 20), 70);
+});
+
+test('offerCounterAmount: borderline tier splits closer to asking while still fresh, or with no logged date at all', () => {
+  assert.equal(offerCounterAmount('borderline', 60, 100, RELIST_FRESH_DAYS - 1), 90);
+  assert.equal(offerCounterAmount('borderline', 60, 100, 0), 90);
+  // No listing date logged defaults to the same firmer split as a genuinely
+  // fresh listing, never the stale-listing split with no real evidence for it.
+  assert.equal(offerCounterAmount('borderline', 60, 100, null), 90);
+});
+
+test('ebayTrsProgress: counts only real ebay sales within the trailing 365 days, ignores other platforms and out-of-window dates', () => {
+  const sales = [
+    { platform: 'ebay', salePrice: 100, saleDate: '2026-09-01' },
+    { platform: 'ebay', salePrice: 50, saleDate: '2025-10-01' }, // in window
+    { platform: 'ebay', salePrice: 999, saleDate: '2025-09-01' }, // just outside window
+    { platform: 'depop', salePrice: 999, saleDate: '2026-09-01' } // wrong platform
+  ];
+  const result = ebayTrsProgress(sales, [], '2026-09-24');
+  assert.equal(result.transactions, 2);
+  assert.equal(result.grossSales, 150);
+  assert.equal(result.meetsCountTargets, false);
+});
+
+test('ebayTrsProgress: meetsCountTargets is true only once both the transaction count and dollar targets are actually hit', () => {
+  const hundredSales = Array.from({ length: 100 }, (_, i) => ({ platform: 'ebay', salePrice: 10, saleDate: '2026-09-01' }));
+  const shortOfDollars = ebayTrsProgress(hundredSales, [], '2026-09-24');
+  assert.equal(shortOfDollars.transactions, 100);
+  assert.equal(shortOfDollars.grossSales, 1000);
+  assert.equal(shortOfDollars.meetsCountTargets, true);
+
+  const shortOfCount = ebayTrsProgress([{ platform: 'ebay', salePrice: 5000, saleDate: '2026-09-01' }], [], '2026-09-24');
+  assert.equal(shortOfCount.meetsCountTargets, false);
+});
+
+test('ebayTrsProgress: nonSellerResolvedRate is null with no sales yet, not a misleading 0%', () => {
+  assert.equal(ebayTrsProgress([], [], '2026-09-24').nonSellerResolvedRate, null);
+});
+
+test('ebayTrsProgress: nonSellerResolvedRate only counts disputes resolved against the seller, and only within the same window', () => {
+  const sales = [
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-01' },
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-02' }
+  ];
+  const disputes = [
+    { platform: 'ebay', status: 'resolved-buyer', openedDate: '2026-09-03' },
+    { platform: 'ebay', status: 'resolved-seller', openedDate: '2026-09-03' }, // doesn't count against the seller
+    { platform: 'ebay', status: 'resolved-buyer', openedDate: '2024-01-01' }, // outside the window
+    { platform: 'depop', status: 'resolved-buyer', openedDate: '2026-09-03' } // wrong platform
+  ];
+  assert.equal(ebayTrsProgress(sales, disputes, '2026-09-24').nonSellerResolvedRate, 0.5);
+});
+
+test('depopTopSellerProgress: sums real depop sales within the rolling 30 days only', () => {
+  const sales = [
+    { platform: 'depop', salePrice: 400, saleDate: '2026-09-20' },
+    { platform: 'depop', salePrice: 400, saleDate: '2026-09-01' }, // 23 days back, still in window
+    { platform: 'depop', salePrice: 999, saleDate: '2026-08-01' }, // outside the 30-day window
+    { platform: 'ebay', salePrice: 999, saleDate: '2026-09-20' } // wrong platform
+  ];
+  const result = depopTopSellerProgress(sales, [], '2026-09-24');
+  assert.equal(result.grossSales, 800);
+  assert.equal(result.meetsCountTargets, false);
+  assert.equal(depopTopSellerProgress([{ platform: 'depop', salePrice: 1000, saleDate: '2026-09-24' }], [], '2026-09-24').meetsCountTargets, true);
 });

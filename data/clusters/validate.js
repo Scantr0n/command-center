@@ -147,6 +147,12 @@ function main() {
 
     if (c.relatedTo !== undefined && !Array.isArray(c.relatedTo)) {
       errors.push(where + ': "relatedTo" must be an array of cluster ids');
+    } else if (Array.isArray(c.relatedTo) && c.id && c.relatedTo.includes(c.id)) {
+      // graph-core.js's relation-curve math has no defined behavior for a
+      // self-loop edge (an id related to itself), so this is caught here
+      // rather than left to render as whatever a zero-length curve happens
+      // to draw.
+      errors.push(where + ': "relatedTo" lists its own id "' + c.id + '", a cluster cannot be related to itself');
     }
     if (c.relationReasons !== undefined && (typeof c.relationReasons !== 'object' || c.relationReasons === null || Array.isArray(c.relationReasons))) {
       errors.push(where + ': "relationReasons" must be an object keyed by cluster id');
@@ -181,6 +187,27 @@ function main() {
       }
     });
   });
+
+  // toggles.json accumulates one key per toggleable cluster and nothing
+  // ever prunes it, so a cluster that gets renamed or removed leaves its old
+  // toggleId sitting there forever with nothing left to key on. Not itself
+  // wrong (server.js's own /api/toggles/:toggleId route already refuses to
+  // set an unknown one), but dead state nobody would otherwise notice.
+  const togglesFile = path.join(DATA_DIR, '..', 'toggles.json');
+  if (fs.existsSync(togglesFile)) {
+    try {
+      const toggles = JSON.parse(fs.readFileSync(togglesFile, 'utf8'));
+      const knownToggleIds = new Set(clusters.map(({ data: c }) => c.toggleId).filter(Boolean));
+      Object.keys(toggles).forEach(toggleId => {
+        if (!knownToggleIds.has(toggleId)) {
+          warnings.push('data/toggles.json: toggleId "' + toggleId +
+            '" does not match any cluster\'s "toggleId", likely orphaned by a rename or removal');
+        }
+      });
+    } catch (e) {
+      errors.push('data/toggles.json: failed to parse (' + e.message + ')');
+    }
+  }
 
   if (warnings.length) {
     console.warn(warnings.length + ' warning(s):');

@@ -50,6 +50,7 @@ const {
   computeMarketStatus,
   timeAgo,
   freshnessClass,
+  computeHeadline,
   formatDuration,
   mostRecentConnectedAt,
   currentStateStartedAt,
@@ -143,38 +144,6 @@ function updateGlanceIndicators(cls) {
   document.title = `Alpha (${GLANCE_TEXT[cls] || cls}) / Command Center`;
 }
 
-// The one glance-first signal at the very top of the page, above every
-// detailed section. Derived entirely from fields the page already has
-// (connection state, reading freshness, kill-switch state), never from
-// anything invented. Kill switch engaged always wins: it is the one state
-// Jack would want to see even from across the room, current or last known.
-// isLastKnown marks that `data.live` has been substituted with a cached
-// last-known-connected reading (see loadLastKnown below); the headline must
-// say so explicitly rather than let a stale reading pass as current.
-function computeHeadline(data, isLastKnown) {
-  const live = data.live || {};
-  const asOf = live.asOf;
-  const killEngaged = live.killSwitch && live.killSwitch.engaged;
-
-  if (killEngaged === true) {
-    return {
-      level: 'critical',
-      text: isLastKnown ? 'KILL SWITCH ENGAGED (last known, now disconnected)' : 'KILL SWITCH ENGAGED',
-      asOf
-    };
-  }
-  if (isLastKnown) {
-    return { level: 'lastknown', text: 'Disconnected - showing last known state from ' + (timeAgo(asOf) || 'earlier'), asOf };
-  }
-  if (!data.connection.connected || !asOf) {
-    return { level: 'awaiting', text: 'Awaiting live connection', asOf };
-  }
-  const cls = freshnessClass(asOf);
-  if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale', asOf };
-  if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging', asOf };
-  return { level: 'good', text: 'Connected', asOf };
-}
-
 // A momentary disconnect from Alpha's real daemon shouldn't blank the page
 // back to "awaiting connection" the instant it happens: that throws away a
 // real reading Jack just had a moment ago for no reason other than a blip.
@@ -183,7 +152,7 @@ function computeHeadline(data, isLastKnown) {
 // last real value with an explicit, honest age on it rather than reverting
 // to unknown. This cache is deliberately narrow: only the slow-changing,
 // non-monetary fields (kill switch, regime, drawdown %, debate panel,
-// genealogy). Account and open positions are excluded on purpose, even
+// genealogy, stuck-agent count). Account and open positions are excluded on purpose, even
 // though they live right next to these fields in the same live payload:
 // those are real-money figures that can be wrong within seconds of going
 // stale, and showing a frozen dollar amount as if it might still be current
@@ -202,7 +171,8 @@ function saveLastKnown(data) {
       killSwitch: live.killSwitch,
       positionSizing: live.positionSizing,
       debatePanel: live.debatePanel,
-      genealogy: live.genealogy
+      genealogy: live.genealogy,
+      anomalies: live.anomalies
     }));
   } catch (e) {
     // Private browsing / storage blocked: just skip caching, page still
@@ -226,10 +196,10 @@ function renderLastKnownBanner(lastKnown) {
   if (!lastKnown) return;
   const age = timeAgo(lastKnown.asOf) || 'earlier';
   document.getElementById('lastKnownBannerDetail').textContent =
-    'Kill switch, regime, drawdown, debate panel, and genealogy below are the last real reading Alpha gave, from ' +
-    age + ' (' + formatAbsolute(lastKnown.asOf) + '), not current. Account and positions are left at ' +
-    '"awaiting connection" instead, since those can change every second and a frozen dollar figure would be ' +
-    'misleading rather than merely old.';
+    'Kill switch, regime, drawdown, debate panel, genealogy, and anomaly count below are the last real reading ' +
+    'Alpha gave, from ' + age + ' (' + formatAbsolute(lastKnown.asOf) + '), not current. Account and positions ' +
+    'are left at "awaiting connection" instead, since those can change every second and a frozen dollar figure ' +
+    'would be misleading rather than merely old.';
 }
 
 function setLastKnownTag(id, lastKnown) {
@@ -694,6 +664,41 @@ function wireTickTooltips(container) {
     });
   });
 }
+
+// The connectivity-check and daily-uptime strips each render up to 60/90
+// individually-focusable buttons (HISTORY_TICK_LIMIT / the daily-bucket
+// count), every one with the default implicit tabindex=0 a plain <button>
+// gets. A keyboard user tabbing through the page had to pass through every
+// single one just to get past these two strips, a real practical barrier,
+// not just a formal WCAG gap. Roving tabindex (APG toolbar pattern) fixes
+// it: only one tick is ever a real tab stop, arrow keys move within the
+// strip, so entering or leaving it costs exactly one Tab either way. Called
+// fresh on every re-render (the buttons are rebuilt each time, so there's
+// no stale state to preserve); the container's own keydown listener is
+// wired once (dataset guard) since the container element itself persists
+// across re-renders even though its children don't.
+function wireRovingTabindex(container) {
+  const items = () => Array.from(container.querySelectorAll('[data-tick-detail]'));
+  items().forEach((el, i) => el.setAttribute('tabindex', i === 0 ? '0' : '-1'));
+  if (container.dataset.rovingWired) return;
+  container.dataset.rovingWired = '1';
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return;
+    const els = items();
+    const currentIndex = els.indexOf(document.activeElement);
+    if (currentIndex === -1) return;
+    let nextIndex = currentIndex;
+    if (e.key === 'ArrowLeft') nextIndex = Math.max(0, currentIndex - 1);
+    else if (e.key === 'ArrowRight') nextIndex = Math.min(els.length - 1, currentIndex + 1);
+    else if (e.key === 'Home') nextIndex = 0;
+    else if (e.key === 'End') nextIndex = els.length - 1;
+    if (nextIndex === currentIndex) return;
+    e.preventDefault();
+    els[currentIndex].setAttribute('tabindex', '-1');
+    els[nextIndex].setAttribute('tabindex', '0');
+    els[nextIndex].focus();
+  });
+}
 document.addEventListener('click', (e) => {
   if (!e.target.closest('[data-tick-detail]')) hideTickTooltip();
 });
@@ -737,6 +742,7 @@ function renderConnectionHistory(data, clientHistory) {
     return `<button type="button" class="history-tick ${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-tick-detail="${escapeHtml(title)}"></button>`;
   }).join('');
   wireTickTooltips(strip);
+  wireRovingTabindex(strip);
 
   // A per-check tick strip shows the shape of recent history but not its
   // overall rate, exactly what a single "X% uptime" summary communicates at
@@ -856,6 +862,7 @@ function renderDailyUptime(data, clientHistory) {
 
   strip.innerHTML = buckets.map(dailyUptimeBarItem).join('');
   wireTickTooltips(strip);
+  wireRovingTabindex(strip);
 
   // Overall percentage across the covered days: real per-day up/total counts
   // summed first and divided once, never averaged day-to-day, same
@@ -921,6 +928,20 @@ function renderStats(data) {
     // it wasn't.
     debateActive ? null : 'Blocked on: ' + ((live.debatePanel && live.debatePanel.blockedOn) || 'unknown'),
     !debateActive
+  ));
+
+  // Distinct from the everyday "awaiting connection" gray: a real stuckCount
+  // of 0 is a genuine clean reading, not an unknown one, so it renders as
+  // "None" rather than the awaiting-connection treatment every other still-
+  // unset field on this row gets. See mapAnomalies' own comment for why a
+  // failed /anomalies subrequest reports null here rather than a guessed 0.
+  const stuckCount = live.anomalies && live.anomalies.stuckCount;
+  const anomaliesKnown = stuckCount != null;
+  tiles.push(statTile(
+    anomaliesKnown ? (stuckCount === 0 ? 'None' : escapeHtml(String(stuckCount))) : awaiting,
+    'Active anomalies',
+    anomaliesKnown ? (stuckCount > 0 ? 'Stuck agent(s) detected' : 'No stuck agents at last check') : null,
+    !anomaliesKnown
   ));
 
   document.getElementById('statRow').innerHTML = tiles.join('');
@@ -1014,7 +1035,7 @@ function renderPositionSizing(data, clientDrawdownHistory, clientRobustnessHisto
 // (account-core.test.js) instead of only ever running live once a real
 // position feed exists. See that file's own header comment for the real bug
 // this already caused with no test coverage.
-const { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals } = AlphaAccountCore;
+const { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct } = AlphaAccountCore;
 
 // server.js's /equity-history proxy (see mapEquityCurve's own comment there)
 // forwards the raw real equity readings its drawdown calculation already
@@ -1119,10 +1140,21 @@ function renderAccount(data) {
 // green/red color coding so a scan across many rows reads winners and
 // losers instantly rather than requiring reading each sign. Sorted by
 // market value (server-side) so the biggest real exposure leads.
+// Single-position concentration risk is a standard trading/portfolio risk-
+// dashboard threshold (any single name above roughly 5% of the account gets
+// a second look, 10%+ is commonly flagged outright as concentrated), so the
+// column reuses this page's existing amber "caution" treatment (the same
+// color as a stale connection or a pending architecture feature) at 10% and
+// above rather than inventing a new color for a new kind of warning.
+const POSITION_CONCENTRATION_CAUTION_PCT = 10;
+
 function renderPositions(data) {
   const panel = document.getElementById('positionsPanel');
   const positions = (data.live && Array.isArray(data.live.positions)) ? data.live.positions : [];
+  const acct = data.live && data.live.account;
+  const equity = (acct && typeof acct.equity === 'number' && Number.isFinite(acct.equity)) ? acct.equity : null;
   lastPositionsSnapshot = positions;
+  lastPositionsEquitySnapshot = equity;
 
   const csvBtn = document.getElementById('positionsCsvBtn');
   if (csvBtn) {
@@ -1149,6 +1181,13 @@ function renderPositions(data) {
     // value's dash would have been colored red, falsely reading as "losing".
     const plIsNumber = typeof p.unrealizedPl === 'number' && Number.isFinite(p.unrealizedPl);
     const goodClass = plIsNumber ? (p.unrealizedPl >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
+    const concPct = positionConcentrationPct(p.marketValue, equity);
+    const concHigh = concPct != null && concPct >= POSITION_CONCENTRATION_CAUTION_PCT;
+    const concText = concPct != null ? concPct.toFixed(1) + '%' : '-';
+    const concTitle = concPct != null
+      ? escapeHtml(p.symbol) + ' is ' + concPct.toFixed(1) + '% of account equity' +
+        (concHigh ? ', at or above the ' + POSITION_CONCENTRATION_CAUTION_PCT + '% single-position concentration threshold' : '')
+      : 'Awaiting a real equity reading to compute this against';
     return `
       <tr>
         <td class="pos-symbol font-mono">${escapeHtml(p.symbol)}</td>
@@ -1160,6 +1199,7 @@ function renderPositions(data) {
         <td class="font-mono pos-num ${goodClass}">${escapeHtml(fmtDollar(p.unrealizedPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(p.unrealizedPlPct) || '')}</span>
         </td>
+        <td class="font-mono pos-num${concHigh ? ' pos-conc-high' : ''}" title="${concTitle}">${escapeHtml(concText)}</td>
       </tr>
     `;
   }).join('');
@@ -1172,6 +1212,11 @@ function renderPositions(data) {
   let totalsRow = '';
   if (totalsKnown) {
     const totalGoodClass = totalPl >= 0 ? 'pl-good' : 'pl-bad';
+    // The totals row's own "% of equity" cell is exactly computeExposure's
+    // pctDeployed (already shown as the Account section's "Invested" tile,
+    // see renderAccount above), reused rather than re-derived, so the two
+    // never have a chance to silently disagree.
+    const { pctDeployed } = computeExposure(equity != null ? { equity } : null, positions);
     totalsRow = `
       <tr class="pos-totals-row">
         <td class="font-mono" colspan="5">Total (${positions.length} position${positions.length === 1 ? '' : 's'})</td>
@@ -1179,6 +1224,7 @@ function renderPositions(data) {
         <td class="font-mono pos-num ${totalGoodClass}">${escapeHtml(fmtDollar(totalPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(totalPlPct) || '')}</span>
         </td>
+        <td class="font-mono pos-num">${pctDeployed != null ? escapeHtml(pctDeployed.toFixed(1) + '%') : '-'}</td>
       </tr>
     `;
   }
@@ -1188,7 +1234,7 @@ function renderPositions(data) {
       <table class="pos-table">
         <thead>
           <tr>
-            <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg entry</th><th>Current</th><th>Mkt value</th><th>Unrealized P&amp;L</th>
+            <th scope="col">Symbol</th><th scope="col">Side</th><th scope="col">Qty</th><th scope="col">Avg entry</th><th scope="col">Current</th><th scope="col">Mkt value</th><th scope="col">Unrealized P&amp;L</th><th scope="col" title="Real position market value as a percentage of real account equity, computed client-side from the two figures this page already has">% of equity</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -1606,7 +1652,7 @@ refreshServiceWorkerDiagnostic();
 // that is simply informational rather than good or bad on its own.
 function diagnosticRow(label, status, badgeText, detail) {
   const badgeClass = status === 'ok' ? 'badge-active' : status === 'blocked' ? 'badge-pending' : 'badge-retired';
-  return `<tr><th>${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
+  return `<tr><th scope="row">${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
 }
 
 function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount) {
@@ -1863,6 +1909,12 @@ let lastRawData = null;
 // reading forward.
 let lastPositionsSnapshot = [];
 
+// The real equity figure the concentration column below is computed
+// against, captured alongside lastPositionsSnapshot at the same render so
+// the CSV export can reproduce the exact same per-row percentages already
+// on screen, never a second fetch or a stale equity reading.
+let lastPositionsEquitySnapshot = null;
+
 async function loadStatus() {
   const requestId = ++latestStatusRequestId;
   try {
@@ -2045,6 +2097,7 @@ function buildStatusSummary(data) {
     '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),
     '- Robustness score: ' + (typeof ps.robustnessScore === 'number' ? ps.robustnessScore + '/100' : awaiting),
     '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active) ? 'Active' : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
+    '- Active anomalies: ' + ((live.anomalies && live.anomalies.stuckCount != null) ? String(live.anomalies.stuckCount) : awaiting),
     '- Genealogy: ' + (() => {
       const g = live.genealogy || {};
       if (g.generation == null && g.lastBreedingEventAt == null) return awaiting;
@@ -2126,34 +2179,32 @@ backupBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-function csvField(v) {
-  let s = v == null ? '' : String(v);
-  // CSV/formula injection (OWASP): a value starting with =, +, -, @, tab, or
-  // a carriage return is read as a live formula by Excel/Sheets when this
-  // export is opened there, not as plain text. Same leading-quote mitigation
-  // as the other hubs' own CSV exports, even though every field here comes
-  // from Alpha's own real feed rather than free-text entry, since a symbol
-  // or side string is still attacker-shaped input from this page's own
-  // point of view.
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+// Extracted to data/export-core.js so its formula-injection guard has a
+// real regression test instead of only ever running live in a browser.
+const { csvField } = AlphaExportCore;
 
 const POSITIONS_CSV_COLUMNS = [
   ['symbol', 'Symbol'], ['side', 'Side'], ['qty', 'Qty'], ['avgEntryPrice', 'Avg entry'],
   ['currentPrice', 'Current'], ['marketValue', 'Mkt value'], ['unrealizedPl', 'Unrealized P&L'],
-  ['unrealizedPlPct', 'Unrealized P&L %']
+  ['unrealizedPlPct', 'Unrealized P&L %'], ['concentrationPct', '% of equity']
 ];
 
 // Exports exactly the real open positions currently on screen, read straight
 // from lastPositionsSnapshot (the same array renderPositions just rendered),
 // never a second fetch or a reconstructed copy. Read-only like every other
 // button on this page: it only ever downloads a file to this browser, never
-// writes anything back to Alpha.
+// writes anything back to Alpha. concentrationPct isn't a real field on the
+// position itself (see the % of equity column comment in renderPositions),
+// so it's computed here from the same lastPositionsEquitySnapshot captured
+// at that same render, never a second, possibly-drifted equity reading.
 document.getElementById('positionsCsvBtn').addEventListener('click', () => {
   if (!lastPositionsSnapshot.length) return;
   const header = POSITIONS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
-  const lines = lastPositionsSnapshot.map(p => POSITIONS_CSV_COLUMNS.map(([key]) => csvField(p[key])).join(','));
+  const lines = lastPositionsSnapshot.map(p => POSITIONS_CSV_COLUMNS.map(([key]) => csvField(
+    key === 'concentrationPct'
+      ? (positionConcentrationPct(p.marketValue, lastPositionsEquitySnapshot) ?? '')
+      : p[key]
+  )).join(','));
   const csv = [header, ...lines].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -2291,7 +2342,7 @@ document.addEventListener('keydown', (e) => {
 // content, even though this page has no free-text input today, so a future
 // one doesn't silently start eating keystrokes.
 document.addEventListener('keydown', (e) => {
-  if (shortcutsOpen) return;
+  if (shortcutsOpen || jumpNavOpen) return;
   const active = document.activeElement;
   const tag = active && active.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -2314,11 +2365,118 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Jump-to-section nav, same markup/behavior as Garage/Sondrik/CGT/CSM/Job
+// Search's: this page runs 10 real sections including the changelog, with
+// no sticky header once the critical bar isn't showing, so this is the one
+// way back to a specific section without scrolling blind. Built from the
+// real on-page section titles at load time, no separate list to keep in
+// sync by hand as sections get added.
+let jumpNavOpen = false;
+let jumpNavLastFocusedEl = null;
+
+function collectJumpSections() {
+  const usedIds = new Set();
+  return Array.from(document.querySelectorAll('main > section')).map((section) => {
+    if (section.hidden) return null;
+    const titleEl = section.querySelector('h2.section-title, summary.section-title');
+    if (!titleEl) return null;
+    // Strip this page's own live badges (the Data Quality/Activity-log/
+    // Architecture-verified counts, and the "LAST KNOWN" tags on Summary/
+    // Position sizing/Genealogy) so the label stays a stable section name
+    // instead of picking up their ever-changing text.
+    const clone = titleEl.cloneNode(true);
+    clone.querySelectorAll('.section-title-meta, .lastknown-tag').forEach(el => el.remove());
+    const label = clone.textContent.replace(/\s+/g, ' ').trim();
+    if (!label) return null;
+    if (!section.id) {
+      let slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'section';
+      let candidate = 'jump-' + slug;
+      let n = 2;
+      while (usedIds.has(candidate) || document.getElementById(candidate)) {
+        candidate = 'jump-' + slug + '-' + n;
+        n++;
+      }
+      section.id = candidate;
+    }
+    usedIds.add(section.id);
+    return { id: section.id, label };
+  }).filter(Boolean);
+}
+
+function renderJumpNavList() {
+  const sections = collectJumpSections();
+  document.getElementById('jumpNavList').innerHTML = sections.map(s =>
+    '<a class="jump-nav-link" href="#' + s.id + '" data-jump-target="' + s.id + '">' + escapeHtml(s.label) + '</a>'
+  ).join('');
+}
+
+function getJumpNavFocusable() {
+  return Array.from(document.getElementById('jumpNavModal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function openJumpNav() {
+  if (jumpNavOpen) return;
+  jumpNavOpen = true;
+  jumpNavLastFocusedEl = document.activeElement;
+  renderJumpNavList();
+  document.getElementById('jumpNavOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('jumpNavClose').focus();
+}
+
+function closeJumpNav() {
+  if (!jumpNavOpen) return;
+  jumpNavOpen = false;
+  document.getElementById('jumpNavOverlay').hidden = true;
+  unlockBodyScroll();
+  if (jumpNavLastFocusedEl && typeof jumpNavLastFocusedEl.focus === 'function') jumpNavLastFocusedEl.focus();
+  jumpNavLastFocusedEl = null;
+}
+
+document.getElementById('jumpNavBtn').addEventListener('click', openJumpNav);
+document.getElementById('jumpNavClose').addEventListener('click', closeJumpNav);
+document.getElementById('jumpNavOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'jumpNavOverlay') closeJumpNav();
+});
+document.getElementById('jumpNavList').addEventListener('click', (e) => {
+  const link = e.target.closest('.jump-nav-link');
+  if (!link) return;
+  e.preventDefault();
+  const target = document.getElementById(link.dataset.jumpTarget);
+  closeJumpNav();
+  if (target) {
+    // The scroll-lock release above needs a frame to settle, starting the
+    // smooth scroll before that clobbers it.
+    requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!jumpNavOpen) return;
+  if (e.key === 'Escape') { closeJumpNav(); return; }
+  if (e.key === 'Tab') {
+    const focusable = getJumpNavFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
+
 // This is a glance-at-status page Jack checks without leaving Command
 // Center, so it re-reads status.json on its own rather than requiring a
 // manual reload. Purely a re-fetch of the same read-only file, paused
 // while the tab is hidden so it never runs pointlessly in the background.
 const REFRESH_INTERVAL_MS = 30000;
+let nextAutoRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
 setInterval(() => {
   if (document.visibilityState === 'visible') {
     loadStatus();
@@ -2327,7 +2485,29 @@ setInterval(() => {
     // the same cadence rather than piggybacking on loadStatus succeeding.
     renderMarketStatus();
   }
+  nextAutoRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
 }, REFRESH_INTERVAL_MS);
+
+// Visible companion to the auto-refresh above: without it, the 30s poll is
+// invisible until a value happens to change, and there's no way to tell "the
+// page is quietly staying current" from "the page stopped updating". Plain
+// countdown text next to Refresh, real status-page convention. Reflects this
+// interval's real schedule (not reset by a manual click, since the interval
+// above isn't either) and goes blank whenever it wouldn't be true: tab
+// hidden (the tick above is skipped then, per the comment on it) or a manual
+// refresh already in flight.
+const nextRefreshEl = document.getElementById('connNextRefresh');
+function renderNextRefreshCountdown() {
+  if (!nextRefreshEl) return;
+  if (document.visibilityState !== 'visible' || refreshBtn.disabled) {
+    nextRefreshEl.textContent = '';
+    return;
+  }
+  const secs = Math.max(0, Math.ceil((nextAutoRefreshAt - Date.now()) / 1000));
+  nextRefreshEl.textContent = 'Next check in ' + secs + 's';
+}
+setInterval(renderNextRefreshCountdown, 1000);
+renderNextRefreshCountdown();
 
 // The interval above only fires while the tab is visible, so a tab left
 // hidden for a while (Jack tabs away, comes back) can show a reading up to

@@ -41,6 +41,30 @@
   const RELIST_FRESH_DAYS = 30;
   const POSHMARK_HOLD_DAYS = 60;
 
+  // eBay's final value fee is not one flat percentage across every
+  // category. Most categories, including Consumer Electronics, charge the
+  // 13.6% standard rate; Clothing, Shoes & Accessories charges 15.3%
+  // instead (eBay raised it from 15% to 15.3% during 2026, per eBay's own
+  // published seller fee schedule as of September 2026). Both real live
+  // boots listings are "shoes", so 15.3% is the rate that actually applies
+  // to them, not the standard one, an earlier version of this file charged
+  // them 13.6% and undercounted both listings' real net payout by it. This
+  // is a genuine eBay-published category rate, and a different number from
+  // the ~14.9% figure an earlier bug (fb89c3e, reverted at d1d3c45) briefly
+  // charged the "shoes" category: that number was never a real category
+  // rate at all, just a small sale's *effective* rate once the flat
+  // per-order fee gets folded in (13.6% + $0.40 on a $30 sale works out to
+  // ~14.9% of the total). The only other shoes-specific number on this page
+  // is the unrelated *lower* 8% rate for qualifying athletic shoes sold at
+  // $150+, which doesn't apply to either real boots listing here (both are
+  // under $150 and non-athletic).
+  const EBAY_STANDARD_RATE = 0.136;
+  const EBAY_CATEGORY_RATES = { shoes: 0.153 };
+
+  function ebayFinalValueRate(category) {
+    return EBAY_CATEGORY_RATES[category] || EBAY_STANDARD_RATE;
+  }
+
   // Standard published 2026 seller fee schedules, not a live account
   // connection. eBay moved to managed payments years ago: the final value
   // fee is one combined rate with no separate card-processing surcharge on
@@ -50,17 +74,8 @@
   function estimateNetPayout(platform, price, category) {
     if (price == null) return null;
     switch (platform) {
-      // Clothing, Shoes & Accessories is one of eBay's standard-rate
-      // categories, 13.6% same as most others, not a higher rate of its own
-      // (eBay's published seller fee schedule; the only shoes-specific
-      // exception is a *lower* 8% rate for qualifying athletic shoes sold at
-      // $150+, which doesn't apply to either real boots listing here). An
-      // earlier version of this charged the "shoes" category 14.9%, mixing
-      // up that flat rate with the effective rate a small sale gets once the
-      // fixed per-order fee is folded in (13.6% + $0.40 on a $30 sale really
-      // is ~14.9% of the total), which isn't a category-specific number.
       case 'ebay':
-        return price - (price * 0.136 + (price > 10 ? 0.40 : 0.30));
+        return price - (price * ebayFinalValueRate(category) + (price > 10 ? 0.40 : 0.30));
       case 'vinted': return price;
       case 'poshmark': return price < 15 ? price - 2.95 : price * 0.80;
       case 'depop': return price - (price * 0.033 + 0.45);
@@ -68,10 +83,11 @@
     }
   }
 
-  function ebayMinPriceForNet(targetNet) {
-    const lowStep = (targetNet + 0.30) / (1 - 0.136);
+  function ebayMinPriceForNet(targetNet, category) {
+    const rate = ebayFinalValueRate(category);
+    const lowStep = (targetNet + 0.30) / (1 - rate);
     if (lowStep <= 10) return lowStep;
-    return (targetNet + 0.40) / (1 - 0.136);
+    return (targetNet + 0.40) / (1 - rate);
   }
 
   function depopMinPriceForNet(targetNet, applyBoost) {
@@ -89,9 +105,30 @@
     return targetNet / 0.80;
   }
 
-  function minListingPriceForNet(platform, targetNet, applyBoost) {
+  // Consecutive days of at least one logged Poshmark share, walking back
+  // from today through the real logged dates only, never assuming an
+  // ungapped day was actually shared. A day not logged yet stays inside the
+  // streak until it's actually over, so opening this page in the morning
+  // before today's first share doesn't read as a broken streak. todayStr is
+  // passed in rather than read from the real clock here, the same reason
+  // every other date function in this file takes its "today" as an argument:
+  // a pure function of its inputs can actually be unit-tested against a
+  // fixed date instead of only ever running live against whatever day it
+  // happens to be.
+  function computePoshmarkShareStreak(log, todayStr) {
+    let cursor = todayStr;
+    if (!log[cursor]) cursor = addDaysToDateStr(cursor, -1);
+    let streak = 0;
+    while (log[cursor]) {
+      streak++;
+      cursor = addDaysToDateStr(cursor, -1);
+    }
+    return streak;
+  }
+
+  function minListingPriceForNet(platform, targetNet, applyBoost, category) {
     switch (platform) {
-      case 'ebay': return ebayMinPriceForNet(targetNet);
+      case 'ebay': return ebayMinPriceForNet(targetNet, category);
       case 'vinted': return targetNet;
       case 'poshmark': return poshmarkMinPriceForNet(targetNet);
       case 'depop': return depopMinPriceForNet(targetNet, applyBoost);
@@ -103,6 +140,60 @@
     const d = new Date(dateStr + 'T00:00:00');
     d.setDate(d.getDate() + days);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // Real IRS-published standard business mileage rates for 2026: 72.5
+  // cents/mi Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 -
+  // Dec 31 announced 2026-07-13 due to fuel prices (irs.gov/newsroom: "IRS
+  // sets 2026 business standard mileage rate at 72.5 cents per mile" and
+  // "IRS Increases Standard Mileage Rate for Second Half of 2026"). This
+  // used to be copy-pasted into both app.js and validate.js separately with
+  // a comment on each saying "kept in sync with the other one", the same
+  // manual-sync shape as the eBay-fee and Poshmark-deadline bugs above, so
+  // it lives here once instead and both files require it from here. Only
+  // 2026 is a real published rate right now, an expense dated outside it
+  // gets an honest "no rate known" rather than reusing the wrong year's
+  // number.
+  const MILEAGE_RATES_2026 = [
+    { from: '2026-01-01', to: '2026-06-30', rate: 0.725 },
+    { from: '2026-07-01', to: '2026-12-31', rate: 0.76 }
+  ];
+  function irsMileageRateForDate(dateStr) {
+    if (!dateStr) return null;
+    const hit = MILEAGE_RATES_2026.find(r => dateStr >= r.from && dateStr <= r.to);
+    return hit ? hit.rate : null;
+  }
+
+  // A mileage expense with real miles and a real date but no computed amount
+  // has two very different causes that otherwise render identically as "not
+  // logged": a genuine backfill gap (no miles/date logged yet), or this
+  // table itself being out of date (dated after MILEAGE_RATES_2026's last
+  // known range, e.g. once 2027 starts and the IRS hasn't published or this
+  // table hasn't been updated with next year's rate yet). Only the second
+  // one is "the app's own fault, not a logging mistake", so it gets a
+  // distinct, specific message instead of leaving the two indistinguishable.
+  function mileageRateGapReason(e) {
+    if (e.amount != null || e.category !== 'mileage' || e.miles == null || !e.date) return null;
+    if (irsMileageRateForDate(e.date) != null) return null;
+    const lastKnown = MILEAGE_RATES_2026[MILEAGE_RATES_2026.length - 1].to;
+    if (e.date > lastKnown) {
+      return `No IRS rate known past ${lastKnown}, this tool's rate table only has 2026 rates in it. Log a real ` +
+        `manual amount, or add the newly published rate to MILEAGE_RATES_2026 once the IRS announces it.`;
+    }
+    return `No IRS rate known for ${e.date}, this tool's rate table only has 2026 rates in it. Log a real manual amount instead.`;
+  }
+
+  // A logged "amount" always wins (it's a real number someone entered), a
+  // mileage entry with no amount falls back to computing one from real
+  // miles at the real rate for its real date, everything else with no
+  // amount stays honestly un-computable (null) rather than assumed $0.
+  function computeExpenseAmount(e) {
+    if (e.amount != null) return e.amount;
+    if (e.category === 'mileage' && e.miles != null && e.date) {
+      const rate = irsMileageRateForDate(e.date);
+      return rate != null ? e.miles * rate : null;
+    }
+    return null;
   }
 
   // Real response-clock math for the two platforms with a published fixed
@@ -225,13 +316,126 @@
     return parts.length ? parts : [{ tier: 'unknown', text: 'nothing left to relist' }];
   }
 
+  // Real reseller counteroffer-ladder convention: accept a near-target offer
+  // outright, counter a good-but-low one once splitting the gap, and let a
+  // borderline offer's split depend on how long the item's actually been
+  // listed (reusing RELIST_FRESH_DAYS above, a stale listing has more to gain
+  // from finally moving than a fresh one does from holding the line). This
+  // was inline-only in app.js's renderOfferGuide, the exact same untested,
+  // branchy real-dollar shape as the bugs listed in this file's header
+  // comment (a wrong branch here would suggest a real dollar counteroffer to
+  // send a real buyer), so it lives here now with the rest of that math.
+  const OFFER_TIER_ACCEPT_PCT = 0.90;
+  const OFFER_TIER_COUNTER_PCT = 0.75;
+  const OFFER_TIER_BORDERLINE_PCT = 0.50;
+
+  function offerTier(pct) {
+    if (pct >= OFFER_TIER_ACCEPT_PCT) return 'accept';
+    if (pct >= OFFER_TIER_COUNTER_PCT) return 'counter';
+    if (pct >= OFFER_TIER_BORDERLINE_PCT) return 'borderline';
+    return 'decline';
+  }
+
+  // Returns the suggested counter dollar amount, or null for a tier with
+  // nothing to counter (accept it outright, or decline without countering).
+  // A borderline offer with no logged listing date defaults to the same
+  // firmer split as a genuinely fresh listing, never the stale-listing split,
+  // since there's no real evidence yet that it's actually been sitting.
+  function offerCounterAmount(tier, offer, asking, days) {
+    if (tier === 'counter') return offer + (asking - offer) * 0.5;
+    if (tier === 'borderline') {
+      return days != null && days >= RELIST_FRESH_DAYS
+        ? offer + (asking - offer) * 0.25
+        : offer + (asking - offer) * 0.75;
+    }
+    return null;
+  }
+
+  // Real, published, count-based requirements toward eBay's Top Rated Seller
+  // tier and Depop's Top Seller tier (see the "Seller status & standards, by
+  // platform" reference table on the page), the only two platforms whose
+  // status tier has a real numeric threshold this dashboard already logs
+  // enough to compute: a trailing-12-month transaction count and dollar
+  // volume for eBay, a rolling-30-day dollar volume for Depop, both read
+  // straight from real sales.json rows. Vinted and Poshmark's tiers key off
+  // a star rating and review count this dashboard has no data source for, so
+  // they stay reference-only rather than guessing a number. Neither eBay's
+  // defect-rate/late-shipment-rate requirements nor Depop's on-time-shipping
+  // requirement are computed either, both need real per-order ship
+  // timestamps this dashboard doesn't log; the case-outcome rate below is
+  // the one real proxy actually buildable from what disputes.json tracks.
+  const EBAY_TRS_WINDOW_DAYS = 365;
+  const EBAY_TRS_TRANSACTIONS_TARGET = 100;
+  const EBAY_TRS_GROSS_SALES_TARGET = 1000;
+  const DEPOP_TOP_SELLER_WINDOW_DAYS = 30;
+  const DEPOP_TOP_SELLER_GROSS_SALES_TARGET = 1000;
+
+  function salesInWindow(sales, platform, todayStr, windowDays) {
+    const start = addDaysToDateStr(todayStr, -windowDays);
+    return (sales || []).filter(s => s.platform === platform && s.saleDate && s.saleDate >= start && s.saleDate <= todayStr);
+  }
+
+  function disputesInWindow(disputes, platform, todayStr, windowDays) {
+    const start = addDaysToDateStr(todayStr, -windowDays);
+    return (disputes || []).filter(d => d.platform === platform && d.openedDate && d.openedDate >= start && d.openedDate <= todayStr);
+  }
+
+  // A case resolved in the buyer's favor, or split, is the one outcome that
+  // counts against a seller's standing on both platforms below; a case still
+  // open or resolved for the seller doesn't. "resolved-buyer"/"resolved-split"
+  // are the exact status values the quick-log dispute tool already writes,
+  // see the ndStatus options in index.html.
+  function isNonSellerResolved(d) {
+    return d.status === 'resolved-buyer' || d.status === 'resolved-split';
+  }
+
+  // Returns null (not 0) for a rate with no real transactions to divide by
+  // yet, same "unknown, not zero" rule daysSincePublished above follows, so
+  // an empty sales log reads as "no data yet" rather than a clean 0% record.
+  function nonSellerResolvedRate(disputes, sales) {
+    return sales.length > 0 ? disputes.filter(isNonSellerResolved).length / sales.length : null;
+  }
+
+  function ebayTrsProgress(sales, disputes, todayStr) {
+    const windowSales = salesInWindow(sales, 'ebay', todayStr, EBAY_TRS_WINDOW_DAYS);
+    const windowDisputes = disputesInWindow(disputes, 'ebay', todayStr, EBAY_TRS_WINDOW_DAYS);
+    const transactions = windowSales.length;
+    const grossSales = windowSales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+    return {
+      windowDays: EBAY_TRS_WINDOW_DAYS,
+      transactions, transactionsTarget: EBAY_TRS_TRANSACTIONS_TARGET,
+      grossSales, grossSalesTarget: EBAY_TRS_GROSS_SALES_TARGET,
+      nonSellerResolvedRate: nonSellerResolvedRate(windowDisputes, windowSales),
+      meetsCountTargets: transactions >= EBAY_TRS_TRANSACTIONS_TARGET && grossSales >= EBAY_TRS_GROSS_SALES_TARGET
+    };
+  }
+
+  function depopTopSellerProgress(sales, disputes, todayStr) {
+    const windowSales = salesInWindow(sales, 'depop', todayStr, DEPOP_TOP_SELLER_WINDOW_DAYS);
+    const windowDisputes = disputesInWindow(disputes, 'depop', todayStr, DEPOP_TOP_SELLER_WINDOW_DAYS);
+    const grossSales = windowSales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+    return {
+      windowDays: DEPOP_TOP_SELLER_WINDOW_DAYS,
+      grossSales, grossSalesTarget: DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
+      nonSellerResolvedRate: nonSellerResolvedRate(windowDisputes, windowSales),
+      meetsCountTargets: grossSales >= DEPOP_TOP_SELLER_GROSS_SALES_TARGET
+    };
+  }
+
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
-    POSHMARK_WEIGHT_TIERS,
-    estimateNetPayout,
+    POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
+    estimateNetPayout, ebayFinalValueRate,
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
+    MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
     remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
-    poshmarkWeightTier, bundleNetComparison
+    poshmarkWeightTier, bundleNetComparison,
+    computePoshmarkShareStreak,
+    OFFER_TIER_ACCEPT_PCT, OFFER_TIER_COUNTER_PCT, OFFER_TIER_BORDERLINE_PCT,
+    offerTier, offerCounterAmount,
+    EBAY_TRS_WINDOW_DAYS, EBAY_TRS_TRANSACTIONS_TARGET, EBAY_TRS_GROSS_SALES_TARGET,
+    DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
+    ebayTrsProgress, depopTopSellerProgress
   };
 });

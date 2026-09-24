@@ -38,6 +38,10 @@
       "active": false,
       "blockedOn": "API key"
     },
+    "anomalies": {
+      "stuckCount": null,
+      "checkedAt": null
+    },
     "account": null,
     "positions": [],
     "genealogy": {

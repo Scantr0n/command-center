@@ -16,6 +16,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <script src="/vendor/d3-force-selection-zoom.min.js"></script>
+<script src="/data/dashboard-core.js"></script>
+<script src="/data/graph-core.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -187,6 +189,25 @@
     }
     #categoryFilterRow::-webkit-scrollbar { display: none; }
     #categoryFilterRow .tag-chip { flex-shrink: 0; }
+  }
+
+  /* Fades the trailing edge of a horizontally-scrollable row so content cut
+     off at the visible edge reads as "scroll for more", not a stray
+     rendering bug. The category-chip row above gets away without this (a
+     chip's own rounded pill shape already reads as "cut off, more coming"
+     on its own), but a plain text label sliced mid-word, confirmed against
+     a real 390px-wide screenshot of #statsRow below ("NEEDS ATTENTIO" with
+     no ellipsis, "N" gone), reads as broken text instead. initEdgeFade (see
+     script below) clears the fade the moment a row's real content stops
+     overflowing or has been scrolled all the way to its real end, so this
+     never lies about content that's already fully visible. */
+  .edge-fade-x {
+    mask-image: linear-gradient(to right, black calc(100% - 22px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 22px), transparent 100%);
+  }
+  .edge-fade-x.edge-fade-x-none {
+    mask-image: none;
+    -webkit-mask-image: none;
   }
 
   /* Atmosphere behind the graph: real dark-space gradient + radar grid.
@@ -551,7 +572,7 @@
           <span>Jump to</span>
           <kbd id="paletteBtnKbd" class="kbd-chip text-[10px]" style="color: var(--sub)" aria-hidden="true">&#8984;K</kbd>
         </button>
-        <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right"></div>
+        <div id="statsRow" class="flex items-center gap-3 sm:gap-5 text-right edge-fade-x"></div>
         <div id="driveStatusBadge" class="hidden items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border" style="color: #E0807A; background: #E04A4A1A; border-color: #E04A4A40"></div>
         <div id="viewToggleGroup" class="flex items-center border rounded-lg overflow-hidden font-mono text-xs hairline" role="group" aria-label="View">
           <button id="viewGraphBtn" class="view-toggle-btn active px-3 py-1.5" aria-pressed="true">Graph</button>
@@ -608,7 +629,7 @@
       <span>Same shape as each node's own status dot, not just color &middot; Closer to hub = higher priority &middot; Dashed ring = top priority &middot; Grouped by category</span>
     </div>
 
-    <div id="categoryFilterRow" class="flex flex-wrap items-center gap-2 mb-4" role="group" aria-label="Filter by category"></div>
+    <div id="categoryFilterRow" class="flex flex-wrap items-center gap-2 mb-4 edge-fade-x" role="group" aria-label="Filter by category"></div>
 
     <div id="noResultsMsg" class="hidden items-center justify-between gap-3 rounded-lg px-4 py-3 border hairline mb-4 text-sm" style="background: rgba(255,255,255,0.02); color: var(--sub)">
       <span id="noResultsText"></span>
@@ -763,6 +784,42 @@
   </div>
 
 <script>
+// Staleness/grid-sort math lives in dashboard-core.js, graph layout/curve
+// collision math lives in graph-core.js, both loaded before this script
+// (see <head>), so they can be unit-tested outside the browser. If either
+// fails to load (a network blip on a first, not-yet-cached visit, an ad
+// blocker, a bad deploy that drops one file), the destructure below would
+// otherwise throw and silently abort this entire script, leaving the page
+// stuck on its static skeleton placeholders forever. This makes that
+// failure visible instead.
+const CORE_SCRIPTS = [
+  ['DashboardCore', 'dashboard-core.js'],
+  ['GraphCore', 'graph-core.js']
+];
+const missingCoreScript = CORE_SCRIPTS.find(([globalName]) => typeof window[globalName] === 'undefined');
+if (missingCoreScript) {
+  const errBox = document.getElementById('errorBanner');
+  if (errBox) {
+    errBox.textContent = `Page failed to load fully (${missingCoreScript[1]} did not load). Reload the page.`;
+    errBox.classList.remove('hidden');
+  }
+  throw new Error(`index.html: ${missingCoreScript[1]} did not load, aborting init`);
+}
+const {
+  daysAgoLocal,
+  shortRelativeTime,
+  relativeTime,
+  isStale,
+  sortForGrid: sortForGridCore
+} = window.DashboardCore;
+const {
+  groupByCategory,
+  priorityOrbit,
+  nodeRadius,
+  curveMinClearance,
+  computeRelationBulge
+} = window.GraphCore;
+
 let clusters = [];
 let activeCluster = null;
 let activityFeedExpanded = false;
@@ -776,7 +833,6 @@ let chatSessionId = 0;
 let currentView = 'graph';
 let lastFocusedEl = null;
 
-const CATEGORY_ORDER = ['Ventures & Business', 'Trading', 'Content', 'Reselling', 'School & Career', 'Health & Personal', 'Travel & Logistics', 'Personal & Infra', 'Uncategorized'];
 const CATEGORY_COLOR = {
   'Ventures & Business': '#D9A441',
   'Trading': '#3DDC84',
@@ -1092,6 +1148,29 @@ window.addEventListener('afterprint', () => {
   renderActivityFeed();
 });
 
+// Pairs with the .edge-fade-x CSS rule above: clears the trailing-edge fade
+// the instant a horizontally-scrollable row's real content stops
+// overflowing its own box (most viewport widths, where flex-wrap wraps
+// instead of scrolling) or has actually been scrolled all the way to its
+// real end, so the fade never implies there's more to see when there isn't.
+// Self-registers its own scroll/resize listeners once per element (guarded
+// by dataset.edgeFadeWired) since renderStats/renderCategoryFilter rebuild
+// this same element's innerHTML on every poll, not just once on load.
+function updateEdgeFadeNow(el) {
+  if (!el) return;
+  const maxScroll = el.scrollWidth - el.clientWidth;
+  const atEnd = el.scrollLeft >= maxScroll - 1;
+  el.classList.toggle('edge-fade-x-none', maxScroll <= 1 || atEnd);
+}
+function initEdgeFade(el) {
+  if (!el) return;
+  updateEdgeFadeNow(el);
+  if (el.dataset.edgeFadeWired) return;
+  el.dataset.edgeFadeWired = '1';
+  el.addEventListener('scroll', () => updateEdgeFadeNow(el), { passive: true });
+  window.addEventListener('resize', () => updateEdgeFadeNow(el));
+}
+
 function renderStats() {
   const total = clusters.length;
   const active = clusters.filter(c => c.status === 'active').length;
@@ -1132,11 +1211,11 @@ function renderStats() {
     </div>
     <button type="button" id="attnStatBtn" class="stat-tile stat-tile-btn flex items-center gap-2"
       ${attention ? '' : 'disabled'}
-      aria-label="${attention ? `View the ${attention} project${attention === 1 ? '' : 's'} that need attention` : 'No projects need attention right now'}">
+      aria-label="${attention} needs attention${attention ? `, view the flagged project${attention === 1 ? '' : 's'}` : ' right now'}">
       <span class="stat-badge" style="background: ${attnColor}1F; color: ${attnColor}">${statIcon(ICON_ALERT)}</span>
       <div class="text-left">
         <div class="font-display font-bold text-lg leading-none" style="color: ${attnColor}">${attention}</div>
-        <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">NEEDS ATTN</div>
+        <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">NEEDS ATTENTION</div>
       </div>
     </button>
     <div class="stat-tile flex items-center gap-2" title="The most recent lastUpdate date logged on any project's own status entry, not a sync timestamp - this page has no separate sync step of its own to report, and real code/feature activity (see Recent Commits above) can be more current than any project's own status note.">
@@ -1147,6 +1226,7 @@ function renderStats() {
       </div>
     </div>
   `;
+  initEdgeFade(document.getElementById('statsRow'));
 
   if (attention) {
     document.getElementById('attnStatBtn').addEventListener('click', () => {
@@ -1625,26 +1705,10 @@ function nodeLabelWord(name) {
   return words[0];
 }
 
-function groupByCategory(list) {
-  const map = {};
-  list.forEach(c => {
-    const cat = c.category || 'Uncategorized';
-    (map[cat] = map[cat] || []).push(c);
-  });
-  const keys = [
-    ...CATEGORY_ORDER.filter(k => map[k]),
-    ...Object.keys(map).filter(k => !CATEGORY_ORDER.includes(k))
-  ];
-  return keys.map(k => ({ category: k, items: map[k] }));
-}
-
-function priorityOrbit(priority) {
-  return priority === 'top' ? 235 : priority === 'low' ? 345 : 295;
-}
-
-function nodeRadius(priority) {
-  return priority === 'top' ? 34 : priority === 'low' ? 22 : 28;
-}
+// groupByCategory/priorityOrbit/nodeRadius now live in graph-core.js
+// (destructured near the top of this script) so the sector-assignment and
+// orbit/radius lookups behind the graph's layout can be unit-tested outside
+// the browser.
 
 // One radial gradient per category, defined once and referenced by every
 // matching node's glow halo via url(#glow-<slug>), real bloom falloff
@@ -1694,26 +1758,11 @@ function ensureGraphDefs() {
   defs.innerHTML = gradients + hubGradients;
 }
 
-// Real collision check for a relation curve, not a guessed constant: samples
-// the actual quadratic bezier and measures clearance against every OTHER
-// node's real circle (never the curve's own two endpoints, which the curve
-// legitimately starts/ends inside of, that's fine, each node's own opaque
-// fill covers that on its own). Used by renderGraph to grow the bulge only
-// as far as a given curve actually needs, instead of one fixed number that
-// would either cut it close for a crowded pair or over-bulge an isolated one.
-function curveMinClearance(p0, p1, p2, otherNodes) {
-  let min = Infinity;
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12;
-    const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
-    const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
-    otherNodes.forEach(n => {
-      const clearance = Math.hypot(x - n.x, y - n.y) - n.radius;
-      if (clearance < min) min = clearance;
-    });
-  }
-  return min;
-}
+// curveMinClearance and computeRelationBulge (the perpendicular-offset/
+// outward-bow/bulge-growth math renderGraph uses below) now live in
+// graph-core.js, so the collision check behind every relation curve can be
+// unit-tested outside the browser. See that file's own comment for why
+// this matters: it's the fix for a real, previously-shipped bug.
 
 // Touch/tap fallback for the relation-line reason (see the #graphTooltip CSS
 // comment for why this exists, SVG <title> has no touch equivalent at all).
@@ -1753,6 +1802,54 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') hideRelationTooltip();
 });
+
+// Same roving-tabindex fix public/alpha/app.js's wireRovingTabindex already
+// applies to its connectivity/uptime strips (a real practical Tab-key
+// barrier, not just a formal WCAG gap), just never applied to the graph.
+// Category labels, relation lines, and cluster nodes are each rendered as
+// their own separate group of individually-focusable elements, so with the
+// default implicit tabindex a keyboard user has to Tab through every single
+// one (up to ~30+ stops at today's 22 clusters) just to get past the graph.
+// Roving tabindex (APG toolbar pattern) makes each group its own single tab
+// stop: arrow keys move within a group, Tab moves between groups or out.
+// Reset on every renderGraph() call (elements are rebuilt from scratch each
+// time), the container's own keydown listener wired once (dataset guard)
+// since #graphSvg itself persists across re-renders even though its
+// children don't.
+const GRAPH_ROVING_GROUPS = ['.cat-label', '.relation-line', '.graph-node'];
+
+function resetGraphRovingTabindex(svg) {
+  GRAPH_ROVING_GROUPS.forEach(selector => {
+    svg.selectAll(selector).nodes().forEach((el, i) => el.setAttribute('tabindex', i === 0 ? '0' : '-1'));
+  });
+}
+
+function wireGraphRovingKeydown(svg) {
+  const svgEl = svg.node();
+  if (svgEl.dataset.rovingWired) return;
+  svgEl.dataset.rovingWired = '1';
+  svgEl.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+    const groupSelector = GRAPH_ROVING_GROUPS.find(sel => document.activeElement.matches(sel));
+    if (!groupSelector) return;
+    // Excludes a dimmed/aria-hidden graph node from the arrow-key sequence
+    // too, not just from being the initial tab stop: cat-label/relation-line
+    // never set aria-hidden, so this is a no-op for those two groups.
+    const items = svg.selectAll(groupSelector).nodes().filter(el => el.getAttribute('aria-hidden') !== 'true');
+    const currentIndex = items.indexOf(document.activeElement);
+    if (currentIndex === -1) return;
+    let nextIndex = currentIndex;
+    if (event.key === 'ArrowLeft') nextIndex = Math.max(0, currentIndex - 1);
+    else if (event.key === 'ArrowRight') nextIndex = Math.min(items.length - 1, currentIndex + 1);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = items.length - 1;
+    if (nextIndex === currentIndex) return;
+    event.preventDefault();
+    items[currentIndex].setAttribute('tabindex', '-1');
+    items[nextIndex].setAttribute('tabindex', '0');
+    items[nextIndex].focus();
+  });
+}
 
 function renderGraph() {
   ensureGraphDefs();
@@ -1843,25 +1940,13 @@ function renderGraph() {
         || (other.relationReasons && other.relationReasons[c.id]);
       if (!realReason) return;
       seenPairs.add(pairKey);
-      // Bulge magnitude: the old fixed-12%-of-endpoint-distance formula
-      // shrinks to near-zero for two nodes that end up close together after
-      // the force simulation, leaving an almost-straight line with no real
-      // clearance from whatever else sits between them, that, combined
-      // with the node fill being translucent (fixed below), is what made
-      // lines visibly cut through unrelated circles. Enforcing a minimum
-      // pixel bulge, and always bowing away from the hub (toward open
-      // canvas) rather than in whichever perpendicular direction the raw
-      // coordinates happened to produce, gives every relation curve real
-      // clearance regardless of how close its two endpoints are.
-      const dist = Math.hypot(other.x - nx, other.y - ny);
-      const perpX = (ny - other.y) / (dist || 1);
-      const perpY = (other.x - nx) / (dist || 1);
-      const midRawX = (nx + other.x) / 2, midRawY = (ny + other.y) / 2;
-      // Flip the perpendicular so it points away from the hub center,
-      // consistently bowing outward into open space instead of back toward
-      // the dense middle of the canvas.
-      const outwardSign = ((midRawX - cx) * perpX + (midRawY - cy) * perpY) >= 0 ? 1 : -1;
-      const p0 = { x: nx, y: ny }, p2 = { x: other.x, y: other.y };
+      // Bulge magnitude and direction: graph-core.js's computeRelationBulge
+      // (the old fixed-12%-of-endpoint-distance formula it replaces shrank
+      // to near-zero for two nodes placed close together by the force
+      // simulation, leaving an almost-straight line with no real clearance
+      // from whatever else sat between them, visibly cutting through
+      // unrelated circles). It always bows away from the hub, toward open
+      // canvas, and grows only as far as this specific curve actually needs.
       const others = simNodes.filter(n => n.id !== c.id && n.id !== other.id)
         .map(n => ({ x: n.x, y: n.y, radius: n.radius }));
       // The hub circle itself was never in this list, so a relation curve
@@ -1869,20 +1954,7 @@ function renderGraph() {
       // relation, none of today's happen to be) could bow straight through
       // the "COMMAND CENTER" hub with no clearance check ever catching it.
       others.push({ x: cx, y: cy, radius: hubR });
-      // Start at the same minimum as before and grow in real steps, checking
-      // the actual curve against every other node's real circle each time,
-      // until it clears by a comfortable margin or a sane cap is hit (a
-      // relation between two nodes boxed in on all sides has to stop
-      // growing somewhere rather than loop forever).
-      let bulge = Math.max(dist * 0.16, 34);
-      const MARGIN = 10, MAX_BULGE = 260, STEP = 20;
-      while (bulge <= MAX_BULGE) {
-        const p1 = { x: midRawX + perpX * bulge * outwardSign, y: midRawY + perpY * bulge * outwardSign };
-        if (curveMinClearance(p0, p1, p2, others) >= MARGIN) break;
-        bulge += STEP;
-      }
-      const midX = midRawX + perpX * bulge * outwardSign;
-      const midY = midRawY + perpY * bulge * outwardSign;
+      const { midX, midY } = computeRelationBulge(nx, ny, other.x, other.y, cx, cy, others);
       const reasonLabel = `${c.name} ↔ ${other.name}: ${realReason}`;
       relationsHtml += `<path class="relation-line" tabindex="0" role="img" aria-label="${escapeHtml(reasonLabel)}" data-reason="${escapeHtml(reasonLabel)}" d="M${nx.toFixed(1)},${ny.toFixed(1)} Q${midX.toFixed(1)},${midY.toFixed(1)} ${other.x.toFixed(1)},${other.y.toFixed(1)}" fill="none" stroke="var(--sub)" stroke-width="1" stroke-dasharray="1,4" opacity="0.5"><title>${escapeHtml(reasonLabel)}</title></path>`;
     });
@@ -2004,6 +2076,8 @@ function renderGraph() {
         hideRelationTooltip();
       }
     });
+  resetGraphRovingTabindex(svg);
+  wireGraphRovingKeydown(svg);
   applyFilters();
   centerGraphScroll();
   setupGraphZoom();
@@ -2128,6 +2202,7 @@ function renderCategoryFilter() {
   row.querySelectorAll('.cat-filter-chip').forEach(el => {
     el.addEventListener('click', () => toggleCategoryFilter(el));
   });
+  initEdgeFade(row);
 }
 
 function applyFilters() {
@@ -2151,6 +2226,11 @@ function applyFilters() {
     el.classList.toggle('dimmed', anyFilterActive && !(matchesSearch && matchesCategory));
   });
 
+  // Graph nodes are a roving-tabindex group (see GRAPH_ROVING_GROUPS above):
+  // exactly one non-dimmed node is ever a real tab stop, not one per node.
+  // Collected here rather than given the same blanket tabindex the other
+  // four element types get below, then resolved once after the loop.
+  const visibleGraphNodes = [];
   document.querySelectorAll('.graph-node, .cluster-card, .activity-row, .attn-pill, .attn-card').forEach(el => {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
@@ -2168,12 +2248,21 @@ function applyFilters() {
     // just fading it, so it's excluded the same way for every user, not
     // just visually.
     el.setAttribute('aria-hidden', String(isDimmed));
-    el.setAttribute('tabindex', isDimmed ? '-1' : '0');
+    if (el.classList.contains('graph-node')) {
+      el.setAttribute('tabindex', '-1');
+      if (!isDimmed) visibleGraphNodes.push(el);
+    } else {
+      el.setAttribute('tabindex', isDimmed ? '-1' : '0');
+    }
     if (matches && !countedIds.has(id)) {
       countedIds.add(id);
       matchCount++;
     }
   });
+  if (visibleGraphNodes.length) {
+    const current = visibleGraphNodes.includes(document.activeElement) ? document.activeElement : visibleGraphNodes[0];
+    current.setAttribute('tabindex', '0');
+  }
   document.querySelectorAll('.cat-label').forEach(el => {
     const isActive = activeCategory === el.getAttribute('data-category');
     el.setAttribute('aria-pressed', String(isActive));
@@ -2238,67 +2327,12 @@ document.getElementById('searchClearBtn').addEventListener('click', () => {
   searchInputEl.focus();
 });
 
-// Real calendar-day difference between dateStr's local date and today's
-// local date. Dividing a raw Date.now() - dateStr-midnight ms gap by a
-// fixed 86400000 (the old approach here) silently loses or gains whatever
-// hour a DST transition falls in between the two, so for the several months
-// between a spring-forward and the following fall-back, any date logged
-// before that transition read as one calendar day "fresher" than it really
-// was on every single render, in relativeTime's activity-feed labels and
-// shortRelativeTime's graph badges alike. Naively swapping Math.floor for
-// Math.round doesn't fix this: it would round the ordinary second half of
-// *today* (any time from noon on) up to "1 day ago". Subtracting two Date
-// objects built straight from Y/M/D components instead, each resolved by
-// the runtime to its own correct local-midnight instant, cancels the DST
-// hour out entirely and stays exact for the plain same-day case too.
-function daysAgoLocal(dateStr) {
-  const then = new Date(dateStr + 'T00:00:00');
-  const now = new Date();
-  const thenMidnight = new Date(then.getFullYear(), then.getMonth(), then.getDate());
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((nowMidnight - thenMidnight) / 86400000);
-}
-
-// Compact form of relativeTime() for the graph's connector badges, where
-// "3 days ago" is too wide to sit on a spoke without crowding a 22-node
-// canvas. No real date means no badge at all (return null, skip rendering)
-// rather than force an awkward "no date on record" pill onto the graph.
-function shortRelativeTime(dateStr) {
-  if (!dateStr) return null;
-  const days = daysAgoLocal(dateStr);
-  if (days <= 0) return 'today';
-  if (days < 30) return `${days}d`;
-  const months = Math.floor(days / 30);
-  return `${months}mo`;
-}
-
-function relativeTime(dateStr) {
-  if (!dateStr) return 'no date on record';
-  const days = daysAgoLocal(dateStr);
-  if (days <= 0) return 'today';
-  if (days === 1) return '1 day ago';
-  if (days < 30) return `${days} days ago`;
-  const months = Math.floor(days / 30);
-  return months === 1 ? '1 month ago' : `${months} months ago`;
-}
-
-// Same 30-day threshold the graph's own dashed-ring treatment already uses
-// (renderGraph), pulled out here so Grid can flag the same thing instead of
-// silently dropping it: staleness was previously only visible as a dashed
-// stroke on a node, so anyone using Grid (a persisted, one-click-away default)
-// had no way to see a quietly stalled project without opening its modal.
-//
-// An active/stalled cluster with lastUpdate === null used to fall straight
-// through the `c.lastUpdate &&` short-circuit and read as never stale, no
-// matter how long it actually sat untouched: a project that has never once
-// logged a date is at least as neglected as one that logged a date 31+ days
-// ago, not less. done/unknown/broken clusters are left alone here: "done"
-// genuinely doesn't need a date, "unknown" and "broken" already render with
-// their own distinct, honest status treatment elsewhere on the page.
-function isStale(c) {
-  if (!c.lastUpdate) return c.status === 'active' || c.status === 'stalled';
-  return daysAgoLocal(c.lastUpdate) > 30;
-}
+// daysAgoLocal/shortRelativeTime/relativeTime/isStale now live in
+// dashboard-core.js (destructured near the top of this script), so their
+// DST-safe local-calendar-day math and the 30-day staleness threshold can
+// be unit-tested outside the browser. See that file's own comments for the
+// DST reasoning and why a null lastUpdate still counts as stale for an
+// active/stalled cluster.
 
 // Shared accessible name for a cluster, used by both the graph node (whose
 // nested <title> alone isn't a reliable accessible name for a JS role="button"
@@ -2317,22 +2351,11 @@ document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
   btn.setAttribute('aria-pressed', String(btn.dataset.sort === gridSortBy));
 });
 
-const STATUS_SEVERITY = { broken: 0, stalled: 1, active: 2, unknown: 3, done: 4 };
-
-// Grid's own sort, independent of the `clusters` array order the graph relies
-// on for its priority-orbit and category-sector angles, so re-sorting the
-// grid never nudges graph node positions.
+// Sort math (including the STATUS_SEVERITY ranking) lives in
+// dashboard-core.js; this just supplies the page's current gridSortBy so
+// the core function stays a pure, unit-testable function of its arguments.
 function sortForGrid(list) {
-  const sorted = list.slice();
-  if (gridSortBy === 'name') {
-    sorted.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (gridSortBy === 'updated') {
-    sorted.sort((a, b) => (b.lastUpdate || '').localeCompare(a.lastUpdate || ''));
-  } else if (gridSortBy === 'status') {
-    sorted.sort((a, b) => (STATUS_SEVERITY[a.status] ?? 3) - (STATUS_SEVERITY[b.status] ?? 3));
-  }
-  // 'priority' needs no re-sort, `clusters` is already priority-ordered.
-  return sorted;
+  return sortForGridCore(list, gridSortBy);
 }
 
 function setGridSort(sortBy) {
@@ -3051,7 +3074,9 @@ const SHORTCUTS = [
   { keys: ['/'], label: 'Focus search' },
   { keys: ['&#8984;K', 'Ctrl K'], label: 'Jump to a project, or search a card/prospect/listing/lead/application' },
   { keys: ['&uarr;', '&darr;'], label: 'Move selection in Jump to' },
-  { keys: ['Enter'], label: 'Open the focused project' },
+  { keys: ['&larr;', '&rarr;'], label: 'In the graph, move focus between nodes, category labels, or relation lines' },
+  { keys: ['Home', 'End'], label: 'In the graph, jump to the first or last node, label, or relation line' },
+  { keys: ['Enter', 'Space'], label: 'Open the focused project or graph node' },
   { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
   { keys: ['Esc'], label: 'Close the open dialog' },
   { keys: ['?'], label: 'Show this help' }

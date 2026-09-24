@@ -251,6 +251,71 @@ header.page-head .sub {
   margin-bottom: 14px;
 }
 .section-toolbar .section-title { margin: 0; }
+/* Applications section's own validate.js self-check result, same
+   "warning if real findings, silent if clean or unavailable" reading as
+   every other hub's identical .section-title-meta.warn pattern. */
+.section-title-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--dim);
+  margin-left: 8px;
+}
+.section-title-meta.warn { color: #E0A030; }
+
+/* "Possible duplicates" panel, same pattern and colors as CGT/CSM/Garage/
+   Sondrik's own duplicate-record panel: an amber list of clickable rows,
+   grouping logic shared with validate.js via JobSearchValidateCore. */
+.data-quality-list {
+  border: 1px solid rgba(224,160,48,0.3);
+  background: rgba(224,160,48,0.04);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 32px;
+}
+.data-quality-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(224,160,48,0.15);
+  font-size: 0.85rem;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.data-quality-row:first-of-type { border-top: none; }
+.data-quality-row:hover, .data-quality-row:focus-visible {
+  background: rgba(224,160,48,0.08);
+}
+.data-quality-row:focus-visible { outline: 1px solid rgba(224,160,48,0.5); outline-offset: -1px; }
+.data-quality-row .dq-why {
+  margin-left: auto;
+  color: #E0A030;
+  font-size: 0.72rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Clicking a duplicate row above jumps to and highlights the matching
+   applications-table row, same "you clicked through" confirmation as
+   .section-flash elsewhere on this page. Animates the cells, not the <tr>
+   itself: box-shadow does not render on a table row in most browsers. */
+.row-flash td {
+  animation: rowFlash 1.6s ease-out;
+}
+@keyframes rowFlash {
+  0% { background: rgba(224,160,48,0.16); }
+  100% { background: transparent; }
+}
 .section-note {
   font-size: 0.78rem;
   color: var(--dim);
@@ -288,6 +353,23 @@ section { margin-bottom: 36px; }
   text-transform: uppercase;
   font-weight: 500;
 }
+.data-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+.data-table thead th.sortable:hover,
+.data-table thead th.sortable:focus-visible {
+  color: var(--ink);
+}
+.data-table thead th.sortable:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: -2px; }
+.data-table thead th.sortable::after {
+  content: '';
+  margin-left: 5px;
+  opacity: 0.35;
+}
+.data-table thead th.sortable[aria-sort="ascending"]::after { content: '\2191'; opacity: 1; color: var(--ink); }
+.data-table thead th.sortable[aria-sort="descending"]::after { content: '\2193'; opacity: 1; color: var(--ink); }
 .data-table tbody tr:hover { background: rgba(255,255,255,0.02); }
 .data-table td.num-col { color: var(--dim); font-family: 'JetBrains Mono', monospace; width: 1%; white-space: nowrap; }
 .data-table td.pay-col { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
@@ -549,6 +631,55 @@ section { margin-bottom: 36px; }
 }
 .offline-banner[hidden] { display: none; }
 
+/* Data changelog: real git commit history of this hub's own data files,
+   same row shape as the "Possible duplicates" list above but its own tag
+   color (a commit hash, not a data-quality flag) so the two don't read as
+   the same kind of fact. Same classes/markup as CSM's identical section. */
+.changelog-feed {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 12px;
+  background: var(--panel);
+}
+.changelog-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.changelog-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.82rem;
+}
+.changelog-row:first-child { border-top: none; }
+.changelog-date {
+  color: var(--dim);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  width: 82px;
+}
+.changelog-hash {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  color: var(--sub);
+  flex-shrink: 0;
+}
+.changelog-author { flex-shrink: 0; color: var(--sub); }
+.changelog-subject { color: var(--ink); }
+.changelog-subject-reset { color: #E0A030; font-style: italic; }
+.changelog-files { color: var(--dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+.changelog-generated-note { margin-top: 4px; margin-bottom: 36px; }
+
 .sr-only-live {
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
@@ -564,6 +695,39 @@ footer.page-foot {
   line-height: 1.6;
 }
 footer.page-foot code { overflow-wrap: anywhere; }
+
+/* Jump-to-section FAB, same markup/classes/behavior as Garage/Sondrik/CGT/
+   CSM's: this page runs 9 real sections including older digest runs and
+   the changelog, with no sticky header, so this is the one way back to a
+   specific section without scrolling blind. */
+.jump-nav-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  background: var(--panel);
+  color: var(--sub);
+  border: 1px solid var(--hairlineHover);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.jump-nav-fab:hover, .jump-nav-fab:focus-visible { color: var(--ink); border-color: var(--accent); }
+.jump-nav-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.jump-nav-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 60vh; overflow-y: auto; }
+.jump-nav-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--sub);
+  text-decoration: none;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.jump-nav-link:hover, .jump-nav-link:focus-visible { background: var(--panelLight); color: var(--ink); border-color: var(--hairline); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -587,7 +751,7 @@ footer.page-foot code { overflow-wrap: anywhere; }
   }
   body { background: #fff; color: #111; }
   .wrap { max-width: none; padding: 0.4in 0.5in; }
-  .print-btn, .back-link, .schema-help, .modal-overlay, .offline-banner {
+  .print-btn, .back-link, .schema-help, .modal-overlay, .offline-banner, .jump-nav-fab {
     display: none !important;
   }
   .callout { border-color: #bbb; background: none; color: #333; }
@@ -598,6 +762,19 @@ footer.page-foot code { overflow-wrap: anywhere; }
      earlier in source order, same real ambiguity hit on CGT's card-table
      header fix tonight, forced the same way rather than left unresolved. */
   .callout-warning strong { color: #111 !important; }
+  /* Same real print-contrast bug already found and fixed on the other 5
+     hubs' own .section-title-meta.warn: raw #E0A030 on white clears nowhere
+     near 4.5:1, darkened until it does, not an arbitrary pick. */
+  .section-title-meta.warn, .dq-why { color: #8a5a00; }
+  .data-quality-list { border-color: #d9b04a; background: none; }
+  .data-quality-row { border-top-color: #e8d6a8; }
+  .changelog-feed { background: none; border-color: #bbb; }
+  .changelog-row { border-color: #ddd; }
+  .changelog-date, .changelog-author, .changelog-files { color: #444; }
+  .changelog-subject { color: #111; }
+  .changelog-subject-reset { color: #654600; font-style: italic; }
+  .changelog-hash { border-color: #999; background: none !important; color: #111 !important; }
+  .changelog-generated-note { color: #555; }
   .snapshot-chip, .lead-card, .criteria-item, .dealbreaker-item, .sub-list-item, .data-table-wrap {
     background: none;
     border: 1px solid #ccc;

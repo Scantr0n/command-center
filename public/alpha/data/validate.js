@@ -22,13 +22,18 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+// isIsoDatetimeOrNull, isFutureDatetime, emDashFields, and findForbiddenKeys
+// used to live here inline, no regression coverage of their own, only ever
+// exercised by hand-running this CLI. Moved to validate-core.js (no
+// fs/path/child_process, so it can be required from a plain node --test file
+// with no CLI side effects) so scanForForbiddenKeys in particular, the one
+// check standing between this page and a fabricated dollar figure showing up
+// on a real, live-money system, gets the same real test coverage every other
+// shared-math module in this hub already has. Same shared-core pattern
+// already proven at CGT's, Garage's, and CSM's own validate-core.js.
+const { isIsoDatetimeOrNull, isFutureDatetime, emDashFields, findForbiddenKeys } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
-const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-
-// Keys that would only legitimately appear here if real performance data
-// had been wired in, which it never has been from this sandbox.
-const FORBIDDEN_KEY_PATTERN = /pnl|profit|balance|equity|winrate|win_rate|winRate|tradecount|trade_count|tradeCount|dollaramount|returnpct|roi/i;
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
@@ -36,50 +41,11 @@ function loadJson(name) {
   return JSON.parse(raw);
 }
 
-function isIsoDatetimeOrNull(v) {
-  return v === null || v === undefined || (typeof v === 'string' && ISO_DATETIME_RE.test(v));
-}
-
-// Every real free-text field this page renders is written without em
-// dashes, so a hand-typed or pasted-in field that has one reads as coming
-// from somewhere else rather than this product's own voice. Same
-// emDashFields helper public/sondrik/data/validate.js already uses for this
-// reason. Warning-level only: an em dash never breaks anything rendered,
-// this is a style nudge, not a data error.
-function emDashFields(obj, fields) {
-  const hits = [];
-  if (!obj) return hits;
-  fields.forEach(f => {
-    const v = obj[f];
-    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
-  });
-  return hits;
-}
-
-// live.asOf and system.lastVerifiedAt drive every staleness signal this page
-// shows (freshnessClass's live/stale/down thresholds, the "last verified"
-// architecture trust label), so a mistyped year would otherwise silently
-// read as a fresh, trustworthy reading instead of the typo it actually is.
-// Same isFutureDate idea public/sondrik/data/validate.js and
-// data/clusters/validate.js already run on their own date fields, adapted
-// here for full ISO datetimes: a few minutes of tolerance for real clock
-// skew between whatever wrote this file and whatever validates it.
-const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
-function isFutureDatetime(v) {
-  if (!v || !ISO_DATETIME_RE.test(v)) return false;
-  return new Date(v).getTime() > Date.now() + CLOCK_SKEW_TOLERANCE_MS;
-}
-
 function scanForForbiddenKeys(obj, pathSoFar, errors) {
-  if (obj === null || typeof obj !== 'object') return;
-  for (const key of Object.keys(obj)) {
-    const where = pathSoFar ? pathSoFar + '.' + key : key;
-    if (FORBIDDEN_KEY_PATTERN.test(key)) {
-      errors.push(where + ': key looks like real performance data (P&L / balance / win rate / trade count). ' +
-        'This sandbox has no access to Alpha\'s real numbers, remove this field or confirm it is genuinely wired in.');
-    }
-    scanForForbiddenKeys(obj[key], where, errors);
-  }
+  findForbiddenKeys(obj, pathSoFar).forEach(where => {
+    errors.push(where + ': key looks like real performance data (P&L / balance / win rate / trade count). ' +
+      'This sandbox has no access to Alpha\'s real numbers, remove this field or confirm it is genuinely wired in.');
+  });
 }
 
 function main() {
@@ -96,13 +62,40 @@ function main() {
 
   scanForForbiddenKeys(data, '', errors);
 
+  // live.account and live.positions are documented (index.html's schema
+  // table) as populated only by the live daemon proxy in server.js at
+  // request time, never hand-edited into this static fallback, since this
+  // file has no legitimate way to know a real balance or a real position's
+  // price. scanForForbiddenKeys above only catches a hand-added field whose
+  // *name* matches the forbidden pattern (pnl/profit/balance/equity/etc),
+  // which misses plenty of real-looking dollar fields these two objects'
+  // own documented shapes actually use: a position's entryPrice/
+  // currentPrice/marketValue, or an account's cash/buyingPower/dayChange,
+  // none of which match that pattern. Confirmed by hand: a hand-added
+  // live.positions entry with a fake entryPrice/currentPrice/marketValue,
+  // or a live.account with cash/buyingPower/dayChange and no literal
+  // "equity"/"balance" substring, both passed this validator clean before
+  // this check existed. These two explicit shape checks close that gap
+  // directly instead of trying to grow the name-pattern regex to cover
+  // every dollar-shaped field name that might ever appear.
+  if (data.live && data.live.account != null) {
+    errors.push('live.account: must be null in this static fallback file. It is only ever populated by the live ' +
+      'daemon proxy in server.js at request time, since this file has no legitimate way to know a real balance.');
+  }
+  if (data.live && data.live.positions != null && !(Array.isArray(data.live.positions) && data.live.positions.length === 0)) {
+    errors.push('live.positions: must be an empty array (or omitted) in this static fallback file. It is only ' +
+      'ever populated by the live daemon proxy in server.js at request time, since this file has no legitimate ' +
+      'way to know a real open position.');
+  }
+
   const live = data.live || {};
   const anyLiveValueSet =
     live.regime != null ||
     (live.killSwitch && live.killSwitch.engaged != null) ||
     (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null || live.positionSizing.maxDrawdownPct != null || live.positionSizing.robustnessScore != null)) ||
     (live.genealogy && (live.genealogy.generation != null || live.genealogy.lastBreedingEventAt != null ||
-      (Array.isArray(live.genealogy.lineages) && live.genealogy.lineages.length > 0)));
+      (Array.isArray(live.genealogy.lineages) && live.genealogy.lineages.length > 0))) ||
+    (live.anomalies && live.anomalies.stuckCount != null);
 
   if (anyLiveValueSet && !live.asOf) {
     errors.push('live: one or more live fields are set but "live.asOf" is missing. Every live reading must carry ' +
@@ -230,6 +223,24 @@ function main() {
     errors.push('live.positionSizing.robustnessScore: must be null or a finite number from 0 to 100 ' +
       '(it drives a percentage meter on the page, same as currentDrawdownPct/maxDrawdownPct): ' +
       JSON.stringify(robustnessScore));
+  }
+
+  // Stuck-agent detection is a real, live-daemon-only reading, same
+  // "unknown means null, never a guessed 0" rule as everything else under
+  // live: a real check that found nothing stuck (stuckCount: 0) is not the
+  // same fact as a check that never ran, so both must carry a real
+  // checkedAt when stuckCount is set.
+  const stuckCount = live.anomalies && live.anomalies.stuckCount;
+  if (stuckCount != null && !(typeof stuckCount === 'number' && Number.isFinite(stuckCount) && stuckCount >= 0)) {
+    errors.push('live.anomalies.stuckCount: must be null or a non-negative finite number: ' + JSON.stringify(stuckCount));
+  }
+  if (live.anomalies && !isIsoDatetimeOrNull(live.anomalies.checkedAt)) {
+    errors.push('live.anomalies.checkedAt: not a valid ISO datetime or null');
+  } else if (live.anomalies && isFutureDatetime(live.anomalies.checkedAt)) {
+    warnings.push('live.anomalies.checkedAt (' + live.anomalies.checkedAt + ') is in the future, check for a typo\'d year');
+  }
+  if (stuckCount != null && !live.anomalies.checkedAt) {
+    errors.push('live.anomalies: stuckCount is set but checkedAt is missing, a real reading needs the timestamp it was actually observed at');
   }
 
   if (data.connection && data.connection.connected === true && !data.connection.checkedAt) {

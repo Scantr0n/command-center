@@ -260,6 +260,23 @@ header.page-head .sub {
   margin: 0 0 14px;
 }
 
+/* Sentence-length freshness note next to a hand-verified reference's title,
+   e.g. the eBay/Vinted/Poshmark/Depop fee schedule this page's payout math
+   is built on: overrides .section-title's uppercase/letter-spacing so it
+   reads as normal prose, not a second heading. Neutral until the review
+   date passes the stale-after threshold in app.js, then the same red used
+   for a bug-fix/decline badge elsewhere on this page, so it reads as a real
+   prompt to re-verify rather than decoration. */
+.reference-freshness {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--dim);
+}
+.reference-freshness-stale { color: #E56464; }
+
 section { margin-bottom: 36px; }
 
 /* Pure platform-reference tables (best time to post, seasonal calendar,
@@ -701,6 +718,11 @@ table.card-table {
 .tax-progress-pct { font-size: 0.72rem; color: var(--sub); min-width: 2.8em; text-align: right; }
 .tax-status-met { color: #E0A030; font-weight: 500; }
 .tax-tracker-note { font-size: 0.78rem; color: var(--dim); margin-top: 8px; }
+
+.seller-standards-progress { min-width: 220px; }
+.seller-standards-progress > .cell-value { display: block; margin-top: 6px; }
+.seller-standards-progress > .cell-value:first-child { margin-top: 0; }
+.seller-standards-progress > .cell-muted { display: block; font-size: 0.78rem; margin-top: 6px; }
 
 .row-clickable { cursor: pointer; }
 .row-clickable:hover td { background: var(--panelLight); }

@@ -13,7 +13,10 @@
     "test:cgt": "node --test public/cgt/data/*.test.js",
     "test:alpha": "node --test public/alpha/data/*.test.js",
     "test:garage": "node --test public/garage/data/*.test.js",
-    "test:csm": "node --test public/csm/data/*.test.js"
+    "test:csm": "node --test public/csm/data/*.test.js",
+    "test:job-search": "node --test public/job-search/data/*.test.js",
+    "test:dashboard": "node --test public/data/*.test.js",
+    "test:server": "node --test data/*.test.js"
   },
   "license": "ISC",
   "type": "commonjs",

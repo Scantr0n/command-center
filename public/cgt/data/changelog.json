@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T06:51:37.332Z",
+  "generatedAt": "2026-09-23T20:45:02.033Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "a8251e8",
+      "fullHash": "a8251e8dba59e597d5aae5516d74e4ec77aca321",
+      "date": "2026-09-23",
+      "author": "Claude",
+      "subject": "CGT: track acquisition date and estimate collectibles capital-gains tax on sold cards",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
     {
       "hash": "788e530",
       "fullHash": "788e530906f52fbfa16a1c7c0a41e1b34241732f",

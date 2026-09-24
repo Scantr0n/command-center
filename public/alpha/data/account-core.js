@@ -88,5 +88,22 @@
     return { totalsKnown: true, totalMv, totalPl, totalPlPct };
   }
 
-  return { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals };
+  // Real risk-dashboard convention (portfolio concentration risk): pairing a
+  // position's dollar size with what share of the whole account it actually
+  // represents catches an oversized single-name bet a raw market-value
+  // column alone doesn't, e.g. a $50k position reads very differently in a
+  // $2M account than in a $200k one. Same derived-client-side,
+  // never-fetched-as-its-own-field pattern as computeExposure's pctDeployed
+  // above: only equity and the row's own real marketValue, both fields this
+  // page already has, nothing new asked of the feed. Returns null (never 0)
+  // whenever either input isn't a real usable number, same "unknown, not
+  // zero" rule pctDeployed already follows, so a bad reading never renders
+  // as a falsely reassuring 0% concentration.
+  function positionConcentrationPct(marketValue, equity) {
+    if (typeof marketValue !== 'number' || !Number.isFinite(marketValue)) return null;
+    if (typeof equity !== 'number' || !Number.isFinite(equity) || equity <= 0) return null;
+    return (marketValue / equity) * 100;
+  }
+
+  return { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct };
 });

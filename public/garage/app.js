@@ -22,7 +22,10 @@ let garageChangelogDriftStatus = null;
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
 // shared as a link, same convention as the CSM and CGT hubs.
-const VALID_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+// Aliases GarageValidateCore.PLATFORMS (shared with validate.js) rather than
+// its own copy, see PAYOUT_PLATFORMS below for why that used to be two
+// separate identical arrays under different names.
+const VALID_PLATFORMS = GarageValidateCore.PLATFORMS;
 
 function restoreStateFromUrl() {
   const params = new URLSearchParams(location.search);
@@ -64,14 +67,203 @@ function syncUrl() {
 const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
   estimateNetPayout, minListingPriceForNet,
+  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
-  poshmarkWeightTier, bundleNetComparison
+  poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
+  offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress
 } = GarageCore;
+
+// This is the exact reference that already drifted wrong twice on this page
+// (see the real-bug list in garage-core.js's header comment: a processing
+// fee eBay no longer even charges, then a "shoes" rate mixed up twice over),
+// both times silently, with nothing on the page saying the numbers might be
+// stale. This date is the "as of September 2026" claim already made in the
+// "Fee formulas used" callout above the payout table; keep the two in sync
+// by hand whenever the schedule is re-verified. 45 days, not CGT's 30: this
+// schedule has moved at least as fast in this file's own history, but it's
+// a smaller page surface (one combined table, not six graders' full tier
+// lists), so a slightly longer window before nagging is the right tradeoff.
+const FEE_SCHEDULE_REVIEWED_ON = '2026-09-23';
+const FEE_SCHEDULE_STALE_AFTER_DAYS = 45;
+
+// Independent of listings/sales/etc. load state (no fetch involved, the
+// review date is a hardcoded constant above), so this runs unconditionally
+// at page load rather than from inside loadData()'s try/catch, same
+// separation CGT's own renderGradingReferenceFreshness draws for the same
+// reason: a bad listings.json shouldn't also blank a freshness note that
+// has nothing to do with it.
+function renderFeeScheduleFreshness() {
+  const el = document.getElementById('feeScheduleFreshness');
+  if (!el) return;
+  const age = daysSincePublished(FEE_SCHEDULE_REVIEWED_ON);
+  const stale = age != null && age > FEE_SCHEDULE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published seller fee schedule on ' + FEE_SCHEDULE_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as FEE_SCHEDULE_REVIEWED_ON/TITLE_SPECS_REVIEWED_ON
+// above: the "Return & dispute handling" table states real per-platform
+// response windows and resolution mechanics as prose ("as of September
+// 2026") with nothing on the page actually tracking whether that claim has
+// aged past being trustworthy, same gap that let the fee schedule and title
+// caps drift silently before this pattern existed. This table doubles as
+// the direct follow-up to the real eBay return-policy bug (the auto-parts
+// policy that blocked publish), so a stale response-window claim here is a
+// real risk of missing a buyer's dispute deadline, not just a cosmetic
+// reference going out of date. Re-verified 2026-09-24 against eBay, Vinted,
+// and Poshmark's own current help-center pages; the Depop row is unchanged.
+const RETURN_DISPUTE_REVIEWED_ON = '2026-09-24';
+const RETURN_DISPUTE_STALE_AFTER_DAYS = 45;
+
+function renderReturnDisputeFreshness() {
+  const el = document.getElementById('returnDisputeFreshness');
+  if (!el) return;
+  const age = daysSincePublished(RETURN_DISPUTE_REVIEWED_ON);
+  const stale = age != null && age > RETURN_DISPUTE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published return/dispute documentation on ' + RETURN_DISPUTE_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as RETURN_DISPUTE_REVIEWED_ON above: the scam
+// patterns this table warns about (eBay INAD return fraud and the $750
+// signature-confirmation threshold, off-platform payment requests on
+// Vinted/Poshmark, Depop Resolution Center miscategorization) are real,
+// checkable claims sitting right next to the dispute-mechanics table this
+// pattern was built for, with the same silent-drift risk if left untracked.
+// Re-verified 2026-09-24 against eBay's own seller-protection policy page
+// (the $750 threshold) and Vinted's own Buyer Protection help page (payment
+// must go through Vinted's checkout); Poshmark and Depop rows unchanged.
+const SCAM_PATTERNS_REVIEWED_ON = '2026-09-24';
+const SCAM_PATTERNS_STALE_AFTER_DAYS = 45;
+
+function renderScamPatternsFreshness() {
+  const el = document.getElementById('scamPatternsFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SCAM_PATTERNS_REVIEWED_ON);
+  const stale = age != null && age > SCAM_PATTERNS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published fraud/protection documentation on ' + SCAM_PATTERNS_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as the tables above: this one gates the
+// highest-stakes numbers on the page (the exact eBay Top Rated Seller and
+// Depop Top Seller thresholds "Real progress" is computed against below),
+// and the callout above it says this matters "now, before the 48-draft
+// Depop backlog goes live", so a stale threshold here is a real risk of
+// Jack tracking progress against the wrong bar. Re-verified 2026-09-24
+// against eBay's own seller-standards policy page (the 90-day/100-
+// transaction/$1,000/0.5%/0.3%/3%/95% figures) and Depop's own Top Seller
+// program page and third-party coverage of it (the $1,000/month, 4.5-star,
+// 90%-in-5-days, and under-5%-refund figures); secondary sources disagree
+// on whether Depop also requires a minimum live-listing count and whether
+// that's sustained for 3 or 4 months, so that's deliberately left off this
+// table rather than guessed at. Vinted and Poshmark rows are reference-only
+// prose with no hard numbers pinned down, so re-verifying those isn't the
+// same kind of drift risk as the two computed-progress rows are.
+const SELLER_STANDARDS_REVIEWED_ON = '2026-09-24';
+const SELLER_STANDARDS_STALE_AFTER_DAYS = 45;
+
+function renderSellerStandardsFreshness() {
+  const el = document.getElementById('sellerStandardsFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SELLER_STANDARDS_REVIEWED_ON);
+  const stale = age != null && age > SELLER_STANDARDS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published seller-status documentation on ' + SELLER_STANDARDS_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as the tables above, applied to the one
+// number on this page that isn't platform policy at all: the federal
+// 1099-K threshold is set by Congress, not eBay/Vinted/Poshmark/Depop, and
+// it has already flip-flopped once in real life (ARPA dropped it to $600
+// for 2022, IRS delayed that twice, OBBBA restored $20,000/200 transactions
+// in July 2025). A callout with no tracked verification date is exactly
+// the silent-drift risk this pattern exists to catch, and getting a real
+// tax-reporting threshold wrong is a worse failure mode than a stale fee
+// schedule. Re-verified 2026-09-24 against current IRS/OBBBA reporting
+// (1800Accountant, TaxAct, Avalara, 1099online): still $20,000 AND 200
+// transactions per platform for the 2026 tax year, both conditions required.
+const TAX_TRACKER_REVIEWED_ON = '2026-09-24';
+const TAX_TRACKER_STALE_AFTER_DAYS = 45;
+
+function renderTaxTrackerFreshness() {
+  const el = document.getElementById('taxTrackerFreshness');
+  if (!el) return;
+  const age = daysSincePublished(TAX_TRACKER_REVIEWED_ON);
+  const stale = age != null && age > TAX_TRACKER_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current IRS Form 1099-K reporting-threshold guidance on ' + TAX_TRACKER_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as the tables above. Found a real error while
+// re-verifying this one 2026-09-24: the eBay row had the USPS lithium
+// battery mark transition backwards, it said the mark "without a phone
+// number" was the older one retiring 2026-12-31, when USPS Publication 52
+// (Feb 2026 edition) and the underlying PHMSA/Federal Register rule say the
+// opposite, the older mark is the one WITH the phone number, and the mark
+// dropping the phone number is the newer one required from 2027-01-01.
+// Fixed the row text to match; this badge exists so that class of reversed
+// claim gets caught faster next time instead of sitting live on a real
+// battery-item listing's shipping requirements.
+const ELECTRONICS_RULES_REVIEWED_ON = '2026-09-24';
+const ELECTRONICS_RULES_STALE_AFTER_DAYS = 45;
+
+function renderElectronicsRulesFreshness() {
+  const el = document.getElementById('electronicsRulesFreshness');
+  if (!el) return;
+  const age = daysSincePublished(ELECTRONICS_RULES_REVIEWED_ON);
+  const stale = age != null && age > ELECTRONICS_RULES_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own electronics/dangerous-goods policy and USPS Publication 52 on ' + ELECTRONICS_RULES_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as the tables above. This table's own
+// callout already frames the Poshmark row as "the same class of
+// silent-failure risk as the eBay return-policy bug", so it gets the same
+// tracking. Re-verified 2026-09-24: Poshmark's Ground Advantage-only,
+// no-Priority-Mail-packaging rule (with the Post Office refusing or
+// charging a $5 fee for Priority boxes) took effect 2025-09-12 and is
+// still the live policy, no change to confirm here beyond that.
+const PACKAGING_RULES_REVIEWED_ON = '2026-09-24';
+const PACKAGING_RULES_STALE_AFTER_DAYS = 45;
+
+function renderPackagingRulesFreshness() {
+  const el = document.getElementById('packagingRulesFreshness');
+  if (!el) return;
+  const age = daysSincePublished(PACKAGING_RULES_REVIEWED_ON);
+  const stale = age != null && age > PACKAGING_RULES_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own shipping/seller documentation on ' + PACKAGING_RULES_REVIEWED_ON + '.';
+}
 
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
-const PAYOUT_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+// Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
+// identical to VALID_PLATFORMS above under a different name; now the same
+// shared array both aliases point at.
+const PAYOUT_PLATFORMS = GarageValidateCore.PLATFORMS;
 const EXPENSE_CATEGORY_LABELS = {
   mileage: 'Mileage', supplies: 'Supplies', 'platform-fees': 'Platform fees',
   subscriptions: 'Subscriptions', other: 'Other'
@@ -98,54 +290,6 @@ const ACQUISITION_SOURCE_LABELS = {
 // page: a count with no reorder point set yet can't be judged low or not.
 function isSupplyLowStock(s) {
   return s.qtyOnHand != null && s.reorderThreshold != null && s.qtyOnHand <= s.reorderThreshold;
-}
-
-// Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
-// Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
-// announced 2026-07-13 due to fuel prices (irs.gov/newsroom). Kept in sync
-// with the same table in data/validate.js. Only 2026 is a real published
-// rate right now, an expense dated outside it gets an honest "no rate known"
-// rather than reusing the wrong year's number.
-const MILEAGE_RATES_2026 = [
-  { from: '2026-01-01', to: '2026-06-30', rate: 0.725 },
-  { from: '2026-07-01', to: '2026-12-31', rate: 0.76 }
-];
-function irsMileageRateForDate(dateStr) {
-  if (!dateStr) return null;
-  const hit = MILEAGE_RATES_2026.find(r => dateStr >= r.from && dateStr <= r.to);
-  return hit ? hit.rate : null;
-}
-
-// A mileage expense with real miles and a real date but no computed amount
-// has two very different causes that otherwise render identically as "not
-// logged": a genuine backfill gap (no miles/date logged yet), or this table
-// itself being out of date (dated after MILEAGE_RATES_2026's last known
-// range, e.g. once 2027 starts and the IRS hasn't published or this table
-// hasn't been updated with next year's rate yet). Only the second one is
-// "the app's own fault, not a logging mistake", so it gets a distinct,
-// specific message instead of leaving the two indistinguishable.
-function mileageRateGapReason(e) {
-  if (e.amount != null || e.category !== 'mileage' || e.miles == null || !e.date) return null;
-  if (irsMileageRateForDate(e.date) != null) return null;
-  const lastKnown = MILEAGE_RATES_2026[MILEAGE_RATES_2026.length - 1].to;
-  if (e.date > lastKnown) {
-    return `No IRS rate known past ${lastKnown}, this tool's rate table only has 2026 rates in it. Log a real ` +
-      `manual amount, or add the newly published rate to MILEAGE_RATES_2026 once the IRS announces it.`;
-  }
-  return `No IRS rate known for ${e.date}, this tool's rate table only has 2026 rates in it. Log a real manual amount instead.`;
-}
-
-// A logged "amount" always wins (it's a real number someone entered), a
-// mileage entry with no amount falls back to computing one from real miles
-// at the real rate for its real date, everything else with no amount stays
-// honestly un-computable (null) rather than assumed $0.
-function computeExpenseAmount(e) {
-  if (e.amount != null) return e.amount;
-  if (e.category === 'mileage' && e.miles != null && e.date) {
-    const rate = irsMileageRateForDate(e.date);
-    return rate != null ? e.miles * rate : null;
-  }
-  return null;
 }
 
 // Looks up the eBay category of the listing a sale references, so a sold
@@ -461,6 +605,7 @@ async function loadData() {
     document.getElementById('acquisitionsTotals').innerHTML = '';
   }
 
+  renderSellerStandardsProgress(sales, disputes);
   initTableScrollShadows();
   renderAttentionBar();
 }
@@ -655,22 +800,6 @@ function savePoshmarkShareLog(log) {
   }
 }
 
-// Consecutive days of at least one logged share, walking back from today
-// through the real logged dates only, never assuming an ungapped day was
-// actually shared. A day not logged yet stays inside the streak until it's
-// actually over, so opening this page in the morning before today's first
-// share doesn't read as a broken streak.
-function computePoshmarkShareStreak(log) {
-  let cursor = todayDateStr();
-  if (!log[cursor]) cursor = addDaysToDateStr(cursor, -1);
-  let streak = 0;
-  while (log[cursor]) {
-    streak++;
-    cursor = addDaysToDateStr(cursor, -1);
-  }
-  return streak;
-}
-
 // Only shows up when a real listing is actually on Poshmark, the tracker has
 // nothing to do otherwise. Purely a manual log, no live Poshmark connection
 // exists to confirm a share actually happened.
@@ -686,7 +815,7 @@ function renderPoshmarkShareTracker(listings) {
   const log = loadPoshmarkShareLog();
   const today = todayDateStr();
   const todayCount = log[today] || 0;
-  const streak = computePoshmarkShareStreak(log);
+  const streak = computePoshmarkShareStreak(log, today);
   const dayWord = streak === 1 ? 'day' : 'days';
 
   const result = document.getElementById('poshmarkShareResult');
@@ -1003,14 +1132,33 @@ function renderAttentionBar() {
   });
 }
 
-// Real published title-length caps as of September 2026, sourced from each
-// platform's own seller/help documentation (see the "Title & photo specs"
-// details on the page). eBay and Poshmark share an 80-char hard cap, Vinted
-// is tighter at 70. Depop has no published hard cap, its mobile search UI
-// just visibly truncates around 50 chars, so that's a soft warning tier,
-// not a hard "over" like the other three.
-const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
-const DEPOP_SOFT_LIMIT = 50;
+// Real published title-length caps, and Depop's soft mobile-truncation
+// point: now GarageValidateCore.TITLE_HARD_LIMITS / .DEPOP_TITLE_SOFT_LIMIT,
+// the same shared constants validate.js checks against, rather than this
+// file's own separately hand-maintained copy (see validate-core.js for the
+// real sourcing note and the Vinted 70-vs-100 drift this used to risk).
+const TITLE_HARD_LIMITS = GarageValidateCore.TITLE_HARD_LIMITS;
+const DEPOP_SOFT_LIMIT = GarageValidateCore.DEPOP_TITLE_SOFT_LIMIT;
+
+// Same freshness-badge pattern as FEE_SCHEDULE_REVIEWED_ON below: this table
+// drives a real advisory/blocker on the pre-publish checklist and the photo
+// draft tool, not just a display table, so a stale cap is a real risk of a
+// missed rejection (or an over-cautious false warning, as the Vinted 70
+// bug above was) rather than just a cosmetic reference going out of date.
+const TITLE_SPECS_REVIEWED_ON = '2026-09-23';
+const TITLE_SPECS_STALE_AFTER_DAYS = 45;
+
+function renderTitleSpecsFreshness() {
+  const el = document.getElementById('titleSpecsFreshness');
+  if (!el) return;
+  const age = daysSincePublished(TITLE_SPECS_REVIEWED_ON);
+  const stale = age != null && age > TITLE_SPECS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published title/photo specs on ' + TITLE_SPECS_REVIEWED_ON + '.';
+}
 
 function titleFitCell(platform, title, platforms) {
   if (!(platforms || []).includes(platform)) {
@@ -1320,8 +1468,12 @@ function applyFiltersAndRender() {
   }
   empty.hidden = true;
 
+  // No aria-label here on purpose: this row's own real price/platform/date/
+  // location cells are the actual content a screen reader user needs the
+  // same way a sighted user reads them off the table, an aria-label reciting
+  // only the title would silently override all of that with just the name.
   tbody.innerHTML = filtered.map(l => `
-    <tr class="row-clickable" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="View details for ${escapeHtml(l.title || 'Untitled item')}">
+    <tr class="row-clickable" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button">
       <td>
         <div class="cell-card-name">${escapeHtml(l.title || 'Untitled item')}</div>
         ${l.notes ? `<div class="cell-card-meta">${escapeHtml(l.notes)}</div>` : ''}
@@ -1419,6 +1571,7 @@ function initTableScrollShadows() {
 // payout table above, just driven by a typed price instead of listings.json.
 const CALC_FEE_DESCRIPTIONS = {
   ebay: '13.6% final value fee + $0.30 ($0.40 over $10) per-order fee',
+  ebayShoes: '15.3% final value fee (Clothing, Shoes & Accessories) + $0.30 ($0.40 over $10) per-order fee',
   vinted: 'No seller fees',
   poshmark: 'Flat $2.95 under $15, otherwise 20% commission',
   depop: '3.3% + $0.45 payment processing, no commission'
@@ -1432,6 +1585,7 @@ const CALC_FEE_DESCRIPTIONS = {
 // seller is deciding whether boosting a new item is worth it.
 let calcPlatforms = new Set(PAYOUT_PLATFORMS);
 let includeDepopBoost = false;
+let includeEbayShoesRate = false;
 
 // Reads a positive-or-zero numeric input, treating blank as "not provided"
 // (null) rather than 0, since a real $0 cost and "haven't entered one yet"
@@ -1475,6 +1629,7 @@ function renderCalc() {
   const hasShipping = shipping != null && shipping !== undefined;
   const showProfit = hasCost || hasShipping;
   document.getElementById('calcDepopBoostWrap').hidden = !calcPlatforms.has('depop');
+  document.getElementById('calcEbayShoesWrap').hidden = !calcPlatforms.has('ebay');
 
   if (price == null || Number.isNaN(price) || price < 0 || calcPlatforms.size === 0) {
     table.hidden = true;
@@ -1489,11 +1644,13 @@ function renderCalc() {
   profitHead.hidden = !showProfit;
 
   const applyBoost = includeDepopBoost && calcPlatforms.has('depop');
+  const applyEbayShoesRate = includeEbayShoesRate && calcPlatforms.has('ebay');
+  const ebayCategory = applyEbayShoesRate ? 'shoes' : undefined;
 
   const rows = PAYOUT_PLATFORMS.filter(p => calcPlatforms.has(p)).map(p => {
     const net = p === 'depop' && applyBoost
       ? estimateNetPayout(p, price) - price * DEPOP_BOOST_FEE_PCT
-      : estimateNetPayout(p, price);
+      : estimateNetPayout(p, price, p === 'ebay' ? ebayCategory : undefined);
     return { p, net };
   });
   const bestNet = rows.length > 1 ? Math.max(...rows.map(r => r.net)) : null;
@@ -1504,7 +1661,9 @@ function renderCalc() {
     const profit = showProfit ? r.net - (hasCost ? cost : 0) - (hasShipping ? shipping : 0) : null;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
-      : CALC_FEE_DESCRIPTIONS[r.p];
+      : r.p === 'ebay' && applyEbayShoesRate
+        ? CALC_FEE_DESCRIPTIONS.ebayShoes
+        : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
       <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
@@ -1522,6 +1681,10 @@ function wireCalc() {
   document.getElementById('calcShippingInput').addEventListener('input', renderCalc);
   document.getElementById('calcDepopBoostInput').addEventListener('change', e => {
     includeDepopBoost = e.target.checked;
+    renderCalc();
+  });
+  document.getElementById('calcEbayShoesInput').addEventListener('change', e => {
+    includeEbayShoesRate = e.target.checked;
     renderCalc();
   });
   const container = document.getElementById('calcPlatformToggle');
@@ -1546,6 +1709,7 @@ function wireCalc() {
 // simple lookup once fees are a function of the unknown price.
 let beCalcPlatforms = new Set(PAYOUT_PLATFORMS);
 let beIncludeDepopBoost = false;
+let beIncludeEbayShoesRate = false;
 
 // eBay's per-order fee is a step function of price ($0.30 at/under $10, else
 // $0.40), so solve assuming the lower step first; the lower step is always
@@ -1582,6 +1746,7 @@ function renderBreakEven() {
   profitError.textContent = profitInvalid ? 'Enter a valid target profit of $0 or more, ignoring it for now.' : '';
 
   document.getElementById('beDepopBoostWrap').hidden = !beCalcPlatforms.has('depop');
+  document.getElementById('beEbayShoesWrap').hidden = !beCalcPlatforms.has('ebay');
 
   const hasCost = cost != null && cost !== undefined && cost > 0;
   const hasAnyInput = hasCost || (shipping != null && shipping !== undefined && shipping > 0) ||
@@ -1600,9 +1765,10 @@ function renderBreakEven() {
 
   const targetNet = (cost || 0) + (shipping || 0) + (profit || 0);
   const applyBoost = beIncludeDepopBoost && beCalcPlatforms.has('depop');
+  const applyEbayShoesRate = beIncludeEbayShoesRate && beCalcPlatforms.has('ebay');
 
   const rows = PAYOUT_PLATFORMS.filter(p => beCalcPlatforms.has(p)).map(p => {
-    const minPrice = minListingPriceForNet(p, targetNet, applyBoost);
+    const minPrice = minListingPriceForNet(p, targetNet, applyBoost, p === 'ebay' && applyEbayShoesRate ? 'shoes' : undefined);
     return { p, minPrice };
   });
   const lowest = rows.length > 1 ? Math.min(...rows.map(r => r.minPrice)) : null;
@@ -1612,7 +1778,9 @@ function renderBreakEven() {
     const isBest = lowest != null && !tiedForLowest && r.minPrice === lowest;
     const feeDescription = r.p === 'depop' && applyBoost
       ? CALC_FEE_DESCRIPTIONS.depop + ' + 12% boost fee'
-      : CALC_FEE_DESCRIPTIONS[r.p];
+      : r.p === 'ebay' && applyEbayShoesRate
+        ? CALC_FEE_DESCRIPTIONS.ebayShoes
+        : CALC_FEE_DESCRIPTIONS[r.p];
     return `
     <tr>
       <td>${escapeHtml(PLATFORM_LABELS[r.p])}</td>
@@ -1629,6 +1797,10 @@ function wireBreakEven() {
   document.getElementById('beProfitInput').addEventListener('input', renderBreakEven);
   document.getElementById('beDepopBoostInput').addEventListener('change', e => {
     beIncludeDepopBoost = e.target.checked;
+    renderBreakEven();
+  });
+  document.getElementById('beEbayShoesInput').addEventListener('change', e => {
+    beIncludeEbayShoesRate = e.target.checked;
     renderBreakEven();
   });
   const container = document.getElementById('bePlatformToggle');
@@ -1883,10 +2055,6 @@ function wirePromotedCalc() {
 let offerItemId = 'custom';
 let offerPlatform = null;
 
-const OFFER_TIER_ACCEPT_PCT = 0.90;
-const OFFER_TIER_COUNTER_PCT = 0.75;
-const OFFER_TIER_BORDERLINE_PCT = 0.50;
-
 function offerGuideSelectedListing() {
   return offerItemId !== 'custom' ? listings.find(l => l.id === offerItemId) || null : null;
 }
@@ -1943,13 +2111,6 @@ function renderOfferItemChips(currentListings) {
   onOfferItemChange();
 }
 
-function offerTier(pct) {
-  if (pct >= OFFER_TIER_ACCEPT_PCT) return 'accept';
-  if (pct >= OFFER_TIER_COUNTER_PCT) return 'counter';
-  if (pct >= OFFER_TIER_BORDERLINE_PCT) return 'borderline';
-  return 'decline';
-}
-
 // A copy-paste reply matching the ladder verdict above, same "Copy" pattern
 // as the buyer message templates below: the guide already computes the
 // right counter number, this is the last step from "what to do" to an
@@ -2001,15 +2162,14 @@ function renderOfferGuide() {
     actionText = `At ${pctLabel} of asking, this is close enough to target, common ladder guidance is to accept rather than risk losing the sale over a small gap.`;
   } else if (tier === 'counter') {
     tierLabel = 'Counter once'; badgeClass = 'badge-due';
-    counterAmount = Math.round(offer + (asking - offer) * 0.5);
+    counterAmount = Math.round(offerCounterAmount(tier, offer, asking, days));
     actionText = `At ${pctLabel} of asking, counter once rather than accept or decline outright, common ladder guidance splits the gap between the offer and asking.`;
   } else if (tier === 'borderline') {
     tierLabel = 'Borderline, use listing age'; badgeClass = 'badge-hold';
+    counterAmount = Math.round(offerCounterAmount(tier, offer, asking, days));
     if (days != null && days >= RELIST_FRESH_DAYS) {
-      counterAmount = Math.round(offer + (asking - offer) * 0.25);
       actionText = `At ${pctLabel} of asking and ${days} day(s) listed, past the ${RELIST_FRESH_DAYS}-day fresh window, common guidance leans toward accepting or countering close to their number, a stale listing has more to gain from finally moving than from holding the line.`;
     } else {
-      counterAmount = Math.round(offer + (asking - offer) * 0.75);
       actionText = days != null
         ? `At ${pctLabel} of asking and only ${days} day(s) listed, inside the ${RELIST_FRESH_DAYS}-day fresh window, common guidance is to counter firmly, closer to asking, since there's little pressure yet to move it.`
         : `At ${pctLabel} of asking with no listing date logged, defaulting to a firmer counter as if this were a fresh listing.`;
@@ -2360,6 +2520,41 @@ function renderTaxTracker(sales) {
   }
   note.hidden = noteParts.length === 0;
   note.textContent = noteParts.join(' ');
+}
+
+// Turns the eBay and Depop rows of the "Seller status & standards" reference
+// table from static text into a real progress readout, computed from actual
+// sales.json/disputes.json rows via ebayTrsProgress/depopTopSellerProgress in
+// garage-core.js. Vinted and Poshmark's tiers key off a star rating and
+// review count this dashboard has no data source for, so those two rows stay
+// plain reference text (see the static markup in index.html) rather than
+// getting a fabricated number here.
+function renderSellerStandardsProgress(sales, disputes) {
+  const today = todayDateStr();
+  const ebay = ebayTrsProgress(sales, disputes, today);
+  const depop = depopTopSellerProgress(sales, disputes, today);
+
+  const progressBar = (value, target) => {
+    const pct = Math.min(100, (value / target) * 100);
+    return `<div class="tax-progress-row"><div class="tax-progress-track"><div class="tax-progress-fill" ` +
+      `style="width:${pct}%"></div></div><span class="tax-progress-pct font-mono">${pct.toFixed(0)}%</span></div>`;
+  };
+  const rateText = rate => rate == null ? 'no sales yet' : (rate * 100).toFixed(1) + '%';
+
+  document.getElementById('ebayTrsProgressCell').innerHTML =
+    `<div class="cell-value">${ebay.transactions} <span class="cell-muted">/ ${ebay.transactionsTarget} txns</span></div>` +
+    progressBar(ebay.transactions, ebay.transactionsTarget) +
+    `<div class="cell-value">${formatUsd(ebay.grossSales)} <span class="cell-muted">/ ${formatUsd(ebay.grossSalesTarget)}</span></div>` +
+    progressBar(ebay.grossSales, ebay.grossSalesTarget) +
+    `<div class="cell-muted">Cases resolved against seller: ${rateText(ebay.nonSellerResolvedRate)} (target &le;0.3%), ` +
+    `trailing ${ebay.windowDays} days. Defect rate and late-shipment rate aren't computed here, this dashboard ` +
+    `doesn't log per-order ship timestamps.</div>`;
+
+  document.getElementById('depopTopSellerProgressCell').innerHTML =
+    `<div class="cell-value">${formatUsd(depop.grossSales)} <span class="cell-muted">/ ${formatUsd(depop.grossSalesTarget)}</span></div>` +
+    progressBar(depop.grossSales, depop.grossSalesTarget) +
+    `<div class="cell-muted">Refund rate: ${rateText(depop.nonSellerResolvedRate)} (target &lt;5%), rolling ` +
+    `${depop.windowDays} days. On-time-shipping rate isn't computed here, same reason as eBay's.</div>`;
 }
 
 // Expenses are sorted most-recent-first when a date is logged, undated
@@ -3235,12 +3430,26 @@ function renderKanban(listings, pipelineData) {
       ? cards.reduce((s, l) => s + remainingPlatforms(l).length, 0)
       : cards.length;
     const moreCount = (typeof known === 'number' && known > loggedForCompare) ? known - loggedForCompare : 0;
-    const cardsHtml = cards.length ? cards.map(l => `
-      <div class="kanban-card" draggable="true" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="${escapeHtml(l.title || 'Untitled item')}, open to edit">
+    const cardsHtml = cards.length ? cards.map(l => {
+      const priceText = l.price != null ? formatUsd(l.price) : 'no price set';
+      const platformText = (l.platforms || []).length + ' platform' + ((l.platforms || []).length === 1 ? '' : 's');
+      // The aria-label used to say only "{title}, open to edit", dropping the
+      // real price/platform-count the card's own visible sub-line shows, an
+      // aria-label that doesn't contain a control's real visible text is a
+      // genuine WCAG 2.5.3 miss (confirmed via Lighthouse's accessibility
+      // audit), not just a style nit: it silently withholds real data a
+      // screen reader user would otherwise get. Built from the same
+      // priceText/platformText the visible sub-line renders below so the two
+      // can never drift; "open to edit" kept at the end since that's real
+      // added context (this is a drag target, but a plain click/Enter opens
+      // the edit form too) the visible text alone doesn't convey.
+      return `
+      <div class="kanban-card" draggable="true" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="${escapeHtml(l.title || 'Untitled item')}, ${escapeHtml(priceText)} &middot; ${escapeHtml(platformText)}, open to edit">
         <div class="kanban-card-title">${escapeHtml(l.title || 'Untitled item')}</div>
-        <div class="kanban-card-sub">${l.price != null ? formatUsd(l.price) : 'no price set'} &middot; ${(l.platforms || []).length} platform${(l.platforms || []).length === 1 ? '' : 's'}</div>
+        <div class="kanban-card-sub">${escapeHtml(priceText)} &middot; ${escapeHtml(platformText)}</div>
       </div>
-    `).join('') : '<div class="kanban-empty">No individually logged items in this stage.</div>';
+    `;
+    }).join('') : '<div class="kanban-empty">No individually logged items in this stage.</div>';
     const moreHtml = moreCount > 0
       ? `<div class="kanban-more-note">+${moreCount} more known from the real pipeline count, not individually logged yet</div>`
       : '';
@@ -4820,6 +5029,14 @@ wireQuickLogAcquisitionTool();
 wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
+renderFeeScheduleFreshness();
+renderTitleSpecsFreshness();
+renderReturnDisputeFreshness();
+renderScamPatternsFreshness();
+renderSellerStandardsFreshness();
+renderTaxTrackerFreshness();
+renderElectronicsRulesFreshness();
+renderPackagingRulesFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch

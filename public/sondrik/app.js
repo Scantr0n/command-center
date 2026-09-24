@@ -36,6 +36,27 @@
     goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
   } = window.SondrikGoalsCore;
 
+  // Shared, unit-tested bugfix-checkin date math (release-core.js), same
+  // shared-core pattern as SondrikGoalsCore above: the exact function that
+  // has already produced two real bugs (a NaN-date crash, a silently
+  // dropped missed-checkpoint) now lives in one place a test suite can
+  // actually exercise. See release-core.js's own header for both bugs.
+  const { bugfixCheckinStatus, suggestedCheckCadence, computeReminders: computeRemindersCore } = window.SondrikReleaseCore;
+
+  // Shared, unit-tested CSV/ICS serialization (export-core.js): csvField's
+  // CSV/formula-injection guard and icsFoldLine's UTF-8-byte-aware line
+  // folding, same shared-core pattern as the two destructures above. CSM
+  // already had the identical three functions tested; this closes the same
+  // gap for Sondrik.
+  const { csvField, icsEscapeText, icsFoldLine } = window.SondrikExportCore;
+
+  // Shared, unit-tested "what needs a real human action right now" logic
+  // (next-steps-core.js), same shared-core pattern as the three destructures
+  // above: the Next Steps section and the header's attention pill are both
+  // real, user-facing signals Jack checks every visit, and until now neither
+  // had a regression test.
+  const { computeNextSteps: computeNextStepsCore } = window.SondrikNextStepsCore;
+
   printBtn.addEventListener('click', () => window.print());
 
   // "New since your last visit" is a per-browser convenience, not a second
@@ -428,83 +449,11 @@
   // since a feature release has no "did the bug stay fixed" question to
   // answer at those checkpoints. Shared by the release card and the next
   // steps checklist below so both agree on the same tier at the same time.
-  const BUGFIX_CHECKPOINTS = [7, 14];
-  const BUGFIX_CHECKPOINT_GRACE_DAYS = 3;
-  function bugfixCheckinStatus(release) {
-    if (!release || release.type !== 'bugfix' || !release.date) return null;
-    // A malformed release.date (a non-zero-padded "2026-9-5") makes
-    // daysBetween return NaN, and every `days < N` comparison below is
-    // always false for NaN, so both checkpoints fell into missedCheckpoints
-    // and rendered "day NaN" instead of erroring, the same date-guard bug
-    // goals-core.js's own header describes and computeGoalPaceStatus
-    // already guards against elsewhere in this file.
-    if (!isValidDateStr(release.date)) return null;
-    const days = daysBetween(release.date, todayIso());
-    if (days < 0) return null;
-
-    // A checkpoint whose grace window closes before the *next* checkpoint
-    // arrives (true for 7, since 7+3=10 is before 14) used to just fall
-    // through this loop unrecorded: past day 10 with no check-in logged,
-    // this jumped straight to treating the 14-day checkpoint as "upcoming"
-    // with no trace that the 7-day one was ever due, let alone missed.
-    // There's no persisted "confirmed" flag in releases.json (a check-in is
-    // just Jack looking and seeing nothing new), so the only honest signal
-    // available here is "its grace window closed without this function ever
-    // getting to report it as due" -- tracked in missedCheckpoints and
-    // surfaced instead of silently dropped.
-    const missedCheckpoints = [];
-    for (const checkpoint of BUGFIX_CHECKPOINTS) {
-      if (days < checkpoint) {
-        if (missedCheckpoints.length) {
-          return {
-            tier: 'missed',
-            text: 'Missed the ' + missedCheckpoints.join('- and ') + '-day check-in (day ' + days + '); next is the ' +
-              checkpoint + '-day check-in in ' + (checkpoint - days) + (checkpoint - days === 1 ? ' day' : ' days') +
-              ' (' + fmtDate(addDays(release.date, checkpoint)) + ')'
-          };
-        }
-        return {
-          tier: 'upcoming',
-          text: checkpoint + '-day check-in in ' + (checkpoint - days) + (checkpoint - days === 1 ? ' day' : ' days') +
-            ' (' + fmtDate(addDays(release.date, checkpoint)) + ')'
-        };
-      }
-      if (days < checkpoint + BUGFIX_CHECKPOINT_GRACE_DAYS) {
-        // An earlier checkpoint's own grace window can close before this
-        // one's due window even opens (true for 7: 7+3=10 is before 14),
-        // so missedCheckpoints can already be non-empty by the time this
-        // branch runs. Returning plain "due" here dropped that missed
-        // checkpoint the moment the next one's window opened, the same
-        // silent-drop this function's own comment above says never to do.
-        if (missedCheckpoints.length) {
-          return {
-            tier: 'missed',
-            text: 'Missed the ' + missedCheckpoints.join(' and ') + '-day check-in' + (missedCheckpoints.length > 1 ? 's' : '') +
-              ' (day ' + days + '); the ' + checkpoint + '-day check-in is also due now, confirm no new reports of the fixed bug'
-          };
-        }
-        return {
-          tier: 'due',
-          text: 'Past the ' + checkpoint + '-day check-in (day ' + days + '), confirm no new reports of the fixed bug'
-        };
-      }
-      missedCheckpoints.push(checkpoint);
-    }
-    if (missedCheckpoints.length) {
-      return {
-        tier: 'missed',
-        text: 'Missed the ' + missedCheckpoints.join(' and ') + '-day check-in' + (missedCheckpoints.length > 1 ? 's' : '') +
-          ' (day ' + days + ')'
-      };
-    }
-    return {
-      tier: 'passed',
-      text: 'Both the 7- and 14-day check-ins have passed (day ' + days + ')'
-    };
-  }
-
+  // The tier/text logic itself lives in release-core.js (imported above as
+  // bugfixCheckinStatus) so it can be unit-tested; this just supplies the
+  // live "today" and the page's own locale date formatter.
   function bugfixCheckinHtml(release) {
-    const status = bugfixCheckinStatus(release);
+    const status = bugfixCheckinStatus(release, todayIso(), fmtDate);
     if (!status) return '';
     return '<div class="bugfix-checkin bugfix-checkin-' + status.tier + ' font-mono">' +
       escapeHtml(status.text.toUpperCase()) + '</div>';
@@ -539,23 +488,6 @@
       '</div>' +
       '<div class="launch-window-marks font-mono" aria-hidden="true"><span>0</span><span>30</span><span>60</span><span>90+</span></div>' +
       '</div>';
-  }
-
-  // Shared "how long between real check-ins on average, and when's the next
-  // one due" calculation, used both by the cadence line in the Traction
-  // section below and by the calendar reminders export, so the two can never
-  // state two different suggested next-check dates off the same real gaps.
-  // Needs at least two real checks (no gap exists off a single point).
-  function suggestedCheckCadence(downloadsData) {
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length < 2) return null;
-    const gaps = [];
-    for (let i = 1; i < checks.length; i++) gaps.push(daysBetween(checks[i - 1].date, checks[i].date));
-    const avgGap = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
-    if (avgGap <= 0) return null;
-    const latest = checks[checks.length - 1];
-    return { avgGap, gapCount: gaps.length, latest, nextDate: addDays(latest.date, avgGap) };
   }
 
   function renderTraction(data) {
@@ -1119,225 +1051,28 @@
   // approvals. Before this split, a stale download check or a missed
   // bugfix check-in only ever showed up if you scrolled down to Next
   // steps; a backgrounded tab gave no glance signal for either.
+  // The actual branch-by-branch logic now lives in next-steps-core.js
+  // (SondrikNextStepsCore, destructured near the top of this file) so it can
+  // be unit-tested directly; every date/pace helper it needs is passed in
+  // here rather than re-implemented there, so there is only ever one real
+  // copy of each of those calculations.
   function computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData, changelogStatusData) {
-    const steps = [];
-
-    // The one validate.js warning most directly tied to the real 2026-09-17
-    // trust incident this changelog section exists to guard against, and
-    // previously the one warning with no on-page signal at all: Jack would
-    // only find out the changelog had drifted by running the CLI validator
-    // himself. Urgent, since a drifted changelog is actively showing
-    // something untrustworthy, not just an unfilled field.
-    if (changelogStatusData && changelogStatusData.drifted) {
-      steps.push({
-        urgent: true,
-        text: 'The data changelog is out of sync with real git history (' + changelogStatusData.recordedCount +
-          ' recorded vs ' + changelogStatusData.realCount + ' real commits), run ' +
-          'node public/sondrik/data/changelog.js to refresh it.',
-        href: '#changelogSection'
-      });
-    }
-
-    const releases = (releasesData && releasesData.releases) || [];
-    const undatedReleases = releases.filter(r => !r.date);
-    if (undatedReleases.length > 0) {
-      steps.push({
-        urgent: false,
-        text: 'Log the ship date for ' +
-          (undatedReleases.length === 1 ? 'v' + undatedReleases[0].version : undatedReleases.length + ' releases') +
-          ', no date is on record.',
-        href: '#releaseSection'
-      });
-    }
-
-    const datedReleases = releases.filter(r => r.date).slice().sort((a, b) => b.date.localeCompare(a.date));
-    if (datedReleases.length > 0) {
-      const checkinStatus = bugfixCheckinStatus(datedReleases[0]);
-      if (checkinStatus && (checkinStatus.tier === 'due' || checkinStatus.tier === 'missed')) {
-        steps.push({
-          urgent: true,
-          text: 'v' + datedReleases[0].version + ': ' + checkinStatus.text.charAt(0).toLowerCase() + checkinStatus.text.slice(1) + '.',
-          href: '#releaseSection'
-        });
+    return computeNextStepsCore(
+      { releasesData, downloadsData, leadsData, goalsData, channelsData, changelogStatusData },
+      {
+        todayIsoStr: todayIso(),
+        fmtDate,
+        staleAfterDays: STALE_AFTER_DAYS,
+        agingAfterDays: AGING_AFTER_DAYS,
+        bugfixCheckinStatus,
+        currentMetricValue,
+        computeGoalProgressPct,
+        computeGoalPaceStatus,
+        findDuplicateLeads: SondrikValidateCore.findDuplicateLeads,
+        isValidDateStr,
+        daysBetween
       }
-    }
-
-    const leads = (leadsData && leadsData.leads) || [];
-
-    // Same "no real date logged" gap as undatedReleases above, for the other
-    // record type that carries a real date field: a lead with loggedDate
-    // null already renders under the Timeline's "no date on record" list,
-    // but that section is easy to miss, and nothing previously surfaced it
-    // as an actual next action the way an undated release already did.
-    const undatedLeads = leads.filter(l => !l.loggedDate);
-    if (undatedLeads.length > 0) {
-      steps.push({
-        urgent: false,
-        text: 'Log the real date ' +
-          (undatedLeads.length === 1
-            ? (undatedLeads[0].sourceDetail || undatedLeads[0].source || 'this lead') + ' actually came in'
-            : undatedLeads.length + ' leads actually came in') +
-          ', no date is on record.',
-        href: '#leadsSection'
-      });
-    }
-
-    leads.forEach(l => {
-      const o = l.outreach || {};
-      if (!o.sent && o.approvalStatus === 'awaiting-approval') {
-        steps.push({
-          urgent: true,
-          text: 'Approve or send the drafted message to ' + (l.sourceDetail || l.source || 'this lead') + '.',
-          href: '#leadsSection'
-        });
-        if (!o.draftText) {
-          steps.push({
-            urgent: false,
-            text: 'Paste the actual drafted text for ' + (l.sourceDetail || l.source || 'this lead') +
-              ' into outreach.draftText so it can be previewed on this page before approving it.',
-            href: '#leadsSection'
-          });
-        }
-      }
-    });
-
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length === 0) {
-      steps.push({
-        urgent: false,
-        text: 'Log a first download check in downloads.json once you have a real count to record.',
-        href: '#tractionSection'
-      });
-    } else {
-      const latest = checks[checks.length - 1];
-      const ageDays = daysBetween(latest.date, todayIso());
-      if (ageDays > STALE_AFTER_DAYS) {
-        steps.push({
-          urgent: true,
-          text: 'Pull a fresh ' + (metric.label || 'download') + ' count, the last one logged is ' + ageDays + ' days old.',
-          href: '#tractionSection'
-        });
-      } else if (ageDays > AGING_AFTER_DAYS) {
-        steps.push({
-          urgent: false,
-          text: 'The last ' + (metric.label || 'download') + ' count is ' + ageDays + ' days old, plan to pull a fresh one soon before it goes stale.',
-          href: '#tractionSection'
-        });
-      }
-      if (!metric.source) {
-        steps.push({
-          urgent: false,
-          text: 'Cite a source for the ' + (metric.label || 'download') + ' count, an uncited number reads as an estimate.',
-          href: '#tractionSection'
-        });
-      }
-
-      // Same real data-quality gap validate.js already warns on (a
-      // cumulative GitHub release download count that reads lower than the
-      // check before it almost always means a transposed digit or the wrong
-      // number pasted in, not a real drop), but that check previously only
-      // ever ran from the command line. This is the exact number the
-      // snapshot strip and Traction section currently show as fact, so a
-      // regression here is urgent rather than a background nit, same
-      // reasoning as the changelog-drift item above.
-      const regressions = checks.filter((c, idx) => idx > 0 && c.count < checks[idx - 1].count);
-      if (regressions.length > 0) {
-        steps.push({
-          urgent: true,
-          text: (regressions.length === 1
-            ? 'The ' + fmtDate(regressions[0].date) + ' check (' + regressions[0].count + ')'
-            : regressions.length + ' checks') +
-            ' logged a lower ' + (metric.label || 'download') + ' count than the check before it, a real ' +
-            'cumulative count should not go down, check for a typo.',
-          href: '#tractionSection'
-        });
-      }
-    }
-
-    const channels = (channelsData && channelsData.channels) || [];
-    const unexplainedGaps = channels.filter(c => c.status === 'not-tracked' && !c.note);
-    if (unexplainedGaps.length > 0) {
-      steps.push({
-        urgent: false,
-        text: 'Add a note explaining why ' +
-          (unexplainedGaps.length === 1 ? (unexplainedGaps[0].name || 'this channel') + ' is' : unexplainedGaps.length + ' channels are') +
-          ' not tracked yet, an unexplained gap reads as an oversight.',
-        href: '#channelsSection'
-      });
-    }
-
-    // Same gap validate.js already warns on: a channel marked "tracked" with
-    // no linkedMetric wired up renders identically to a tracked channel that
-    // just has no data logged yet (both fall through to "No number logged
-    // yet." in renderChannels' linkedValue), so without this the wiring gap
-    // itself was invisible on the page, only ever caught by running the CLI.
-    const unwiredTracked = channels.filter(c => c.status === 'tracked' && !c.linkedMetric);
-    if (unwiredTracked.length > 0) {
-      steps.push({
-        urgent: false,
-        text: 'Wire up a linkedMetric (downloads or leads) for ' +
-          (unwiredTracked.length === 1 ? (unwiredTracked[0].name || 'this channel') : unwiredTracked.length + ' channels') +
-          ' marked tracked, without one there is nothing real to display for it.',
-        href: '#channelsSection'
-      });
-    }
-
-    const goals = (goalsData && goalsData.goals) || [];
-    if (goals.length === 0) {
-      steps.push({
-        urgent: false,
-        text: 'Set a real target in goals.json once there is one worth tracking against.',
-        href: '#goalsSection'
-      });
-    }
-
-    // The Goals card already computes both of these (see renderGoals: the
-    // "TARGET DATE PASSED" pace line and the BEHIND PACE tier from
-    // computeGoalPaceStatus), but only ever showed them to someone who
-    // scrolled down to that card. Same consolidation this function already
-    // does for the stale-check and missed-checkin signals above, applied to
-    // the one real goal now on record. Skips an already-met goal entirely,
-    // "reached its target late" isn't an open action.
-    goals.forEach(g => {
-      const current = currentMetricValue(g.metric, downloadsData, leadsData);
-      const currentCount = current ? current.count : 0;
-      const pct = computeGoalProgressPct(g.target, currentCount);
-      const achieved = g.target > 0 && currentCount >= g.target;
-      if (achieved) return;
-
-      if (g.targetDate && isValidDateStr(g.targetDate) && daysBetween(todayIso(), g.targetDate) < 0) {
-        steps.push({
-          urgent: true,
-          text: '"' + g.label + '" target date has passed (' + fmtDate(g.targetDate) + '), ' +
-            currentCount + ' of ' + g.target + ' reached, revise the target or the date.',
-          href: '#goalsSection'
-        });
-      } else if (current) {
-        const paceStatus = computeGoalPaceStatus(g.setDate, g.targetDate, pct, todayIso());
-        if (paceStatus && paceStatus.tier === 'behind') {
-          steps.push({
-            urgent: false,
-            text: '"' + g.label + '" is behind pace, ' + pct + '% reached vs an expected ~' +
-              paceStatus.expectedPct + '% by now.',
-            href: '#goalsSection'
-          });
-        }
-      }
-    });
-
-    const duplicateLeadGroups = SondrikValidateCore.findDuplicateLeads(leads);
-    if (duplicateLeadGroups.length > 0) {
-      const dupCount = duplicateLeadGroups.reduce((n, g) => n + g.length, 0);
-      steps.push({
-        urgent: false,
-        text: dupCount + ' leads look like the same real contact logged twice (matched on channel + source detail), check before counting both.',
-        href: '#leadsSection'
-      });
-    }
-
-    steps.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
-    return steps;
+    );
   }
 
   function renderNextSteps(steps) {
@@ -1469,84 +1204,14 @@
     return parts.join(' ');
   }
 
-  // Turns the same two forward-looking real dates already computed elsewhere
-  // on the page (the bugfix check-in schedule, the check-in cadence estimate)
-  // into calendar reminders, so they land somewhere Jack will actually see
-  // them instead of only on this page when he happens to visit it. Only ever
-  // a date that is today or still in the future: a reminder for one that has
-  // already passed isn't useful as a calendar event, Next Steps above already
-  // flags an overdue one as an action item instead. Adds no new fact, purely
-  // a re-expression of real data that already renders elsewhere.
+  // The real filter/date math now lives in release-core.js alongside
+  // BUGFIX_CHECKPOINTS/bugfixCheckinStatus, same reason those were split
+  // out: a wrong filter here means Jack's real .ics calendar reminders
+  // silently drift. This wrapper just supplies "today" explicitly from the
+  // real clock, since the core function takes it as a parameter rather than
+  // reading Date.now() itself, so it stays deterministically testable.
   function computeReminders(releasesData, downloadsData) {
-    const reminders = [];
-
-    const dated = ((releasesData && releasesData.releases) || []).filter(r => r.date)
-      .slice().sort((a, b) => b.date.localeCompare(a.date));
-    const latestRelease = dated[0];
-    if (latestRelease && latestRelease.type === 'bugfix') {
-      BUGFIX_CHECKPOINTS.forEach(checkpoint => {
-        const date = addDays(latestRelease.date, checkpoint);
-        if (date >= todayIso()) {
-          reminders.push({
-            date,
-            uid: 'sondrik-checkin-v' + latestRelease.version + '-' + checkpoint + '@command-center',
-            summary: 'Sondrik v' + latestRelease.version + ': ' + checkpoint + '-day check-in',
-            description: 'Confirm no new reports of the bug fixed in v' + latestRelease.version +
-              (latestRelease.summary ? ' (' + latestRelease.summary + ')' : '') + '.'
-          });
-        }
-      });
-    }
-
-    const cadence = suggestedCheckCadence(downloadsData);
-    if (cadence && cadence.nextDate >= todayIso()) {
-      const metric = (downloadsData && downloadsData.metric) || {};
-      reminders.push({
-        date: cadence.nextDate,
-        uid: 'sondrik-download-check-' + cadence.nextDate + '@command-center',
-        summary: 'Sondrik: pull a fresh ' + (metric.label || 'download') + ' count',
-        description: 'Based on ' + (cadence.gapCount === 1
-          ? 'your only check-in gap so far' : 'the average of your last ' + cadence.gapCount + ' check-in gaps') +
-          ' (~' + cadence.avgGap + (cadence.avgGap === 1 ? ' day' : ' days') + ').' +
-          (metric.source ? ' Source: ' + metric.source + '.' : '')
-      });
-    }
-
-    return reminders.sort((a, b) => a.date.localeCompare(b.date));
-  }
-
-  // RFC 5545 (iCalendar) text escaping and 75-octet line folding, same
-  // approach CSM's own nudge-queue calendar export already uses for exactly
-  // the same reason (long SUMMARY/DESCRIPTION values, and a UTF-8-safe fold
-  // so a multi-byte character never gets split across the line break).
-  function icsEscapeText(s) {
-    return String(s == null ? '' : s)
-      .replace(/\\/g, '\\\\')
-      .replace(/;/g, '\\;')
-      .replace(/,/g, '\\,')
-      .replace(/\n/g, '\\n');
-  }
-
-  const icsEncoder = new TextEncoder();
-  function icsFoldLine(line) {
-    if (icsEncoder.encode(line).length <= 75) return line;
-    const segments = [];
-    let seg = '';
-    let segBytes = 0;
-    let budget = 75;
-    for (const ch of line) { // for...of walks by code point, never a lone surrogate half
-      const chBytes = icsEncoder.encode(ch).length;
-      if (segBytes + chBytes > budget) {
-        segments.push(seg);
-        seg = '';
-        segBytes = 0;
-        budget = 74; // continuation lines carry a leading space, counted separately below
-      }
-      seg += ch;
-      segBytes += chBytes;
-    }
-    if (seg) segments.push(seg);
-    return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
+    return computeRemindersCore(releasesData, downloadsData, todayIso());
   }
 
   // One all-day VEVENT per real reminder, never anything that contacts
@@ -1647,16 +1312,6 @@
     const label = 'sondrik downloads';
     const value = latest.count + ' (as of ' + fmtDate(latest.date) + ')';
     return renderFlatBadgeSvg(label, value, '#3B82C4');
-  }
-
-  function csvField(v) {
-    let s = v == null ? '' : String(v);
-    // CSV/formula injection (OWASP): a hand-typed note starting with
-    // =, +, -, @, tab, or a carriage return is read as a live formula by
-    // Excel/Sheets when this export is opened there, not as plain text.
-    // A leading single quote is the standard mitigation both recommend.
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
   // Exports the real, logged download-check history only, one row per actual
@@ -2038,8 +1693,8 @@
       if (!summary) blockers.push('A summary is required.');
       if (!date) blockers.push('Date logged is required.');
 
-      qlWarnings.textContent = blockers.join(' ');
       if (blockers.length) {
+        qlWarnings.textContent = blockers.join(' ');
         qlOutput.hidden = true;
         qlCopyBtn.hidden = true;
         return;
@@ -2060,6 +1715,19 @@
           note: null
         }
       };
+
+      // Same real-contact-logged-twice check the leads feed already flags
+      // inline (POSSIBLE DUPLICATE) and validate.js already warns on, run
+      // here too so it surfaces before a duplicate is even pasted into
+      // leads.json, not only after. Advisory, not a blocker: matching on
+      // channel + source detail is a strong signal, not certainty, the same
+      // reason validate.js treats it as a warning rather than a hard error.
+      const existingLeads = (leadsData && leadsData.leads) || [];
+      const dupGroups = SondrikValidateCore.findDuplicateLeads(existingLeads.concat([obj]));
+      const isDuplicate = dupGroups.some(group => group.indexOf(obj) !== -1);
+      qlWarnings.textContent = isDuplicate
+        ? 'This looks like it might be the same real contact as a lead already logged (same channel + source detail). Check leads.json before adding a second entry for the same person.'
+        : '';
 
       qlOutput.value = JSON.stringify(obj, null, 2) + ',';
       qlOutput.hidden = false;
@@ -2606,7 +2274,7 @@
   // while focus sits in a real text field (the quick-log forms all take
   // free text, including one with a literal "?" placeholder character).
   document.addEventListener('keydown', e => {
-    if (shortcutsOpen) return;
+    if (shortcutsOpen || jumpNavOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -2620,6 +2288,112 @@
       if (copyStatusBtn.disabled) return;
       e.preventDefault();
       copyStatusBtn.click();
+    }
+  });
+
+  // Jump-to-section nav, same markup/behavior as the Garage hub's: this
+  // page has no sticky header and runs long once the changelog and norms
+  // references are open, so this is the one way back to a specific section
+  // without scrolling blind. Built from the real on-page section titles at
+  // load time, no separate list to keep in sync by hand as sections get
+  // added.
+  let jumpNavOpen = false;
+  let jumpNavLastFocusedEl = null;
+
+  function collectJumpSections() {
+    const usedIds = new Set();
+    return Array.from(document.querySelectorAll('main > section')).map((section) => {
+      if (section.hidden) return null;
+      const titleEl = section.querySelector('h2.section-title, summary.section-title');
+      if (!titleEl) return null;
+      // Strip a live meta badge nested in the title itself (the "Data
+      // changelog" heading carries the Self-check warning count this way)
+      // so the label stays a stable section name instead of picking up
+      // that badge's own, ever-changing text.
+      const clone = titleEl.cloneNode(true);
+      clone.querySelectorAll('.section-title-meta').forEach(el => el.remove());
+      const label = clone.textContent.replace(/\s+/g, ' ').trim();
+      if (!label) return null;
+      if (!section.id) {
+        let slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'section';
+        let candidate = 'jump-' + slug;
+        let n = 2;
+        while (usedIds.has(candidate) || document.getElementById(candidate)) {
+          candidate = 'jump-' + slug + '-' + n;
+          n++;
+        }
+        section.id = candidate;
+      }
+      usedIds.add(section.id);
+      return { id: section.id, label };
+    }).filter(Boolean);
+  }
+
+  function renderJumpNavList() {
+    const sections = collectJumpSections();
+    document.getElementById('jumpNavList').innerHTML = sections.map(s => `
+      <a class="jump-nav-link" href="#${s.id}" data-jump-target="${s.id}">${escapeHtml(s.label)}</a>
+    `).join('');
+  }
+
+  function getJumpNavFocusable() {
+    return Array.from(document.getElementById('jumpNavModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openJumpNav() {
+    if (jumpNavOpen) return;
+    jumpNavOpen = true;
+    jumpNavLastFocusedEl = document.activeElement;
+    renderJumpNavList();
+    document.getElementById('jumpNavOverlay').hidden = false;
+    lockBodyScroll();
+    document.getElementById('jumpNavClose').focus();
+  }
+
+  function closeJumpNav() {
+    if (!jumpNavOpen) return;
+    jumpNavOpen = false;
+    document.getElementById('jumpNavOverlay').hidden = true;
+    unlockBodyScroll();
+    if (jumpNavLastFocusedEl && typeof jumpNavLastFocusedEl.focus === 'function') jumpNavLastFocusedEl.focus();
+    jumpNavLastFocusedEl = null;
+  }
+
+  document.getElementById('jumpNavBtn').addEventListener('click', openJumpNav);
+  document.getElementById('jumpNavClose').addEventListener('click', closeJumpNav);
+  document.getElementById('jumpNavOverlay').addEventListener('click', e => {
+    if (e.target.id === 'jumpNavOverlay') closeJumpNav();
+  });
+  document.getElementById('jumpNavList').addEventListener('click', e => {
+    const link = e.target.closest('.jump-nav-link');
+    if (!link) return;
+    e.preventDefault();
+    const target = document.getElementById(link.dataset.jumpTarget);
+    closeJumpNav();
+    if (target) {
+      // The scroll-lock release above needs a frame to settle, starting the
+      // smooth scroll before that clobbers it.
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!jumpNavOpen) return;
+    if (e.key === 'Escape') { closeJumpNav(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getJumpNavFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   });
 

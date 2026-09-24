@@ -7,8 +7,15 @@
   const {
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-    nudgeUrgencyLevel, computeNudgeRows,
-    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso
+    nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
+    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
+    reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
+    computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
+    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
+    csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+    channelSortRank, listComparator, computeDataQualityFlags,
+    slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
+    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -110,6 +117,26 @@
   const nudgeTodayNoteEl = document.getElementById('nudgeTodayNote');
   if (nudgeTodayNoteEl) {
     nudgeTodayNoteEl.textContent = 'Due dates below are computed against today, ' + fmtDate(todayIso()) + ', this device’s local date.';
+  }
+
+  // China runs a single national timezone (China Standard Time, UTC+8, no
+  // daylight saving), so a nudge that looks "due today" on this device can
+  // still land in the middle of the recipient's night. Cold-outreach
+  // benchmarks are consistent that weekday mornings in the recipient's own
+  // timezone get the best reply rates, the same category of signal
+  // rollToWeekdayIso already applies to which day a nudge rolls onto; this
+  // surfaces the hour, computed once at page load like every other
+  // "computed against this clock" note on this page, not a live tick.
+  const beijingTimeNoteEl = document.getElementById('beijingTimeNote');
+  if (beijingTimeNoteEl) {
+    const b = beijingTimeInfo();
+    const clock = String(b.hour).padStart(2, '0') + ':' + String(b.minute).padStart(2, '0');
+    let verdict;
+    if (b.isPrimeReplyWindow) verdict = 'Inside the Tue-Thu morning window general cold-outreach benchmarks report as strongest for replies.';
+    else if (b.isBusinessHours) verdict = 'Inside typical business hours, outside that Tue-Thu-morning window.';
+    else if (b.isWeekday) verdict = 'Outside typical business hours; a message sent now likely sits unread until morning there.';
+    else verdict = 'A weekend in China; a message sent now likely sits unread until Monday there.';
+    beijingTimeNoteEl.textContent = 'Beijing time right now: ' + clock + ', ' + b.weekdayName + '. ' + verdict;
   }
 
   // Reference/analytics widgets below the attention bar (platform reference,
@@ -402,6 +429,15 @@
     const coldSignalCount = computeColdSignal(prospects).active.length;
     const backfillCount = computeDataQualityFlags(stages, prospects).length;
     const duplicateCount = CSMValidateCore.findDuplicateProspects(prospects).length;
+    // Casing drift has its own section (casingDriftSection) with the same
+    // "silently fragments filtering/grouping" real-world impact as a
+    // duplicate prospect, but was never counted up here, so it could sit
+    // fully populated at the bottom of the page with nothing above the fold
+    // ever pointing at it. Same CSMValidateCore.findCasingDrift call
+    // renderCasingDrift itself already makes for each of the two fields it
+    // checks (category, social platform).
+    const casingDriftCount = CSMValidateCore.findCasingDrift(prospects, p => [p.category]).length +
+      CSMValidateCore.findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform)).length;
 
     const items = [];
     // Same reasoning as Sondrik's own Next Steps widget: a drifted changelog
@@ -445,6 +481,12 @@
         label: duplicateCount === 1 ? 'possible duplicate' : 'possible duplicates'
       });
     }
+    if (casingDriftCount) {
+      items.push({
+        n: casingDriftCount, tone: 'warn', target: 'casingDriftList',
+        label: casingDriftCount === 1 ? 'spelling inconsistency across prospects' : 'spelling inconsistencies across prospects'
+      });
+    }
 
     if (items.length === 0) {
       attentionBarEl.hidden = true;
@@ -466,33 +508,12 @@
     });
   }
 
-  function byUrgency(a, b) {
-    // Two prospects sharing the exact same nextNudgeDate used to always
-    // return 1 (never 0), a comparator that claims every equal pair is
-    // "greater than" itself in both directions, which violates a real sort
-    // comparator's own contract (compare(a,b) and compare(b,a) can't both
-    // be positive) and leaves their relative order effectively arbitrary.
-    // Falls through to the same name-based tiebreak the "neither has a
-    // date" case below already uses, for a deterministic order either way.
-    if (a.nextNudgeDate && b.nextNudgeDate && a.nextNudgeDate !== b.nextNudgeDate) {
-      return a.nextNudgeDate < b.nextNudgeDate ? -1 : 1;
-    }
-    if (a.nextNudgeDate && !b.nextNudgeDate) return -1;
-    if (b.nextNudgeDate && !a.nextNudgeDate) return 1;
-    return (a.name || '').localeCompare(b.name || '');
-  }
-
   const stalledEl = document.getElementById('stalledList');
   const stalledSection = document.getElementById('stalledSection');
 
-  function computeStalled(stages, prospects) {
-    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
-    return prospects
-      .map(p => ({ p, info: stallInfo(p, stageById) }))
-      .filter(x => x.info && x.info.isStale)
-      .sort((a, b) => b.info.days - a.info.days);
-  }
-
+  // Pure stalled-prospect rollup math now lives in csm-core.js
+  // (computeStalled), same shared-core-with-tests pattern as the other
+  // pure math above.
   function renderStalled(stages, prospects) {
     const stalled = computeStalled(stages, prospects);
 
@@ -518,10 +539,11 @@
   const duplicatesSection = document.getElementById('duplicatesSection');
 
   // Real risk this catches: the "Log new prospect" generator only guards
-  // against an exact id collision (npUniqueId), so hand-typing the same
-  // person into a second entry under a slightly different id would otherwise
-  // go unnoticed. Shared with validate.js via CSMValidateCore (same reasoning
-  // as CGT's own validate-core.js) so the two can never drift.
+  // against an exact id collision (nextAvailableId, in csm-core.js), so
+  // hand-typing the same person into a second entry under a slightly
+  // different id would otherwise go unnoticed. Shared with validate.js via
+  // CSMValidateCore (same reasoning as CGT's own validate-core.js) so the
+  // two can never drift.
   function renderDuplicates(prospects) {
     const groups = CSMValidateCore.findDuplicateProspects(prospects);
     if (groups.length === 0) {
@@ -581,44 +603,10 @@
   const coldSignalParkedWrap = document.getElementById('coldSignalParkedWrap');
   const coldSignalParkedEl = document.getElementById('coldSignalParkedList');
 
-  // Real signal from cold-outreach practice, not something invented for this
-  // board: a contact who has received several real touches (initial send +
-  // nudges, from the same outreachLog already used above) while still sitting
-  // in outreach-sent (no reply, no stage move) is a sign the hook or channel
-  // isn't landing, not just that another identical nudge is due. Distinct
-  // from "stalled" (which only looks at time sitting in a stage regardless of
-  // how many touches happened) and from "needs backfill" (missing fields):
-  // this looks at real touch count vs. real stage movement.
-  const COLD_TOUCH_THRESHOLD = 3;
-
-  // Flagging a cold prospect forever with no way to act on it is its own bad
-  // pattern: cold-outreach convention is to stop repeating the identical
-  // nudge after a few unanswered touches and deliberately park a real
-  // re-attempt months out, not nag on the same cadence or drop the lead.
-  // nudgeSchedule.doNotNudgeBefore already exists for exactly this, editable
-  // from this prospect's own edit form, so a future date there is read as
-  // "already decided, come back later" and split into its own list instead
-  // of sitting in the urgent one forever.
-  function computeColdSignal(prospects) {
-    const today = todayIso();
-    const flagged = prospects
-      .filter(p => p.stage === 'outreach-sent')
-      .map(p => ({ p, touches: touchCount(p) }))
-      .filter(x => x.touches >= COLD_TOUCH_THRESHOLD);
-
-    const active = [];
-    const parked = [];
-    flagged.forEach(x => {
-      const notBefore = x.p.nudgeSchedule && x.p.nudgeSchedule.doNotNudgeBefore;
-      if (notBefore && isValidDateStr(notBefore) && notBefore > today) parked.push(x);
-      else active.push(x);
-    });
-
-    active.sort((a, b) => b.touches - a.touches);
-    parked.sort((a, b) => a.p.nudgeSchedule.doNotNudgeBefore.localeCompare(b.p.nudgeSchedule.doNotNudgeBefore));
-    return { active, parked };
-  }
-
+  // Pure cold-outreach threshold/parking math now lives in csm-core.js
+  // (computeColdSignal), same shared-core-with-tests pattern as the other
+  // nudge/stall math above, so it has real regression coverage instead of
+  // only ever running live in a browser.
   function renderColdSignal(stages, prospects) {
     const { active, parked } = computeColdSignal(prospects);
     if (active.length === 0 && parked.length === 0) {
@@ -661,51 +649,11 @@
     }
   }
 
-  // True once some forward-looking plan is on record for this prospect, by
-  // any of the three real ways one can be logged: a queued nextNudgeDate, a
-  // planned nudgeSchedule.nudgePoint, or a deliberate parked
-  // nudgeSchedule.doNotNudgeBefore (the same "on purpose, not neglected"
-  // signal the cold-signal parked list below already treats as a real
-  // decision, not a gap).
-  function hasNudgePlan(p) {
-    if (p.nextNudgeDate && isValidDateStr(p.nextNudgeDate)) return true;
-    const ns = p.nudgeSchedule || {};
-    if (ns.nudgePoint && isValidDateStr(ns.nudgePoint)) return true;
-    if (ns.doNotNudgeBefore && isValidDateStr(ns.doNotNudgeBefore)) return true;
-    return false;
-  }
-
-  function computeDataQualityFlags(stages, prospects) {
-    return prospects
-      .map(p => {
-        const reasons = [];
-        if (p.stage !== 'researched') {
-          if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
-          if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
-        }
-        if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
-          reasons.push('CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL');
-        }
-        // The nudge queue, the "unqueued" (nudgePoint-passed) flag above it,
-        // and the cold-signal panel each only fire once *some* nudge field is
-        // already logged. A prospect that was actually contacted and then
-        // never got any nudgeSchedule or nextNudgeDate at all falls through
-        // every one of those checks and is otherwise invisible anywhere on
-        // this board, the exact real failure mode this pipeline is trying to
-        // catch (a real reply lost because no follow-up was ever scheduled).
-        if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
-          reasons.push('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT');
-        }
-        const snapStale = socialSnapshotsStaleInfo(p);
-        if (snapStale) reasons.push(snapStale.days + 'D OLD ' + (snapStale.platform ? escapeHtml(snapStale.platform).toUpperCase() + ' ' : '') + 'SNAPSHOT, DUE FOR REFRESH');
-        if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');
-        if (hasOutOfOrderDates(p.outreachLog)) reasons.push('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING');
-        if (p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate)) reasons.push('NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING');
-        return { p, reasons };
-      })
-      .filter(x => x.reasons.length > 0);
-  }
-
+  // hasNudgePlan, and the missingContactChannelType/missingVerifiedHook/
+  // channelTypeLoggedWithNoDetail/missingFollowUpPlan predicates this badge
+  // shares with the "Log new prospect" warnings below, now live in
+  // csm-core.js, same shared-core-with-tests pattern as the other pure
+  // math above.
   function renderDataQuality(stages, prospects) {
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
     const flagged = computeDataQualityFlags(stages, prospects);
@@ -721,7 +669,7 @@
       '<strong>' + escapeHtml(p.name) + '</strong>' +
       '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
       '<span class="dq-why">' + escapeHtml(stageLabel[p.stage] || p.stage) +
-      ', ' + reasons.join(' &middot; ') + '</span>' +
+      ', ' + reasons.map(escapeHtml).join(' &middot; ') + '</span>' +
       '</button>'
     ).join('');
     wireRowsToModal(dataQualityList);
@@ -865,28 +813,9 @@
       ' from ' + (data.generatedFrom || 'git log') + '.';
   }
 
-  // How many prospects have ever reached each stage, inferred from current
-  // stage alone: since the pipeline is a straight line (researched ->
-  // outreach-sent -> silent-replied -> in-exploration -> client), a prospect
-  // sitting at stage index i has necessarily already passed every stage
-  // before it, whether or not that move was ever logged in stageHistory.
-  // Unlike computeStageVelocity, this works from data every prospect already
-  // has (the required "stage" field), not only from optional history logs.
-  function computeFunnel(stages, prospects) {
-    const indexOfStage = Object.fromEntries(stages.map((s, i) => [s.id, i]));
-    const reached = stages.map(() => 0);
-    prospects.forEach(p => {
-      const idx = indexOfStage[p.stage];
-      if (idx == null) return;
-      for (let i = 0; i <= idx; i++) reached[i]++;
-    });
-    return stages.map((stage, i) => ({
-      stage,
-      reached: reached[i],
-      conversionFromPrev: i > 0 && reached[i - 1] > 0 ? Math.round((reached[i] / reached[i - 1]) * 100) : null
-    }));
-  }
-
+  // Pure funnel reach/conversion math now lives in csm-core.js
+  // (computeFunnel), same shared-core-with-tests pattern as the other pure
+  // math above.
   function renderFunnel(stages, prospects) {
     const results = computeFunnel(stages, prospects);
     const total = results.length ? results[0].reached : 0;
@@ -912,37 +841,6 @@
     }).join('');
   }
 
-  // Average time actually spent in each stage, computed only from completed
-  // moves in a prospect's own stageHistory (entering a stage, then later
-  // logging a move out of it). Deliberately separate from stallInfo(), which
-  // only looks at prospects still sitting in a stage right now, this is a
-  // pipeline-wide velocity signal from moves that already finished.
-  function computeStageVelocity(stages, prospects) {
-    const sums = {};
-    const counts = {};
-    stages.forEach(s => { sums[s.id] = 0; counts[s.id] = 0; });
-    prospects.forEach(p => {
-      const history = (p.stageHistory || [])
-        .filter(e => e && e.date && e.stage)
-        .slice()
-        .sort((a, b) => a.date.localeCompare(b.date));
-      for (let i = 0; i < history.length - 1; i++) {
-        const cur = history[i];
-        const next = history[i + 1];
-        if (!(cur.stage in sums)) continue;
-        const dwellDays = daysUntil(next.date) - daysUntil(cur.date);
-        if (dwellDays < 0) continue;
-        sums[cur.stage] += dwellDays;
-        counts[cur.stage] += 1;
-      }
-    });
-    return stages.map(s => ({
-      stage: s,
-      n: counts[s.id],
-      avgDays: counts[s.id] > 0 ? Math.round(sums[s.id] / counts[s.id]) : null
-    }));
-  }
-
   function renderStageVelocity(stages, prospects) {
     const results = computeStageVelocity(stages, prospects);
     const totalMoves = results.reduce((sum, r) => sum + r.n, 0);
@@ -965,67 +863,10 @@
     }).join('');
   }
 
-  // Counts, not rates, per contactChannel.type: how many prospects who have
-  // actually been contacted (stage past "researched") went on to reach real
-  // active exploration. "silent-replied" is deliberately excluded from the
-  // positive count, that stage covers both no-response and an unadvanced
-  // reply, so it cannot honestly be read as a signal either way. A minimum
-  // sample size gates showing a percentage at all, so a 1-of-1 record never
-  // renders as a misleading "100%".
-  const CHANNEL_EFF_MIN_N_FOR_RATE = 5;
-  function computeChannelEffectiveness(prospects) {
-    const order = ['named-decision-maker', 'generic-inbox', 'unlogged'];
-    const labels = {
-      'named-decision-maker': 'Named decision-maker',
-      'generic-inbox': 'Generic inbox',
-      'unlogged': 'Channel not logged'
-    };
-    const buckets = {};
-    order.forEach(key => { buckets[key] = { key, label: labels[key], contacted: 0, advanced: 0 }; });
-    prospects.forEach(p => {
-      if (p.stage === 'researched') return;
-      const rawType = p.contactChannel && p.contactChannel.type;
-      const key = buckets[rawType] ? rawType : 'unlogged';
-      buckets[key].contacted += 1;
-      const reachedExploration = p.stage === 'in-exploration' || p.stage === 'client' ||
-        (p.stageHistory || []).some(e => e && (e.stage === 'in-exploration' || e.stage === 'client'));
-      if (reachedExploration) buckets[key].advanced += 1;
-    });
-    return order.map(key => buckets[key]);
-  }
-
-  // Same shape as channel effectiveness above, but grouped by category
-  // instead of contact channel: of prospects who have actually been
-  // contacted, how many reached real active exploration, per category.
-  // Category is the other real field this project tracks per prospect
-  // (alongside contact channel), so which verticals are actually worth the
-  // outreach effort is its own real signal, not folded into the channel
-  // breakdown above. Same "silent-replied" exclusion and minimum-sample
-  // gating as computeChannelEffectiveness, for the same reasons.
-  function computeCategoryEffectiveness(prospects) {
-    const buckets = {};
-    const order = [];
-    function bucketFor(category) {
-      const key = category || 'uncategorized';
-      if (!buckets[key]) {
-        buckets[key] = { key, label: category || 'No category logged', contacted: 0, advanced: 0 };
-        order.push(key);
-      }
-      return buckets[key];
-    }
-    prospects.forEach(p => {
-      if (p.stage === 'researched') return;
-      const bucket = bucketFor(p.category);
-      bucket.contacted += 1;
-      const reachedExploration = p.stage === 'in-exploration' || p.stage === 'client' ||
-        (p.stageHistory || []).some(e => e && (e.stage === 'in-exploration' || e.stage === 'client'));
-      if (reachedExploration) bucket.advanced += 1;
-    });
-    return order
-      .map(key => buckets[key])
-      .sort((a, b) => b.contacted - a.contacted || a.label.localeCompare(b.label));
-  }
-
+  // Pure channel/category effectiveness math now lives in csm-core.js
+  // (computeChannelEffectiveness, computeCategoryEffectiveness,
+  // CHANNEL_EFF_MIN_N_FOR_RATE), same shared-core-with-tests pattern as the
+  // other pure math above.
   function renderCategoryEffectiveness(prospects) {
     const results = computeCategoryEffectiveness(prospects);
     const totalContacted = results.reduce((sum, r) => sum + r.contacted, 0);
@@ -1100,66 +941,10 @@
     }).join('');
   }
 
-  // Aggregates real socialSnapshots across every prospect into per-platform
-  // reach totals. Only the most recent asOfDate entry per prospect per
-  // platform counts, so logging a refresh snapshot never double-counts that
-  // same account's followers under the same platform. This is a rollup of
-  // one-time manual research pulls, never a live number, same honesty rule
-  // socialSnapshotStaleInfo already enforces per snapshot in the modal.
-  function computeSocialReach(prospects) {
-    const byPlatform = {};
-    const order = [];
-    function bucketFor(platform) {
-      if (!byPlatform[platform]) {
-        byPlatform[platform] = {
-          platform, prospectCount: 0, totalFollowers: 0, hasFollowers: false,
-          engagementSum: 0, engagementCount: 0, mostRecentAsOf: null, staleCount: 0
-        };
-        order.push(platform);
-      }
-      return byPlatform[platform];
-    }
-    prospects.forEach(p => {
-      const latestByPlatform = {};
-      (p.socialSnapshots || []).forEach(snap => {
-        if (!snap || !snap.platform) return;
-        const existing = latestByPlatform[snap.platform];
-        if (!existing || (snap.asOfDate || '') > (existing.asOfDate || '')) {
-          latestByPlatform[snap.platform] = snap;
-        }
-      });
-      Object.values(latestByPlatform).forEach(snap => {
-        const bucket = bucketFor(snap.platform);
-        bucket.prospectCount += 1;
-        // validate.js already rejects a non-numeric followers/engagementRate
-        // as a hard error, but that only runs from the CLI, not against
-        // whatever socialSnapshots data is actually live on disk right now.
-        // Without the Number.isFinite guard, one bad hand-edited value (a
-        // "12K" string, a typo) turned Number(snap.followers) into NaN,
-        // which then poisoned this whole platform's totalFollowers/
-        // engagementSum for every other prospect on that platform too, not
-        // just the bad entry, showing "NaN followers" for the whole bucket.
-        const followers = Number(snap.followers);
-        if (snap.followers != null && Number.isFinite(followers)) {
-          bucket.totalFollowers += followers;
-          bucket.hasFollowers = true;
-        }
-        const engagementRate = Number(snap.engagementRate);
-        if (snap.engagementRate != null && Number.isFinite(engagementRate)) {
-          bucket.engagementSum += engagementRate;
-          bucket.engagementCount += 1;
-        }
-        if (snap.asOfDate && (!bucket.mostRecentAsOf || snap.asOfDate > bucket.mostRecentAsOf)) {
-          bucket.mostRecentAsOf = snap.asOfDate;
-        }
-        if (socialSnapshotStaleInfo(snap)) bucket.staleCount += 1;
-      });
-    });
-    return order.map(key => byPlatform[key])
-      .sort((a, b) => b.totalFollowers - a.totalFollowers || b.prospectCount - a.prospectCount ||
-        a.platform.localeCompare(b.platform));
-  }
-
+  // Pure per-platform social reach rollup math now lives in csm-core.js
+  // (computeSocialReach), same shared-core-with-tests pattern as the other
+  // pure math above. Locks in regression coverage for the NaN-followers bug
+  // this function was previously patched for (see changelog).
   function renderSocialReach(prospects) {
     const results = computeSocialReach(prospects);
     if (results.length === 0) {
@@ -1232,6 +1017,16 @@
     boardEl.querySelectorAll('[data-prospect-id]').forEach(el => {
       el.addEventListener('click', () => openModal(el.getAttribute('data-prospect-id')));
     });
+    boardEl.querySelectorAll('.card-move[data-move-prospect-id]').forEach(sel => {
+      sel.addEventListener('click', e => e.stopPropagation());
+      sel.addEventListener('change', () => {
+        const id = sel.getAttribute('data-move-prospect-id');
+        const targetStageId = sel.value;
+        sel.value = '';
+        if (!targetStageId) return;
+        openModalForStageMove(id, targetStageId);
+      });
+    });
     boardEl.querySelectorAll('.column-toggle').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1249,7 +1044,10 @@
   // logged anywhere. Instead a drop opens that prospect's own detail modal
   // with the existing stage-move generator pre-set to the target stage and
   // already generated, so the only thing dragging saves is the clicks to get
-  // there, never the honesty check on whether the move is real.
+  // there, never the honesty check on whether the move is real. Each card's
+  // own "Move to stage..." select (wired in renderBoard) reaches the exact
+  // same openModalForStageMove call, so a keyboard or screen-reader user
+  // gets that same shortcut without needing to drag anything.
   function wireCardDragAndDrop() {
     boardEl.querySelectorAll('.card[data-prospect-id]').forEach(card => {
       card.addEventListener('dragstart', e => {
@@ -1301,53 +1099,10 @@
   // nudge across the whole pipeline", which a column-grouped board can't
   // answer without scanning every column. Real, well-documented CRM UX
   // pattern (e.g. Pipeline CRM, HubSpot), not invented for this project.
-  function channelSortRank(channel) {
-    const type = channel && channel.type;
-    if (type === 'named-decision-maker') return 0;
-    if (type === 'generic-inbox') return 1;
-    return 2;
-  }
-
-  function listComparator(key, dir, stageById, stageOrderIndex) {
-    const mul = dir === 'desc' ? -1 : 1;
-    return (a, b) => {
-      let av, bv;
-      switch (key) {
-        case 'stage':
-          av = stageOrderIndex[a.stage]; bv = stageOrderIndex[b.stage];
-          av = av == null ? 999 : av; bv = bv == null ? 999 : bv;
-          break;
-        case 'category':
-          av = (a.category || '').toLowerCase(); bv = (b.category || '').toLowerCase();
-          break;
-        case 'channel':
-          av = channelSortRank(a.contactChannel); bv = channelSortRank(b.contactChannel);
-          break;
-        case 'nextNudge':
-          av = a.nextNudgeDate || '9999-99-99'; bv = b.nextNudgeDate || '9999-99-99';
-          break;
-        case 'stalled': {
-          const ai = stallInfo(a, stageById), bi = stallInfo(b, stageById);
-          av = ai ? ai.days : -1; bv = bi ? bi.days : -1;
-          break;
-        }
-        case 'lastTouch': {
-          const at = daysSinceLastTouch(a), bt = daysSinceLastTouch(b);
-          av = at == null ? -1 : at; bv = bt == null ? -1 : bt;
-          break;
-        }
-        case 'touches':
-          av = touchCount(a); bv = touchCount(b);
-          break;
-        case 'name':
-        default:
-          av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase();
-      }
-      if (av < bv) return -1 * mul;
-      if (av > bv) return 1 * mul;
-      return (a.name || '').localeCompare(b.name || '');
-    };
-  }
+  // channelSortRank/listComparator now live in csm-core.js, the same reason
+  // touchCount/stallInfo etc. were split out: a plain Node test can exercise
+  // the real multi-key sort (and its deliberate missing-value placeholders)
+  // directly.
 
   let listSortKey = 'nextNudge';
   let listSortDir = 'asc';
@@ -1568,34 +1323,6 @@
     statsEl.innerHTML = parts.join('');
   }
 
-  // Days since the most recent real outreach touch (initial send or nudge),
-  // separate from stallInfo's "days in stage": a prospect can sit in the
-  // same stage for a while yet have been touched recently (fresh), or be
-  // fresh into a stage yet have gone quiet on actual contact (neglected).
-  // Surfacing this on the card itself, not only inside the detail modal's
-  // outreach log, makes that distinction visible at a glance on the board.
-  function daysSinceLastTouch(p) {
-    // isValidDateStr, not just a truthy date: an invalid entry (bad
-    // hand-typed format) would otherwise make daysSince return NaN, and
-    // every caller here checks `!= null`, which NaN passes, so the card and
-    // list would render a literal "NaND SINCE LAST TOUCH" badge instead of
-    // just skipping the malformed entry.
-    const log = (p.outreachLog || []).filter(e => e && isValidDateStr(e.date));
-    if (log.length === 0) return null;
-    const lastDate = log.reduce((max, e) => (e.date > max ? e.date : max), log[0].date);
-    return daysSince(lastDate);
-  }
-
-  // How many real touches have actually gone out, not just when the last
-  // one landed. Cold outreach research is consistent that a real reply
-  // typically takes several touches, not one attempt, so a board scanned at
-  // a glance should show effort-so-far as its own signal, not require
-  // opening the modal's outreach log to find out whether "silent" here
-  // means one email sent once or five real attempts over a month.
-  function touchCount(p) {
-    return (p.outreachLog || []).filter(e => e && isValidDateStr(e.date)).length;
-  }
-
   // Only the two tiers a person would actually act on today ('overdue' and
   // 'today') get a card badge, 'soon'/'later' stay in the Nudge Queue section
   // only, same reasoning as the research this session's improvement was
@@ -1630,12 +1357,30 @@
     const nextActionLine = p.nextAction
       ? '<div class="card-next-action">' + escapeHtml(p.nextAction) + '</div>'
       : '';
-    return '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" draggable="true" data-prospect-id="' + escapeHtml(p.id) + '">' +
+    // Dragging a card (wireCardDragAndDrop) has no keyboard equivalent of its
+    // own: a keyboard/screen-reader user could open the card's own detail
+    // modal and hunt inside it for the stage-move generator, but nothing on
+    // the card face offered the same one-step "prep this move" shortcut a
+    // mouse drag does. This select is that keyboard-operable equivalent,
+    // wired to the exact same openModalForStageMove a drop already calls.
+    const moveOptions = allStages.filter(s => s.id !== p.stage)
+      .map(s => '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.label) + '</option>')
+      .join('');
+    return '<div class="card-wrap">' +
+      '<button class="card' + (info && info.isStale ? ' card-stale' : '') + '" draggable="true" data-prospect-id="' + escapeHtml(p.id) + '">' +
       '<div class="card-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="card-company">' + escapeHtml(p.company || 'Company not logged') + '</div>' +
       '<div class="card-meta">' + nudgeCardBadge(p, nudgeUrgencyById) + categoryBadge + channelBadge(p.contactChannel) + stallBadge + touchBadge + '</div>' +
       nextActionLine +
-      '</button>';
+      '</button>' +
+      '<div class="card-move-row">' +
+      '<label class="sr-only" for="cardMove-' + escapeHtml(p.id) + '">Move ' + escapeHtml(p.name) + ' to a different stage (keyboard alternative to dragging)</label>' +
+      '<select class="card-move" id="cardMove-' + escapeHtml(p.id) + '" data-move-prospect-id="' + escapeHtml(p.id) + '">' +
+      '<option value="" selected>Move to stage&hellip;</option>' +
+      moveOptions +
+      '</select>' +
+      '</div>' +
+      '</div>';
   }
 
   let byId = {};
@@ -1863,16 +1608,8 @@
     URL.revokeObjectURL(url);
   }
 
-  function csvField(v) {
-    let s = v == null ? '' : String(v);
-    // CSV/formula injection (OWASP): a hand-typed note starting with
-    // =, +, -, @, tab, or a carriage return is read as a live formula by
-    // Excel/Sheets when this export is opened there, not as plain text.
-    // A leading single quote is the standard mitigation both recommend.
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  }
-
+  // csvField now lives in csm-core.js, same shared-core-with-tests pattern
+  // as the other pure math above (locks in its formula-injection guard).
   const CSV_COLUMNS = [
     ['name', 'Name'], ['company', 'Company'], ['category', 'Category'],
     ['stage', 'Stage'], ['stageEnteredDate', 'Stage Entered'],
@@ -2142,49 +1879,9 @@
     downloadFile(JSON.stringify(backup, null, 2), 'csm-backup-' + todayIso() + '.json', 'application/json;charset=utf-8;');
   });
 
-  // RFC 5545 (iCalendar) text escaping: backslash, comma, semicolon, and
-  // newline all need a backslash escape inside a property value.
-  function icsEscapeText(s) {
-    return String(s == null ? '' : s)
-      .replace(/\\/g, '\\\\')
-      .replace(/;/g, '\\;')
-      .replace(/,/g, '\\,')
-      .replace(/\n/g, '\\n');
-  }
-
-  // Folds a single logical property line at 75 octets with a CRLF + single
-  // space continuation, per RFC 5545 section 3.1. Long SUMMARY/DESCRIPTION
-  // lines are common here (name + company, or a full next-action sentence),
-  // and unfolded lines are technically invalid even though most calendar
-  // apps tolerate them.
-  // RFC 5545 folds at 75 octets, not 75 characters, and a multi-byte UTF-8
-  // character must never be split across the fold. This pipeline logs real
-  // prospect names/notes for Chinese social platforms, so counting JS string
-  // length here (UTF-16 code units) instead of UTF-8 bytes would cut a
-  // non-ASCII character in half the moment a name or note pushed a line past
-  // 75 of those units, producing a line some calendar apps reject on import.
-  const icsEncoder = new TextEncoder();
-  function icsFoldLine(line) {
-    if (icsEncoder.encode(line).length <= 75) return line;
-    const segments = [];
-    let seg = '';
-    let segBytes = 0;
-    let budget = 75;
-    for (const ch of line) { // for...of walks by code point, never a lone surrogate half
-      const chBytes = icsEncoder.encode(ch).length;
-      if (segBytes + chBytes > budget) {
-        segments.push(seg);
-        seg = '';
-        segBytes = 0;
-        budget = 74; // continuation lines carry a leading space, counted separately below
-      }
-      seg += ch;
-      segBytes += chBytes;
-    }
-    if (seg) segments.push(seg);
-    return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
-  }
-
+  // icsEscapeText and icsFoldLine now live in csm-core.js, same
+  // shared-core-with-tests pattern as the other pure math above (locks in
+  // icsFoldLine's UTF-8-byte-not-UTF-16-unit fold-point math).
   // One all-day VEVENT per prospect with a real nextNudgeDate, meant to be
   // imported into a real calendar app so the "don't nudge before X, nudge by
   // Y" schedule becomes an actual reminder instead of only living on this
@@ -2373,17 +2070,22 @@
   // Same class of warnings npBuildWarnings raises for a brand-new prospect,
   // re-run here against the edited values so correcting an existing record
   // gets the same backfill/consistency checks a new one does.
+  // Stage itself isn't editable from this form (that's the separate "stage
+  // move" generator), so it always comes from the real, unedited p rather
+  // than edited, merged in just for the shared missingContactChannelType/
+  // missingVerifiedHook predicates below (same ones npBuildWarnings and
+  // computeDataQualityFlags share) to read.
   function peBuildWarnings(p, edited) {
     const warnings = [];
-    if (p.stage !== 'researched' && !(edited.contactChannel && edited.contactChannel.type)) {
+    if (missingContactChannelType({ stage: p.stage, contactChannel: edited.contactChannel })) {
       warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
         'biggest driver of real reply rate, fill it in as soon as it is known.');
     }
-    if (edited.contactChannel && edited.contactChannel.type && !edited.contactChannel.detail) {
+    if (channelTypeLoggedWithNoDetail({ contactChannel: edited.contactChannel })) {
       warnings.push('Contact channel type is logged but contact channel detail (the actual email/handle/contact) ' +
         'is not. Knowing it is a named decision-maker is not useful without the real way to reach them.');
     }
-    if (p.stage !== 'researched' && !edited.verifiedHook) {
+    if (missingVerifiedHook({ stage: p.stage, verifiedHook: edited.verifiedHook })) {
       warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
         'is a real fit once known.');
     }
@@ -2399,14 +2101,10 @@
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
     }
-    if (edited.category) {
-      const norm = edited.category.trim().toLowerCase();
-      const existing = allProspects.filter(x => x.id !== p.id).map(x => x.category).filter(Boolean);
-      const clash = existing.find(c => c.trim().toLowerCase() === norm && c !== edited.category);
-      if (clash) {
-        warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
-          clash + '", they would render as separate filter chips. Pick one spelling.');
-      }
+    const categoryClash = findCategoryCasingClash(edited.category, allProspects.filter(x => x.id !== p.id));
+    if (categoryClash) {
+      warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
+        categoryClash + '", they would render as separate filter chips. Pick one spelling.');
     }
     return warnings;
   }
@@ -2533,17 +2231,8 @@
   // (see the contact-channel callout in index.html). Warn right where
   // outreach is actually about to be logged as sent, not only after the
   // fact in the passive "Needs backfill" list further down the page.
-  function outreachReadinessWarnings(p) {
-    const warnings = [];
-    if (!p.verifiedHook) {
-      warnings.push('No verifiedHook logged yet for this prospect, the real reason this person/brand fits.');
-    }
-    if (!p.contactChannel || !p.contactChannel.type) {
-      warnings.push('contactChannel.type is not logged yet (named decision-maker vs. generic inbox), the single field most predictive of a real reply.');
-    }
-    return warnings;
-  }
-
+  // outreachReadinessWarnings now lives in csm-core.js, same
+  // shared-core-with-tests pattern as the other pure math above.
   function stageMoveGeneratorHtml() {
     return '<div class="inline-gen">' +
       '<div class="inline-gen-row">' +
@@ -2970,12 +2659,112 @@
   // form, or a prospect's edit form all take free text).
   document.addEventListener('keydown', e => {
     if (e.key !== '?') return;
-    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen) return;
+    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen || jumpNavOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
     e.preventDefault();
     openShortcuts();
+  });
+
+  // Jump-to-section nav, same markup/behavior as Garage/Sondrik/CGT's: this
+  // page runs 16 real sections including several collapsible references and
+  // the changelog, with no sticky header, so this is the one way back to a
+  // specific section without scrolling blind. Built from the real on-page
+  // section titles at load time, no separate list to keep in sync by hand
+  // as sections get added.
+  let jumpNavOpen = false;
+  let jumpNavLastFocusedEl = null;
+
+  function collectJumpSections() {
+    const usedIds = new Set();
+    return Array.from(document.querySelectorAll('main > section')).map((section) => {
+      if (section.hidden) return null;
+      const titleEl = section.querySelector('h2.section-title, summary.section-title');
+      if (!titleEl) return null;
+      const label = titleEl.textContent.replace(/\s+/g, ' ').trim();
+      if (!label) return null;
+      if (!section.id) {
+        let slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'section';
+        let candidate = 'jump-' + slug;
+        let n = 2;
+        while (usedIds.has(candidate) || document.getElementById(candidate)) {
+          candidate = 'jump-' + slug + '-' + n;
+          n++;
+        }
+        section.id = candidate;
+      }
+      usedIds.add(section.id);
+      return { id: section.id, label };
+    }).filter(Boolean);
+  }
+
+  function renderJumpNavList() {
+    const sections = collectJumpSections();
+    document.getElementById('jumpNavList').innerHTML = sections.map(s => `
+      <a class="jump-nav-link" href="#${s.id}" data-jump-target="${s.id}">${escapeHtml(s.label)}</a>
+    `).join('');
+  }
+
+  function getJumpNavFocusable() {
+    return Array.from(document.getElementById('jumpNavModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openJumpNav() {
+    if (jumpNavOpen) return;
+    jumpNavOpen = true;
+    jumpNavLastFocusedEl = document.activeElement;
+    renderJumpNavList();
+    document.getElementById('jumpNavOverlay').hidden = false;
+    lockBodyScroll();
+    document.getElementById('jumpNavClose').focus();
+  }
+
+  function closeJumpNav() {
+    if (!jumpNavOpen) return;
+    jumpNavOpen = false;
+    document.getElementById('jumpNavOverlay').hidden = true;
+    unlockBodyScroll();
+    if (jumpNavLastFocusedEl && typeof jumpNavLastFocusedEl.focus === 'function') jumpNavLastFocusedEl.focus();
+    jumpNavLastFocusedEl = null;
+  }
+
+  document.getElementById('jumpNavBtn').addEventListener('click', openJumpNav);
+  document.getElementById('jumpNavClose').addEventListener('click', closeJumpNav);
+  document.getElementById('jumpNavOverlay').addEventListener('click', e => {
+    if (e.target.id === 'jumpNavOverlay') closeJumpNav();
+  });
+  document.getElementById('jumpNavList').addEventListener('click', e => {
+    const link = e.target.closest('.jump-nav-link');
+    if (!link) return;
+    e.preventDefault();
+    const target = document.getElementById(link.dataset.jumpTarget);
+    closeJumpNav();
+    if (target) {
+      // The scroll-lock release above needs a frame to settle, starting the
+      // smooth scroll before that clobbers it.
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!jumpNavOpen) return;
+    if (e.key === 'Escape') { closeJumpNav(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getJumpNavFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   });
 
   restoreStateFromUrl();
@@ -3349,12 +3138,9 @@
       const company = values.company || null;
       const category = values.category || null;
       const verifiedHook = values.verifiedHook || null;
-      const slugResult = npSlugify(name, company);
+      const slugResult = slugifyProspectId(name, company);
       const baseId = slugResult.id;
-      let id = baseId;
-      let n = 2;
-      while (seenIdsThisBatch.has(id)) { id = baseId + '-' + n; n++; }
-      const isDuplicateId = id !== baseId;
+      const { id, isDuplicateId } = nextAvailableId(baseId, seenIdsThisBatch);
       seenIdsThisBatch.add(id);
 
       const warnings = [];
@@ -3368,8 +3154,7 @@
           'more readable (a romanized version of the name works well) before pasting this in.');
       }
       const nameKey = name.trim().toLowerCase() + '|' + (company || '').trim().toLowerCase();
-      const existingMatch = allProspects.find(x => x.name &&
-        x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === nameKey);
+      const existingMatch = findProspectByNameCompany(name, company, allProspects);
       if (existingMatch) {
         warnings.push('An existing entry already has this same name and company ("' + existingMatch.name +
           (existingMatch.company ? ', ' + existingMatch.company : '') + '", id "' + existingMatch.id +
@@ -3379,14 +3164,10 @@
           (company ? ', ' + company : '') + '"). If this is really the same person, remove the duplicate row.');
       }
       seenKeysThisBatch.set(nameKey, id);
-      if (category) {
-        const norm = category.trim().toLowerCase();
-        const existingCats = allProspects.map(x => x.category).filter(Boolean);
-        const clash = existingCats.find(c => c.trim().toLowerCase() === norm && c !== category);
-        if (clash) {
-          warnings.push('Category "' + category + '" differs in casing/spacing from existing category "' + clash +
-            '", they would render as separate filter chips. Pick one spelling.');
-        }
+      const categoryClash = findCategoryCasingClash(category, allProspects);
+      if (categoryClash) {
+        warnings.push('Category "' + category + '" differs in casing/spacing from existing category "' + categoryClash +
+          '", they would render as separate filter chips. Pick one spelling.');
       }
 
       const p = {
@@ -3439,25 +3220,10 @@
       .finally(() => { setTimeout(() => { npQuickCopyBtn.textContent = original; }, 1800); });
   });
 
-  // Strips to [a-z0-9] only, so a real name/company typed entirely in
-  // Chinese characters (this hub's whole subject is China social media
-  // prospects, a very real, expected case, not an edge case) strips to
-  // nothing and silently falls back to the generic "new-prospect" id with
-  // no indication anything unusual happened. Exposes whether that fallback
-  // was hit on real input (as opposed to no input at all) so the caller can
-  // warn about it, rather than baking the warning logic into this function.
-  function npSlugify(name, company) {
-    const base = [company, name].filter(Boolean).join('-');
-    const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    return { id: slug || 'new-prospect', collapsedFromRealInput: !slug && !!base };
-  }
-
-  function npUniqueId(baseId) {
-    if (!byId[baseId]) return baseId;
-    let n = 2;
-    while (byId[baseId + '-' + n]) n++;
-    return baseId + '-' + n;
-  }
+  // slugifyProspectId/nextAvailableId (id generation and collision handling
+  // for both this single-add form and the paste-a-batch quick-add above)
+  // now live in csm-core.js, shared and tested the same way as the rest of
+  // this file's extracted pure math.
 
   function npVal(id) {
     const v = document.getElementById(id).value.trim();
@@ -3478,15 +3244,15 @@
         'name), so this defaulted to the generic id "' + p.id + '". Hand-edit the "id" field below to something ' +
         'more readable (a romanized version of the name works well) before pasting this in.');
     }
-    if (p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type)) {
+    if (missingContactChannelType(p)) {
       warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
         'biggest driver of real reply rate, fill it in as soon as it is known.');
     }
-    if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
+    if (channelTypeLoggedWithNoDetail(p)) {
       warnings.push('Contact channel type is logged but contact channel detail (the actual email/handle/contact) ' +
         'is not. Knowing it is a named decision-maker is not useful without the real way to reach them.');
     }
-    if (p.stage !== 'researched' && !p.verifiedHook) {
+    if (missingVerifiedHook(p)) {
       warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
         'is a real fit once known.');
     }
@@ -3502,7 +3268,7 @@
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
     }
-    if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
+    if (missingFollowUpPlan(p)) {
       warnings.push('Stage is "' + p.stage + '" but nothing is scheduled, no next nudge date, nudge point, or ' +
         'do-not-nudge-before. Without one of those this prospect will not show up anywhere the board flags a ' +
         'follow-up as due, log a real plan even if it is just a rough one.');
@@ -3518,24 +3284,16 @@
           'which platform this snapshot is for, these numbers cannot be attributed to anything without it.');
       }
     });
-    if (p.category) {
-      const norm = p.category.trim().toLowerCase();
-      const existing = allProspects.map(x => x.category).filter(Boolean);
-      const clash = existing.find(c => c.trim().toLowerCase() === norm && c !== p.category);
-      if (clash) {
-        warnings.push('Category "' + p.category + '" differs in casing/spacing from existing category "' + clash +
-          '", they would render as separate filter chips. Pick one spelling.');
-      }
+    const categoryClash = findCategoryCasingClash(p.category, allProspects);
+    if (categoryClash) {
+      warnings.push('Category "' + p.category + '" differs in casing/spacing from existing category "' + categoryClash +
+        '", they would render as separate filter chips. Pick one spelling.');
     }
-    if (p.name) {
-      const nameKey = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
-      const match = allProspects.find(x => x.name &&
-        x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === nameKey);
-      if (match) {
-        warnings.push('An existing entry already has this same name and company ("' + match.name +
-          (match.company ? ', ' + match.company : '') + '", id "' + match.id + '"). If this is really the same ' +
-          'person, edit that entry instead of adding a second one.');
-      }
+    const nameMatch = findProspectByNameCompany(p.name, p.company, allProspects);
+    if (nameMatch) {
+      warnings.push('An existing entry already has this same name and company ("' + nameMatch.name +
+        (nameMatch.company ? ', ' + nameMatch.company : '') + '", id "' + nameMatch.id + '"). If this is really the same ' +
+        'person, edit that entry instead of adding a second one.');
     }
     return warnings;
   }
@@ -3545,10 +3303,9 @@
     const company = npVal('npCompany');
     const stage = npStageSelect.value;
     const stageEnteredDate = npVal('npStageEnteredDate');
-    const slugResult = npSlugify(name || 'new-prospect', company);
+    const slugResult = slugifyProspectId(name || 'new-prospect', company);
     const baseId = slugResult.id;
-    const id = npUniqueId(baseId);
-    const isDuplicateId = id !== baseId;
+    const { id, isDuplicateId } = nextAvailableId(baseId, Object.keys(byId));
 
     const socialPlatform = npVal('npSocialPlatform');
     const socialFollowers = npVal('npSocialFollowers');

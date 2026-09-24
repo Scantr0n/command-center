@@ -365,6 +365,50 @@
     <div id="leadsSection"></div>
   </section>
 
+  <section id="leadNormsSection">
+    <details class="schema-help">
+      <summary>Responding to a beta-tester / lifetime-access offer (general guidance, not Sondrik data)</summary>
+      <div class="schema-help-body">
+        <p>General practice for the exact situation the one real lead above is in: someone offering to test the
+          product in exchange for lifetime access, reviewed September 2026 from founder threads and beta/lifetime-deal
+          contract guides (sources linked below). This is <strong>not</strong> a logged fact about this lead and
+          doesn't feed any number elsewhere on this page, it exists so a reply, once approved, can be shaped against
+          real prior experience instead of drafted from scratch.</p>
+        <div class="schema-table-wrap">
+        <table class="schema-table">
+          <tbody>
+            <tr><th>Scope what<br>"lifetime" covers</th><td>Founders who've offered a lifetime deal before generally
+              recommend capping what it actually applies to rather than promising everything forever, for example
+              covering the current major version only or framing it as a capped-count "founding member" grant.
+              That leaves room to charge for a future paid tier or major version without breaking a promise already
+              made.</td></tr>
+            <tr><th>Vet for a real fit<br>before saying yes</th><td>Guidance from founders who've run beta programs
+              stresses checking that a volunteer is actually a real target user and treating feedback as an explicit
+              part of the deal, not an assumed one. Someone who takes the access but never actually uses the product
+              or reports back is a worse outcome than having said no.</td></tr>
+            <tr><th>Put the terms in<br>writing, even briefly</th><td>Beta and lifetime-access agreement guides
+              consistently call for stating plainly, even in a short reply, what's included, what's explicitly
+              excluded (future paid tiers, enterprise features, support commitments), and that this is a beta with
+              real bugs and no uptime guarantee. Calling something "beta" is not treated as a substitute for saying
+              that directly.</td></tr>
+            <tr><th>Cap it if the<br>offer repeats</th><td>If more people make the same offer later, founder
+              discussions of running lifetime deals recommend capping the total number of grants to something
+              sustainable rather than accepting every offer on the same terms, since a lifetime-access holder tends
+              to expect more ongoing support than a regular beta tester.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="schema-help-body" style="margin-top:.75rem; padding:0;">
+          Sources:
+          <a href="https://www.indiehackers.com/post/free-lifetime-access-for-beta-users-596b6822c3" target="_blank" rel="noopener noreferrer">Indie Hackers, free lifetime access for beta users?</a>,
+          <a href="https://www.indiehackers.com/post/lifetime-deals-ltds-yes-or-no-210e5a7b1a" target="_blank" rel="noopener noreferrer">Indie Hackers, lifetime deals (LTDs)... yes or no?</a>,
+          <a href="https://www.sprintlaw.com/articles/beta-testing-agreement-refunds-disclosures-and-contract-risks-to-watch/" target="_blank" rel="noopener noreferrer">Sprintlaw, beta testing agreement refunds/disclosures/risks</a>,
+          <a href="https://ironcladapp.com/journal/contracts/beta-agreements-from-a-to-z" target="_blank" rel="noopener noreferrer">Ironclad, beta agreements from A to Z</a>.
+        </p>
+      </div>
+    </details>
+  </section>
+
   <section>
     <h2 class="section-title">Data changelog <span class="section-title-meta" id="dataQualityMeta"></span></h2>
     <p class="section-note">Real git commit history of the five data files above, not a hand-typed claim.
@@ -384,7 +428,14 @@
     Run <code>node --test public/sondrik/data/validate-core.test.js</code> after changing the duplicate-lead
     logic itself, it guards the exact check that flags a real contact possibly logged twice. Run
     <code>node --test public/sondrik/data/goals-core.test.js</code> after changing the Goals card's date/pace
-    math, it guards the two real bugs that math has already produced.
+    math, it guards the two real bugs that math has already produced. Run
+    <code>node --test public/sondrik/data/release-core.test.js</code> after changing the bugfix check-in logic,
+    it guards the NaN-date crash and the silently-dropped-missed-checkpoint bug that logic has already produced. Run
+    <code>node --test public/sondrik/data/export-core.test.js</code> after changing the CSV/ICS export helpers, it
+    guards the CSV-formula-injection escape and the UTF-8-byte-aware ICS line folding. Run
+    <code>node --test public/sondrik/data/next-steps-core.test.js</code> after changing the Next Steps
+    checklist logic, it guards which real gaps and overdue check-ins surface as an action item there and on the
+    header's attention pill.
   </footer>
 </div>
 
@@ -396,8 +447,21 @@
   </div>
 </div>
 
+<button type="button" id="jumpNavBtn" class="jump-nav-fab font-mono" aria-label="Sections, jump to a section on this page">Sections</button>
+
+<div class="modal-overlay" id="jumpNavOverlay" hidden>
+  <div class="modal" id="jumpNavModal" role="dialog" aria-modal="true" aria-labelledby="jumpNavTitle">
+    <button class="modal-close" id="jumpNavClose" aria-label="Close">&times;</button>
+    <h3 id="jumpNavTitle" class="font-display">Jump to section</h3>
+    <div class="jump-nav-list" id="jumpNavList"></div>
+  </div>
+</div>
+
 <script src="/sondrik/data/validate-core.js"></script>
 <script src="/sondrik/data/goals-core.js"></script>
+<script src="/sondrik/data/release-core.js"></script>
+<script src="/sondrik/data/next-steps-core.js"></script>
+<script src="/sondrik/data/export-core.js"></script>
 <script src="/sondrik/app.js"></script>
 <script src="/sidebar.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>

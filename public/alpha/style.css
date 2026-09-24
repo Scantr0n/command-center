@@ -479,6 +479,18 @@ header.page-head .sub {
   fill: #3DDC84;
 }
 
+/* Companion to .conn-latency: a plain "Next check in Ns" countdown next to
+   the Refresh button, real status-page convention (Statuspage-style
+   dashboards) for making an invisible polling cadence visible at a glance.
+   aria-hidden since it's a decorative tick, not a state change worth a
+   screen reader announcing every second; the connection state itself is
+   still announced via #connStrip's role="status". */
+.conn-next-refresh {
+  font-size: 0.68rem;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+
 .refresh-btn {
   font-size: 0.72rem;
   color: var(--sub);
@@ -1024,9 +1036,34 @@ header.page-head .sub {
 .pos-totals-row:hover { background: transparent; }
 .pos-symbol { font-weight: 600; }
 .pos-num { text-align: right; }
-.pos-side-long { color: #3DDC84; text-transform: uppercase; font-size: 0.72rem; }
-.pos-side-short { color: #E0A030; text-transform: uppercase; font-size: 0.72rem; }
 .pos-plpct { display: block; font-size: 0.7rem; opacity: 0.75; }
+/* Real bug found while adding the concentration column below and confirmed
+   against a mocked live feed (this table has never rendered against a real
+   position, per account-core.js's own header comment, so nothing had ever
+   exercised this): every one of these sets color directly on the same <td>
+   `.pos-table td` above already targets with its own `color: var(--ink)`.
+   `.pos-table td`'s specificity is (0,1,1), one class plus the `td` type
+   selector, which beats a plain single-class selector like `.pl-good`
+   (0,1,0) regardless of source order, so long/short and P&L color-coding
+   silently rendered as plain ink-colored text the whole time, exactly the
+   "real dashboard convention: green/red so a scan across many rows reads
+   winners and losers instantly" this table's own comment already promises
+   but never delivered. Scoping each selector under `.pos-table td` too
+   raises it to (0,2,1), which wins outright; `.pl-good`/`.pl-bad` keep
+   their original unscoped rule above since Account's day-change tile uses
+   them on a nested <span>, a different element from `.stat-tile-value`,
+   where plain specificity already worked fine. */
+.pos-table td.pos-side-long { color: #3DDC84; text-transform: uppercase; font-size: 0.72rem; }
+.pos-table td.pos-side-short { color: #E0A030; text-transform: uppercase; font-size: 0.72rem; }
+.pos-table td.pl-good { color: #3DDC84; }
+.pos-table td.pl-bad { color: #E05050; }
+.pos-table td.pl-neutral { color: var(--dim); }
+/* Same amber "caution" this page already uses for a stale connection dot and
+   a pending architecture badge, reused here rather than a new color, for a
+   single position at or above the concentration-risk threshold (see the
+   POSITION_CONCENTRATION_CAUTION_PCT comment in app.js). Scoped the same way
+   as the rules above, for the same reason. */
+.pos-table td.pos-conc-high { color: #E0A030; font-weight: 600; }
 
 /* Architecture cards */
 .arch-grid {
@@ -1302,6 +1339,39 @@ body.has-sticky-critical { padding-top: 40px; }
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* Jump-to-section FAB, same markup/classes/behavior as Garage/Sondrik/CGT/
+   CSM/Job Search's: this page runs 10 real sections including the
+   changelog, with no sticky header once the critical bar isn't showing, so
+   this is the one way back to a specific section without scrolling blind. */
+.jump-nav-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  background: var(--panel);
+  color: var(--sub);
+  border: 1px solid var(--hairlineHover);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.jump-nav-fab:hover, .jump-nav-fab:focus-visible { color: var(--ink); border-color: var(--accent); }
+.jump-nav-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.jump-nav-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 60vh; overflow-y: auto; }
+.jump-nav-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--sub);
+  text-decoration: none;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.jump-nav-link:hover, .jump-nav-link:focus-visible { background: var(--panelLight); color: var(--ink); border-color: var(--hairline); }
+
 /* Same precedent as CGT/CSM/Garage/Sondrik's own style.css: every
    hover/focus transition on this page, even without a real keyframe
    animation behind it, still triggers vestibular discomfort for someone who
@@ -1447,8 +1517,8 @@ footer.page-foot {
      here rather than trying to preserve the color coding on paper. */
   .incident-ongoing .incident-duration { color: #111 !important; }
 
-  .sticky-critical-bar, .refresh-btn, .back-link, .schema-help,
-  .modal-overlay, .toast-container {
+  .sticky-critical-bar, .refresh-btn, .conn-next-refresh, .back-link, .schema-help,
+  .modal-overlay, .toast-container, .jump-nav-fab {
     display: none !important;
   }
   body.has-sticky-critical { padding-top: 0 !important; }

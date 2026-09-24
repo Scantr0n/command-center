@@ -45,48 +45,32 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible } = require('./validate-core.js');
+const {
+  PLATFORMS, TITLE_HARD_LIMITS, findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible
+} = require('./validate-core.js');
+const { irsMileageRateForDate } = require('./garage-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
 const STATUSES = ['draft', 'ready-to-post', 'live', 'sold'];
 const STAGES = ['draft', 'ready-to-post', 'live', 'sold'];
 const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
-// Real published title-length hard caps as of September 2026 (see the "Title
-// & photo specs" reference on the Garage page itself for sourcing). Depop
-// has no published hard cap, only a soft mobile-truncation point, so it's
-// deliberately left out here rather than treated as a validation error.
-const TITLE_HARD_LIMITS = { ebay: 80, vinted: 70, poshmark: 80 };
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
-// eBay category classifier. Neither value changes eBay fee math (Clothing,
-// Shoes & Accessories and Consumer Electronics both charge the same 13.6%
-// final value fee, no special rate to model for either). What "shoes"
-// actually drives is which itemSpecifics fields get checked below (size and
-// color only matter for something you wear). "electronics" drives the real
-// Depop platform ban checked below instead (Depop prohibits battery-powered/
-// electronic items outright, see the Electronics & battery-item rules
-// reference on the page); everything else stays null.
+// eBay category classifier. "shoes" drives real eBay fee math: Clothing,
+// Shoes & Accessories charges a 15.3% final value fee, not the 13.6%
+// standard rate most other categories (including Consumer Electronics) get
+// (see EBAY_CATEGORY_RATES in garage-core.js). "shoes" also drives which
+// itemSpecifics fields get checked below (size and color only matter for
+// something you wear). "electronics" drives the real Depop platform ban
+// checked below instead (Depop prohibits battery-powered/electronic items
+// outright, see the Electronics & battery-item rules reference on the
+// page); everything else stays null.
 const LISTING_CATEGORIES = ['shoes', 'electronics'];
 const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
 const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
 const ITEM_SPECIFIC_KEYS = ['brand', 'size', 'color', 'condition'];
 const ACQUISITION_SOURCES = ['thrift-store', 'estate-sale', 'garage-sale', 'wholesale-lot', 'online-marketplace', 'personal-item', 'other'];
-// Real IRS-published standard business mileage rates for 2026: 72.5 cents/mi
-// Jan 1 - Jun 30, then a mid-year increase to 76 cents/mi Jul 1 - Dec 31
-// announced 2026-07-13 (irs.gov/newsroom: "IRS sets 2026 business standard
-// mileage rate at 72.5 cents per mile" and "IRS Increases Standard Mileage
-// Rate for Second Half of 2026"). Kept in sync with the same table in app.js.
-const MILEAGE_RATES_2026 = [
-  { from: '2026-01-01', to: '2026-06-30', rate: 0.725 },
-  { from: '2026-07-01', to: '2026-12-31', rate: 0.76 }
-];
-function irsMileageRateForDate(dateStr) {
-  if (!dateStr) return null;
-  const hit = MILEAGE_RATES_2026.find(r => dateStr >= r.from && dateStr <= r.to);
-  return hit ? hit.rate : null;
-}
 
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);

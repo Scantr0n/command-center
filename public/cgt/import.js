@@ -13,52 +13,10 @@
 // those live in DATASETS below rather than three near-duplicate copies of
 // this file.
 
-function normalizeHeader(s) {
-  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function normalizeBasis(raw) {
-  const v = String(raw || '').trim().toLowerCase();
-  if (!v) return null;
-  if (v === 'recent-sale' || v === 'recent sale' || v === 'sale' || v === 'sold') return 'recent-sale';
-  if (v === 'comp-estimate' || v === 'comp estimate' || v === 'estimate' || v === 'comp') return 'comp-estimate';
-  return v; // left as-is so an unrecognized value shows up as a validation error, not a silent guess
-}
-
-// Applied per-field on the way from a raw trimmed CSV cell to the value that
-// goes into the downloaded JSON. Kept generic (rather than one bespoke
-// builder function per dataset) since the same handful of coercions
-// (number, whole number, uppercase, lowercase, valuation basis) cover every
-// field across all three schemas.
-function coerceField(value, type) {
-  if (value == null) return null;
-  switch (type) {
-    case 'number': {
-      const n = Number(String(value).replace(/[$,]/g, ''));
-      return Number.isNaN(n) ? null : n;
-    }
-    case 'int': {
-      const n = Number(String(value).replace(/[$,]/g, ''));
-      return Number.isNaN(n) ? null : Math.round(n);
-    }
-    case 'upper': return String(value).toUpperCase();
-    case 'lower': return String(value).toLowerCase();
-    case 'basis': return normalizeBasis(value);
-    default: return value;
-  }
-}
-
-function slugify(s, fallback) {
-  return String(s || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || (fallback || 'row');
-}
-
-function csvField(v) {
-  const s = v == null ? '' : String(v);
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+// CSV parsing, cell coercion, id-slugging, and column-guessing are pure
+// logic shared with a Node test; see data/import-core.js for the
+// implementations and why they live there.
+const { csvField, parseCsv, guessMapping, buildRowFromMapping } = window.CGTImportCore;
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -89,10 +47,10 @@ const DATASETS = {
       { key: 'sport', label: 'Sport', aliases: ['sport', 'category'], type: 'lower' },
       { key: 'gradingCompany', label: 'Grading company', aliases: ['gradingcompany', 'grader', 'grading', 'company'], type: 'upper' },
       { key: 'grade', label: 'Grade', aliases: ['grade'] },
-      { key: 'subgradeCentering', label: 'BGS centering subgrade (BGS only)', aliases: ['subgradecentering', 'centering'], type: 'number' },
-      { key: 'subgradeCorners', label: 'BGS corners subgrade (BGS only)', aliases: ['subgradecorners', 'corners'], type: 'number' },
-      { key: 'subgradeEdges', label: 'BGS edges subgrade (BGS only)', aliases: ['subgradeedges', 'edges'], type: 'number' },
-      { key: 'subgradeSurface', label: 'BGS surface subgrade (BGS only)', aliases: ['subgradesurface', 'surface'], type: 'number' },
+      { key: 'subgradeCentering', label: 'BGS centering subgrade (BGS only)', aliases: ['subgradecentering', 'centering', 'bgscentering'], type: 'number' },
+      { key: 'subgradeCorners', label: 'BGS corners subgrade (BGS only)', aliases: ['subgradecorners', 'corners', 'bgscorners'], type: 'number' },
+      { key: 'subgradeEdges', label: 'BGS edges subgrade (BGS only)', aliases: ['subgradeedges', 'edges', 'bgsedges'], type: 'number' },
+      { key: 'subgradeSurface', label: 'BGS surface subgrade (BGS only)', aliases: ['subgradesurface', 'surface', 'bgssurface'], type: 'number' },
       { key: 'certNumber', label: 'Cert number', aliases: ['certnumber', 'cert', 'certno', 'serial', 'serialnumber'] },
       { key: 'storageLocation', label: 'Storage location', aliases: ['storagelocation', 'location', 'storage', 'box', 'binder', 'safe'] },
       { key: 'estimatedValue', label: 'Estimated value', aliases: ['estimatedvalue', 'value', 'price', 'estvalue', 'estimate'], type: 'number' },
@@ -101,6 +59,7 @@ const DATASETS = {
       { key: 'sourceNote', label: 'Source', aliases: ['sourcenote', 'source'] },
       { key: 'imageUrl', label: 'Photo URL', aliases: ['imageurl', 'image', 'photo', 'photourl', 'picture', 'img'] },
       { key: 'costBasis', label: 'Cost basis (what was paid)', aliases: ['costbasis', 'paid', 'pricepaid', 'cost'], type: 'number' },
+      { key: 'acquisitionDate', label: 'Acquisition date (when bought/acquired)', aliases: ['acquisitiondate', 'dateacquired', 'datebought', 'purchasedate', 'boughtdate'] },
       { key: 'datePriced', label: 'Date priced', aliases: ['datepriced', 'date'] },
       { key: 'soldDate', label: 'Sold date (blank if still owned)', aliases: ['solddate', 'datesold'] },
       { key: 'soldPrice', label: 'Sold price', aliases: ['soldprice', 'saleprice'], type: 'number' },
@@ -170,38 +129,6 @@ const DATASETS = {
 function currentDataset() {
   const key = document.querySelector('#datasetPicker .chip[aria-pressed="true"]').getAttribute('data-dataset');
   return DATASETS[key];
-}
-
-// Minimal RFC4180-ish CSV parser: handles quoted fields, doubled quotes
-// inside a quoted field, commas/newlines inside quotes, and both \n and
-// \r\n line endings. Good enough for a spreadsheet export; not a full CSV
-// grammar (e.g. no support for a BOM beyond stripping one at the very start).
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let field = '';
-  let inQuotes = false;
-  let i = 0;
-  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-  const len = text.length;
-  while (i < len) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
-        inQuotes = false; i++; continue;
-      }
-      field += ch; i++; continue;
-    }
-    if (ch === '"') { inQuotes = true; i++; continue; }
-    if (ch === ',') { row.push(field); field = ''; i++; continue; }
-    if (ch === '\r') { i++; continue; }
-    if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
-    field += ch; i++;
-  }
-  row.push(field);
-  if (row.length > 1 || row[0] !== '') rows.push(row);
-  return rows.filter(r => r.length > 1 || (r[0] || '').trim() !== '');
 }
 
 let parsedHeaders = [];
@@ -298,24 +225,9 @@ document.getElementById('parseBtn').addEventListener('click', () => {
   runPipeline();
 });
 
-// One <select> per detected CSV column, defaulted to whichever schema field's
-// alias list matches that header (normalized), each field usable at most
-// once as an auto-guess so two similarly-named columns don't both silently
-// land on the same field. The user can still point any column at any field,
-// including a field another column was auto-mapped to, by hand.
-function guessMapping(dataset) {
-  const used = new Set();
-  return parsedHeaders.map(h => {
-    const norm = normalizeHeader(h);
-    const match = dataset.fieldDefs.find(f => !used.has(f.key) && f.aliases.includes(norm));
-    if (match) used.add(match.key);
-    return match ? match.key : '';
-  });
-}
-
 function renderMappingStep() {
   const dataset = currentDataset();
-  const guesses = guessMapping(dataset);
+  const guesses = guessMapping(parsedHeaders, dataset);
   const grid = document.getElementById('mappingGrid');
   const options = '<option value="">(ignore this column)</option>' +
     dataset.fieldDefs.map(f => `<option value="${f.key}">${escapeHtml(f.label)}</option>`).join('');
@@ -339,34 +251,6 @@ function currentMapping() {
     if (field) map[Number(sel.getAttribute('data-col'))] = field;
   });
   return map;
-}
-
-// Turns one raw CSV row into a row object matching the current dataset's
-// schema, using the current column mapping. Blank cells become null, not
-// empty strings, so they read the same as a hand-edited "leave it null"
-// entry rather than looking like a deliberately-empty value.
-function buildRowFromMapping(row, mapping, usedIds, dataset) {
-  const raw = {};
-  Object.entries(mapping).forEach(([colIdx, field]) => {
-    const v = (row[Number(colIdx)] ?? '').trim();
-    raw[field] = v === '' ? null : v;
-  });
-
-  const built = {};
-  dataset.fieldDefs.forEach(f => {
-    if (f.key === 'id') return; // resolved below, after every other field is coerced
-    built[f.key] = coerceField(raw[f.key], f.type);
-  });
-
-  let id = raw.id
-    ? slugify(raw.id, dataset.idFallback)
-    : slugify(dataset.idFields.map(k => built[k]).filter(Boolean).join('-'), dataset.idFallback) + (dataset.idSuffix || '');
-  let uniqueId = id;
-  let n = 2;
-  while (usedIds.has(uniqueId)) { uniqueId = id + '-' + n; n++; }
-  usedIds.add(uniqueId);
-
-  return Object.assign({ id: uniqueId }, built);
 }
 
 let lastMergedRows = [];

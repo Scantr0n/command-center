@@ -25,6 +25,7 @@
   const digestExcludedNote = document.getElementById('digestExcludedNote');
   const digestSourcingNote = document.getElementById('digestSourcingNote');
   const printBtn = document.getElementById('printBtn');
+  const changelogFeedEl = document.getElementById('changelogFeed');
 
   printBtn.addEventListener('click', () => window.print());
 
@@ -102,6 +103,29 @@
     const d = new Date(iso + 'T00:00:00');
     if (isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // Click-to-sort Applications table, same aria-sort/tabindex pattern CGT's
+  // card table and Garage's listings table already use, just never shipped
+  // on this hub's own table. Defaults to "num" ascending, the order the
+  // tracker already lists them in.
+  let appSortKey = 'num';
+  let appSortDir = 'asc';
+
+  function applicationSortValue(a, key) {
+    if (key === 'num') return a.num;
+    if (key === 'applied') return a.appliedDate || '';
+    return a[key];
+  }
+
+  function sortApplications(apps, key, dir) {
+    const mult = dir === 'desc' ? -1 : 1;
+    return apps.slice().sort((a, b) => {
+      const av = applicationSortValue(a, key);
+      const bv = applicationSortValue(b, key);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mult;
+      return String(av ?? '').localeCompare(String(bv ?? '')) * mult;
+    });
   }
 
   // ISO "YYYY-MM-DD" strings compare correctly with plain >, so this finds
@@ -202,27 +226,59 @@
     });
   }
 
+  const APPLICATION_SORT_COLUMNS = [
+    { key: 'num', label: '#' },
+    { key: 'role', label: 'Role' },
+    { key: 'company', label: 'Company' },
+    { key: 'location', label: 'Location' },
+    { key: 'pay', label: 'Pay' },
+    { key: 'applied', label: 'Applied' }
+  ];
+
   function renderApplications(data) {
     const apps = data.applications || [];
     if (!apps.length) {
       applicationsTableWrap.innerHTML = '<div class="empty-state">No applications logged yet.</div>';
-    } else {
-      applicationsTableWrap.innerHTML =
-        '<div class="data-table-wrap"><table class="data-table"><thead><tr>' +
-        '<th>#</th><th>Role</th><th>Company</th><th>Location</th><th>Pay</th><th>Applied</th>' +
-        '</tr></thead><tbody>' +
-        apps.map(a =>
-          '<tr>' +
-          '<td class="num-col" data-label="#">' + escapeHtml(String(a.num)) + '</td>' +
-          '<td data-label="Role">' + escapeHtml(a.role) + '</td>' +
-          '<td data-label="Company">' + escapeHtml(a.company) + '</td>' +
-          '<td data-label="Location">' + escapeHtml(a.location) + '</td>' +
-          '<td class="pay-col" data-label="Pay">' + escapeHtml(a.pay) + '</td>' +
-          '<td data-label="Applied">' + escapeHtml(fmtDate(a.appliedDate) || 'undated') + '</td>' +
-          '</tr>'
-        ).join('') +
-        '</tbody></table></div>';
+      return;
     }
+
+    const sorted = sortApplications(apps, appSortKey, appSortDir);
+    const headHtml = APPLICATION_SORT_COLUMNS.map(col => {
+      const ariaSort = col.key === appSortKey ? (appSortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      return '<th class="sortable" data-sort="' + col.key + '" tabindex="0" aria-sort="' + ariaSort + '">' +
+        escapeHtml(col.label) + '</th>';
+    }).join('');
+
+    applicationsTableWrap.innerHTML =
+      '<div class="data-table-wrap"><table class="data-table"><thead><tr>' + headHtml + '</tr></thead><tbody>' +
+      sorted.map(a =>
+        '<tr id="app-row-' + escapeHtml(String(a.num)) + '">' +
+        '<td class="num-col" data-label="#">' + escapeHtml(String(a.num)) + '</td>' +
+        '<td data-label="Role">' + escapeHtml(a.role) + '</td>' +
+        '<td data-label="Company">' + escapeHtml(a.company) + '</td>' +
+        '<td data-label="Location">' + escapeHtml(a.location) + '</td>' +
+        '<td class="pay-col" data-label="Pay">' + escapeHtml(a.pay) + '</td>' +
+        '<td data-label="Applied">' + escapeHtml(fmtDate(a.appliedDate) || 'undated') + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div>';
+
+    applicationsTableWrap.querySelectorAll('th.sortable').forEach(th => {
+      const activate = () => {
+        const key = th.getAttribute('data-sort');
+        if (appSortKey === key) {
+          appSortDir = appSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          appSortKey = key;
+          appSortDir = 'asc';
+        }
+        renderApplications(data);
+      };
+      th.addEventListener('click', activate);
+      th.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+      });
+    });
 
     const asides = [];
     const dropped = data.dropped || [];
@@ -244,6 +300,49 @@
       );
     }
     applicationsAsides.innerHTML = asides.join('');
+  }
+
+  // Real risk this catches: applications.json's only existing uniqueness
+  // check is on "num" (an auto-incrementing counter, so it can't naturally
+  // collide except by mistake), so the same tracker entry hand-transcribed
+  // twice under two different "num" values would otherwise go completely
+  // undetected on this page, unlike CGT/CSM/Garage/Sondrik's own record
+  // lists, which all already show this same panel. Grouping logic lives in
+  // JobSearchValidateCore, shared with validate.js, same reasoning as every
+  // other hub's own validate-core.js.
+  let duplicateRowFlashTimer = null;
+  function jumpToApplicationRow(num) {
+    const row = document.getElementById('app-row-' + num);
+    if (!row) return;
+    row.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    clearTimeout(duplicateRowFlashTimer);
+    document.querySelectorAll('.row-flash').forEach(n => n.classList.remove('row-flash'));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      row.classList.add('row-flash');
+      duplicateRowFlashTimer = setTimeout(() => row.classList.remove('row-flash'), 1600);
+    }));
+  }
+
+  function renderDuplicates(applications) {
+    const section = document.getElementById('duplicatesSection');
+    const list = document.getElementById('duplicatesList');
+    if (!section || !list || typeof JobSearchValidateCore === 'undefined') return;
+    const groups = JobSearchValidateCore.findDuplicateApplications(applications);
+    if (!groups.length) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+    list.innerHTML = groups.map(group => group.map(a =>
+      '<button type="button" class="data-quality-row" data-num="' + escapeHtml(String(a.num)) + '">' +
+      '<strong>' + escapeHtml(a.company) + '</strong>' +
+      '<span style="color:var(--sub)">' + escapeHtml(a.role) + '</span>' +
+      '<span class="dq-why">#' + escapeHtml(String(a.num)) + ', ' + group.length + ' ENTRIES MATCH ON COMPANY + ROLE</span>' +
+      '</button>'
+    ).join('')).join('');
+    list.querySelectorAll('.data-quality-row').forEach(btn => {
+      btn.addEventListener('click', () => jumpToApplicationRow(btn.dataset.num));
+    });
   }
 
   function renderCriteria(data) {
@@ -370,6 +469,7 @@
 
     if (applicationsData) {
       renderApplications(applicationsData);
+      renderDuplicates(applicationsData.applications || []);
     } else {
       applicationsTableWrap.innerHTML = '<div class="empty-state" role="alert">Failed to load applications data: ' +
         escapeHtml(applicationsResult.reason.message) + '</div>';
@@ -493,13 +593,118 @@
   });
 
   document.addEventListener('keydown', e => {
-    if (shortcutsOpen) return;
+    if (shortcutsOpen || jumpNavOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
     if (e.key === '?') {
       e.preventDefault();
       openShortcuts();
+    }
+  });
+
+  // Jump-to-section nav, same markup/behavior as Garage/Sondrik/CGT/CSM's:
+  // this page runs 9 real sections including older digest runs and the
+  // changelog, with no sticky header, so this is the one way back to a
+  // specific section without scrolling blind. Built from the real on-page
+  // section titles at load time, no separate list to keep in sync by hand
+  // as sections get added.
+  let jumpNavOpen = false;
+  let jumpNavLastFocusedEl = null;
+
+  function collectJumpSections() {
+    const usedIds = new Set();
+    return Array.from(document.querySelectorAll('main > section')).map((section) => {
+      if (section.hidden) return null;
+      const titleEl = section.querySelector('h2.section-title, summary.section-title');
+      if (!titleEl) return null;
+      // Strip the "Applications submitted" heading's own nested Data
+      // Quality badge so the label stays a stable section name instead of
+      // picking up that badge's ever-changing warning count.
+      const clone = titleEl.cloneNode(true);
+      clone.querySelectorAll('.section-title-meta').forEach(el => el.remove());
+      const label = clone.textContent.replace(/\s+/g, ' ').trim();
+      if (!label) return null;
+      if (!section.id) {
+        let slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'section';
+        let candidate = 'jump-' + slug;
+        let n = 2;
+        while (usedIds.has(candidate) || document.getElementById(candidate)) {
+          candidate = 'jump-' + slug + '-' + n;
+          n++;
+        }
+        section.id = candidate;
+      }
+      usedIds.add(section.id);
+      return { id: section.id, label };
+    }).filter(Boolean);
+  }
+
+  function renderJumpNavList() {
+    const sections = collectJumpSections();
+    document.getElementById('jumpNavList').innerHTML = sections.map(s =>
+      '<a class="jump-nav-link" href="#' + s.id + '" data-jump-target="' + s.id + '">' + escapeHtml(s.label) + '</a>'
+    ).join('');
+  }
+
+  function getJumpNavFocusable() {
+    return Array.from(document.getElementById('jumpNavModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openJumpNav() {
+    if (jumpNavOpen) return;
+    jumpNavOpen = true;
+    jumpNavLastFocusedEl = document.activeElement;
+    renderJumpNavList();
+    document.getElementById('jumpNavOverlay').hidden = false;
+    lockBodyScroll();
+    document.getElementById('jumpNavClose').focus();
+  }
+
+  function closeJumpNav() {
+    if (!jumpNavOpen) return;
+    jumpNavOpen = false;
+    document.getElementById('jumpNavOverlay').hidden = true;
+    unlockBodyScroll();
+    if (jumpNavLastFocusedEl && typeof jumpNavLastFocusedEl.focus === 'function') jumpNavLastFocusedEl.focus();
+    jumpNavLastFocusedEl = null;
+  }
+
+  document.getElementById('jumpNavBtn').addEventListener('click', openJumpNav);
+  document.getElementById('jumpNavClose').addEventListener('click', closeJumpNav);
+  document.getElementById('jumpNavOverlay').addEventListener('click', e => {
+    if (e.target.id === 'jumpNavOverlay') closeJumpNav();
+  });
+  document.getElementById('jumpNavList').addEventListener('click', e => {
+    const link = e.target.closest('.jump-nav-link');
+    if (!link) return;
+    e.preventDefault();
+    const target = document.getElementById(link.dataset.jumpTarget);
+    closeJumpNav();
+    if (target) {
+      // The scroll-lock release above needs a frame to settle, starting the
+      // smooth scroll before that clobbers it.
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!jumpNavOpen) return;
+    if (e.key === 'Escape') { closeJumpNav(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getJumpNavFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   });
 
@@ -514,4 +719,121 @@
   window.addEventListener('offline', updateOfflineBanner);
   window.addEventListener('online', updateOfflineBanner);
   updateOfflineBanner();
+
+  // Surfaces this hub's own validate.js self-check (date sanity, em-dash
+  // scan, source-URL check, duplicate-application detection) on the page
+  // itself, via the same generic /api/<hub>/data-quality route every other
+  // hub already reads. server.js has exposed /api/job-search/data-quality
+  // since the route was added, but nothing on this page read it until now,
+  // so a hand-transcription mistake in applications.json previously only
+  // ever surfaced on the command line. "unavailable" (validate.js missing,
+  // node unreachable) is an environment gap, not a real finding, so it
+  // stays silent, same contract as every other hub's identical check.
+  function renderDataQuality(data) {
+    const meta = document.getElementById('dataQualityMeta');
+    const callout = document.getElementById('dataQualityCallout');
+    if (!meta || !callout) return;
+    meta.classList.remove('warn');
+    if (!data || data.unavailable) {
+      meta.textContent = '';
+      meta.title = '';
+      callout.innerHTML = '';
+      return;
+    }
+    const warnings = data.warnings || 0;
+    const errors = data.errors || 0;
+    if (!warnings && !errors) {
+      meta.textContent = 'Self-check: clean';
+      meta.title = 'This hub\'s own validate.js (date sanity, em-dash scan, source-URL check, duplicate-application detection) found nothing to flag.';
+      callout.innerHTML = '';
+      return;
+    }
+    meta.textContent = errors ? 'Self-check: ' + errors + ' error(s)' : 'Self-check: ' + warnings + ' warning(s)';
+    meta.classList.add('warn');
+    meta.title = 'Run node public/job-search/data/validate.js for the full detail.';
+    const counts = [errors ? errors + ' error(s)' : '', warnings ? warnings + ' warning(s)' : ''].filter(Boolean).join(', ');
+    callout.innerHTML = '<div class="callout callout-warning">' +
+      '<strong>' + (errors ? 'This hub\'s data-quality check found real errors.' : 'This hub\'s data-quality check found warnings.') + '</strong> ' +
+      escapeHtml(counts) + ' from public/job-search/data/validate.js (guards against a bad date, an untranscribed em dash, ' +
+      'a broken source link, and a duplicate application entry). Run <code>node public/job-search/data/validate.js</code> for the full detail.' +
+      '</div>';
+  }
+
+  // One-time on load, independent of the data-file fetches above: validate.js's
+  // result only changes when someone hand-edits and redeploys a data file,
+  // never on its own poll cadence (this page has none), so there's nothing to
+  // gain from re-fetching it later.
+  function loadDataQuality() {
+    fetch('/api/job-search/data-quality').then(r => r.ok ? r.json() : null).then(renderDataQuality).catch(() => renderDataQuality(null));
+  }
+  loadDataQuality();
+
+  // Renders changelog.json, a file no one hand-edits: it's regenerated from
+  // this repo's real git history by public/job-search/data/changelog.js, so
+  // every hash, author, and date here is independently checkable against the
+  // repo instead of resting on a hand-typed claim. Missing the file entirely
+  // (never generated yet, or a fresh clone) is an honest empty state, not an
+  // error. driftStatus comes from /api/job-search/changelog-status, the same
+  // live drift check already exposed for the other 5 hubs: it compares
+  // changelog.json's recorded commit hashes for this hub's own data files
+  // against this repo's real git log, so a real drift shows up here on the
+  // live page instead of only when someone happens to run node
+  // public/job-search/data/changelog.js from the command line. "unavailable"
+  // (not a git checkout, shallow clone, etc) is an environment gap, not a
+  // data error, so it stays silent rather than showing a warning no one can
+  // act on. Same markup/classes as CSM's identical section.
+  function renderChangelog(data, driftStatus) {
+    if (!changelogFeedEl) return;
+    const driftWarning = (driftStatus && driftStatus.drifted)
+      ? '<div class="callout callout-warning"><strong>Changelog is out of sync.</strong> changelog.json records ' +
+        driftStatus.recordedCount + ' commit' + (driftStatus.recordedCount === 1 ? '' : 's') +
+        ' for this hub\'s data files, but this repo\'s real git history has ' + driftStatus.realCount +
+        '. Run <code>node public/job-search/data/changelog.js</code> to regenerate it.</div>'
+      : '';
+    const entries = (data && data.entries) || [];
+    if (entries.length === 0) {
+      changelogFeedEl.innerHTML = driftWarning + '<p class="changelog-empty">No changelog generated yet. Run ' +
+        '<code>node public/job-search/data/changelog.js</code> to build one from this repo&rsquo;s git history.</p>';
+      return;
+    }
+    const rowsHtml = entries.map(e => {
+      const files = (e.files || []).join(', ');
+      return '<div class="changelog-row' + (e.historyReset ? ' changelog-row-reset' : '') + '">' +
+        '<span class="changelog-date font-mono">' + escapeHtml(fmtDate(e.date)) + '</span>' +
+        '<span class="changelog-hash" title="' + escapeHtml(e.fullHash || e.hash) + '">' + escapeHtml(e.hash) + '</span>' +
+        '<span class="changelog-author">' + escapeHtml(e.author) + '</span>' +
+        '<span class="changelog-subject' + (e.historyReset ? ' changelog-subject-reset' : '') + '">' +
+        (e.historyReset ? '&#9888; ' : '') + escapeHtml(e.subject) + '</span>' +
+        (files ? '<span class="changelog-files">touched: ' + escapeHtml(files) + '</span>' : '') +
+        '</div>';
+    }).join('');
+    changelogFeedEl.innerHTML = driftWarning + rowsHtml;
+    let noteEl = changelogFeedEl.nextElementSibling;
+    if (!noteEl || !noteEl.classList.contains('changelog-generated-note')) {
+      noteEl = document.createElement('p');
+      noteEl.className = 'section-note changelog-generated-note';
+      changelogFeedEl.after(noteEl);
+    }
+    noteEl.textContent = 'Generated ' + (fmtDate((data.generatedAt || '').slice(0, 10)) || 'at an unknown time') +
+      ' from ' + (data.generatedFrom || 'git log') + '.';
+  }
+
+  // One-time on load, same reasoning as loadDataQuality above: changelog.json
+  // only changes when someone commits a data-file edit and regenerates it,
+  // never on its own poll cadence. The drift check is a separate,
+  // best-effort fetch so an unavailable git checkout never blocks rendering
+  // the changelog entries that did load.
+  function loadChangelog() {
+    Promise.allSettled([
+      fetch('/job-search/data/changelog.json').then(r => {
+        if (!r.ok) throw new Error('changelog.json returned ' + r.status);
+        return r.json();
+      }),
+      fetch('/api/job-search/changelog-status').then(r => r.ok ? r.json() : null).catch(() => null)
+    ]).then(([changelogResult, driftResult]) => {
+      const driftStatus = driftResult.status === 'fulfilled' ? driftResult.value : null;
+      renderChangelog(changelogResult.status === 'fulfilled' ? changelogResult.value : { entries: [] }, driftStatus);
+    });
+  }
+  loadChangelog();
 })();
