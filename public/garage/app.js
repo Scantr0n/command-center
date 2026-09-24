@@ -185,6 +185,32 @@ function renderSellerStandardsFreshness() {
   el.title = 'Last hand-verified against each platform\'s own published seller-status documentation on ' + SELLER_STANDARDS_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above, applied to the one
+// number on this page that isn't platform policy at all: the federal
+// 1099-K threshold is set by Congress, not eBay/Vinted/Poshmark/Depop, and
+// it has already flip-flopped once in real life (ARPA dropped it to $600
+// for 2022, IRS delayed that twice, OBBBA restored $20,000/200 transactions
+// in July 2025). A callout with no tracked verification date is exactly
+// the silent-drift risk this pattern exists to catch, and getting a real
+// tax-reporting threshold wrong is a worse failure mode than a stale fee
+// schedule. Re-verified 2026-09-24 against current IRS/OBBBA reporting
+// (1800Accountant, TaxAct, Avalara, 1099online): still $20,000 AND 200
+// transactions per platform for the 2026 tax year, both conditions required.
+const TAX_TRACKER_REVIEWED_ON = '2026-09-24';
+const TAX_TRACKER_STALE_AFTER_DAYS = 45;
+
+function renderTaxTrackerFreshness() {
+  const el = document.getElementById('taxTrackerFreshness');
+  if (!el) return;
+  const age = daysSincePublished(TAX_TRACKER_REVIEWED_ON);
+  const stale = age != null && age > TAX_TRACKER_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current IRS Form 1099-K reporting-threshold guidance on ' + TAX_TRACKER_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -4961,6 +4987,7 @@ renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
 renderSellerStandardsFreshness();
+renderTaxTrackerFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
