@@ -622,7 +622,8 @@ function appendAlphaConnHistory(at, connected, paused) {
 // client-side half of this same feed.
 const {
   computeDrawdowns, mapPositions, mapAccount, mapEquityCurve,
-  evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt
+  evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt,
+  mapAnomalies
 } = require('./public/alpha/data/live-core.js');
 
 app.get('/api/alpha/live', async (req, res) => {
@@ -643,7 +644,11 @@ app.get('/api/alpha/live', async (req, res) => {
     const [state, evoHistory, anomalies, debates, equity] = await Promise.all([
       fetchAlpha('/state'),
       fetchAlpha('/evolution-history').catch(() => ({ history: [] })),
-      fetchAlpha('/anomalies').catch(() => ({ stuck: [] })),
+      // Falls back to `stuck: null`, not `stuck: []`, when this one
+      // subrequest fails while /health and /state still succeed: mapAnomalies
+      // below treats null as a genuinely unknown reading, never a guessed
+      // "0 stuck agents" standing in for a check that never actually ran.
+      fetchAlpha('/anomalies').catch(() => ({ stuck: null })),
       fetchAlpha('/debates').catch(() => ({ enabled: false })),
       fetchAlpha('/equity-history').catch(() => ({ history: [] }))
     ]);
@@ -684,6 +689,7 @@ app.get('/api/alpha/live', async (req, res) => {
           active: !!debates.enabled,
           blockedOn: debates.enabled ? null : 'API key'
         },
+        anomalies: mapAnomalies(anomalies, now),
         account,
         positions: mapPositions(state.positions),
         genealogy: {

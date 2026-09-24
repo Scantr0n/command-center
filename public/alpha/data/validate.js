@@ -68,7 +68,8 @@ function main() {
     (live.killSwitch && live.killSwitch.engaged != null) ||
     (live.positionSizing && (live.positionSizing.activeMode != null || live.positionSizing.currentDrawdownPct != null || live.positionSizing.maxDrawdownPct != null || live.positionSizing.robustnessScore != null)) ||
     (live.genealogy && (live.genealogy.generation != null || live.genealogy.lastBreedingEventAt != null ||
-      (Array.isArray(live.genealogy.lineages) && live.genealogy.lineages.length > 0)));
+      (Array.isArray(live.genealogy.lineages) && live.genealogy.lineages.length > 0))) ||
+    (live.anomalies && live.anomalies.stuckCount != null);
 
   if (anyLiveValueSet && !live.asOf) {
     errors.push('live: one or more live fields are set but "live.asOf" is missing. Every live reading must carry ' +
@@ -196,6 +197,24 @@ function main() {
     errors.push('live.positionSizing.robustnessScore: must be null or a finite number from 0 to 100 ' +
       '(it drives a percentage meter on the page, same as currentDrawdownPct/maxDrawdownPct): ' +
       JSON.stringify(robustnessScore));
+  }
+
+  // Stuck-agent detection is a real, live-daemon-only reading, same
+  // "unknown means null, never a guessed 0" rule as everything else under
+  // live: a real check that found nothing stuck (stuckCount: 0) is not the
+  // same fact as a check that never ran, so both must carry a real
+  // checkedAt when stuckCount is set.
+  const stuckCount = live.anomalies && live.anomalies.stuckCount;
+  if (stuckCount != null && !(typeof stuckCount === 'number' && Number.isFinite(stuckCount) && stuckCount >= 0)) {
+    errors.push('live.anomalies.stuckCount: must be null or a non-negative finite number: ' + JSON.stringify(stuckCount));
+  }
+  if (live.anomalies && !isIsoDatetimeOrNull(live.anomalies.checkedAt)) {
+    errors.push('live.anomalies.checkedAt: not a valid ISO datetime or null');
+  } else if (live.anomalies && isFutureDatetime(live.anomalies.checkedAt)) {
+    warnings.push('live.anomalies.checkedAt (' + live.anomalies.checkedAt + ') is in the future, check for a typo\'d year');
+  }
+  if (stuckCount != null && !live.anomalies.checkedAt) {
+    errors.push('live.anomalies: stuckCount is set but checkedAt is missing, a real reading needs the timestamp it was actually observed at');
   }
 
   if (data.connection && data.connection.connected === true && !data.connection.checkedAt) {

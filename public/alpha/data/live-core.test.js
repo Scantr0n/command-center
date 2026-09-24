@@ -12,7 +12,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   computeDrawdowns, mapPositions, mapAccount, mapEquityCurve, EQUITY_CURVE_POINT_CAP,
-  evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt
+  evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt,
+  mapAnomalies
 } = require('./live-core.js');
 
 test('computeDrawdowns reports null/null for missing or empty history', () => {
@@ -161,4 +162,26 @@ test('lastKillSwitchTriggerAt returns the most recent real engage transition, nu
     { at: 't4', connected: true, paused: true }
   ];
   assert.equal(lastKillSwitchTriggerAt(triggeredTwice), 't4', 'the most recent engage, not the first');
+});
+
+test('mapAnomalies reports null/null when the subrequest itself failed, never a guessed 0', () => {
+  assert.deepEqual(mapAnomalies(null), { stuckCount: null, checkedAt: null });
+  assert.deepEqual(mapAnomalies(undefined), { stuckCount: null, checkedAt: null });
+  assert.deepEqual(mapAnomalies({ stuck: null }), { stuckCount: null, checkedAt: null });
+});
+
+test('mapAnomalies reports a real 0 when the check succeeded and found nothing stuck', () => {
+  assert.deepEqual(
+    mapAnomalies({ stuck: [], checkedAt: 't1' }),
+    { stuckCount: 0, checkedAt: 't1' }
+  );
+});
+
+test('mapAnomalies counts real stuck-agent entries and passes through the real checkedAt', () => {
+  const anomalies = { stuck: [{ agentId: 'AGENT_1' }, { agentId: 'AGENT_2' }], checkedAt: 't2' };
+  assert.deepEqual(mapAnomalies(anomalies), { stuckCount: 2, checkedAt: 't2' });
+});
+
+test('mapAnomalies falls back to the passed-in checkedAt when the daemon omitted its own', () => {
+  assert.deepEqual(mapAnomalies({ stuck: [] }, 'fallback-t'), { stuckCount: 0, checkedAt: 'fallback-t' });
 });

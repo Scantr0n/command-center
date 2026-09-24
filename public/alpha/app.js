@@ -183,7 +183,7 @@ function computeHeadline(data, isLastKnown) {
 // last real value with an explicit, honest age on it rather than reverting
 // to unknown. This cache is deliberately narrow: only the slow-changing,
 // non-monetary fields (kill switch, regime, drawdown %, debate panel,
-// genealogy). Account and open positions are excluded on purpose, even
+// genealogy, stuck-agent count). Account and open positions are excluded on purpose, even
 // though they live right next to these fields in the same live payload:
 // those are real-money figures that can be wrong within seconds of going
 // stale, and showing a frozen dollar amount as if it might still be current
@@ -202,7 +202,8 @@ function saveLastKnown(data) {
       killSwitch: live.killSwitch,
       positionSizing: live.positionSizing,
       debatePanel: live.debatePanel,
-      genealogy: live.genealogy
+      genealogy: live.genealogy,
+      anomalies: live.anomalies
     }));
   } catch (e) {
     // Private browsing / storage blocked: just skip caching, page still
@@ -226,10 +227,10 @@ function renderLastKnownBanner(lastKnown) {
   if (!lastKnown) return;
   const age = timeAgo(lastKnown.asOf) || 'earlier';
   document.getElementById('lastKnownBannerDetail').textContent =
-    'Kill switch, regime, drawdown, debate panel, and genealogy below are the last real reading Alpha gave, from ' +
-    age + ' (' + formatAbsolute(lastKnown.asOf) + '), not current. Account and positions are left at ' +
-    '"awaiting connection" instead, since those can change every second and a frozen dollar figure would be ' +
-    'misleading rather than merely old.';
+    'Kill switch, regime, drawdown, debate panel, genealogy, and anomaly count below are the last real reading ' +
+    'Alpha gave, from ' + age + ' (' + formatAbsolute(lastKnown.asOf) + '), not current. Account and positions ' +
+    'are left at "awaiting connection" instead, since those can change every second and a frozen dollar figure ' +
+    'would be misleading rather than merely old.';
 }
 
 function setLastKnownTag(id, lastKnown) {
@@ -958,6 +959,20 @@ function renderStats(data) {
     // it wasn't.
     debateActive ? null : 'Blocked on: ' + ((live.debatePanel && live.debatePanel.blockedOn) || 'unknown'),
     !debateActive
+  ));
+
+  // Distinct from the everyday "awaiting connection" gray: a real stuckCount
+  // of 0 is a genuine clean reading, not an unknown one, so it renders as
+  // "None" rather than the awaiting-connection treatment every other still-
+  // unset field on this row gets. See mapAnomalies' own comment for why a
+  // failed /anomalies subrequest reports null here rather than a guessed 0.
+  const stuckCount = live.anomalies && live.anomalies.stuckCount;
+  const anomaliesKnown = stuckCount != null;
+  tiles.push(statTile(
+    anomaliesKnown ? (stuckCount === 0 ? 'None' : escapeHtml(String(stuckCount))) : awaiting,
+    'Active anomalies',
+    anomaliesKnown ? (stuckCount > 0 ? 'Stuck agent(s) detected' : 'No stuck agents at last check') : null,
+    !anomaliesKnown
   ));
 
   document.getElementById('statRow').innerHTML = tiles.join('');
@@ -2082,6 +2097,7 @@ function buildStatusSummary(data) {
     '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),
     '- Robustness score: ' + (typeof ps.robustnessScore === 'number' ? ps.robustnessScore + '/100' : awaiting),
     '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active) ? 'Active' : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
+    '- Active anomalies: ' + ((live.anomalies && live.anomalies.stuckCount != null) ? String(live.anomalies.stuckCount) : awaiting),
     '- Genealogy: ' + (() => {
       const g = live.genealogy || {};
       if (g.generation == null && g.lastBreedingEventAt == null) return awaiting;

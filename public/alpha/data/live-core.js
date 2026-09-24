@@ -179,8 +179,21 @@
     return triggers.length ? triggers[triggers.length - 1].at : null;
   }
 
+  // The daemon's real /anomalies endpoint reports currently-stuck agents as
+  // of that one check, a live snapshot no different in kind from
+  // killSwitch.engaged, never a running tally. server.js falls back to
+  // `{ stuck: null }` when that one subrequest fails while /health and
+  // /state still succeed, so null in means null out here too: an honest
+  // "unknown", never a guessed 0 that would misreport a failed check as a
+  // clean one.
+  function mapAnomalies(anomalies, fallbackCheckedAt) {
+    if (!anomalies || !Array.isArray(anomalies.stuck)) return { stuckCount: null, checkedAt: null };
+    return { stuckCount: anomalies.stuck.length, checkedAt: anomalies.checkedAt || fallbackCheckedAt || null };
+  }
+
   return {
     computeDrawdowns, mapPositions, mapAccount, mapEquityCurve, EQUITY_CURVE_POINT_CAP,
-    evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt
+    evolutionEvents, connectionStateEvents, killSwitchStateEvents, lastKillSwitchTriggerAt,
+    mapAnomalies
   };
 });
