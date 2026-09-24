@@ -71,7 +71,7 @@ const {
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
-  offerTier, offerCounterAmount
+  offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -452,6 +452,7 @@ async function loadData() {
     document.getElementById('acquisitionsTotals').innerHTML = '';
   }
 
+  renderSellerStandardsProgress(sales, disputes);
   initTableScrollShadows();
   renderAttentionBar();
 }
@@ -2366,6 +2367,41 @@ function renderTaxTracker(sales) {
   }
   note.hidden = noteParts.length === 0;
   note.textContent = noteParts.join(' ');
+}
+
+// Turns the eBay and Depop rows of the "Seller status & standards" reference
+// table from static text into a real progress readout, computed from actual
+// sales.json/disputes.json rows via ebayTrsProgress/depopTopSellerProgress in
+// garage-core.js. Vinted and Poshmark's tiers key off a star rating and
+// review count this dashboard has no data source for, so those two rows stay
+// plain reference text (see the static markup in index.html) rather than
+// getting a fabricated number here.
+function renderSellerStandardsProgress(sales, disputes) {
+  const today = todayDateStr();
+  const ebay = ebayTrsProgress(sales, disputes, today);
+  const depop = depopTopSellerProgress(sales, disputes, today);
+
+  const progressBar = (value, target) => {
+    const pct = Math.min(100, (value / target) * 100);
+    return `<div class="tax-progress-row"><div class="tax-progress-track"><div class="tax-progress-fill" ` +
+      `style="width:${pct}%"></div></div><span class="tax-progress-pct font-mono">${pct.toFixed(0)}%</span></div>`;
+  };
+  const rateText = rate => rate == null ? 'no sales yet' : (rate * 100).toFixed(1) + '%';
+
+  document.getElementById('ebayTrsProgressCell').innerHTML =
+    `<div class="cell-value">${ebay.transactions} <span class="cell-muted">/ ${ebay.transactionsTarget} txns</span></div>` +
+    progressBar(ebay.transactions, ebay.transactionsTarget) +
+    `<div class="cell-value">${formatUsd(ebay.grossSales)} <span class="cell-muted">/ ${formatUsd(ebay.grossSalesTarget)}</span></div>` +
+    progressBar(ebay.grossSales, ebay.grossSalesTarget) +
+    `<div class="cell-muted">Cases resolved against seller: ${rateText(ebay.nonSellerResolvedRate)} (target &le;0.3%), ` +
+    `trailing ${ebay.windowDays} days. Defect rate and late-shipment rate aren't computed here, this dashboard ` +
+    `doesn't log per-order ship timestamps.</div>`;
+
+  document.getElementById('depopTopSellerProgressCell').innerHTML =
+    `<div class="cell-value">${formatUsd(depop.grossSales)} <span class="cell-muted">/ ${formatUsd(depop.grossSalesTarget)}</span></div>` +
+    progressBar(depop.grossSales, depop.grossSalesTarget) +
+    `<div class="cell-muted">Refund rate: ${rateText(depop.nonSellerResolvedRate)} (target &lt;5%), rolling ` +
+    `${depop.windowDays} days. On-time-shipping rate isn't computed here, same reason as eBay's.</div>`;
 }
 
 // Expenses are sorted most-recent-first when a date is logged, undated

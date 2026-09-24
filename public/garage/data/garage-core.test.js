@@ -20,6 +20,7 @@ const {
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
+  ebayTrsProgress, depopTopSellerProgress,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
 } = require('./garage-core.js');
 
@@ -297,4 +298,59 @@ test('offerCounterAmount: borderline tier splits closer to asking while still fr
   // No listing date logged defaults to the same firmer split as a genuinely
   // fresh listing, never the stale-listing split with no real evidence for it.
   assert.equal(offerCounterAmount('borderline', 60, 100, null), 90);
+});
+
+test('ebayTrsProgress: counts only real ebay sales within the trailing 365 days, ignores other platforms and out-of-window dates', () => {
+  const sales = [
+    { platform: 'ebay', salePrice: 100, saleDate: '2026-09-01' },
+    { platform: 'ebay', salePrice: 50, saleDate: '2025-10-01' }, // in window
+    { platform: 'ebay', salePrice: 999, saleDate: '2025-09-01' }, // just outside window
+    { platform: 'depop', salePrice: 999, saleDate: '2026-09-01' } // wrong platform
+  ];
+  const result = ebayTrsProgress(sales, [], '2026-09-24');
+  assert.equal(result.transactions, 2);
+  assert.equal(result.grossSales, 150);
+  assert.equal(result.meetsCountTargets, false);
+});
+
+test('ebayTrsProgress: meetsCountTargets is true only once both the transaction count and dollar targets are actually hit', () => {
+  const hundredSales = Array.from({ length: 100 }, (_, i) => ({ platform: 'ebay', salePrice: 10, saleDate: '2026-09-01' }));
+  const shortOfDollars = ebayTrsProgress(hundredSales, [], '2026-09-24');
+  assert.equal(shortOfDollars.transactions, 100);
+  assert.equal(shortOfDollars.grossSales, 1000);
+  assert.equal(shortOfDollars.meetsCountTargets, true);
+
+  const shortOfCount = ebayTrsProgress([{ platform: 'ebay', salePrice: 5000, saleDate: '2026-09-01' }], [], '2026-09-24');
+  assert.equal(shortOfCount.meetsCountTargets, false);
+});
+
+test('ebayTrsProgress: nonSellerResolvedRate is null with no sales yet, not a misleading 0%', () => {
+  assert.equal(ebayTrsProgress([], [], '2026-09-24').nonSellerResolvedRate, null);
+});
+
+test('ebayTrsProgress: nonSellerResolvedRate only counts disputes resolved against the seller, and only within the same window', () => {
+  const sales = [
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-01' },
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-02' }
+  ];
+  const disputes = [
+    { platform: 'ebay', status: 'resolved-buyer', openedDate: '2026-09-03' },
+    { platform: 'ebay', status: 'resolved-seller', openedDate: '2026-09-03' }, // doesn't count against the seller
+    { platform: 'ebay', status: 'resolved-buyer', openedDate: '2024-01-01' }, // outside the window
+    { platform: 'depop', status: 'resolved-buyer', openedDate: '2026-09-03' } // wrong platform
+  ];
+  assert.equal(ebayTrsProgress(sales, disputes, '2026-09-24').nonSellerResolvedRate, 0.5);
+});
+
+test('depopTopSellerProgress: sums real depop sales within the rolling 30 days only', () => {
+  const sales = [
+    { platform: 'depop', salePrice: 400, saleDate: '2026-09-20' },
+    { platform: 'depop', salePrice: 400, saleDate: '2026-09-01' }, // 23 days back, still in window
+    { platform: 'depop', salePrice: 999, saleDate: '2026-08-01' }, // outside the 30-day window
+    { platform: 'ebay', salePrice: 999, saleDate: '2026-09-20' } // wrong platform
+  ];
+  const result = depopTopSellerProgress(sales, [], '2026-09-24');
+  assert.equal(result.grossSales, 800);
+  assert.equal(result.meetsCountTargets, false);
+  assert.equal(depopTopSellerProgress([{ platform: 'depop', salePrice: 1000, saleDate: '2026-09-24' }], [], '2026-09-24').meetsCountTargets, true);
 });

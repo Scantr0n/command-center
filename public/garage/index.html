@@ -646,8 +646,13 @@
       platform's own current seller documentation and reseller-community benchmarking as of September 2026. Worth
       knowing now, before the 48-draft Depop backlog goes live and volume changes fast: several of these track
       real shipping speed and buyer rating behavior starting from the very first sale, not just abstract volume
-      further down the road. Reference only, not computed from any logged data here, there's no live account
-      connection to read a real standing from.
+      further down the road. eBay's and Depop's transaction-count/dollar-volume requirements, plus a case-outcome
+      rate proxy, are computed live in the "Real progress" column below from actual <code>sales.json</code> and
+      <code>disputes.json</code> rows, since that's just arithmetic over data already tracked elsewhere on this
+      page. Vinted's and Poshmark's tiers key off a star rating and review count this dashboard has no data
+      source for, and no platform's shipping-speed/defect-rate requirement is computed either since none of
+      those are logged here, so those cells stay reference-only, there's no live account connection to read a
+      real standing from.
     </div>
     <div class="table-wrap">
       <table class="card-table">
@@ -657,6 +662,7 @@
             <th>Status tier</th>
             <th>Real requirements</th>
             <th>What it actually unlocks</th>
+            <th>Real progress</th>
           </tr>
         </thead>
         <tbody>
@@ -669,6 +675,7 @@
               transactions</td>
             <td>A Best Match search ranking boost, roughly 5-15 positions above an otherwise-equal non-TRS
               listing, plus a discount on the final value fee under Top Rated Plus</td>
+            <td id="ebayTrsProgressCell" class="seller-standards-progress"></td>
           </tr>
           <tr>
             <td>Vinted</td>
@@ -679,6 +686,8 @@
             <td>Reseller-community benchmarking puts 4.5+ stars with 20+ reviews at roughly a 94% successful-
               transaction rate, with higher-value items in practice needing 4.8+ stars and 50+ reviews to sell
               smoothly; shipping on time, every time, is the one lever that actually protects this</td>
+            <td class="cell-muted">Not computed, this dashboard has no data source for Vinted's real star
+              rating or review count</td>
           </tr>
           <tr>
             <td>Poshmark</td>
@@ -688,6 +697,9 @@
               sellers' listings</td>
             <td>A profile badge, algorithmic recommendation to new users, Posh Party hosting eligibility, and
               other program perks</td>
+            <td class="cell-muted">Not computed here, this dashboard has no data source for Posh Ambassador's
+              real sales-count or Love Notes criteria (see the sharing streak tracker above for the one Poshmark
+              stat this page does track)</td>
           </tr>
           <tr>
             <td>Depop</td>
@@ -696,6 +708,7 @@
               days, and a refund rate under 5%</td>
             <td>A Top Seller badge on the profile and listings, one of the few visible trust signals that matters
               given Depop's own inconsistent reputation (roughly 3/5 on Trustpilot as of 2026)</td>
+            <td id="depopTopSellerProgressCell" class="seller-standards-progress"></td>
           </tr>
         </tbody>
       </table>

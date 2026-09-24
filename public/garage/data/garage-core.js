@@ -351,6 +351,77 @@
     return null;
   }
 
+  // Real, published, count-based requirements toward eBay's Top Rated Seller
+  // tier and Depop's Top Seller tier (see the "Seller status & standards, by
+  // platform" reference table on the page), the only two platforms whose
+  // status tier has a real numeric threshold this dashboard already logs
+  // enough to compute: a trailing-12-month transaction count and dollar
+  // volume for eBay, a rolling-30-day dollar volume for Depop, both read
+  // straight from real sales.json rows. Vinted and Poshmark's tiers key off
+  // a star rating and review count this dashboard has no data source for, so
+  // they stay reference-only rather than guessing a number. Neither eBay's
+  // defect-rate/late-shipment-rate requirements nor Depop's on-time-shipping
+  // requirement are computed either, both need real per-order ship
+  // timestamps this dashboard doesn't log; the case-outcome rate below is
+  // the one real proxy actually buildable from what disputes.json tracks.
+  const EBAY_TRS_WINDOW_DAYS = 365;
+  const EBAY_TRS_TRANSACTIONS_TARGET = 100;
+  const EBAY_TRS_GROSS_SALES_TARGET = 1000;
+  const DEPOP_TOP_SELLER_WINDOW_DAYS = 30;
+  const DEPOP_TOP_SELLER_GROSS_SALES_TARGET = 1000;
+
+  function salesInWindow(sales, platform, todayStr, windowDays) {
+    const start = addDaysToDateStr(todayStr, -windowDays);
+    return (sales || []).filter(s => s.platform === platform && s.saleDate && s.saleDate >= start && s.saleDate <= todayStr);
+  }
+
+  function disputesInWindow(disputes, platform, todayStr, windowDays) {
+    const start = addDaysToDateStr(todayStr, -windowDays);
+    return (disputes || []).filter(d => d.platform === platform && d.openedDate && d.openedDate >= start && d.openedDate <= todayStr);
+  }
+
+  // A case resolved in the buyer's favor, or split, is the one outcome that
+  // counts against a seller's standing on both platforms below; a case still
+  // open or resolved for the seller doesn't. "resolved-buyer"/"resolved-split"
+  // are the exact status values the quick-log dispute tool already writes,
+  // see the ndStatus options in index.html.
+  function isNonSellerResolved(d) {
+    return d.status === 'resolved-buyer' || d.status === 'resolved-split';
+  }
+
+  // Returns null (not 0) for a rate with no real transactions to divide by
+  // yet, same "unknown, not zero" rule daysSincePublished above follows, so
+  // an empty sales log reads as "no data yet" rather than a clean 0% record.
+  function nonSellerResolvedRate(disputes, sales) {
+    return sales.length > 0 ? disputes.filter(isNonSellerResolved).length / sales.length : null;
+  }
+
+  function ebayTrsProgress(sales, disputes, todayStr) {
+    const windowSales = salesInWindow(sales, 'ebay', todayStr, EBAY_TRS_WINDOW_DAYS);
+    const windowDisputes = disputesInWindow(disputes, 'ebay', todayStr, EBAY_TRS_WINDOW_DAYS);
+    const transactions = windowSales.length;
+    const grossSales = windowSales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+    return {
+      windowDays: EBAY_TRS_WINDOW_DAYS,
+      transactions, transactionsTarget: EBAY_TRS_TRANSACTIONS_TARGET,
+      grossSales, grossSalesTarget: EBAY_TRS_GROSS_SALES_TARGET,
+      nonSellerResolvedRate: nonSellerResolvedRate(windowDisputes, windowSales),
+      meetsCountTargets: transactions >= EBAY_TRS_TRANSACTIONS_TARGET && grossSales >= EBAY_TRS_GROSS_SALES_TARGET
+    };
+  }
+
+  function depopTopSellerProgress(sales, disputes, todayStr) {
+    const windowSales = salesInWindow(sales, 'depop', todayStr, DEPOP_TOP_SELLER_WINDOW_DAYS);
+    const windowDisputes = disputesInWindow(disputes, 'depop', todayStr, DEPOP_TOP_SELLER_WINDOW_DAYS);
+    const grossSales = windowSales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+    return {
+      windowDays: DEPOP_TOP_SELLER_WINDOW_DAYS,
+      grossSales, grossSalesTarget: DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
+      nonSellerResolvedRate: nonSellerResolvedRate(windowDisputes, windowSales),
+      meetsCountTargets: grossSales >= DEPOP_TOP_SELLER_GROSS_SALES_TARGET
+    };
+  }
+
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
     POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
@@ -362,6 +433,9 @@
     poshmarkWeightTier, bundleNetComparison,
     computePoshmarkShareStreak,
     OFFER_TIER_ACCEPT_PCT, OFFER_TIER_COUNTER_PCT, OFFER_TIER_BORDERLINE_PCT,
-    offerTier, offerCounterAmount
+    offerTier, offerCounterAmount,
+    EBAY_TRS_WINDOW_DAYS, EBAY_TRS_TRANSACTIONS_TARGET, EBAY_TRS_GROSS_SALES_TARGET,
+    DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
+    ebayTrsProgress, depopTopSellerProgress
   };
 });
