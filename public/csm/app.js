@@ -8,7 +8,7 @@
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
-    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
+    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
@@ -115,6 +115,26 @@
   const nudgeTodayNoteEl = document.getElementById('nudgeTodayNote');
   if (nudgeTodayNoteEl) {
     nudgeTodayNoteEl.textContent = 'Due dates below are computed against today, ' + fmtDate(todayIso()) + ', this device’s local date.';
+  }
+
+  // China runs a single national timezone (China Standard Time, UTC+8, no
+  // daylight saving), so a nudge that looks "due today" on this device can
+  // still land in the middle of the recipient's night. Cold-outreach
+  // benchmarks are consistent that weekday mornings in the recipient's own
+  // timezone get the best reply rates, the same category of signal
+  // rollToWeekdayIso already applies to which day a nudge rolls onto; this
+  // surfaces the hour, computed once at page load like every other
+  // "computed against this clock" note on this page, not a live tick.
+  const beijingTimeNoteEl = document.getElementById('beijingTimeNote');
+  if (beijingTimeNoteEl) {
+    const b = beijingTimeInfo();
+    const clock = String(b.hour).padStart(2, '0') + ':' + String(b.minute).padStart(2, '0');
+    let verdict;
+    if (b.isPrimeReplyWindow) verdict = 'inside the Tue-Thu morning window general cold-outreach benchmarks report as strongest for replies.';
+    else if (b.isBusinessHours) verdict = 'inside typical business hours, outside that Tue-Thu-morning window.';
+    else if (b.isWeekday) verdict = 'outside typical business hours; a message sent now likely sits unread until morning there.';
+    else verdict = 'a weekend in China; a message sent now likely sits unread until Monday there.';
+    beijingTimeNoteEl.textContent = 'Beijing time right now: ' + clock + ', ' + b.weekdayName + '. ' + verdict;
   }
 
   // Reference/analytics widgets below the attention bar (platform reference,

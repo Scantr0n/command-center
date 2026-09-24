@@ -176,6 +176,33 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // China runs a single national timezone, China Standard Time, UTC+8
+  // year-round with no daylight saving, so this offset never needs a real
+  // timezone database, unlike almost any other cross-border time
+  // conversion. Cold-outreach research is consistent that the recipient's
+  // own local business hours matter for reply rate (and specifically
+  // weekday mornings), same category of timing signal rollToWeekdayIso
+  // above already applies to the day, this covers the hour. Takes a real
+  // JS Date (defaults to "now") so it stays testable against a fixed
+  // instant instead of only ever running live.
+  const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function beijingTimeInfo(nowUtc) {
+    const now = nowUtc instanceof Date ? nowUtc : new Date();
+    const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const hour = shifted.getUTCHours();
+    const minute = shifted.getUTCMinutes();
+    const dayOfWeek = shifted.getUTCDay();
+    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+    const isBusinessHours = isWeekday && hour >= 9 && hour < 18;
+    // Tue-Thu, roughly 8-11am recipient-local: the mid-week-morning window
+    // general cold-outreach benchmarks report as the strongest for replies.
+    const isPrimeReplyWindow = dayOfWeek >= 2 && dayOfWeek <= 4 && hour >= 8 && hour < 11;
+    return {
+      hour, minute, dayOfWeek, weekdayName: WEEKDAY_NAMES[dayOfWeek],
+      isWeekday, isBusinessHours, isPrimeReplyWindow
+    };
+  }
+
   // How many real touches have actually gone out, not just when the last
   // one landed. Cold outreach research is consistent that a real reply
   // typically takes several touches, not one attempt, so this is the count
@@ -638,7 +665,7 @@
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
-    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
+    todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, csvField, icsEscapeText, icsFoldLine,

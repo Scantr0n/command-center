@@ -18,7 +18,7 @@ const {
   isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
-  todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
+  todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
@@ -186,6 +186,47 @@ test('rollToWeekdayIso rolls a Saturday/Sunday forward to Monday and leaves a we
   assert.equal(rollToWeekdayIso('2026-09-26'), '2026-09-28'); // Saturday -> Monday
   assert.equal(rollToWeekdayIso('2026-09-27'), '2026-09-28'); // Sunday -> Monday
   assert.equal(rollToWeekdayIso('2026-09-23'), '2026-09-23'); // Wednesday, unchanged
+});
+
+test('beijingTimeInfo converts a UTC instant to China Standard Time (UTC+8, no DST)', () => {
+  // 2026-09-22T01:30:00Z is a real Tuesday; +8h lands at 09:30 Beijing time,
+  // still Tuesday.
+  const info = beijingTimeInfo(new Date('2026-09-22T01:30:00Z'));
+  assert.equal(info.hour, 9);
+  assert.equal(info.minute, 30);
+  assert.equal(info.weekdayName, 'Tuesday');
+  assert.equal(info.isWeekday, true);
+});
+
+test('beijingTimeInfo flags a weekday mid-week morning as the prime reply window', () => {
+  const info = beijingTimeInfo(new Date('2026-09-22T01:30:00Z')); // Tue 09:30 Beijing
+  assert.equal(info.isBusinessHours, true);
+  assert.equal(info.isPrimeReplyWindow, true);
+});
+
+test('beijingTimeInfo does not flag business hours or the prime window on a real weekend', () => {
+  // 2026-09-25T20:00:00Z (Friday) +8h lands at 2026-09-26 04:00, a Saturday.
+  const info = beijingTimeInfo(new Date('2026-09-25T20:00:00Z'));
+  assert.equal(info.weekdayName, 'Saturday');
+  assert.equal(info.isWeekday, false);
+  assert.equal(info.isBusinessHours, false);
+  assert.equal(info.isPrimeReplyWindow, false);
+});
+
+test('beijingTimeInfo treats a weekday evening as business-hours-over, outside the prime reply window', () => {
+  // 2026-09-23T14:00:00Z +8h lands at 22:00 Beijing time, a Wednesday.
+  const info = beijingTimeInfo(new Date('2026-09-23T14:00:00Z'));
+  assert.equal(info.weekdayName, 'Wednesday');
+  assert.equal(info.hour, 22);
+  assert.equal(info.isWeekday, true);
+  assert.equal(info.isBusinessHours, false);
+  assert.equal(info.isPrimeReplyWindow, false);
+});
+
+test('beijingTimeInfo defaults to the real current instant when called with no argument', () => {
+  const info = beijingTimeInfo();
+  assert.ok(info.hour >= 0 && info.hour <= 23);
+  assert.ok(info.dayOfWeek >= 0 && info.dayOfWeek <= 6);
 });
 
 test('byUrgency sorts a sooner nextNudgeDate before a later one', () => {
