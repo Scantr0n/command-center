@@ -11,10 +11,11 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
+    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
     csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
     channelSortRank, listComparator, computeDataQualityFlags,
-    slugifyProspectId, nextAvailableId
+    slugifyProspectId, nextAvailableId,
+    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -648,8 +649,11 @@
     }
   }
 
-  // hasNudgePlan now lives in csm-core.js, same shared-core-with-tests
-  // pattern as the other pure math above.
+  // hasNudgePlan, and the missingContactChannelType/missingVerifiedHook/
+  // channelTypeLoggedWithNoDetail/missingFollowUpPlan predicates this badge
+  // shares with the "Log new prospect" warnings below, now live in
+  // csm-core.js, same shared-core-with-tests pattern as the other pure
+  // math above.
   function renderDataQuality(stages, prospects) {
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
     const flagged = computeDataQualityFlags(stages, prospects);
@@ -3144,15 +3148,15 @@
         'name), so this defaulted to the generic id "' + p.id + '". Hand-edit the "id" field below to something ' +
         'more readable (a romanized version of the name works well) before pasting this in.');
     }
-    if (p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type)) {
+    if (missingContactChannelType(p)) {
       warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
         'biggest driver of real reply rate, fill it in as soon as it is known.');
     }
-    if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
+    if (channelTypeLoggedWithNoDetail(p)) {
       warnings.push('Contact channel type is logged but contact channel detail (the actual email/handle/contact) ' +
         'is not. Knowing it is a named decision-maker is not useful without the real way to reach them.');
     }
-    if (p.stage !== 'researched' && !p.verifiedHook) {
+    if (missingVerifiedHook(p)) {
       warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
         'is a real fit once known.');
     }
@@ -3168,7 +3172,7 @@
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
     }
-    if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
+    if (missingFollowUpPlan(p)) {
       warnings.push('Stage is "' + p.stage + '" but nothing is scheduled, no next nudge date, nudge point, or ' +
         'do-not-nudge-before. Without one of those this prospect will not show up anywhere the board flags a ' +
         'follow-up as due, log a real plan even if it is just a rough one.');

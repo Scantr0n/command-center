@@ -23,7 +23,8 @@ const {
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
   csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
-  channelSortRank, listComparator, slugifyProspectId, nextAvailableId
+  channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
+  missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -1048,6 +1049,31 @@ test('nextAvailableId lets a batch of same-named rows each get their own suffix 
   seen.add(second.id);
   assert.equal(first.id, 'jane-doe-2');
   assert.equal(second.id, 'jane-doe-3');
+});
+
+test('missingContactChannelType is false while still researched, true once past it with nothing logged', () => {
+  assert.equal(missingContactChannelType({ stage: 'researched' }), false);
+  assert.equal(missingContactChannelType({ stage: 'in-exploration' }), true);
+  assert.equal(missingContactChannelType({ stage: 'in-exploration', contactChannel: { type: 'generic-inbox' } }), false);
+});
+
+test('missingVerifiedHook is false while still researched, true once past it with no hook logged', () => {
+  assert.equal(missingVerifiedHook({ stage: 'researched' }), false);
+  assert.equal(missingVerifiedHook({ stage: 'in-exploration' }), true);
+  assert.equal(missingVerifiedHook({ stage: 'in-exploration', verifiedHook: 'Real hook' }), false);
+});
+
+test('channelTypeLoggedWithNoDetail only fires once a type is logged with no way to actually reach them', () => {
+  assert.equal(channelTypeLoggedWithNoDetail({}), false);
+  assert.equal(channelTypeLoggedWithNoDetail({ contactChannel: { type: 'named-decision-maker', detail: 'a@b.com' } }), false);
+  assert.equal(channelTypeLoggedWithNoDetail({ contactChannel: { type: 'named-decision-maker', detail: null } }), true);
+});
+
+test('missingFollowUpPlan only fires once contacted with nothing scheduled, and clears once something is', () => {
+  assert.equal(missingFollowUpPlan({ stage: 'researched' }), false);
+  assert.equal(missingFollowUpPlan({ stage: 'outreach-sent' }), true);
+  assert.equal(missingFollowUpPlan({ stage: 'silent-replied' }), true);
+  assert.equal(missingFollowUpPlan({ stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), 3) }), false);
 });
 
 test('computeDataQualityFlags filters out every prospect with nothing wrong', () => {

@@ -497,6 +497,28 @@
     return false;
   }
 
+  // Whether a prospect past the researched stage still has no logged
+  // contact channel type (named decision-maker vs. generic inbox), the
+  // single field this project's own real history has found most predictive
+  // of a reply. Shared between the Data Quality badge below and the "Log
+  // new prospect" warnings in app.js so the two can never independently
+  // drift on what counts as a real gap.
+  function missingContactChannelType(p) {
+    return p.stage !== 'researched' && !(p.contactChannel && p.contactChannel.type);
+  }
+
+  function missingVerifiedHook(p) {
+    return p.stage !== 'researched' && !p.verifiedHook;
+  }
+
+  function channelTypeLoggedWithNoDetail(p) {
+    return !!(p.contactChannel && p.contactChannel.type && !p.contactChannel.detail);
+  }
+
+  function missingFollowUpPlan(p) {
+    return (p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p);
+  }
+
   // Per-prospect data-quality check: every real gap the board can actually
   // detect from a prospect's own fields, not just the stall/cold-signal/
   // duplicate checks that already get their own panels. Reasons are plain
@@ -507,14 +529,12 @@
     return prospects
       .map(p => {
         const reasons = [];
-        if (p.stage !== 'researched') {
-          if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
-          if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
-        }
-        if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
+        if (missingContactChannelType(p)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
+        if (missingVerifiedHook(p)) reasons.push('NO VERIFIED HOOK LOGGED');
+        if (channelTypeLoggedWithNoDetail(p)) {
           reasons.push('CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL');
         }
-        if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
+        if (missingFollowUpPlan(p)) {
           reasons.push('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT');
         }
         const snapStale = socialSnapshotsStaleInfo(p);
@@ -706,6 +726,7 @@
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, channelSortRank, listComparator,
-    slugifyProspectId, nextAvailableId
+    slugifyProspectId, nextAvailableId,
+    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
   };
 });
