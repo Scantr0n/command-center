@@ -3667,17 +3667,11 @@ copyLinkBtn.addEventListener('click', () => {
     });
 });
 
-function csvField(v) {
-  let s = v == null ? '' : String(v);
-  // CSV/formula injection (OWASP): a hand-typed note starting with
-  // =, +, -, @, tab, or a carriage return is read as a live formula by
-  // Excel/Sheets when this export is opened there, not as plain text.
-  // A leading single quote is the standard mitigation both recommend, and
-  // matters here specifically since the sales/expenses CSVs get opened in
-  // a spreadsheet for real Schedule C bookkeeping.
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+// Shared, unit-tested CSV serialization (export-core.js): csvField's
+// CSV/formula-injection guard now has a real regression test instead of
+// only ever running live in a browser, same shared-core pattern already
+// used for GarageValidateCore above.
+const csvField = GarageExportCore.csvField;
 
 const CSV_COLUMNS = [
   ['title', 'Item'], ['price', 'Price'], ['costBasis', 'Cost basis'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
