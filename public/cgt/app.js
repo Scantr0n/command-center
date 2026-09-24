@@ -3633,15 +3633,10 @@ copyLinkBtn.addEventListener('click', () => {
     });
 });
 
-function csvField(v) {
-  let s = v == null ? '' : String(v);
-  // CSV/formula injection (OWASP): a hand-typed note starting with
-  // =, +, -, @, tab, or a carriage return is read as a live formula by
-  // Excel/Sheets when this export is opened there, not as plain text.
-  // A leading single quote is the standard mitigation both recommend.
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+// Shared, unit-tested CSV serialization (export-core.js): csvField's
+// CSV/formula-injection guard now has a real regression test instead of
+// only ever running live in a browser.
+const csvField = CgtExportCore.csvField;
 
 // Each column is [accessor, label] rather than [key, label] so a derived
 // column (gain/loss isn't a real field on the card, it's computed from two
