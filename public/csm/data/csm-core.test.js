@@ -21,7 +21,7 @@ const {
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
+  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
   csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
   channelSortRank, listComparator
 } = require('./csm-core.js');
@@ -896,4 +896,65 @@ test('listComparator falls back to name sort for an unrecognized key, the same a
   const rows = [{ name: 'charlie' }, { name: 'alice' }];
   const sorted = rows.slice().sort(listComparator('not-a-real-key', 'asc', listStageById, listStageOrderIndex));
   assert.deepEqual(sorted.map(r => r.name), ['alice', 'charlie']);
+});
+
+test('computeDataQualityFlags has nothing to say about a researched prospect missing channel/hook, since neither is expected pre-outreach', () => {
+  const p = { stage: 'researched', name: 'a' };
+  assert.deepEqual(computeDataQualityFlags([], [p]), []);
+});
+
+test('computeDataQualityFlags flags a past-outreach prospect missing both contact channel type and verified hook', () => {
+  const p = { stage: 'in-exploration', name: 'a' };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.equal(flagged.length, 1);
+  assert.equal(flagged[0].p, p);
+  assert.ok(flagged[0].reasons.includes('NO CONTACT CHANNEL TYPE LOGGED'));
+  assert.ok(flagged[0].reasons.includes('NO VERIFIED HOOK LOGGED'));
+});
+
+test('computeDataQualityFlags flags a contact channel type logged with no contact detail', () => {
+  const p = { stage: 'in-exploration', verifiedHook: 'real hook', contactChannel: { type: 'named-decision-maker', detail: null } };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.deepEqual(flagged[0].reasons, ['CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL']);
+});
+
+test('computeDataQualityFlags flags an already-contacted prospect with no follow-up scheduled, and clears once one is', () => {
+  const base = { stage: 'outreach-sent', verifiedHook: 'real hook', contactChannel: { type: 'named-decision-maker', detail: 'someone@example.com' } };
+  const noPlan = computeDataQualityFlags([], [base]);
+  assert.equal(noPlan.length, 1);
+  assert.ok(noPlan[0].reasons.includes('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT'));
+  const withPlan = Object.assign({}, base, { nextNudgeDate: addDaysIso(todayIso(), 3) });
+  assert.deepEqual(computeDataQualityFlags([], [withPlan]), []);
+});
+
+test('computeDataQualityFlags surfaces a stale social snapshot with its day count and uppercased platform', () => {
+  const p = {
+    stage: 'researched',
+    socialSnapshots: [{ platform: 'Douyin', followers: 1000, asOfDate: addDaysIso(todayIso(), -95) }]
+  };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.equal(flagged.length, 1);
+  assert.equal(flagged[0].reasons[0], '95D OLD DOUYIN SNAPSHOT, DUE FOR REFRESH');
+});
+
+test('computeDataQualityFlags catches out-of-order stage history and outreach log dates', () => {
+  const p = {
+    stage: 'researched',
+    stageHistory: [{ date: '2026-02-01' }, { date: '2026-9-5' }],
+    outreachLog: [{ date: '2026-02-01' }, { date: '2026-9-5' }]
+  };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.ok(flagged[0].reasons.includes('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING'));
+  assert.ok(flagged[0].reasons.includes('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING'));
+});
+
+test('computeDataQualityFlags catches a malformed nextNudgeDate', () => {
+  const p = { stage: 'researched', nextNudgeDate: '2026-9-5' };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.deepEqual(flagged[0].reasons, ['NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING']);
+});
+
+test('computeDataQualityFlags filters out every prospect with nothing wrong', () => {
+  const clean = { stage: 'client', name: 'clean', verifiedHook: 'x', contactChannel: { type: 'named-decision-maker', detail: 'x' } };
+  assert.deepEqual(computeDataQualityFlags([], [clean]), []);
 });

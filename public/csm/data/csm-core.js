@@ -470,6 +470,36 @@
     return false;
   }
 
+  // Per-prospect data-quality check: every real gap the board can actually
+  // detect from a prospect's own fields, not just the stall/cold-signal/
+  // duplicate checks that already get their own panels. Reasons are plain
+  // text (no HTML escaping here, this module has no DOM); the caller escapes
+  // each reason before rendering it, the same split every other CSMCore
+  // string this app puts into innerHTML already relies on.
+  function computeDataQualityFlags(stages, prospects) {
+    return prospects
+      .map(p => {
+        const reasons = [];
+        if (p.stage !== 'researched') {
+          if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
+          if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
+        }
+        if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
+          reasons.push('CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL');
+        }
+        if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
+          reasons.push('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT');
+        }
+        const snapStale = socialSnapshotsStaleInfo(p);
+        if (snapStale) reasons.push(snapStale.days + 'D OLD ' + (snapStale.platform ? String(snapStale.platform).toUpperCase() + ' ' : '') + 'SNAPSHOT, DUE FOR REFRESH');
+        if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');
+        if (hasOutOfOrderDates(p.outreachLog)) reasons.push('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING');
+        if (p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate)) reasons.push('NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING');
+        return { p, reasons };
+      })
+      .filter(x => x.reasons.length > 0);
+  }
+
   // CSV/formula injection (OWASP): a hand-typed note starting with
   // =, +, -, @, tab, or a carriage return is read as a live formula by
   // Excel/Sheets when this export is opened there, not as plain text.
@@ -611,7 +641,7 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    computeStalled, hasNudgePlan, csvField, icsEscapeText, icsFoldLine,
+    computeStalled, hasNudgePlan, computeDataQualityFlags, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, channelSortRank, listComparator
   };
 });

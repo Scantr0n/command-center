@@ -13,7 +13,7 @@
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
     csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
-    channelSortRank, listComparator
+    channelSortRank, listComparator, computeDataQualityFlags
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -628,37 +628,6 @@
 
   // hasNudgePlan now lives in csm-core.js, same shared-core-with-tests
   // pattern as the other pure math above.
-  function computeDataQualityFlags(stages, prospects) {
-    return prospects
-      .map(p => {
-        const reasons = [];
-        if (p.stage !== 'researched') {
-          if (!(p.contactChannel && p.contactChannel.type)) reasons.push('NO CONTACT CHANNEL TYPE LOGGED');
-          if (!p.verifiedHook) reasons.push('NO VERIFIED HOOK LOGGED');
-        }
-        if (p.contactChannel && p.contactChannel.type && !p.contactChannel.detail) {
-          reasons.push('CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL');
-        }
-        // The nudge queue, the "unqueued" (nudgePoint-passed) flag above it,
-        // and the cold-signal panel each only fire once *some* nudge field is
-        // already logged. A prospect that was actually contacted and then
-        // never got any nudgeSchedule or nextNudgeDate at all falls through
-        // every one of those checks and is otherwise invisible anywhere on
-        // this board, the exact real failure mode this pipeline is trying to
-        // catch (a real reply lost because no follow-up was ever scheduled).
-        if ((p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p)) {
-          reasons.push('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT');
-        }
-        const snapStale = socialSnapshotsStaleInfo(p);
-        if (snapStale) reasons.push(snapStale.days + 'D OLD ' + (snapStale.platform ? escapeHtml(snapStale.platform).toUpperCase() + ' ' : '') + 'SNAPSHOT, DUE FOR REFRESH');
-        if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');
-        if (hasOutOfOrderDates(p.outreachLog)) reasons.push('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING');
-        if (p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate)) reasons.push('NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING');
-        return { p, reasons };
-      })
-      .filter(x => x.reasons.length > 0);
-  }
-
   function renderDataQuality(stages, prospects) {
     const stageLabel = Object.fromEntries(stages.map(s => [s.id, s.label]));
     const flagged = computeDataQualityFlags(stages, prospects);
@@ -674,7 +643,7 @@
       '<strong>' + escapeHtml(p.name) + '</strong>' +
       '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
       '<span class="dq-why">' + escapeHtml(stageLabel[p.stage] || p.stage) +
-      ', ' + reasons.join(' &middot; ') + '</span>' +
+      ', ' + reasons.map(escapeHtml).join(' &middot; ') + '</span>' +
       '</button>'
     ).join('');
     wireRowsToModal(dataQualityList);
