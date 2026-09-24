@@ -22,7 +22,10 @@ let garageChangelogDriftStatus = null;
 // Filters, search, and sort are mirrored into the URL query string so a
 // specific view (e.g. "eBay listings sorted by price") can be bookmarked or
 // shared as a link, same convention as the CSM and CGT hubs.
-const VALID_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+// Aliases GarageValidateCore.PLATFORMS (shared with validate.js) rather than
+// its own copy, see PAYOUT_PLATFORMS below for why that used to be two
+// separate identical arrays under different names.
+const VALID_PLATFORMS = GarageValidateCore.PLATFORMS;
 
 function restoreStateFromUrl() {
   const params = new URLSearchParams(location.search);
@@ -104,7 +107,10 @@ function renderFeeScheduleFreshness() {
 
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
-const PAYOUT_PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
+// Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
+// identical to VALID_PLATFORMS above under a different name; now the same
+// shared array both aliases point at.
+const PAYOUT_PLATFORMS = GarageValidateCore.PLATFORMS;
 const EXPENSE_CATEGORY_LABELS = {
   mileage: 'Mileage', supplies: 'Supplies', 'platform-fees': 'Platform fees',
   subscriptions: 'Subscriptions', other: 'Other'
@@ -972,18 +978,13 @@ function renderAttentionBar() {
   });
 }
 
-// Real published title-length caps as of September 2026, sourced from each
-// platform's own seller/help documentation (see the "Title & photo specs"
-// details on the page). eBay and Poshmark share an 80-char hard cap, Vinted
-// is looser at 100 (an earlier version of this table had it at 70, which
-// undercounted Vinted's real cap and would have flagged a title as "over"
-// up to 30 characters before it actually was, the same class of reference
-// drift the fee schedule below has already produced twice, see
-// FEE_SCHEDULE_REVIEWED_ON's comment). Depop has no published hard cap, its
-// mobile search UI just visibly truncates around 50 chars, so that's a soft
-// warning tier, not a hard "over" like the other three.
-const TITLE_HARD_LIMITS = { ebay: 80, vinted: 100, poshmark: 80 };
-const DEPOP_SOFT_LIMIT = 50;
+// Real published title-length caps, and Depop's soft mobile-truncation
+// point: now GarageValidateCore.TITLE_HARD_LIMITS / .DEPOP_TITLE_SOFT_LIMIT,
+// the same shared constants validate.js checks against, rather than this
+// file's own separately hand-maintained copy (see validate-core.js for the
+// real sourcing note and the Vinted 70-vs-100 drift this used to risk).
+const TITLE_HARD_LIMITS = GarageValidateCore.TITLE_HARD_LIMITS;
+const DEPOP_SOFT_LIMIT = GarageValidateCore.DEPOP_TITLE_SOFT_LIMIT;
 
 // Same freshness-badge pattern as FEE_SCHEDULE_REVIEWED_ON below: this table
 // drives a real advisory/blocker on the pre-publish checklist and the photo

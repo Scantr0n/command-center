@@ -45,24 +45,16 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible } = require('./validate-core.js');
+const {
+  PLATFORMS, TITLE_HARD_LIMITS, findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible
+} = require('./validate-core.js');
 const { irsMileageRateForDate } = require('./garage-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const PLATFORMS = ['ebay', 'vinted', 'poshmark', 'depop'];
 const STATUSES = ['draft', 'ready-to-post', 'live', 'sold'];
 const STAGES = ['draft', 'ready-to-post', 'live', 'sold'];
 const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
-// Real published title-length hard caps as of September 2026 (see the "Title
-// & photo specs" reference on the Garage page itself for sourcing). Depop
-// has no published hard cap, only a soft mobile-truncation point, so it's
-// deliberately left out here rather than treated as a validation error.
-// Vinted is 100, not the 70 an earlier version of this constant (and the
-// matching one in app.js) had it at, which would have flagged a real
-// 71-100 char Vinted title as a validation error it was never actually
-// going to hit on the real site.
-const TITLE_HARD_LIMITS = { ebay: 80, vinted: 100, poshmark: 80 };
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
 // eBay category classifier. "shoes" drives real eBay fee math: Clothing,
 // Shoes & Accessories charges a 15.3% final value fee, not the 13.6%
