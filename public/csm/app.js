@@ -13,7 +13,8 @@
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan,
     csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
-    channelSortRank, listComparator, computeDataQualityFlags
+    channelSortRank, listComparator, computeDataQualityFlags,
+    slugifyProspectId, nextAvailableId
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -537,10 +538,11 @@
   const duplicatesSection = document.getElementById('duplicatesSection');
 
   // Real risk this catches: the "Log new prospect" generator only guards
-  // against an exact id collision (npUniqueId), so hand-typing the same
-  // person into a second entry under a slightly different id would otherwise
-  // go unnoticed. Shared with validate.js via CSMValidateCore (same reasoning
-  // as CGT's own validate-core.js) so the two can never drift.
+  // against an exact id collision (nextAvailableId, in csm-core.js), so
+  // hand-typing the same person into a second entry under a slightly
+  // different id would otherwise go unnoticed. Shared with validate.js via
+  // CSMValidateCore (same reasoning as CGT's own validate-core.js) so the
+  // two can never drift.
   function renderDuplicates(prospects) {
     const groups = CSMValidateCore.findDuplicateProspects(prospects);
     if (groups.length === 0) {
@@ -3031,12 +3033,9 @@
       const company = values.company || null;
       const category = values.category || null;
       const verifiedHook = values.verifiedHook || null;
-      const slugResult = npSlugify(name, company);
+      const slugResult = slugifyProspectId(name, company);
       const baseId = slugResult.id;
-      let id = baseId;
-      let n = 2;
-      while (seenIdsThisBatch.has(id)) { id = baseId + '-' + n; n++; }
-      const isDuplicateId = id !== baseId;
+      const { id, isDuplicateId } = nextAvailableId(baseId, seenIdsThisBatch);
       seenIdsThisBatch.add(id);
 
       const warnings = [];
@@ -3121,25 +3120,10 @@
       .finally(() => { setTimeout(() => { npQuickCopyBtn.textContent = original; }, 1800); });
   });
 
-  // Strips to [a-z0-9] only, so a real name/company typed entirely in
-  // Chinese characters (this hub's whole subject is China social media
-  // prospects, a very real, expected case, not an edge case) strips to
-  // nothing and silently falls back to the generic "new-prospect" id with
-  // no indication anything unusual happened. Exposes whether that fallback
-  // was hit on real input (as opposed to no input at all) so the caller can
-  // warn about it, rather than baking the warning logic into this function.
-  function npSlugify(name, company) {
-    const base = [company, name].filter(Boolean).join('-');
-    const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    return { id: slug || 'new-prospect', collapsedFromRealInput: !slug && !!base };
-  }
-
-  function npUniqueId(baseId) {
-    if (!byId[baseId]) return baseId;
-    let n = 2;
-    while (byId[baseId + '-' + n]) n++;
-    return baseId + '-' + n;
-  }
+  // slugifyProspectId/nextAvailableId (id generation and collision handling
+  // for both this single-add form and the paste-a-batch quick-add above)
+  // now live in csm-core.js, shared and tested the same way as the rest of
+  // this file's extracted pure math.
 
   function npVal(id) {
     const v = document.getElementById(id).value.trim();
@@ -3227,10 +3211,9 @@
     const company = npVal('npCompany');
     const stage = npStageSelect.value;
     const stageEnteredDate = npVal('npStageEnteredDate');
-    const slugResult = npSlugify(name || 'new-prospect', company);
+    const slugResult = slugifyProspectId(name || 'new-prospect', company);
     const baseId = slugResult.id;
-    const id = npUniqueId(baseId);
-    const isDuplicateId = id !== baseId;
+    const { id, isDuplicateId } = nextAvailableId(baseId, Object.keys(byId));
 
     const socialPlatform = npVal('npSocialPlatform');
     const socialFollowers = npVal('npSocialFollowers');

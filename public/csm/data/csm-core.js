@@ -580,6 +580,42 @@
     return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
   }
 
+  // Turns a real name/company into the id a pasted prospect object needs.
+  // Strips to [a-z0-9] only, so a real name/company typed entirely in
+  // Chinese characters (this hub's whole subject is China social media
+  // prospects, a very real, expected case, not an edge case) strips to
+  // nothing and would otherwise silently collapse to the generic
+  // "new-prospect" id with no indication anything unusual happened.
+  // collapsedFromRealInput exposes whether that fallback was hit on real
+  // input (as opposed to no input at all) so a caller can warn about it,
+  // rather than baking the warning text into this function.
+  function slugifyProspectId(name, company) {
+    const base = [company, name].filter(Boolean).join('-');
+    const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return { id: slug || 'new-prospect', collapsedFromRealInput: !slug && !!base };
+  }
+
+  // The "Log new prospect" generator (single-add and paste-a-batch quick-add
+  // both use this) only ever guards against an exact id collision, never a
+  // near-miss under a slightly different id (that's a separate, real check,
+  // see CSMValidateCore.findDuplicateProspects), so getting this exact
+  // collision check right matters: two prospects silently sharing one id
+  // would make one invisibly overwrite the other's card, modal, and edits
+  // everywhere this page looks things up by id. existingIds takes an
+  // array or a Set so both the single-add path (ids already on the page)
+  // and the batch quick-add path (which also has to fold in ids assigned
+  // earlier in the same unsaved batch, before any of them are real) can
+  // share one implementation instead of two hand-rolled copies of the same
+  // suffix loop drifting apart.
+  function nextAvailableId(baseId, existingIds) {
+    const idSet = existingIds instanceof Set ? existingIds : new Set(existingIds);
+    if (!idSet.has(baseId)) return { id: baseId, isDuplicateId: false };
+    let n = 2;
+    let id = baseId + '-' + n;
+    while (idSet.has(id)) { n++; id = baseId + '-' + n; }
+    return { id, isDuplicateId: true };
+  }
+
   // Warnings shown before drafting a real outreach message (the "Copy
   // outreach brief"/stage-move generators): missing the two fields most
   // predictive of a real reply, so a message goes out without either ever
@@ -669,6 +705,7 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, csvField, icsEscapeText, icsFoldLine,
-    outreachReadinessWarnings, channelSortRank, listComparator
+    outreachReadinessWarnings, channelSortRank, listComparator,
+    slugifyProspectId, nextAvailableId
   };
 });

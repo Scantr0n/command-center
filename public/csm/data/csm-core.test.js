@@ -23,7 +23,7 @@ const {
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
   csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
-  channelSortRank, listComparator
+  channelSortRank, listComparator, slugifyProspectId, nextAvailableId
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -993,6 +993,61 @@ test('computeDataQualityFlags catches a malformed nextNudgeDate', () => {
   const p = { stage: 'researched', nextNudgeDate: '2026-9-5' };
   const flagged = computeDataQualityFlags([], [p]);
   assert.deepEqual(flagged[0].reasons, ['NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING']);
+});
+
+test('slugifyProspectId builds a real, readable id from a real name and company', () => {
+  const result = slugifyProspectId('David Fraga', 'City Bound');
+  assert.deepEqual(result, { id: 'city-bound-david-fraga', collapsedFromRealInput: false });
+});
+
+test('slugifyProspectId works from a name alone, no company', () => {
+  const result = slugifyProspectId('Jane Doe', null);
+  assert.deepEqual(result, { id: 'jane-doe', collapsedFromRealInput: false });
+});
+
+test('slugifyProspectId strips punctuation and collapses runs of it to one hyphen', () => {
+  const result = slugifyProspectId("O'Brien & Co.!!", null);
+  assert.equal(result.id, 'o-brien-co');
+});
+
+test('slugifyProspectId falls back to "new-prospect" and flags it for a Chinese-only name with no [a-z0-9] characters', () => {
+  const result = slugifyProspectId('张伟', null);
+  assert.deepEqual(result, { id: 'new-prospect', collapsedFromRealInput: true });
+});
+
+test('slugifyProspectId falls back to "new-prospect" without flagging it when there was no real input at all', () => {
+  const result = slugifyProspectId(null, null);
+  assert.deepEqual(result, { id: 'new-prospect', collapsedFromRealInput: false });
+});
+
+test('nextAvailableId returns the base id unchanged when nothing collides', () => {
+  const result = nextAvailableId('city-bound-david-fraga', ['some-other-id']);
+  assert.deepEqual(result, { id: 'city-bound-david-fraga', isDuplicateId: false });
+});
+
+test('nextAvailableId suffixes -2 on a real exact collision', () => {
+  const result = nextAvailableId('jane-doe', ['jane-doe']);
+  assert.deepEqual(result, { id: 'jane-doe-2', isDuplicateId: true });
+});
+
+test('nextAvailableId keeps counting up past an already-taken -2', () => {
+  const result = nextAvailableId('jane-doe', ['jane-doe', 'jane-doe-2']);
+  assert.deepEqual(result, { id: 'jane-doe-3', isDuplicateId: true });
+});
+
+test('nextAvailableId accepts a Set the same way it accepts a plain array', () => {
+  const result = nextAvailableId('jane-doe', new Set(['jane-doe']));
+  assert.deepEqual(result, { id: 'jane-doe-2', isDuplicateId: true });
+});
+
+test('nextAvailableId lets a batch of same-named rows each get their own suffix by growing the same Set as it goes, the real quick-add-paste use case', () => {
+  const seen = new Set(['jane-doe']);
+  const first = nextAvailableId('jane-doe', seen);
+  seen.add(first.id);
+  const second = nextAvailableId('jane-doe', seen);
+  seen.add(second.id);
+  assert.equal(first.id, 'jane-doe-2');
+  assert.equal(second.id, 'jane-doe-3');
 });
 
 test('computeDataQualityFlags filters out every prospect with nothing wrong', () => {
