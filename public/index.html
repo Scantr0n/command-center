@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="/style.css">
 <script src="/vendor/d3-force-selection-zoom.min.js"></script>
 <script src="/data/dashboard-core.js"></script>
+<script src="/data/graph-core.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -748,20 +749,26 @@
   </div>
 
 <script>
-// Staleness and grid-sort math lives in dashboard-core.js (loaded before
-// this script, see <head>), so it can be unit-tested outside the browser.
-// If it fails to load (a network blip on a first, not-yet-cached visit, an
-// ad blocker, a bad deploy that drops the file), the destructure below
-// would otherwise throw and silently abort this entire script, leaving the
-// page stuck on its static skeleton placeholders forever. This makes that
+// Staleness/grid-sort math lives in dashboard-core.js, graph layout/curve
+// collision math lives in graph-core.js, both loaded before this script
+// (see <head>), so they can be unit-tested outside the browser. If either
+// fails to load (a network blip on a first, not-yet-cached visit, an ad
+// blocker, a bad deploy that drops one file), the destructure below would
+// otherwise throw and silently abort this entire script, leaving the page
+// stuck on its static skeleton placeholders forever. This makes that
 // failure visible instead.
-if (typeof window.DashboardCore === 'undefined') {
+const CORE_SCRIPTS = [
+  ['DashboardCore', 'dashboard-core.js'],
+  ['GraphCore', 'graph-core.js']
+];
+const missingCoreScript = CORE_SCRIPTS.find(([globalName]) => typeof window[globalName] === 'undefined');
+if (missingCoreScript) {
   const errBox = document.getElementById('errorBanner');
   if (errBox) {
-    errBox.textContent = 'Page failed to load fully (dashboard-core.js did not load). Reload the page.';
+    errBox.textContent = `Page failed to load fully (${missingCoreScript[1]} did not load). Reload the page.`;
     errBox.classList.remove('hidden');
   }
-  throw new Error('index.html: dashboard-core.js did not load, aborting init');
+  throw new Error(`index.html: ${missingCoreScript[1]} did not load, aborting init`);
 }
 const {
   daysAgoLocal,
@@ -770,6 +777,13 @@ const {
   isStale,
   sortForGrid: sortForGridCore
 } = window.DashboardCore;
+const {
+  groupByCategory,
+  priorityOrbit,
+  nodeRadius,
+  curveMinClearance,
+  computeRelationBulge
+} = window.GraphCore;
 
 let clusters = [];
 let activeCluster = null;
@@ -784,7 +798,6 @@ let chatSessionId = 0;
 let currentView = 'graph';
 let lastFocusedEl = null;
 
-const CATEGORY_ORDER = ['Ventures & Business', 'Trading', 'Content', 'Reselling', 'School & Career', 'Health & Personal', 'Travel & Logistics', 'Personal & Infra', 'Uncategorized'];
 const CATEGORY_COLOR = {
   'Ventures & Business': '#D9A441',
   'Trading': '#3DDC84',
@@ -1640,26 +1653,10 @@ function nodeLabelWord(name) {
   return words[0];
 }
 
-function groupByCategory(list) {
-  const map = {};
-  list.forEach(c => {
-    const cat = c.category || 'Uncategorized';
-    (map[cat] = map[cat] || []).push(c);
-  });
-  const keys = [
-    ...CATEGORY_ORDER.filter(k => map[k]),
-    ...Object.keys(map).filter(k => !CATEGORY_ORDER.includes(k))
-  ];
-  return keys.map(k => ({ category: k, items: map[k] }));
-}
-
-function priorityOrbit(priority) {
-  return priority === 'top' ? 235 : priority === 'low' ? 345 : 295;
-}
-
-function nodeRadius(priority) {
-  return priority === 'top' ? 34 : priority === 'low' ? 22 : 28;
-}
+// groupByCategory/priorityOrbit/nodeRadius now live in graph-core.js
+// (destructured near the top of this script) so the sector-assignment and
+// orbit/radius lookups behind the graph's layout can be unit-tested outside
+// the browser.
 
 // One radial gradient per category, defined once and referenced by every
 // matching node's glow halo via url(#glow-<slug>), real bloom falloff
@@ -1709,26 +1706,11 @@ function ensureGraphDefs() {
   defs.innerHTML = gradients + hubGradients;
 }
 
-// Real collision check for a relation curve, not a guessed constant: samples
-// the actual quadratic bezier and measures clearance against every OTHER
-// node's real circle (never the curve's own two endpoints, which the curve
-// legitimately starts/ends inside of, that's fine, each node's own opaque
-// fill covers that on its own). Used by renderGraph to grow the bulge only
-// as far as a given curve actually needs, instead of one fixed number that
-// would either cut it close for a crowded pair or over-bulge an isolated one.
-function curveMinClearance(p0, p1, p2, otherNodes) {
-  let min = Infinity;
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12;
-    const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
-    const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
-    otherNodes.forEach(n => {
-      const clearance = Math.hypot(x - n.x, y - n.y) - n.radius;
-      if (clearance < min) min = clearance;
-    });
-  }
-  return min;
-}
+// curveMinClearance and computeRelationBulge (the perpendicular-offset/
+// outward-bow/bulge-growth math renderGraph uses below) now live in
+// graph-core.js, so the collision check behind every relation curve can be
+// unit-tested outside the browser. See that file's own comment for why
+// this matters: it's the fix for a real, previously-shipped bug.
 
 // Touch/tap fallback for the relation-line reason (see the #graphTooltip CSS
 // comment for why this exists, SVG <title> has no touch equivalent at all).
@@ -1858,25 +1840,13 @@ function renderGraph() {
         || (other.relationReasons && other.relationReasons[c.id]);
       if (!realReason) return;
       seenPairs.add(pairKey);
-      // Bulge magnitude: the old fixed-12%-of-endpoint-distance formula
-      // shrinks to near-zero for two nodes that end up close together after
-      // the force simulation, leaving an almost-straight line with no real
-      // clearance from whatever else sits between them, that, combined
-      // with the node fill being translucent (fixed below), is what made
-      // lines visibly cut through unrelated circles. Enforcing a minimum
-      // pixel bulge, and always bowing away from the hub (toward open
-      // canvas) rather than in whichever perpendicular direction the raw
-      // coordinates happened to produce, gives every relation curve real
-      // clearance regardless of how close its two endpoints are.
-      const dist = Math.hypot(other.x - nx, other.y - ny);
-      const perpX = (ny - other.y) / (dist || 1);
-      const perpY = (other.x - nx) / (dist || 1);
-      const midRawX = (nx + other.x) / 2, midRawY = (ny + other.y) / 2;
-      // Flip the perpendicular so it points away from the hub center,
-      // consistently bowing outward into open space instead of back toward
-      // the dense middle of the canvas.
-      const outwardSign = ((midRawX - cx) * perpX + (midRawY - cy) * perpY) >= 0 ? 1 : -1;
-      const p0 = { x: nx, y: ny }, p2 = { x: other.x, y: other.y };
+      // Bulge magnitude and direction: graph-core.js's computeRelationBulge
+      // (the old fixed-12%-of-endpoint-distance formula it replaces shrank
+      // to near-zero for two nodes placed close together by the force
+      // simulation, leaving an almost-straight line with no real clearance
+      // from whatever else sat between them, visibly cutting through
+      // unrelated circles). It always bows away from the hub, toward open
+      // canvas, and grows only as far as this specific curve actually needs.
       const others = simNodes.filter(n => n.id !== c.id && n.id !== other.id)
         .map(n => ({ x: n.x, y: n.y, radius: n.radius }));
       // The hub circle itself was never in this list, so a relation curve
@@ -1884,20 +1854,7 @@ function renderGraph() {
       // relation, none of today's happen to be) could bow straight through
       // the "COMMAND CENTER" hub with no clearance check ever catching it.
       others.push({ x: cx, y: cy, radius: hubR });
-      // Start at the same minimum as before and grow in real steps, checking
-      // the actual curve against every other node's real circle each time,
-      // until it clears by a comfortable margin or a sane cap is hit (a
-      // relation between two nodes boxed in on all sides has to stop
-      // growing somewhere rather than loop forever).
-      let bulge = Math.max(dist * 0.16, 34);
-      const MARGIN = 10, MAX_BULGE = 260, STEP = 20;
-      while (bulge <= MAX_BULGE) {
-        const p1 = { x: midRawX + perpX * bulge * outwardSign, y: midRawY + perpY * bulge * outwardSign };
-        if (curveMinClearance(p0, p1, p2, others) >= MARGIN) break;
-        bulge += STEP;
-      }
-      const midX = midRawX + perpX * bulge * outwardSign;
-      const midY = midRawY + perpY * bulge * outwardSign;
+      const { midX, midY } = computeRelationBulge(nx, ny, other.x, other.y, cx, cy, others);
       const reasonLabel = `${c.name} ↔ ${other.name}: ${realReason}`;
       relationsHtml += `<path class="relation-line" tabindex="0" role="img" aria-label="${escapeHtml(reasonLabel)}" data-reason="${escapeHtml(reasonLabel)}" d="M${nx.toFixed(1)},${ny.toFixed(1)} Q${midX.toFixed(1)},${midY.toFixed(1)} ${other.x.toFixed(1)},${other.y.toFixed(1)}" fill="none" stroke="var(--sub)" stroke-width="1" stroke-dasharray="1,4" opacity="0.5"><title>${escapeHtml(reasonLabel)}</title></path>`;
     });
