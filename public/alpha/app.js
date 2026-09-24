@@ -1234,7 +1234,7 @@ function renderPositions(data) {
       <table class="pos-table">
         <thead>
           <tr>
-            <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg entry</th><th>Current</th><th>Mkt value</th><th>Unrealized P&amp;L</th><th title="Real position market value as a percentage of real account equity, computed client-side from the two figures this page already has">% of equity</th>
+            <th scope="col">Symbol</th><th scope="col">Side</th><th scope="col">Qty</th><th scope="col">Avg entry</th><th scope="col">Current</th><th scope="col">Mkt value</th><th scope="col">Unrealized P&amp;L</th><th scope="col" title="Real position market value as a percentage of real account equity, computed client-side from the two figures this page already has">% of equity</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -1652,7 +1652,7 @@ refreshServiceWorkerDiagnostic();
 // that is simply informational rather than good or bad on its own.
 function diagnosticRow(label, status, badgeText, detail) {
   const badgeClass = status === 'ok' ? 'badge-active' : status === 'blocked' ? 'badge-pending' : 'badge-retired';
-  return `<tr><th>${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
+  return `<tr><th scope="row">${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
 }
 
 function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount) {
