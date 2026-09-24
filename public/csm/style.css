@@ -1454,6 +1454,41 @@ footer.page-foot {
 }
 .data-freshness-stale { color: #E0A030; }
 
+/* Jump-to-section FAB, same markup/classes/behavior as Garage/Sondrik/
+   CGT's: this page runs 16 real sections including several collapsible
+   references and the changelog, with no sticky header, so this is the one
+   way back to a specific section without scrolling blind. Hover/focus
+   border uses --hairlineHover, not --accent (this page has no such token,
+   see .print-btn just above), matching every other plain button here. */
+.jump-nav-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  background: var(--panel);
+  color: var(--sub);
+  border: 1px solid var(--hairlineHover);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.jump-nav-fab:hover, .jump-nav-fab:focus-visible { color: var(--ink); border-color: var(--dim); }
+.jump-nav-fab:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: 2px; }
+
+.jump-nav-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 60vh; overflow-y: auto; }
+.jump-nav-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--sub);
+  text-decoration: none;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.jump-nav-link:hover, .jump-nav-link:focus-visible { background: var(--panelLight); color: var(--ink); border-color: var(--hairline); }
+
 /* Same precedent as public/alpha/style.css: real transitions (card
    hover/focus, drag state, sortable list headers, toggles), not just
    keyframe animations, still trigger vestibular discomfort for someone who
@@ -1494,7 +1529,7 @@ footer.page-foot {
   .section-details > summary.section-title::before { display: none; }
 
   .print-btn, .back-link, .search-input, .channel-filter, .category-filter, .schema-help,
-  .modal-overlay, .attention-bar, .view-toggle, .board-list-wrap {
+  .modal-overlay, .attention-bar, .view-toggle, .board-list-wrap, .jump-nav-fab {
     display: none !important;
   }
 
