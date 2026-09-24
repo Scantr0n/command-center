@@ -1751,6 +1751,54 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') hideRelationTooltip();
 });
 
+// Same roving-tabindex fix public/alpha/app.js's wireRovingTabindex already
+// applies to its connectivity/uptime strips (a real practical Tab-key
+// barrier, not just a formal WCAG gap), just never applied to the graph.
+// Category labels, relation lines, and cluster nodes are each rendered as
+// their own separate group of individually-focusable elements, so with the
+// default implicit tabindex a keyboard user has to Tab through every single
+// one (up to ~30+ stops at today's 22 clusters) just to get past the graph.
+// Roving tabindex (APG toolbar pattern) makes each group its own single tab
+// stop: arrow keys move within a group, Tab moves between groups or out.
+// Reset on every renderGraph() call (elements are rebuilt from scratch each
+// time), the container's own keydown listener wired once (dataset guard)
+// since #graphSvg itself persists across re-renders even though its
+// children don't.
+const GRAPH_ROVING_GROUPS = ['.cat-label', '.relation-line', '.graph-node'];
+
+function resetGraphRovingTabindex(svg) {
+  GRAPH_ROVING_GROUPS.forEach(selector => {
+    svg.selectAll(selector).nodes().forEach((el, i) => el.setAttribute('tabindex', i === 0 ? '0' : '-1'));
+  });
+}
+
+function wireGraphRovingKeydown(svg) {
+  const svgEl = svg.node();
+  if (svgEl.dataset.rovingWired) return;
+  svgEl.dataset.rovingWired = '1';
+  svgEl.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+    const groupSelector = GRAPH_ROVING_GROUPS.find(sel => document.activeElement.matches(sel));
+    if (!groupSelector) return;
+    // Excludes a dimmed/aria-hidden graph node from the arrow-key sequence
+    // too, not just from being the initial tab stop: cat-label/relation-line
+    // never set aria-hidden, so this is a no-op for those two groups.
+    const items = svg.selectAll(groupSelector).nodes().filter(el => el.getAttribute('aria-hidden') !== 'true');
+    const currentIndex = items.indexOf(document.activeElement);
+    if (currentIndex === -1) return;
+    let nextIndex = currentIndex;
+    if (event.key === 'ArrowLeft') nextIndex = Math.max(0, currentIndex - 1);
+    else if (event.key === 'ArrowRight') nextIndex = Math.min(items.length - 1, currentIndex + 1);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = items.length - 1;
+    if (nextIndex === currentIndex) return;
+    event.preventDefault();
+    items[currentIndex].setAttribute('tabindex', '-1');
+    items[nextIndex].setAttribute('tabindex', '0');
+    items[nextIndex].focus();
+  });
+}
+
 function renderGraph() {
   ensureGraphDefs();
   const svg = d3.select('#graphSvg');
@@ -1976,6 +2024,8 @@ function renderGraph() {
         hideRelationTooltip();
       }
     });
+  resetGraphRovingTabindex(svg);
+  wireGraphRovingKeydown(svg);
   applyFilters();
   centerGraphScroll();
   setupGraphZoom();
@@ -2124,6 +2174,11 @@ function applyFilters() {
     el.classList.toggle('dimmed', anyFilterActive && !(matchesSearch && matchesCategory));
   });
 
+  // Graph nodes are a roving-tabindex group (see GRAPH_ROVING_GROUPS above):
+  // exactly one non-dimmed node is ever a real tab stop, not one per node.
+  // Collected here rather than given the same blanket tabindex the other
+  // four element types get below, then resolved once after the loop.
+  const visibleGraphNodes = [];
   document.querySelectorAll('.graph-node, .cluster-card, .activity-row, .attn-pill, .attn-card').forEach(el => {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
@@ -2141,12 +2196,21 @@ function applyFilters() {
     // just fading it, so it's excluded the same way for every user, not
     // just visually.
     el.setAttribute('aria-hidden', String(isDimmed));
-    el.setAttribute('tabindex', isDimmed ? '-1' : '0');
+    if (el.classList.contains('graph-node')) {
+      el.setAttribute('tabindex', '-1');
+      if (!isDimmed) visibleGraphNodes.push(el);
+    } else {
+      el.setAttribute('tabindex', isDimmed ? '-1' : '0');
+    }
     if (matches && !countedIds.has(id)) {
       countedIds.add(id);
       matchCount++;
     }
   });
+  if (visibleGraphNodes.length) {
+    const current = visibleGraphNodes.includes(document.activeElement) ? document.activeElement : visibleGraphNodes[0];
+    current.setAttribute('tabindex', '0');
+  }
   document.querySelectorAll('.cat-label').forEach(el => {
     const isActive = activeCategory === el.getAttribute('data-category');
     el.setAttribute('aria-pressed', String(isActive));
