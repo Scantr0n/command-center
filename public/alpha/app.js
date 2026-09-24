@@ -50,6 +50,7 @@ const {
   computeMarketStatus,
   timeAgo,
   freshnessClass,
+  computeHeadline,
   formatDuration,
   mostRecentConnectedAt,
   currentStateStartedAt,
@@ -141,38 +142,6 @@ function updateGlanceIndicators(cls) {
     favicon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
   }
   document.title = `Alpha (${GLANCE_TEXT[cls] || cls}) / Command Center`;
-}
-
-// The one glance-first signal at the very top of the page, above every
-// detailed section. Derived entirely from fields the page already has
-// (connection state, reading freshness, kill-switch state), never from
-// anything invented. Kill switch engaged always wins: it is the one state
-// Jack would want to see even from across the room, current or last known.
-// isLastKnown marks that `data.live` has been substituted with a cached
-// last-known-connected reading (see loadLastKnown below); the headline must
-// say so explicitly rather than let a stale reading pass as current.
-function computeHeadline(data, isLastKnown) {
-  const live = data.live || {};
-  const asOf = live.asOf;
-  const killEngaged = live.killSwitch && live.killSwitch.engaged;
-
-  if (killEngaged === true) {
-    return {
-      level: 'critical',
-      text: isLastKnown ? 'KILL SWITCH ENGAGED (last known, now disconnected)' : 'KILL SWITCH ENGAGED',
-      asOf
-    };
-  }
-  if (isLastKnown) {
-    return { level: 'lastknown', text: 'Disconnected - showing last known state from ' + (timeAgo(asOf) || 'earlier'), asOf };
-  }
-  if (!data.connection.connected || !asOf) {
-    return { level: 'awaiting', text: 'Awaiting live connection', asOf };
-  }
-  const cls = freshnessClass(asOf);
-  if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale', asOf };
-  if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging', asOf };
-  return { level: 'good', text: 'Connected', asOf };
 }
 
 // A momentary disconnect from Alpha's real daemon shouldn't blank the page

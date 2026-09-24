@@ -16,6 +16,7 @@ const {
   computeMarketStatus,
   timeAgo,
   freshnessClass,
+  computeHeadline,
   formatDuration,
   mostRecentConnectedAt,
   currentStateStartedAt,
@@ -226,4 +227,66 @@ test('dailyUptimeClass tiers full/degraded/down', () => {
   assert.equal(dailyUptimeClass(50), 'degraded');
   assert.equal(dailyUptimeClass(0.1), 'degraded');
   assert.equal(dailyUptimeClass(0), 'down');
+});
+
+// computeHeadline is the single most prominent text on the whole page, so
+// every real branch (and their real priority order) gets its own case here.
+// NOW is a fixed instant so the freshness/age boundaries below (live/stale/
+// down, "just now"/"Nm ago") are exercised deterministically rather than
+// depending on when the test happens to run.
+const NOW = new Date('2026-09-23T18:00:00Z').getTime();
+const FRESH_ASOF = new Date(NOW - 10 * 1000).toISOString(); // 10s ago: 'live'
+const AGING_ASOF = new Date(NOW - 5 * 60 * 1000).toISOString(); // 5m ago: 'stale'
+const OLD_ASOF = new Date(NOW - 60 * 60 * 1000).toISOString(); // 1h ago: 'down'
+
+test('computeHeadline: kill switch engaged always wins, even while otherwise connected and fresh', () => {
+  const data = { connection: { connected: true }, live: { asOf: FRESH_ASOF, killSwitch: { engaged: true } } };
+  const result = computeHeadline(data, false, NOW);
+  assert.equal(result.level, 'critical');
+  assert.equal(result.text, 'KILL SWITCH ENGAGED');
+});
+
+test('computeHeadline: kill switch engaged while showing a last-known reading says so explicitly', () => {
+  const data = { connection: { connected: false }, live: { asOf: OLD_ASOF, killSwitch: { engaged: true } } };
+  const result = computeHeadline(data, true, NOW);
+  assert.equal(result.level, 'critical');
+  assert.equal(result.text, 'KILL SWITCH ENGAGED (last known, now disconnected)');
+});
+
+test('computeHeadline: last-known state (kill switch not engaged) reports a real relative age', () => {
+  const data = { connection: { connected: false }, live: { asOf: AGING_ASOF, killSwitch: { engaged: false } } };
+  const result = computeHeadline(data, true, NOW);
+  assert.equal(result.level, 'lastknown');
+  assert.equal(result.text, 'Disconnected - showing last known state from 5m ago');
+});
+
+test('computeHeadline: disconnected with no cached last-known reading is a plain awaiting state, not a crash', () => {
+  const data = { connection: { connected: false }, live: {} };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'awaiting', text: 'Awaiting live connection', asOf: undefined });
+});
+
+test('computeHeadline: connected but missing asOf is also awaiting, never a fabricated freshness read', () => {
+  const data = { connection: { connected: true }, live: { asOf: null } };
+  const result = computeHeadline(data, false, NOW);
+  assert.equal(result.level, 'awaiting');
+  assert.equal(result.text, 'Awaiting live connection');
+});
+
+test('computeHeadline: connected and fresh (under 1 minute) reads good/Connected', () => {
+  const data = { connection: { connected: true }, live: { asOf: FRESH_ASOF } };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'good', text: 'Connected', asOf: FRESH_ASOF });
+});
+
+test('computeHeadline: connected but aging (1-15 minutes) reads caution, not a false-calm good', () => {
+  const data = { connection: { connected: true }, live: { asOf: AGING_ASOF } };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'caution', text: 'Connected, reading aging', asOf: AGING_ASOF });
+});
+
+test('computeHeadline: connected but truly stale (15+ minutes) reads awaiting, not a false-calm good', () => {
+  const data = { connection: { connected: true }, live: { asOf: OLD_ASOF } };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'awaiting', text: 'Connected, reading stale', asOf: OLD_ASOF });
 });
