@@ -16,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <script src="/vendor/d3-force-selection-zoom.min.js"></script>
+<script src="/data/dashboard-core.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -747,6 +748,29 @@
   </div>
 
 <script>
+// Staleness and grid-sort math lives in dashboard-core.js (loaded before
+// this script, see <head>), so it can be unit-tested outside the browser.
+// If it fails to load (a network blip on a first, not-yet-cached visit, an
+// ad blocker, a bad deploy that drops the file), the destructure below
+// would otherwise throw and silently abort this entire script, leaving the
+// page stuck on its static skeleton placeholders forever. This makes that
+// failure visible instead.
+if (typeof window.DashboardCore === 'undefined') {
+  const errBox = document.getElementById('errorBanner');
+  if (errBox) {
+    errBox.textContent = 'Page failed to load fully (dashboard-core.js did not load). Reload the page.';
+    errBox.classList.remove('hidden');
+  }
+  throw new Error('index.html: dashboard-core.js did not load, aborting init');
+}
+const {
+  daysAgoLocal,
+  shortRelativeTime,
+  relativeTime,
+  isStale,
+  sortForGrid: sortForGridCore
+} = window.DashboardCore;
+
 let clusters = [];
 let activeCluster = null;
 let activityFeedExpanded = false;
@@ -2230,67 +2254,12 @@ document.getElementById('searchClearBtn').addEventListener('click', () => {
   searchInputEl.focus();
 });
 
-// Real calendar-day difference between dateStr's local date and today's
-// local date. Dividing a raw Date.now() - dateStr-midnight ms gap by a
-// fixed 86400000 (the old approach here) silently loses or gains whatever
-// hour a DST transition falls in between the two, so for the several months
-// between a spring-forward and the following fall-back, any date logged
-// before that transition read as one calendar day "fresher" than it really
-// was on every single render, in relativeTime's activity-feed labels and
-// shortRelativeTime's graph badges alike. Naively swapping Math.floor for
-// Math.round doesn't fix this: it would round the ordinary second half of
-// *today* (any time from noon on) up to "1 day ago". Subtracting two Date
-// objects built straight from Y/M/D components instead, each resolved by
-// the runtime to its own correct local-midnight instant, cancels the DST
-// hour out entirely and stays exact for the plain same-day case too.
-function daysAgoLocal(dateStr) {
-  const then = new Date(dateStr + 'T00:00:00');
-  const now = new Date();
-  const thenMidnight = new Date(then.getFullYear(), then.getMonth(), then.getDate());
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((nowMidnight - thenMidnight) / 86400000);
-}
-
-// Compact form of relativeTime() for the graph's connector badges, where
-// "3 days ago" is too wide to sit on a spoke without crowding a 22-node
-// canvas. No real date means no badge at all (return null, skip rendering)
-// rather than force an awkward "no date on record" pill onto the graph.
-function shortRelativeTime(dateStr) {
-  if (!dateStr) return null;
-  const days = daysAgoLocal(dateStr);
-  if (days <= 0) return 'today';
-  if (days < 30) return `${days}d`;
-  const months = Math.floor(days / 30);
-  return `${months}mo`;
-}
-
-function relativeTime(dateStr) {
-  if (!dateStr) return 'no date on record';
-  const days = daysAgoLocal(dateStr);
-  if (days <= 0) return 'today';
-  if (days === 1) return '1 day ago';
-  if (days < 30) return `${days} days ago`;
-  const months = Math.floor(days / 30);
-  return months === 1 ? '1 month ago' : `${months} months ago`;
-}
-
-// Same 30-day threshold the graph's own dashed-ring treatment already uses
-// (renderGraph), pulled out here so Grid can flag the same thing instead of
-// silently dropping it: staleness was previously only visible as a dashed
-// stroke on a node, so anyone using Grid (a persisted, one-click-away default)
-// had no way to see a quietly stalled project without opening its modal.
-//
-// An active/stalled cluster with lastUpdate === null used to fall straight
-// through the `c.lastUpdate &&` short-circuit and read as never stale, no
-// matter how long it actually sat untouched: a project that has never once
-// logged a date is at least as neglected as one that logged a date 31+ days
-// ago, not less. done/unknown/broken clusters are left alone here: "done"
-// genuinely doesn't need a date, "unknown" and "broken" already render with
-// their own distinct, honest status treatment elsewhere on the page.
-function isStale(c) {
-  if (!c.lastUpdate) return c.status === 'active' || c.status === 'stalled';
-  return daysAgoLocal(c.lastUpdate) > 30;
-}
+// daysAgoLocal/shortRelativeTime/relativeTime/isStale now live in
+// dashboard-core.js (destructured near the top of this script), so their
+// DST-safe local-calendar-day math and the 30-day staleness threshold can
+// be unit-tested outside the browser. See that file's own comments for the
+// DST reasoning and why a null lastUpdate still counts as stale for an
+// active/stalled cluster.
 
 // Shared accessible name for a cluster, used by both the graph node (whose
 // nested <title> alone isn't a reliable accessible name for a JS role="button"
@@ -2309,22 +2278,11 @@ document.querySelectorAll('#gridToolbar [data-sort]').forEach(btn => {
   btn.setAttribute('aria-pressed', String(btn.dataset.sort === gridSortBy));
 });
 
-const STATUS_SEVERITY = { broken: 0, stalled: 1, active: 2, unknown: 3, done: 4 };
-
-// Grid's own sort, independent of the `clusters` array order the graph relies
-// on for its priority-orbit and category-sector angles, so re-sorting the
-// grid never nudges graph node positions.
+// Sort math (including the STATUS_SEVERITY ranking) lives in
+// dashboard-core.js; this just supplies the page's current gridSortBy so
+// the core function stays a pure, unit-testable function of its arguments.
 function sortForGrid(list) {
-  const sorted = list.slice();
-  if (gridSortBy === 'name') {
-    sorted.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (gridSortBy === 'updated') {
-    sorted.sort((a, b) => (b.lastUpdate || '').localeCompare(a.lastUpdate || ''));
-  } else if (gridSortBy === 'status') {
-    sorted.sort((a, b) => (STATUS_SEVERITY[a.status] ?? 3) - (STATUS_SEVERITY[b.status] ?? 3));
-  }
-  // 'priority' needs no re-sort, `clusters` is already priority-ordered.
-  return sorted;
+  return sortForGridCore(list, gridSortBy);
 }
 
 function setGridSort(sortBy) {
