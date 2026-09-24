@@ -396,7 +396,15 @@ app.post('/api/clusters/:id/chat', async (req, res) => {
     });
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json({ error: anthropicErrorMessage(data) });
-    res.json({ text: data.content[0].text });
+    // A 200 response is no guarantee content[0] exists or is a text block
+    // (a refusal stop_reason, a future API change) - the same class of
+    // response-shape issue the draft-listing proxy below already guards
+    // against with its own text-block filter. Unguarded, this threw a raw
+    // TypeError that fell into the generic catch and surfaced as an opaque
+    // 500 instead of a real, readable error.
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    if (!textBlock) return res.status(502).json({ error: 'Model returned no text response' });
+    res.json({ text: textBlock.text });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
