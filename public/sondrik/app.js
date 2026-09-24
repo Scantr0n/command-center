@@ -43,6 +43,13 @@
   // actually exercise. See release-core.js's own header for both bugs.
   const { bugfixCheckinStatus, suggestedCheckCadence, computeReminders: computeRemindersCore } = window.SondrikReleaseCore;
 
+  // Shared, unit-tested CSV/ICS serialization (export-core.js): csvField's
+  // CSV/formula-injection guard and icsFoldLine's UTF-8-byte-aware line
+  // folding, same shared-core pattern as the two destructures above. CSM
+  // already had the identical three functions tested; this closes the same
+  // gap for Sondrik.
+  const { csvField, icsEscapeText, icsFoldLine } = window.SondrikExportCore;
+
   printBtn.addEventListener('click', () => window.print());
 
   // "New since your last visit" is a per-browser convenience, not a second
@@ -1397,40 +1404,6 @@
     return computeRemindersCore(releasesData, downloadsData, todayIso());
   }
 
-  // RFC 5545 (iCalendar) text escaping and 75-octet line folding, same
-  // approach CSM's own nudge-queue calendar export already uses for exactly
-  // the same reason (long SUMMARY/DESCRIPTION values, and a UTF-8-safe fold
-  // so a multi-byte character never gets split across the line break).
-  function icsEscapeText(s) {
-    return String(s == null ? '' : s)
-      .replace(/\\/g, '\\\\')
-      .replace(/;/g, '\\;')
-      .replace(/,/g, '\\,')
-      .replace(/\n/g, '\\n');
-  }
-
-  const icsEncoder = new TextEncoder();
-  function icsFoldLine(line) {
-    if (icsEncoder.encode(line).length <= 75) return line;
-    const segments = [];
-    let seg = '';
-    let segBytes = 0;
-    let budget = 75;
-    for (const ch of line) { // for...of walks by code point, never a lone surrogate half
-      const chBytes = icsEncoder.encode(ch).length;
-      if (segBytes + chBytes > budget) {
-        segments.push(seg);
-        seg = '';
-        segBytes = 0;
-        budget = 74; // continuation lines carry a leading space, counted separately below
-      }
-      seg += ch;
-      segBytes += chBytes;
-    }
-    if (seg) segments.push(seg);
-    return segments.map((s, i) => (i === 0 ? s : ' ' + s)).join('\r\n');
-  }
-
   // One all-day VEVENT per real reminder, never anything that contacts
   // anyone, this only builds a file for Jack's own calendar app to import.
   function buildRemindersIcs(reminders) {
@@ -1529,16 +1502,6 @@
     const label = 'sondrik downloads';
     const value = latest.count + ' (as of ' + fmtDate(latest.date) + ')';
     return renderFlatBadgeSvg(label, value, '#3B82C4');
-  }
-
-  function csvField(v) {
-    let s = v == null ? '' : String(v);
-    // CSV/formula injection (OWASP): a hand-typed note starting with
-    // =, +, -, @, tab, or a carriage return is read as a live formula by
-    // Excel/Sheets when this export is opened there, not as plain text.
-    // A leading single quote is the standard mitigation both recommend.
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
   // Exports the real, logged download-check history only, one row per actual

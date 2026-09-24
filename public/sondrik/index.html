@@ -430,7 +430,9 @@
     <code>node --test public/sondrik/data/goals-core.test.js</code> after changing the Goals card's date/pace
     math, it guards the two real bugs that math has already produced. Run
     <code>node --test public/sondrik/data/release-core.test.js</code> after changing the bugfix check-in logic,
-    it guards the NaN-date crash and the silently-dropped-missed-checkpoint bug that logic has already produced.
+    it guards the NaN-date crash and the silently-dropped-missed-checkpoint bug that logic has already produced. Run
+    <code>node --test public/sondrik/data/export-core.test.js</code> after changing the CSV/ICS export helpers, it
+    guards the CSV-formula-injection escape and the UTF-8-byte-aware ICS line folding.
   </footer>
 </div>
 
@@ -445,6 +447,7 @@
 <script src="/sondrik/data/validate-core.js"></script>
 <script src="/sondrik/data/goals-core.js"></script>
 <script src="/sondrik/data/release-core.js"></script>
+<script src="/sondrik/data/export-core.js"></script>
 <script src="/sondrik/app.js"></script>
 <script src="/sidebar.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>
