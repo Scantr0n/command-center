@@ -2179,18 +2179,9 @@ backupBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-function csvField(v) {
-  let s = v == null ? '' : String(v);
-  // CSV/formula injection (OWASP): a value starting with =, +, -, @, tab, or
-  // a carriage return is read as a live formula by Excel/Sheets when this
-  // export is opened there, not as plain text. Same leading-quote mitigation
-  // as the other hubs' own CSV exports, even though every field here comes
-  // from Alpha's own real feed rather than free-text entry, since a symbol
-  // or side string is still attacker-shaped input from this page's own
-  // point of view.
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+// Extracted to data/export-core.js so its formula-injection guard has a
+// real regression test instead of only ever running live in a browser.
+const { csvField } = AlphaExportCore;
 
 const POSITIONS_CSV_COLUMNS = [
   ['symbol', 'Symbol'], ['side', 'Side'], ['qty', 'Qty'], ['avgEntryPrice', 'Avg entry'],
