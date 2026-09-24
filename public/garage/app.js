@@ -258,6 +258,40 @@ function renderPackagingRulesFreshness() {
   el.title = 'Last hand-verified against each platform\'s own shipping/seller documentation on ' + PACKAGING_RULES_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. Found a real error while
+// re-verifying this one 2026-09-24: the eBay row lumped sneakers, handbags,
+// jewelry, and watches under one flat "$500+" threshold. That's wrong for
+// two of the four. Watches only auto-qualify at $2,000+ (Wristwatches and
+// Pocket Watches categories; $500-$1,999.99 is an optional add-on, not
+// automatic) per eBay's own Authenticity Guarantee help page, and sneakers
+// now start as low as $75+ and are brand/model-dependent, not a flat $500
+// at all, a seller can only tell whether a given pair qualifies by what the
+// listing form itself shows (eBay's own sneaker Authenticity Guarantee
+// pages, corroborated by third-party seller-tooling coverage). Handbags and
+// eligible-brand jewelry are the two categories actually at $500+ automatic
+// (with a $200-$499.99 optional add-on tier below that), so the row now
+// says so instead of overstating a $500 floor on watches and understating
+// how low sneakers can actually go. This table's callout already warns a
+// threshold "can trigger automatically... with no opt-in and no way to back
+// out", so a wrong number here is a real risk of Jack being surprised by an
+// authentication hold he didn't expect, or not budgeting for one he should
+// have. Poshmark, Vinted, and Depop rows re-checked against their own
+// current help pages too; no change needed on those three.
+const AUTHENTICATION_RULES_REVIEWED_ON = '2026-09-24';
+const AUTHENTICATION_RULES_STALE_AFTER_DAYS = 45;
+
+function renderAuthenticationRulesFreshness() {
+  const el = document.getElementById('authenticationRulesFreshness');
+  if (!el) return;
+  const age = daysSincePublished(AUTHENTICATION_RULES_REVIEWED_ON);
+  const stale = age != null && age > AUTHENTICATION_RULES_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own authentication/verification program documentation on ' + AUTHENTICATION_RULES_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5030,6 +5064,7 @@ renderSellerStandardsFreshness();
 renderTaxTrackerFreshness();
 renderElectronicsRulesFreshness();
 renderPackagingRulesFreshness();
+renderAuthenticationRulesFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
