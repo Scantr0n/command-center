@@ -1,8 +1,8 @@
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
+// Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+// regression test instead of only ever running live in a browser, same
+// shared-core pattern already used for csvField (see AlphaExportCore
+// further down this file).
+const escapeHtml = AlphaHtmlCore.escapeHtml;
 
 // Market-calendar and uptime/incident date math lives in dates-core.js,
 // regime-segment/distribution math lives in regime-core.js, sparkline
