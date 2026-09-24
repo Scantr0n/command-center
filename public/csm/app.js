@@ -2070,17 +2070,22 @@
   // Same class of warnings npBuildWarnings raises for a brand-new prospect,
   // re-run here against the edited values so correcting an existing record
   // gets the same backfill/consistency checks a new one does.
+  // Stage itself isn't editable from this form (that's the separate "stage
+  // move" generator), so it always comes from the real, unedited p rather
+  // than edited, merged in just for the shared missingContactChannelType/
+  // missingVerifiedHook predicates below (same ones npBuildWarnings and
+  // computeDataQualityFlags share) to read.
   function peBuildWarnings(p, edited) {
     const warnings = [];
-    if (p.stage !== 'researched' && !(edited.contactChannel && edited.contactChannel.type)) {
+    if (missingContactChannelType({ stage: p.stage, contactChannel: edited.contactChannel })) {
       warnings.push('Stage is "' + p.stage + '" but contact channel type is not logged. This is the single ' +
         'biggest driver of real reply rate, fill it in as soon as it is known.');
     }
-    if (edited.contactChannel && edited.contactChannel.type && !edited.contactChannel.detail) {
+    if (channelTypeLoggedWithNoDetail({ contactChannel: edited.contactChannel })) {
       warnings.push('Contact channel type is logged but contact channel detail (the actual email/handle/contact) ' +
         'is not. Knowing it is a named decision-maker is not useful without the real way to reach them.');
     }
-    if (p.stage !== 'researched' && !edited.verifiedHook) {
+    if (missingVerifiedHook({ stage: p.stage, verifiedHook: edited.verifiedHook })) {
       warnings.push('Stage is "' + p.stage + '" but verified hook is not logged. Backfill why this person/brand ' +
         'is a real fit once known.');
     }
@@ -2096,14 +2101,10 @@
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
     }
-    if (edited.category) {
-      const norm = edited.category.trim().toLowerCase();
-      const existing = allProspects.filter(x => x.id !== p.id).map(x => x.category).filter(Boolean);
-      const clash = existing.find(c => c.trim().toLowerCase() === norm && c !== edited.category);
-      if (clash) {
-        warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
-          clash + '", they would render as separate filter chips. Pick one spelling.');
-      }
+    const categoryClash = findCategoryCasingClash(edited.category, allProspects.filter(x => x.id !== p.id));
+    if (categoryClash) {
+      warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
+        categoryClash + '", they would render as separate filter chips. Pick one spelling.');
     }
     return warnings;
   }
