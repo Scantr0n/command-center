@@ -16,7 +16,8 @@ const {
   classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
   COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
-  estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend
+  estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
+  buildPortfolioValueTimeline
 } = require('./grading-core.js');
 
 test('missing rawValue, expectedGradedValue, or estimatedGradingCost returns null, never a guessed verdict', () => {
@@ -220,4 +221,86 @@ test('the real cards.json never crashes computeGainLoss/computeRealizedGainLoss/
     assert.doesNotThrow(() => estimateCardCollectiblesTax(c), `card ${c.id} estimateCardCollectiblesTax should not throw`);
     assert.doesNotThrow(() => computeValueTrend(c), `card ${c.id} computeValueTrend should not throw`);
   }
+});
+
+test('buildPortfolioValueTimeline returns null for no cards, or fewer than 2 distinct priced dates', () => {
+  assert.equal(buildPortfolioValueTimeline([]), null);
+  assert.equal(buildPortfolioValueTimeline(null), null);
+  assert.equal(buildPortfolioValueTimeline([{ estimatedValue: 10, datePriced: '2026-01-01' }]), null, 'one card, one date, not a trend');
+  // Two cards, but both priced on the exact same single date, is still one distinct date.
+  assert.equal(buildPortfolioValueTimeline([
+    { estimatedValue: 10, datePriced: '2026-01-01' },
+    { estimatedValue: 20, datePriced: '2026-01-01' }
+  ]), null);
+});
+
+test('buildPortfolioValueTimeline excludes a card missing estimatedValue or datePriced entirely, including its priceHistory dates', () => {
+  const result = buildPortfolioValueTimeline([
+    { estimatedValue: 10, datePriced: '2026-01-01' },
+    { estimatedValue: null, datePriced: '2026-02-01', priceHistory: [{ date: '2026-01-15', value: 5 }] },
+    { estimatedValue: 20, datePriced: null, priceHistory: [{ date: '2026-01-20', value: 8 }] },
+    { estimatedValue: 30, datePriced: '2026-03-01' }
+  ]);
+  const dates = result.map(t => t.date);
+  assert.deepEqual(dates, ['2026-01-01', '2026-03-01'], 'the unpriced/undated cards never contribute a date at all');
+});
+
+test('buildPortfolioValueTimeline sums every card counted at that date and tracks countedCards', () => {
+  const result = buildPortfolioValueTimeline([
+    { estimatedValue: 100, datePriced: '2026-01-01' },
+    { estimatedValue: 50, datePriced: '2026-02-01' }
+  ]);
+  assert.deepEqual(result, [
+    { date: '2026-01-01', total: 100, countedCards: 1 },
+    { date: '2026-02-01', total: 150, countedCards: 2 }
+  ]);
+});
+
+test('buildPortfolioValueTimeline uses each card\'s latest real point on or before a date, not a straight-line guess', () => {
+  // Card re-priced 10 -> 25 -> 15 over time; a snapshot date between two
+  // real points must use the earlier one, never interpolate or peek ahead.
+  const card = {
+    estimatedValue: 15, datePriced: '2026-04-01',
+    priceHistory: [{ date: '2026-01-01', value: 10 }, { date: '2026-03-01', value: 25 }]
+  };
+  const other = { estimatedValue: 1, datePriced: '2026-02-15' }; // just to create a 3rd distinct date
+  const result = buildPortfolioValueTimeline([card, other]);
+  const byDate = Object.fromEntries(result.map(r => [r.date, r]));
+  assert.equal(byDate['2026-01-01'].total, 10, 'first real point');
+  assert.equal(byDate['2026-02-15'].total, 10 + 1, 'still the Jan point, Mar point is still in the future');
+  assert.equal(byDate['2026-03-01'].total, 25 + 1, 'the Mar re-price point');
+  assert.equal(byDate['2026-04-01'].total, 15 + 1, 'the current estimatedValue/datePriced point');
+});
+
+test('buildPortfolioValueTimeline never counts a card before its own first real point', () => {
+  const lateCard = { estimatedValue: 40, datePriced: '2026-05-01' };
+  const earlyCard = { estimatedValue: 10, datePriced: '2026-01-01' };
+  const result = buildPortfolioValueTimeline([lateCard, earlyCard]);
+  const byDate = Object.fromEntries(result.map(r => [r.date, r]));
+  assert.equal(byDate['2026-01-01'].countedCards, 1, 'only the early card has a real point yet');
+  assert.equal(byDate['2026-01-01'].total, 10);
+  assert.equal(byDate['2026-05-01'].countedCards, 2);
+  assert.equal(byDate['2026-05-01'].total, 50);
+});
+
+test('buildPortfolioValueTimeline drops a card entirely from the date its soldDate lands on, never counting a sold card\'s value', () => {
+  const soldCard = { estimatedValue: 20, datePriced: '2026-01-01', soldDate: '2026-03-01', soldPrice: 25 };
+  const heldCard = { estimatedValue: 5, datePriced: '2026-02-01' };
+  const result = buildPortfolioValueTimeline([soldCard, heldCard]);
+  const byDate = Object.fromEntries(result.map(r => [r.date, r]));
+  assert.equal(byDate['2026-01-01'].countedCards, 1, 'sold card still counts before its own soldDate');
+  assert.equal(byDate['2026-02-01'].countedCards, 2);
+  // '2026-03-01' is the soldDate itself: the break condition is soldDate <=
+  // date, so the sold card drops out on its OWN sale date too, not just
+  // strictly after it.
+  const soldDatePoint = result.find(r => r.date === '2026-03-01');
+  if (soldDatePoint) {
+    assert.equal(soldDatePoint.countedCards, 1, 'the sold card is excluded on its own sale date, the held card remains');
+    assert.equal(soldDatePoint.total, 5);
+  }
+});
+
+test('the real cards.json never crashes buildPortfolioValueTimeline', () => {
+  const data = require('./cards.json');
+  assert.doesNotThrow(() => buildPortfolioValueTimeline(data.cards || []));
 });

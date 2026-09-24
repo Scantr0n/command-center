@@ -1050,48 +1050,15 @@ function renderBiggestMovers() {
 // null when fewer than two distinct real dates exist across the whole
 // collection, since one shared date (or none) is not a trend, it is
 // everything having been priced once on the same day.
+// The real algorithm (forward-walking two-pointer merge across dates and
+// each card's own sorted price points) now lives in grading-core.js, the
+// same reason isSold/computeValueTrend/etc. were split out: a plain Node
+// test (grading-core.test.js) can exercise the real dedup/date-cutoff edge
+// cases directly. This wrapper just supplies the one thing that's a
+// presentation concern, not a real card-data rule: excluding the seeded
+// example row, which the core function deliberately doesn't know about.
 function buildPortfolioValueTimeline() {
-  const perCard = cards
-    .filter(c => !isExample(c) && c.estimatedValue != null && c.datePriced)
-    .map(c => {
-      const points = (c.priceHistory || [])
-        .filter(p => p.date && p.value != null)
-        .map(p => ({ date: p.date, value: p.value }));
-      points.push({ date: c.datePriced, value: c.estimatedValue });
-      points.sort((a, b) => a.date.localeCompare(b.date));
-      return { card: c, points };
-    });
-  if (!perCard.length) return null;
-
-  const allDates = new Set();
-  perCard.forEach(({ points }) => points.forEach(p => allDates.add(p.date)));
-  const sortedDates = [...allDates].sort();
-  if (sortedDates.length < 2) return null;
-
-  // Was one full points.filter() per (card, date) pair, O(dates x cards x
-  // points), re-scanning every card's whole price history from scratch at
-  // every single date. Harmless with 3 cards, but the same "recompute over
-  // everything on every render" shape the 13x-candidate-list-rebuild and
-  // O(n^2) photo-audit-grid perf fixes already caught elsewhere on this hub.
-  // Since both sortedDates and each card's own points are already ascending,
-  // a single forward-walking pointer per card finds the same "latest point
-  // on or before this date" value without re-scanning: dates and a card's
-  // points only ever move forward together, never backward.
-  const totals = sortedDates.map(date => ({ date, total: 0, countedCards: 0 }));
-  perCard.forEach(({ card, points }) => {
-    let pointIdx = -1;
-    for (let i = 0; i < sortedDates.length; i++) {
-      const date = sortedDates[i];
-      // soldDate <= date only ever gets truer as date increases, so once a
-      // card drops out here it stays out for every later date too.
-      if (isSold(card) && card.soldDate && card.soldDate <= date) break;
-      while (pointIdx + 1 < points.length && points[pointIdx + 1].date <= date) pointIdx++;
-      if (pointIdx < 0) continue;
-      totals[i].total += points[pointIdx].value;
-      totals[i].countedCards++;
-    }
-  });
-  return totals;
+  return buildPortfolioValueTimelineCore(cards.filter(c => !isExample(c)));
 }
 
 // Each timeline dot's real per-point data (exact date, dollar total, card
@@ -1269,7 +1236,8 @@ function isExampleCandidate(c) {
 const {
   computeGradingMath, GRADING_RISK_MULTIPLE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
-  estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend
+  estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
+  buildPortfolioValueTimeline: buildPortfolioValueTimelineCore
 } = window.CGTGradingCore;
 
 const CANDIDATE_VERDICT_META = {

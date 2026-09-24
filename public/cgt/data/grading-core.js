@@ -199,11 +199,74 @@
     return { abs, pct, prevValue: prev.value, prevDate: prev.date };
   }
 
+  // Reconstructs the real collection's total value at every distinct date any
+  // unsold, priced real card actually had a value on record (its current
+  // datePriced plus every dated entry in its own priceHistory), the "value
+  // over time" trend CollX and Card Ladder-style trackers lead with once a
+  // collection has real re-pricing history. At each snapshot date a card
+  // counts at the latest real value it had on or before that date (not
+  // counted at all before its first real price, dropped entirely once its
+  // own soldDate has passed, same scope as every other portfolio total on
+  // this page). Returns null when fewer than two distinct real dates exist
+  // across the whole collection, since one shared date (or none) is not a
+  // trend, it is everything having been priced once on the same day.
+  //
+  // Takes `cards` already filtered to whatever the caller counts as "real"
+  // (app.js excludes the seeded example row before calling this), same
+  // separation every other function here keeps: this module only knows real
+  // card-shape rules (estimatedValue, datePriced, priceHistory, soldDate),
+  // never "is this the demo row", which is a presentation concern the caller
+  // owns.
+  function buildPortfolioValueTimeline(cards) {
+    const perCard = (cards || [])
+      .filter(c => c.estimatedValue != null && c.datePriced)
+      .map(c => {
+        const points = (c.priceHistory || [])
+          .filter(p => p.date && p.value != null)
+          .map(p => ({ date: p.date, value: p.value }));
+        points.push({ date: c.datePriced, value: c.estimatedValue });
+        points.sort((a, b) => a.date.localeCompare(b.date));
+        return { card: c, points };
+      });
+    if (!perCard.length) return null;
+
+    const allDates = new Set();
+    perCard.forEach(({ points }) => points.forEach(p => allDates.add(p.date)));
+    const sortedDates = [...allDates].sort();
+    if (sortedDates.length < 2) return null;
+
+    // Was one full points.filter() per (card, date) pair, O(dates x cards x
+    // points), re-scanning every card's whole price history from scratch at
+    // every single date. Harmless with 3 cards, but the same "recompute over
+    // everything on every render" shape the 13x-candidate-list-rebuild and
+    // O(n^2) photo-audit-grid perf fixes already caught elsewhere on this
+    // hub. Since both sortedDates and each card's own points are already
+    // ascending, a single forward-walking pointer per card finds the same
+    // "latest point on or before this date" value without re-scanning: dates
+    // and a card's points only ever move forward together, never backward.
+    const totals = sortedDates.map(date => ({ date, total: 0, countedCards: 0 }));
+    perCard.forEach(({ card, points }) => {
+      let pointIdx = -1;
+      for (let i = 0; i < sortedDates.length; i++) {
+        const date = sortedDates[i];
+        // soldDate <= date only ever gets truer as date increases, so once a
+        // card drops out here it stays out for every later date too.
+        if (isSold(card) && card.soldDate && card.soldDate <= date) break;
+        while (pointIdx + 1 < points.length && points[pointIdx + 1].date <= date) pointIdx++;
+        if (pointIdx < 0) continue;
+        totals[i].total += points[pointIdx].value;
+        totals[i].countedCards++;
+      }
+    });
+    return totals;
+  }
+
   return {
     computeGradingMath, GRADING_RISK_MULTIPLE,
     classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
     COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
     isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
-    estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend
+    estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
+    buildPortfolioValueTimeline
   };
 });
