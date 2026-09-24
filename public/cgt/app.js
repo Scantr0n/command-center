@@ -208,6 +208,42 @@ const ORDER_STATUS_LOOKUP = {
   PSA: { url: 'https://www.psacard.com/orderstatus', text: 'Check status on psacard.com' }
 };
 
+// A submission's "trackingNumber" is the shipping carrier's own number for
+// the box in transit (did it actually arrive at PSA, did it actually leave
+// on the way back), a different real question from ORDER_STATUS_LOOKUP above
+// (has the grader started/finished grading it). No "carrier" field exists on
+// a submission, so this is detected from the tracking number's own format,
+// which real carriers document as distinctive enough to trust for UPS's
+// "1Z" prefix and FedEx's 12/15-digit lengths (USPS uses neither). A 20- or
+// 22-digit all-numeric number is genuinely ambiguous, though: both USPS and
+// FedEx Ground/SmartPost issue numbers in that exact length range, so rather
+// than silently guess one and risk sending Jack to a "not found" page with
+// no explanation, both carriers' links are offered and labeled as a guess.
+// USPS's less common 20/22-digit international "CP" formats and UPS's rarer
+// 9-digit/26-digit/T-prefixed formats aren't covered, real but unlikely to
+// be what a grading-company shipment actually uses. [Source: USPS "go/
+// TrackConfirmAction" and FedEx "fedextrack" query-param formats, UPS's
+// "1Z" prefix format, and real tracking-number length ranges per carrier,
+// checked 2026-09-24]
+function shippingCarrierLinks(trackingNumber) {
+  const t = (trackingNumber || '').replace(/[\s-]/g, '').toUpperCase();
+  if (!t) return [];
+  const usps = { url: 'https://tools.usps.com/go/TrackConfirmAction?tLabels=' + encodeURIComponent(t), text: 'Track on USPS.com' };
+  const ups = { url: 'https://www.ups.com/track?loc=en_US&tracknum=' + encodeURIComponent(t), text: 'Track on UPS.com' };
+  const fedex = { url: 'https://www.fedex.com/fedextrack/?trknbr=' + encodeURIComponent(t), text: 'Track on FedEx.com' };
+  if (/^1Z[0-9A-Z]{16}$/.test(t)) return [ups];
+  if (/^[A-Z]{2}[0-9]{9}US$/.test(t)) return [usps];
+  if (/^(92|93|94|95)[0-9]{18,20}$/.test(t)) return [usps];
+  if (/^[0-9]{12}$/.test(t) || /^[0-9]{15}$/.test(t)) return [fedex];
+  if (/^[0-9]{20}$/.test(t) || /^[0-9]{22}$/.test(t)) {
+    return [
+      { url: usps.url, text: 'Track on USPS.com (guess -- this length also matches FedEx)' },
+      { url: fedex.url, text: 'Track on FedEx.com (guess -- this length also matches USPS)' }
+    ];
+  }
+  return [];
+}
+
 // The published per-tier turnaround table and its lookup, the PSA
 // paused-Value-tier flag, the business-days/calendar-days conversion, the
 // per-grader real-turnaround average, and the date math they're all built
@@ -1583,6 +1619,9 @@ function openSubmissionModal(id) {
   body += field('Card count', s.cardCount != null ? String(s.cardCount) : null, s.cardCount == null);
   body += field('Submitted date', s.submittedDate, !s.submittedDate);
   body += field('Tracking number', s.trackingNumber, !s.trackingNumber);
+  for (const link of shippingCarrierLinks(s.trackingNumber)) {
+    body += `<div class="field-row"><a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(link.text)} &rarr;</a></div>`;
+  }
   body += field('Returned date', s.returnedDate, !s.returnedDate);
   body += field('Cost (grading fee)', s.cost != null ? formatUsd(s.cost) : null, s.cost == null);
   body += field('Cost per card', costPerCard(s) != null ? formatUsd(costPerCard(s)) : null, costPerCard(s) == null);
