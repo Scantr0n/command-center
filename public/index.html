@@ -18,6 +18,7 @@
 <script src="/vendor/d3-force-selection-zoom.min.js"></script>
 <script src="/data/dashboard-core.js"></script>
 <script src="/data/graph-core.js"></script>
+<script src="/data/html-core.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -814,7 +815,8 @@
 // failure visible instead.
 const CORE_SCRIPTS = [
   ['DashboardCore', 'dashboard-core.js'],
-  ['GraphCore', 'graph-core.js']
+  ['GraphCore', 'graph-core.js'],
+  ['HtmlCore', 'html-core.js']
 ];
 const missingCoreScript = CORE_SCRIPTS.find(([globalName]) => typeof window[globalName] === 'undefined');
 if (missingCoreScript) {
@@ -839,6 +841,7 @@ const {
   curveMinClearance,
   computeRelationBulge
 } = window.GraphCore;
+const { escapeHtml } = window.HtmlCore;
 
 let clusters = [];
 let activeCluster = null;
@@ -902,12 +905,6 @@ function makeCardClickable(el) {
       openModal(el.dataset.id);
     }
   });
-}
-
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
 }
 
 function statusColor(status) {

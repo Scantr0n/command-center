@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v46';
+const CACHE_VERSION = 'v47';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -14,6 +14,7 @@ const SHELL_URLS = [
   '/', '/index.html', '/style.css', '/manifest.webmanifest',
   '/favicon.svg', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png',
   '/vendor/d3-force-selection-zoom.min.js', '/sidebar.js', '/data/dashboard-core.js', '/data/graph-core.js',
+  '/data/html-core.js',
   '/alpha/', '/alpha/index.html', '/alpha/app.js', '/alpha/style.css',
   '/alpha/data/account-core.js', '/alpha/data/dates-core.js', '/alpha/data/regime-core.js',
   '/alpha/data/sparkline-core.js', '/alpha/data/export-core.js', '/alpha/data/html-core.js',
