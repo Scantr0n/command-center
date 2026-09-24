@@ -1035,7 +1035,7 @@ function renderPositionSizing(data, clientDrawdownHistory, clientRobustnessHisto
 // (account-core.test.js) instead of only ever running live once a real
 // position feed exists. See that file's own header comment for the real bug
 // this already caused with no test coverage.
-const { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals } = AlphaAccountCore;
+const { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct } = AlphaAccountCore;
 
 // server.js's /equity-history proxy (see mapEquityCurve's own comment there)
 // forwards the raw real equity readings its drawdown calculation already
@@ -1140,10 +1140,21 @@ function renderAccount(data) {
 // green/red color coding so a scan across many rows reads winners and
 // losers instantly rather than requiring reading each sign. Sorted by
 // market value (server-side) so the biggest real exposure leads.
+// Single-position concentration risk is a standard trading/portfolio risk-
+// dashboard threshold (any single name above roughly 5% of the account gets
+// a second look, 10%+ is commonly flagged outright as concentrated), so the
+// column reuses this page's existing amber "caution" treatment (the same
+// color as a stale connection or a pending architecture feature) at 10% and
+// above rather than inventing a new color for a new kind of warning.
+const POSITION_CONCENTRATION_CAUTION_PCT = 10;
+
 function renderPositions(data) {
   const panel = document.getElementById('positionsPanel');
   const positions = (data.live && Array.isArray(data.live.positions)) ? data.live.positions : [];
+  const acct = data.live && data.live.account;
+  const equity = (acct && typeof acct.equity === 'number' && Number.isFinite(acct.equity)) ? acct.equity : null;
   lastPositionsSnapshot = positions;
+  lastPositionsEquitySnapshot = equity;
 
   const csvBtn = document.getElementById('positionsCsvBtn');
   if (csvBtn) {
@@ -1170,6 +1181,13 @@ function renderPositions(data) {
     // value's dash would have been colored red, falsely reading as "losing".
     const plIsNumber = typeof p.unrealizedPl === 'number' && Number.isFinite(p.unrealizedPl);
     const goodClass = plIsNumber ? (p.unrealizedPl >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
+    const concPct = positionConcentrationPct(p.marketValue, equity);
+    const concHigh = concPct != null && concPct >= POSITION_CONCENTRATION_CAUTION_PCT;
+    const concText = concPct != null ? concPct.toFixed(1) + '%' : '-';
+    const concTitle = concPct != null
+      ? escapeHtml(p.symbol) + ' is ' + concPct.toFixed(1) + '% of account equity' +
+        (concHigh ? ', at or above the ' + POSITION_CONCENTRATION_CAUTION_PCT + '% single-position concentration threshold' : '')
+      : 'Awaiting a real equity reading to compute this against';
     return `
       <tr>
         <td class="pos-symbol font-mono">${escapeHtml(p.symbol)}</td>
@@ -1181,6 +1199,7 @@ function renderPositions(data) {
         <td class="font-mono pos-num ${goodClass}">${escapeHtml(fmtDollar(p.unrealizedPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(p.unrealizedPlPct) || '')}</span>
         </td>
+        <td class="font-mono pos-num${concHigh ? ' pos-conc-high' : ''}" title="${concTitle}">${escapeHtml(concText)}</td>
       </tr>
     `;
   }).join('');
@@ -1193,6 +1212,11 @@ function renderPositions(data) {
   let totalsRow = '';
   if (totalsKnown) {
     const totalGoodClass = totalPl >= 0 ? 'pl-good' : 'pl-bad';
+    // The totals row's own "% of equity" cell is exactly computeExposure's
+    // pctDeployed (already shown as the Account section's "Invested" tile,
+    // see renderAccount above), reused rather than re-derived, so the two
+    // never have a chance to silently disagree.
+    const { pctDeployed } = computeExposure(equity != null ? { equity } : null, positions);
     totalsRow = `
       <tr class="pos-totals-row">
         <td class="font-mono" colspan="5">Total (${positions.length} position${positions.length === 1 ? '' : 's'})</td>
@@ -1200,6 +1224,7 @@ function renderPositions(data) {
         <td class="font-mono pos-num ${totalGoodClass}">${escapeHtml(fmtDollar(totalPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(totalPlPct) || '')}</span>
         </td>
+        <td class="font-mono pos-num">${pctDeployed != null ? escapeHtml(pctDeployed.toFixed(1) + '%') : '-'}</td>
       </tr>
     `;
   }
@@ -1209,7 +1234,7 @@ function renderPositions(data) {
       <table class="pos-table">
         <thead>
           <tr>
-            <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg entry</th><th>Current</th><th>Mkt value</th><th>Unrealized P&amp;L</th>
+            <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg entry</th><th>Current</th><th>Mkt value</th><th>Unrealized P&amp;L</th><th title="Real position market value as a percentage of real account equity, computed client-side from the two figures this page already has">% of equity</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -1884,6 +1909,12 @@ let lastRawData = null;
 // reading forward.
 let lastPositionsSnapshot = [];
 
+// The real equity figure the concentration column below is computed
+// against, captured alongside lastPositionsSnapshot at the same render so
+// the CSV export can reproduce the exact same per-row percentages already
+// on screen, never a second fetch or a stale equity reading.
+let lastPositionsEquitySnapshot = null;
+
 async function loadStatus() {
   const requestId = ++latestStatusRequestId;
   try {
@@ -2164,18 +2195,25 @@ function csvField(v) {
 const POSITIONS_CSV_COLUMNS = [
   ['symbol', 'Symbol'], ['side', 'Side'], ['qty', 'Qty'], ['avgEntryPrice', 'Avg entry'],
   ['currentPrice', 'Current'], ['marketValue', 'Mkt value'], ['unrealizedPl', 'Unrealized P&L'],
-  ['unrealizedPlPct', 'Unrealized P&L %']
+  ['unrealizedPlPct', 'Unrealized P&L %'], ['concentrationPct', '% of equity']
 ];
 
 // Exports exactly the real open positions currently on screen, read straight
 // from lastPositionsSnapshot (the same array renderPositions just rendered),
 // never a second fetch or a reconstructed copy. Read-only like every other
 // button on this page: it only ever downloads a file to this browser, never
-// writes anything back to Alpha.
+// writes anything back to Alpha. concentrationPct isn't a real field on the
+// position itself (see the % of equity column comment in renderPositions),
+// so it's computed here from the same lastPositionsEquitySnapshot captured
+// at that same render, never a second, possibly-drifted equity reading.
 document.getElementById('positionsCsvBtn').addEventListener('click', () => {
   if (!lastPositionsSnapshot.length) return;
   const header = POSITIONS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
-  const lines = lastPositionsSnapshot.map(p => POSITIONS_CSV_COLUMNS.map(([key]) => csvField(p[key])).join(','));
+  const lines = lastPositionsSnapshot.map(p => POSITIONS_CSV_COLUMNS.map(([key]) => csvField(
+    key === 'concentrationPct'
+      ? (positionConcentrationPct(p.marketValue, lastPositionsEquitySnapshot) ?? '')
+      : p[key]
+  )).join(','));
   const csv = [header, ...lines].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

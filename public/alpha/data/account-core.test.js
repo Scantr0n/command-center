@@ -12,7 +12,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals
+  fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct
 } = require('./account-core.js');
 
 test('fmtDollar formats positive/negative amounts with a fixed 2 decimals, null for non-numbers', () => {
@@ -107,4 +107,21 @@ test('computePositionsTotals leaves totalPlPct null when total cost basis is zer
   const flat = computePositionsTotals([{ marketValue: 0, unrealizedPl: 0 }]);
   assert.equal(flat.totalsKnown, true);
   assert.equal(flat.totalPlPct, null);
+});
+
+test('positionConcentrationPct is a real position-size / real equity percentage', () => {
+  assert.equal(positionConcentrationPct(500, 1000), 50);
+  assert.equal(positionConcentrationPct(120, 1000), 12);
+});
+
+test('positionConcentrationPct is honest-null (never 0) for a bad marketValue', () => {
+  assert.equal(positionConcentrationPct(null, 1000), null);
+  assert.equal(positionConcentrationPct(NaN, 1000), null);
+  assert.equal(positionConcentrationPct(undefined, 1000), null);
+});
+
+test('positionConcentrationPct is honest-null (never 0) for a missing, zero, or negative equity', () => {
+  assert.equal(positionConcentrationPct(100, null), null);
+  assert.equal(positionConcentrationPct(100, 0), null);
+  assert.equal(positionConcentrationPct(100, -50), null);
 });

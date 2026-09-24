@@ -1036,9 +1036,34 @@ header.page-head .sub {
 .pos-totals-row:hover { background: transparent; }
 .pos-symbol { font-weight: 600; }
 .pos-num { text-align: right; }
-.pos-side-long { color: #3DDC84; text-transform: uppercase; font-size: 0.72rem; }
-.pos-side-short { color: #E0A030; text-transform: uppercase; font-size: 0.72rem; }
 .pos-plpct { display: block; font-size: 0.7rem; opacity: 0.75; }
+/* Real bug found while adding the concentration column below and confirmed
+   against a mocked live feed (this table has never rendered against a real
+   position, per account-core.js's own header comment, so nothing had ever
+   exercised this): every one of these sets color directly on the same <td>
+   `.pos-table td` above already targets with its own `color: var(--ink)`.
+   `.pos-table td`'s specificity is (0,1,1), one class plus the `td` type
+   selector, which beats a plain single-class selector like `.pl-good`
+   (0,1,0) regardless of source order, so long/short and P&L color-coding
+   silently rendered as plain ink-colored text the whole time, exactly the
+   "real dashboard convention: green/red so a scan across many rows reads
+   winners and losers instantly" this table's own comment already promises
+   but never delivered. Scoping each selector under `.pos-table td` too
+   raises it to (0,2,1), which wins outright; `.pl-good`/`.pl-bad` keep
+   their original unscoped rule above since Account's day-change tile uses
+   them on a nested <span>, a different element from `.stat-tile-value`,
+   where plain specificity already worked fine. */
+.pos-table td.pos-side-long { color: #3DDC84; text-transform: uppercase; font-size: 0.72rem; }
+.pos-table td.pos-side-short { color: #E0A030; text-transform: uppercase; font-size: 0.72rem; }
+.pos-table td.pl-good { color: #3DDC84; }
+.pos-table td.pl-bad { color: #E05050; }
+.pos-table td.pl-neutral { color: var(--dim); }
+/* Same amber "caution" this page already uses for a stale connection dot and
+   a pending architecture badge, reused here rather than a new color, for a
+   single position at or above the concentration-risk threshold (see the
+   POSITION_CONCENTRATION_CAUTION_PCT comment in app.js). Scoped the same way
+   as the rules above, for the same reason. */
+.pos-table td.pos-conc-high { color: #E0A030; font-weight: 600; }
 
 /* Architecture cards */
 .arch-grid {
