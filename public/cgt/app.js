@@ -98,11 +98,10 @@ function syncUrl() {
   history.replaceState(null, '', url);
 }
 
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
+// Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+// regression test instead of only ever running live in a browser, same
+// shared-core pattern already used for csvField (see CgtExportCore).
+const escapeHtml = CgtHtmlCore.escapeHtml;
 
 // An empty state that just says "add one to whatever.json" is a dead end,
 // the matching quick-log tool already exists further up the page but stays
