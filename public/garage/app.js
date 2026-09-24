@@ -105,6 +105,32 @@ function renderFeeScheduleFreshness() {
   el.title = 'Last hand-verified against each platform\'s own published seller fee schedule on ' + FEE_SCHEDULE_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as FEE_SCHEDULE_REVIEWED_ON/TITLE_SPECS_REVIEWED_ON
+// above: the "Return & dispute handling" table states real per-platform
+// response windows and resolution mechanics as prose ("as of September
+// 2026") with nothing on the page actually tracking whether that claim has
+// aged past being trustworthy, same gap that let the fee schedule and title
+// caps drift silently before this pattern existed. This table doubles as
+// the direct follow-up to the real eBay return-policy bug (the auto-parts
+// policy that blocked publish), so a stale response-window claim here is a
+// real risk of missing a buyer's dispute deadline, not just a cosmetic
+// reference going out of date. Re-verified 2026-09-24 against eBay, Vinted,
+// and Poshmark's own current help-center pages; the Depop row is unchanged.
+const RETURN_DISPUTE_REVIEWED_ON = '2026-09-24';
+const RETURN_DISPUTE_STALE_AFTER_DAYS = 45;
+
+function renderReturnDisputeFreshness() {
+  const el = document.getElementById('returnDisputeFreshness');
+  if (!el) return;
+  const age = daysSincePublished(RETURN_DISPUTE_REVIEWED_ON);
+  const stale = age != null && age > RETURN_DISPUTE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published return/dispute documentation on ' + RETURN_DISPUTE_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -4878,6 +4904,7 @@ initPhotoAudit();
 renderSeasonalCalendarHighlight();
 renderFeeScheduleFreshness();
 renderTitleSpecsFreshness();
+renderReturnDisputeFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
