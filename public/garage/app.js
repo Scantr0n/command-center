@@ -211,6 +211,31 @@ function renderTaxTrackerFreshness() {
   el.title = 'Last hand-verified against current IRS Form 1099-K reporting-threshold guidance on ' + TAX_TRACKER_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. Found a real error while
+// re-verifying this one 2026-09-24: the eBay row had the USPS lithium
+// battery mark transition backwards, it said the mark "without a phone
+// number" was the older one retiring 2026-12-31, when USPS Publication 52
+// (Feb 2026 edition) and the underlying PHMSA/Federal Register rule say the
+// opposite, the older mark is the one WITH the phone number, and the mark
+// dropping the phone number is the newer one required from 2027-01-01.
+// Fixed the row text to match; this badge exists so that class of reversed
+// claim gets caught faster next time instead of sitting live on a real
+// battery-item listing's shipping requirements.
+const ELECTRONICS_RULES_REVIEWED_ON = '2026-09-24';
+const ELECTRONICS_RULES_STALE_AFTER_DAYS = 45;
+
+function renderElectronicsRulesFreshness() {
+  const el = document.getElementById('electronicsRulesFreshness');
+  if (!el) return;
+  const age = daysSincePublished(ELECTRONICS_RULES_REVIEWED_ON);
+  const stale = age != null && age > ELECTRONICS_RULES_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own electronics/dangerous-goods policy and USPS Publication 52 on ' + ELECTRONICS_RULES_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -4988,6 +5013,7 @@ renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
 renderSellerStandardsFreshness();
 renderTaxTrackerFreshness();
+renderElectronicsRulesFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
