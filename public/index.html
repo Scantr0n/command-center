@@ -282,6 +282,15 @@
   .spoke-badge { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
   .graph-node:hover .spoke-badge, .graph-node:focus-visible .spoke-badge { opacity: 1; }
   .graph-node.dimmed .spoke-badge { display: none; }
+  /* Same reveal convention as .spoke-badge just above: the in-node text is
+     necessarily short (it has to fit inside the node's own circle), this is
+     the real full untruncated name, on-demand only. A small transition
+     delay on reveal (not on hide) avoids flashing it during an incidental
+     mouse pass-through while scanning the graph, only a real pause/focus
+     triggers it. */
+  .node-full-label { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
+  .graph-node:hover .node-full-label, .graph-node:focus-visible .node-full-label { opacity: 1; transition-delay: 0.15s; }
+  .graph-node.dimmed .node-full-label { display: none; }
   /* The browser's own default focus outline traces a focused element's full
      bounding box, and .graph-node's box includes its spoke-badge (see
      renderGraph), which sits well off toward the hub, not tucked against the
@@ -369,7 +378,7 @@
       transition: none !important;
     }
     .spoke-live { animation: none; }
-    .spoke-badge, .node-focus-ring { transition: none !important; }
+    .spoke-badge, .node-focus-ring, .node-full-label { transition: none !important; }
     .status-pulse { animation: none; opacity: 1; }
     .graph-node:hover, .cluster-card:hover { transform: none; }
     .graph-orbit-ring { animation: none; }
@@ -1990,6 +1999,32 @@ function renderGraph() {
       `;
     }
 
+    // Real research finding (D3/force-graph label-legibility patterns -
+    // Obsidian's hover-highlight, Neo4j Bloom's hover tooltip, vasturiano/
+    // force-graph's nodeLabel convention): the in-node text above is
+    // necessarily short (nodeLabelMaxChars caps it to what actually fits
+    // inside the circle), so the FULL name is only ever fully available
+    // via the native <title> tooltip, which is slow and plain-text-only.
+    // This surfaces the complete, untruncated name as a real on-demand
+    // label the instant a node is hovered/focused, same reveal mechanism
+    // .spoke-badge above already established (opacity 0->1 on
+    // :hover/:focus-visible, pure CSS, no simulation/JS changes), so
+    // nothing about how nodes are laid out or ticked had to change.
+    // Positioned below the node rather than the hemisphere-flip leader-
+    // line approach the research also covered: simpler, and this graph's
+    // real label collisions are worth risking only transiently on hover
+    // for one node at a time, not permanently for all 22 at once (the
+    // actual problem this exists to fix).
+    const fullLabelText = c.name;
+    const flw = 12 + fullLabelText.length * 4.9;
+    const fly = ny + r + 16;
+    const fullLabelHtml = `
+      <g class="node-full-label">
+        <rect x="${(nx - flw / 2).toFixed(1)}" y="${(fly - 8).toFixed(1)}" width="${flw.toFixed(1)}" height="16" rx="4" fill="var(--void)" stroke="var(--hairlineHover)" stroke-width="1" />
+        <text x="${nx.toFixed(1)}" y="${(fly + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="var(--ink)" font-weight="500">${escapeHtml(fullLabelText)}</text>
+      </g>
+    `;
+
     // Icon scale/position tuned per radius (22/28/34px, low/mid/top
     // priority): a fixed scale either crowded the smallest nodes or looked
     // tiny on the largest, so both grow together with r. Icon sits above
@@ -2009,6 +2044,7 @@ function renderGraph() {
         <circle class="node-focus-ring" cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r + 8}" fill="none" stroke="var(--ink)" stroke-width="1.5" />
         <text x="${nx.toFixed(1)}" y="${(ny + r * 0.62).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="${r > 30 ? 9 : 8}" fill="var(--ink)" font-weight="500">${escapeHtml(truncateLabel(nodeLabelWord(c.name), nodeLabelMaxChars(r)))}</text>
         ${badgeHtml}
+        ${fullLabelHtml}
       </g>
     `;
   });
