@@ -132,10 +132,10 @@
     const b = beijingTimeInfo();
     const clock = String(b.hour).padStart(2, '0') + ':' + String(b.minute).padStart(2, '0');
     let verdict;
-    if (b.isPrimeReplyWindow) verdict = 'inside the Tue-Thu morning window general cold-outreach benchmarks report as strongest for replies.';
-    else if (b.isBusinessHours) verdict = 'inside typical business hours, outside that Tue-Thu-morning window.';
-    else if (b.isWeekday) verdict = 'outside typical business hours; a message sent now likely sits unread until morning there.';
-    else verdict = 'a weekend in China; a message sent now likely sits unread until Monday there.';
+    if (b.isPrimeReplyWindow) verdict = 'Inside the Tue-Thu morning window general cold-outreach benchmarks report as strongest for replies.';
+    else if (b.isBusinessHours) verdict = 'Inside typical business hours, outside that Tue-Thu-morning window.';
+    else if (b.isWeekday) verdict = 'Outside typical business hours; a message sent now likely sits unread until morning there.';
+    else verdict = 'A weekend in China; a message sent now likely sits unread until Monday there.';
     beijingTimeNoteEl.textContent = 'Beijing time right now: ' + clock + ', ' + b.weekdayName + '. ' + verdict;
   }
 
