@@ -41,7 +41,7 @@
   // has already produced two real bugs (a NaN-date crash, a silently
   // dropped missed-checkpoint) now lives in one place a test suite can
   // actually exercise. See release-core.js's own header for both bugs.
-  const { BUGFIX_CHECKPOINTS, bugfixCheckinStatus } = window.SondrikReleaseCore;
+  const { bugfixCheckinStatus, suggestedCheckCadence, computeReminders: computeRemindersCore } = window.SondrikReleaseCore;
 
   printBtn.addEventListener('click', () => window.print());
 
@@ -474,23 +474,6 @@
       '</div>' +
       '<div class="launch-window-marks font-mono" aria-hidden="true"><span>0</span><span>30</span><span>60</span><span>90+</span></div>' +
       '</div>';
-  }
-
-  // Shared "how long between real check-ins on average, and when's the next
-  // one due" calculation, used both by the cadence line in the Traction
-  // section below and by the calendar reminders export, so the two can never
-  // state two different suggested next-check dates off the same real gaps.
-  // Needs at least two real checks (no gap exists off a single point).
-  function suggestedCheckCadence(downloadsData) {
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length < 2) return null;
-    const gaps = [];
-    for (let i = 1; i < checks.length; i++) gaps.push(daysBetween(checks[i - 1].date, checks[i].date));
-    const avgGap = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
-    if (avgGap <= 0) return null;
-    const latest = checks[checks.length - 1];
-    return { avgGap, gapCount: gaps.length, latest, nextDate: addDays(latest.date, avgGap) };
   }
 
   function renderTraction(data) {
@@ -1404,50 +1387,14 @@
     return parts.join(' ');
   }
 
-  // Turns the same two forward-looking real dates already computed elsewhere
-  // on the page (the bugfix check-in schedule, the check-in cadence estimate)
-  // into calendar reminders, so they land somewhere Jack will actually see
-  // them instead of only on this page when he happens to visit it. Only ever
-  // a date that is today or still in the future: a reminder for one that has
-  // already passed isn't useful as a calendar event, Next Steps above already
-  // flags an overdue one as an action item instead. Adds no new fact, purely
-  // a re-expression of real data that already renders elsewhere.
+  // The real filter/date math now lives in release-core.js alongside
+  // BUGFIX_CHECKPOINTS/bugfixCheckinStatus, same reason those were split
+  // out: a wrong filter here means Jack's real .ics calendar reminders
+  // silently drift. This wrapper just supplies "today" explicitly from the
+  // real clock, since the core function takes it as a parameter rather than
+  // reading Date.now() itself, so it stays deterministically testable.
   function computeReminders(releasesData, downloadsData) {
-    const reminders = [];
-
-    const dated = ((releasesData && releasesData.releases) || []).filter(r => r.date)
-      .slice().sort((a, b) => b.date.localeCompare(a.date));
-    const latestRelease = dated[0];
-    if (latestRelease && latestRelease.type === 'bugfix') {
-      BUGFIX_CHECKPOINTS.forEach(checkpoint => {
-        const date = addDays(latestRelease.date, checkpoint);
-        if (date >= todayIso()) {
-          reminders.push({
-            date,
-            uid: 'sondrik-checkin-v' + latestRelease.version + '-' + checkpoint + '@command-center',
-            summary: 'Sondrik v' + latestRelease.version + ': ' + checkpoint + '-day check-in',
-            description: 'Confirm no new reports of the bug fixed in v' + latestRelease.version +
-              (latestRelease.summary ? ' (' + latestRelease.summary + ')' : '') + '.'
-          });
-        }
-      });
-    }
-
-    const cadence = suggestedCheckCadence(downloadsData);
-    if (cadence && cadence.nextDate >= todayIso()) {
-      const metric = (downloadsData && downloadsData.metric) || {};
-      reminders.push({
-        date: cadence.nextDate,
-        uid: 'sondrik-download-check-' + cadence.nextDate + '@command-center',
-        summary: 'Sondrik: pull a fresh ' + (metric.label || 'download') + ' count',
-        description: 'Based on ' + (cadence.gapCount === 1
-          ? 'your only check-in gap so far' : 'the average of your last ' + cadence.gapCount + ' check-in gaps') +
-          ' (~' + cadence.avgGap + (cadence.avgGap === 1 ? ' day' : ' days') + ').' +
-          (metric.source ? ' Source: ' + metric.source + '.' : '')
-      });
-    }
-
-    return reminders.sort((a, b) => a.date.localeCompare(b.date));
+    return computeRemindersCore(releasesData, downloadsData, todayIso());
   }
 
   // RFC 5545 (iCalendar) text escaping and 75-octet line folding, same

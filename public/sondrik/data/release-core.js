@@ -110,12 +110,83 @@
     };
   }
 
+  // Shared "how long between real check-ins on average, and when's the next
+  // one due" calculation, used both by the cadence line in the Traction
+  // section and by the calendar-reminders export below, so the two can
+  // never state two different suggested next-check dates off the same real
+  // gaps. Needs at least two real checks (no gap exists off a single point).
+  function suggestedCheckCadence(downloadsData) {
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length < 2) return null;
+    const gaps = [];
+    for (let i = 1; i < checks.length; i++) gaps.push(daysBetween(checks[i - 1].date, checks[i].date));
+    const avgGap = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+    if (avgGap <= 0) return null;
+    const latest = checks[checks.length - 1];
+    return { avgGap, gapCount: gaps.length, latest, nextDate: addDays(latest.date, avgGap) };
+  }
+
+  // Turns the same two forward-looking real dates already computed elsewhere
+  // on the page (the bugfix check-in schedule, the check-in cadence estimate)
+  // into calendar reminders, so they land somewhere Jack will actually see
+  // them instead of only on this page when he happens to visit it. Only ever
+  // a date that is today or still in the future: a reminder for one that has
+  // already passed isn't useful as a calendar event, Next Steps already
+  // flags an overdue one as an action item instead. Adds no new fact, purely
+  // a re-expression of real data that already renders elsewhere.
+  //
+  // todayIsoStr is explicit, same reason bugfixCheckinStatus above takes one:
+  // a wrong filter here means Jack's real .ics calendar reminders silently
+  // drift (either a stale reminder for a date that's already passed, or a
+  // real upcoming one silently dropped), and that's only deterministically
+  // testable if "today" isn't read from the real clock inside this function.
+  function computeReminders(releasesData, downloadsData, todayIsoStr) {
+    const reminders = [];
+
+    const dated = ((releasesData && releasesData.releases) || []).filter(r => r.date)
+      .slice().sort((a, b) => b.date.localeCompare(a.date));
+    const latestRelease = dated[0];
+    if (latestRelease && latestRelease.type === 'bugfix') {
+      BUGFIX_CHECKPOINTS.forEach(checkpoint => {
+        const date = addDays(latestRelease.date, checkpoint);
+        if (date >= todayIsoStr) {
+          reminders.push({
+            date,
+            uid: 'sondrik-checkin-v' + latestRelease.version + '-' + checkpoint + '@command-center',
+            summary: 'Sondrik v' + latestRelease.version + ': ' + checkpoint + '-day check-in',
+            description: 'Confirm no new reports of the bug fixed in v' + latestRelease.version +
+              (latestRelease.summary ? ' (' + latestRelease.summary + ')' : '') + '.'
+          });
+        }
+      });
+    }
+
+    const cadence = suggestedCheckCadence(downloadsData);
+    if (cadence && cadence.nextDate >= todayIsoStr) {
+      const metric = (downloadsData && downloadsData.metric) || {};
+      reminders.push({
+        date: cadence.nextDate,
+        uid: 'sondrik-download-check-' + cadence.nextDate + '@command-center',
+        summary: 'Sondrik: pull a fresh ' + (metric.label || 'download') + ' count',
+        description: 'Based on ' + (cadence.gapCount === 1
+          ? 'your only check-in gap so far' : 'the average of your last ' + cadence.gapCount + ' check-in gaps') +
+          ' (~' + cadence.avgGap + (cadence.avgGap === 1 ? ' day' : ' days') + ').' +
+          (metric.source ? ' Source: ' + metric.source + '.' : '')
+      });
+    }
+
+    return reminders.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   return {
     daysBetween,
     addDays,
     isValidDateStr,
     BUGFIX_CHECKPOINTS,
     BUGFIX_CHECKPOINT_GRACE_DAYS,
-    bugfixCheckinStatus
+    bugfixCheckinStatus,
+    suggestedCheckCadence,
+    computeReminders
   };
 });
