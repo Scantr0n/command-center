@@ -2178,9 +2178,9 @@ function renderInsuranceSummary() {
     <table class="insurance-summary-table">
       <thead>
         <tr>
-          ${anyPhotos ? '<th>Photo</th>' : ''}
-          <th>Card</th><th>Sport</th><th>Grader</th><th>Grade</th><th>Cert #</th><th>Location</th>
-          <th class="num">Est. value</th><th>Basis</th><th>Date priced</th>
+          ${anyPhotos ? '<th scope="col">Photo</th>' : ''}
+          <th scope="col">Card</th><th scope="col">Sport</th><th scope="col">Grader</th><th scope="col">Grade</th><th scope="col">Cert #</th><th scope="col">Location</th>
+          <th scope="col" class="num">Est. value</th><th scope="col">Basis</th><th scope="col">Date priced</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
