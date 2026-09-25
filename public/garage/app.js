@@ -6,6 +6,13 @@ let suppliesLog = [];
 let acquisitionsLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
+// Set once from a real ?listing=<id> URL param and consumed once, right
+// after the initial listings render below, the same one-shot pattern CSM's
+// own initialProspectId uses to auto-open a specific record's modal on
+// load. Not mirrored back into syncUrl (unlike CSM's openProspectId):
+// this only needs to answer "open this one listing once, from a link",
+// not track "is a modal currently open" as ongoing page state.
+let initialListingId = null;
 let sortKey = null;
 let sortDir = 'asc';
 let currentStages = [];
@@ -33,10 +40,12 @@ function restoreStateFromUrl() {
   const platform = params.get('platform');
   const sort = params.get('sort');
   const dir = params.get('dir');
+  const listing = params.get('listing');
   if (q) searchTerm = q;
   if (platform && VALID_PLATFORMS.includes(platform)) activePlatform = platform;
   if (sort) sortKey = sort;
   if (dir === 'desc') sortDir = 'desc';
+  if (listing) initialListingId = listing;
 }
 
 function setInitialChipState(containerId, dataAttr, value) {
@@ -707,6 +716,7 @@ async function loadData() {
     renderPromotedItemChips(listings);
     renderKanban(listings, pipelineData);
     renderPoshmarkShareTracker(listings);
+    if (initialListingId && listings.some(l => l.id === initialListingId)) openModal(initialListingId);
   } else {
     listings = [];
     document.getElementById('statRow').innerHTML = '';

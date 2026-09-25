@@ -3053,7 +3053,13 @@ function recordHref(r) {
   const base = '/' + r.hub + '/';
   const params = new URLSearchParams();
   if (r.type === 'prospect' && r.id) params.set('prospect', r.id);
-  else if (r.type === 'card' || r.type === 'listing') params.set('q', r.label);
+  // Garage now supports the same "open this one exact record" deep link as
+  // CSM (?listing=<id>, restoreStateFromUrl in garage/app.js), an id match
+  // rather than a label substring search, so a listing whose title collides
+  // with another (or contains characters ?q= would filter oddly on) still
+  // opens the right one.
+  else if (r.type === 'listing' && r.id) params.set('listing', r.id);
+  else if (r.type === 'card') params.set('q', r.label);
   else if (r.type === 'candidate') params.set('candQ', r.label);
   const qs = params.toString();
   return base + (qs ? '?' + qs : '');
