@@ -1005,6 +1005,38 @@ const TAX_1099K_TXN_THRESHOLD = 200;
 // the "Currently listed on eBay" notes), so this assumes eBay until a card
 // sold somewhere else actually shows up, and says so in the callout rather
 // than fabricating a "platform" field cards.json doesn't have.
+
+// Same freshness-badge pattern as GRADING_REFERENCE_REVIEWED_ON above and
+// Garage's own TAX_TRACKER_REVIEWED_ON for the identical $20,000/200
+// threshold claim: the federal 1099-K threshold is set by Congress, not a
+// grading company, and it has already flip-flopped once in real life (ARPA
+// dropped it to $600 for 2022, IRS delayed that twice, OBBBA restored
+// $20,000/200 transactions in July 2025). A callout with no tracked
+// verification date is exactly the silent-drift risk this pattern exists
+// to catch, and getting a real tax-reporting threshold wrong is a worse
+// failure mode than a stale grading-fee schedule. Verified 2026-09-25
+// against current IRS/OBBBA reporting guidance: still $20,000 AND 200
+// transactions for the 2026 tax year, both conditions required, no change.
+const TAX_TRACKER_REVIEWED_ON = '2026-09-25';
+const TAX_TRACKER_STALE_AFTER_DAYS = 45;
+
+// Independent of cards/submissions/candidates load state (no fetch
+// involved, see TAX_TRACKER_REVIEWED_ON above), so this runs unconditionally
+// at page load rather than from inside loadCards()'s try/catch, same
+// separation renderGradingReferenceFreshness above draws for the same
+// reason.
+function renderTaxTrackerFreshness() {
+  const el = document.getElementById('taxTrackerFreshness');
+  if (!el) return;
+  const age = daysSince(TAX_TRACKER_REVIEWED_ON);
+  const stale = age != null && age > TAX_TRACKER_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current IRS Form 1099-K reporting-threshold guidance on ' + TAX_TRACKER_REVIEWED_ON + '.';
+}
+
 function renderTaxTracker() {
   const tbody = document.getElementById('taxTrackerBody');
   const yearEl = document.getElementById('taxTrackerYear');
@@ -4418,5 +4450,6 @@ window.addEventListener('online', updateOfflineBanner);
 updateOfflineBanner();
 
 renderGradingReferenceFreshness();
+renderTaxTrackerFreshness();
 
 loadCards();
