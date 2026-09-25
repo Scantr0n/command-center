@@ -1258,7 +1258,11 @@ footer.page-foot {
 }
 .quick-log-input:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--hairlineHover); }
 .quick-log-checkbox-row { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 6px; }
-.quick-log-checkbox { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--ink); }
+/* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a pointer target needs at
+   least 24x24 CSS px. This label is the real click target for its
+   checkbox (a plain unstyled <input> is too small on its own), but it was
+   rendering at a text-line-only 20px tall with no padding. */
+.quick-log-checkbox { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--ink); min-height: 24px; padding: 2px 0; box-sizing: border-box; cursor: pointer; }
 .quick-log-generate { align-self: flex-start; margin-top: 12px; }
 
 /* None of these quick-log forms have a backend to save to, so an accidental
