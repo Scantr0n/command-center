@@ -1562,6 +1562,12 @@
 
       const obj = { date, count };
       if (note) obj.note = note;
+
+      // Same real-time em-dash catch CSM's and Garage's own entry forms
+      // already have: a pasted-in note used to go uncaught until the next
+      // `node validate.js` run.
+      SondrikValidateCore.emDashFields(obj, ['note']).forEach(f =>
+        advisory.push('"' + f + '" contains an em dash, this product never uses one, check for a paste-in.'));
       qcWarnings.textContent = advisory.join(' ');
 
       qcOutput.value = JSON.stringify(obj, null, 2) + ',';
@@ -1628,9 +1634,12 @@
         qchCopyBtn.hidden = true;
         return;
       }
-      qchWarnings.textContent = advisory.join(' ');
 
       const obj = { id, name, linkedMetric, status, note: note || null };
+      SondrikValidateCore.emDashFields(obj, ['name', 'note']).forEach(f =>
+        advisory.push('"' + f + '" contains an em dash, this product never uses one, check for a paste-in.'));
+      qchWarnings.textContent = advisory.join(' ');
+
       qchOutput.value = JSON.stringify(obj, null, 2) + ',';
       qchOutput.hidden = false;
       qchCopyBtn.hidden = false;
@@ -1720,9 +1729,13 @@
       const existingLeads = (leadsData && leadsData.leads) || [];
       const dupGroups = SondrikValidateCore.findDuplicateLeads(existingLeads.concat([obj]));
       const isDuplicate = dupGroups.some(group => group.indexOf(obj) !== -1);
-      qlWarnings.textContent = isDuplicate
-        ? 'This looks like it might be the same real contact as a lead already logged (same channel + source detail). Check leads.json before adding a second entry for the same person.'
-        : '';
+      const qlAdvisory = [];
+      if (isDuplicate) {
+        qlAdvisory.push('This looks like it might be the same real contact as a lead already logged (same channel + source detail). Check leads.json before adding a second entry for the same person.');
+      }
+      SondrikValidateCore.emDashFields(obj, ['summary', 'sourceDetail', 'source', 'type']).forEach(f =>
+        qlAdvisory.push('"' + f + '" contains an em dash, this product never uses one, check for a paste-in.'));
+      qlWarnings.textContent = qlAdvisory.join(' ');
 
       qlOutput.value = JSON.stringify(obj, null, 2) + ',';
       qlOutput.hidden = false;
@@ -1783,9 +1796,11 @@
         qrCopyBtn.hidden = true;
         return;
       }
-      qrWarnings.textContent = '';
 
       const obj = { version, date, type: type || null, summary, notes: null };
+      qrWarnings.textContent = SondrikValidateCore.emDashFields(obj, ['summary', 'notes'])
+        .map(f => '"' + f + '" contains an em dash, this product never uses one, check for a paste-in.')
+        .join(' ');
       qrOutput.value = JSON.stringify(obj, null, 2) + ',';
       qrOutput.hidden = false;
       qrCopyBtn.hidden = false;
@@ -1842,9 +1857,11 @@
         qgCopyBtn.hidden = true;
         return;
       }
-      qgWarnings.textContent = '';
 
       const obj = { id, label, metric, target, targetDate, setDate, note: null };
+      qgWarnings.textContent = SondrikValidateCore.emDashFields(obj, ['label', 'note'])
+        .map(f => '"' + f + '" contains an em dash, this product never uses one, check for a paste-in.')
+        .join(' ');
       qgOutput.value = JSON.stringify(obj, null, 2) + ',';
       qgOutput.hidden = false;
       qgCopyBtn.hidden = false;
