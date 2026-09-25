@@ -2119,6 +2119,15 @@
       warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
         categoryClash + '", they would render as separate filter chips. Pick one spelling.');
     }
+    // Same em-dash paste-in catch the "Log new prospect" forms already got
+    // (see emDashHits' own header comment): this edit form was the one real
+    // prospect-entry path that still missed it, so a pasted-in em dash on an
+    // existing prospect only surfaced on the next validate.js run.
+    const emDashHitFields = emDashHits(edited);
+    if (emDashHitFields.length) {
+      warnings.push('Em dash found in ' + emDashHitFields.join(', ') + '. This board never uses one, check ' +
+        'whether that field was pasted in from somewhere else rather than typed.');
+    }
     return warnings;
   }
 
