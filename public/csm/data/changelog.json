@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-20T20:07:52.091Z",
+  "generatedAt": "2026-09-25T16:05:04.017Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "3d7ebcf",
+      "fullHash": "3d7ebcffae067fe75119307dd8f4b70be17ca23b",
+      "date": "2026-09-25",
+      "author": "Claude",
+      "subject": "CSM: add real per-stage entry criteria, checked live on a stage move",
+      "historyReset": false,
+      "files": [
+        "stages.json"
+      ]
+    },
     {
       "hash": "7c973a4",
       "fullHash": "7c973a47601328c094e529b6376ac931551203ef",
