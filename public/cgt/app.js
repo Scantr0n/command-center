@@ -402,6 +402,19 @@ function bookValueSearchLink(c) {
   return { url, text: 'Search SportsCardsPro book value' };
 }
 
+// 130point.com runs a real, free keyword search across eBay sold listings
+// (plus Goldin, Fanatics Collect, and other marketplaces) and, unlike the
+// eBay searches above, does not require signing in to see sold results --
+// the exact gap compSearchLink/rawCompSearchLink's own field-notes flag.
+// Its real search page is confirmed at 130point.com/search, but it has no
+// documented URL query parameter for pre-filling a search term the way
+// eBay's _nkw does, so this links to the real search page itself rather
+// than guessing one, same "don't fabricate a link format" rule the
+// SGC/CGC/KSA landing-only entries in CERT_LOOKUP above already follow.
+function point130Link() {
+  return { url: 'https://130point.com/search', text: 'Search 130point (no eBay login needed)' };
+}
+
 function isStale(c) {
   if (c.estimatedValue == null || !c.datePriced) return false;
   const age = daysSince(c.datePriced);
@@ -1499,9 +1512,11 @@ function openCandidateModal(id) {
   }
   const rawComp = rawCompSearchLink(c);
   if (rawComp) {
+    const point130 = point130Link();
     body += `<div class="field-row">
       <a href="${escapeHtml(rawComp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(rawComp.text)} &rarr;</a>
       <div class="field-note">Opens an eBay sold-listings search for the raw/ungraded card, for researching <code class="inline-code">rawValue</code>. eBay now requires you to be signed in to see sold results.</div>
+      <a href="${escapeHtml(point130.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(point130.text)} &rarr;</a>
     </div>`;
   }
   body += field('Estimated grading cost', c.estimatedGradingCost != null ? formatUsd(c.estimatedGradingCost) : null, c.estimatedGradingCost == null);
@@ -1518,9 +1533,11 @@ function openCandidateModal(id) {
   body += field('Expected graded value', c.expectedGradedValue != null ? formatUsd(c.expectedGradedValue) : null, c.expectedGradedValue == null);
   const gradedComp = compSearchLink({ cardName: c.cardName, year: c.year, gradingCompany: c.targetGradingCompany, grade: c.expectedGrade });
   if (gradedComp) {
+    const point130 = point130Link();
     body += `<div class="field-row">
       <a href="${escapeHtml(gradedComp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(gradedComp.text)} &rarr;</a>
       <div class="field-note">Opens an eBay sold-listings search for ${escapeHtml(c.targetGradingCompany)}${c.expectedGrade ? ' grade ' + escapeHtml(c.expectedGrade) : ''} comps, for researching <code class="inline-code">expectedGradedValue</code>. eBay now requires you to be signed in to see sold results.</div>
+      <a href="${escapeHtml(point130.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(point130.text)} &rarr;</a>
     </div>`;
   }
   body += field('Graded value basis', c.gradedValueBasis === 'recent-sale' ? 'Recent sale' : c.gradedValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.gradedValueBasis);
@@ -3120,9 +3137,11 @@ function openModal(id) {
   }
   const comp = compSearchLink(activeCard);
   if (comp) {
+    const point130 = point130Link();
     body += `<div class="field-row">
       <a href="${escapeHtml(comp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(comp.text)} &rarr;</a>
       <div class="field-note">Opens an eBay sold-listings search built from this card's own name/year/grade. eBay now requires you to be signed in to see sold results.</div>
+      <a href="${escapeHtml(point130.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(point130.text)} &rarr;</a>
     </div>`;
   }
   body += field('Estimated value', activeCard.estimatedValue != null ? formatUsd(activeCard.estimatedValue) : null, activeCard.estimatedValue == null);
