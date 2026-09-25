@@ -1150,6 +1150,8 @@
         currentMetricValue,
         computeGoalProgressPct,
         computeGoalPaceStatus,
+        computeRequiredPerDay,
+        recentDownloadsPerDayRate,
         findDuplicateLeads: SondrikValidateCore.findDuplicateLeads,
         isValidDateStr,
         daysBetween

@@ -32,6 +32,7 @@
     const {
       todayIsoStr, fmtDate, staleAfterDays, agingAfterDays,
       bugfixCheckinStatus, currentMetricValue, computeGoalProgressPct, computeGoalPaceStatus,
+      computeRequiredPerDay, recentDownloadsPerDayRate,
       findDuplicateLeads, isValidDateStr, daysBetween
     } = deps;
 
@@ -237,6 +238,26 @@
               paceStatus.expectedPct + '% by now.',
             href: '#goalsSection'
           });
+        } else if (g.metric === 'downloads' && computeRequiredPerDay && recentDownloadsPerDayRate) {
+          // computeGoalPaceStatus compares progress to elapsed time, which
+          // reads fine early in a long window even while the real trend
+          // will not get there (Sondrik's own real goal: 10% reached vs a
+          // ~5% expected-by-now, "on pace", while the last logged
+          // check-to-check rate is only ~0.5/day against the ~1.4/day the
+          // Dec 31 date actually needs). Only surfaced when the elapsed-
+          // time signal above did not already flag it, so a genuinely
+          // behind goal never gets two competing next-steps for the same
+          // underlying problem.
+          const required = computeRequiredPerDay(g.target, currentCount, g.targetDate, todayIsoStr);
+          const recent = recentDownloadsPerDayRate(downloadsData);
+          if (required && recent && recent.perDay < required.perDay) {
+            steps.push({
+              urgent: false,
+              text: '"' + g.label + '" needs ~' + required.perDay.toFixed(1) + '/day from here to hit ' +
+                fmtDate(g.targetDate) + ', recent pace is only ~' + recent.perDay.toFixed(1) + '/day.',
+              href: '#goalsSection'
+            });
+          }
         }
       }
     });

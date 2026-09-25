@@ -15,7 +15,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { computeNextSteps } = require('./next-steps-core.js');
 const { bugfixCheckinStatus } = require('./release-core.js');
-const { isValidDateStr, daysBetween, computeGoalProgressPct, computeGoalPaceStatus } = require('./goals-core.js');
+const {
+  isValidDateStr, daysBetween, computeGoalProgressPct, computeGoalPaceStatus,
+  computeRequiredPerDay, recentDownloadsPerDayRate
+} = require('./goals-core.js');
 const { findDuplicateLeads } = require('./validate-core.js');
 
 const TODAY = '2026-09-24';
@@ -31,6 +34,8 @@ function baseDeps(overrides) {
     currentMetricValue: () => null,
     computeGoalProgressPct,
     computeGoalPaceStatus,
+    computeRequiredPerDay,
+    recentDownloadsPerDayRate,
     findDuplicateLeads,
     isValidDateStr,
     daysBetween
@@ -303,6 +308,55 @@ test('does not flag a goal on pace', () => {
     baseDeps({ currentMetricValue: () => ({ count: 15, asOf: TODAY }) })
   );
   assert.equal(steps.length, 0);
+});
+
+test('flags a goal whose elapsed-time pace looks fine but the real recent download trend will not reach it', () => {
+  // Sondrik's own real numbers: setDate to targetDate spans 102 days, only
+  // 4 elapsed by TODAY (~4% expected), 15 of 150 (10%) reached, well ahead
+  // of the elapsed-time expectation, computeGoalPaceStatus's own tier is
+  // "on" (would even round to "ahead" a few points either way), so the
+  // existing behind-pace branch above stays silent. But the last logged
+  // check-to-check gap (8 on 09-07 to 15 on 09-20) is only ~0.54/day,
+  // while the 2026-12-31 date actually needs ~1.38/day from today: a real
+  // gap the elaped-time signal alone cannot see this early in the window.
+  const steps = computeNextSteps(
+    {
+      downloadsData: { metric: { label: 'downloads', source: 'gh api', checks: [
+        { date: '2026-09-07', count: 8 }, { date: '2026-09-20', count: 15 }
+      ] } },
+      goalsData: { goals: [{ id: 'g', label: '150 downloads', metric: 'downloads', target: 150, targetDate: '2026-12-31', setDate: '2026-09-20' }] }
+    },
+    baseDeps({ currentMetricValue: () => ({ count: 15, asOf: '2026-09-20' }) })
+  );
+  assert.ok(infoTexts(steps).some(t =>
+    t.includes('"150 downloads" needs ~1.4/day from here to hit 2026-12-31') && t.includes('recent pace is only ~0.5/day')));
+});
+
+test('does not flag the recent-trend gap once the recent pace already clears what is needed', () => {
+  const steps = computeNextSteps(
+    {
+      downloadsData: { metric: { label: 'downloads', source: 'gh api', checks: [
+        { date: '2026-09-07', count: 8 }, { date: '2026-09-20', count: 100 }
+      ] } },
+      goalsData: { goals: [{ id: 'g', label: '150 downloads', metric: 'downloads', target: 150, targetDate: '2026-12-31', setDate: '2026-09-20' }] }
+    },
+    baseDeps({ currentMetricValue: () => ({ count: 100, asOf: '2026-09-20' }) })
+  );
+  assert.ok(!infoTexts(steps).some(t => t.includes('needs ~') && t.includes('recent pace')));
+});
+
+test('does not double-flag a goal that is already behind pace with the recent-trend step too', () => {
+  const steps = computeNextSteps(
+    {
+      downloadsData: { metric: { label: 'downloads', source: 'gh api', checks: [
+        { date: '2026-08-01', count: 1 }, { date: '2026-08-15', count: 2 }
+      ] } },
+      goalsData: { goals: [{ id: 'g', label: '150 downloads', metric: 'downloads', target: 150, targetDate: '2026-10-01', setDate: '2026-08-01' }] }
+    },
+    baseDeps({ currentMetricValue: () => ({ count: 15, asOf: TODAY }) })
+  );
+  assert.ok(infoTexts(steps).some(t => t.includes('"150 downloads" is behind pace')));
+  assert.ok(!infoTexts(steps).some(t => t.includes('needs ~') && t.includes('recent pace')));
 });
 
 test('flags two leads sharing a channel and source detail as a likely duplicate', () => {
