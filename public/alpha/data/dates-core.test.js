@@ -26,13 +26,16 @@ const {
   dailyUptimeClass
 } = require('./dates-core.js');
 
-// A time built from real ET wall-clock hour/minute on a real 2026 date,
-// expressed as a UTC instant. 2026 DST runs 2026-03-08 through 2026-11-01
-// (EDT, UTC-4); outside that window ET is EST (UTC-5), which matters for
-// the November early-close test below. Keeps each test's intent readable as
-// "9:35am ET" rather than a pre-computed UTC offset.
+// A time built from real ET wall-clock hour/minute on a real date, expressed
+// as a UTC instant. 2026 DST runs 2026-03-08 through 2026-11-01, 2027 DST
+// runs 2027-03-14 through 2027-11-07 (each year's real US DST window: second
+// Sunday of March to first Sunday of November); outside those windows ET is
+// EST (UTC-5), which matters for the November early-close test below. Keeps
+// each test's intent readable as "9:35am ET" rather than a pre-computed UTC
+// offset.
 function etInstant(dateKey, hour, minute) {
-  const isEdt = dateKey >= '2026-03-08' && dateKey < '2026-11-01';
+  const isEdt = (dateKey >= '2026-03-08' && dateKey < '2026-11-01') ||
+    (dateKey >= '2027-03-14' && dateKey < '2027-11-07');
   const offset = isEdt ? '-04:00' : '-05:00';
   return new Date(`${dateKey}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00${offset}`);
 }
@@ -105,8 +108,35 @@ test('computeMarketStatus: skips a weekend/holiday run to find the real next ope
   assert.match(status.detail, /Opens Tue, Sep 8 9:30 AM ET/);
 });
 
-test('computeMarketStatus: honestly unknown once the real date rolls past the covered calendar year', () => {
+test('computeMarketStatus: open during a regular 2027 session', () => {
+  // 2027-01-04 is a Monday, and not a holiday: the calendar's 2027 coverage
+  // should make this an ordinary open trading day, not "unknown".
   const status = computeMarketStatus(etInstant('2027-01-04', 10, 0));
+  assert.equal(status.isOpen, true);
+  assert.equal(status.isUnknown, undefined);
+});
+
+test('computeMarketStatus: closed on a real 2027 NYSE holiday, names the reason', () => {
+  const status = computeMarketStatus(etInstant('2027-01-01', 10, 0));
+  assert.equal(status.isOpen, false);
+  assert.equal(status.isUnknown, undefined);
+  assert.match(status.label, /holiday/);
+});
+
+test('computeMarketStatus: skips New Year\'s Day crossing the year boundary into 2027', () => {
+  // Thursday 2026-12-31 after the close: the real next trading day is Monday
+  // 2027-01-04, skipping New Year's Day (a 2027 holiday) and the weekend.
+  // This is the exact regression a single-year-only holiday set produces:
+  // nextTradingDayFrom would otherwise walk right through 2027-01-01 as if
+  // it were an ordinary trading day, since "today" is still 2026 when this
+  // walk starts.
+  const status = computeMarketStatus(etInstant('2026-12-31', 17, 0));
+  assert.equal(status.isOpen, false);
+  assert.match(status.detail, /Opens Mon, Jan 4 9:30 AM ET/);
+});
+
+test('computeMarketStatus: honestly unknown once the real date rolls past every covered calendar year', () => {
+  const status = computeMarketStatus(etInstant('2028-01-04', 10, 0));
   assert.equal(status.isOpen, false);
   assert.equal(status.isUnknown, true);
   assert.equal(status.label, 'Market status unknown');

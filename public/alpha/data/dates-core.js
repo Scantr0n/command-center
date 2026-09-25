@@ -23,8 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   // Source: NYSE's own 2026 trading calendar
   // (nyse.com/publicdocs/nyse/ICE_NYSE_2026_Yearly_Trading_Calendar.pdf),
-  // corroborated against independent market-hours aggregators. Update this
-  // list (and MARKET_CALENDAR_YEAR) once NYSE publishes 2027's.
+  // corroborated against independent market-hours aggregators.
   const MARKET_HOLIDAYS_2026 = new Set([
     '2026-01-01', // New Year's Day
     '2026-01-19', // Martin Luther King Jr. Day
@@ -45,7 +44,45 @@
     '2026-11-27',
     '2026-12-24'
   ]);
-  const MARKET_CALENDAR_YEAR = 2026;
+
+  // Source: NYSE Group's own press release covering 2026, 2027, and 2028
+  // (ir.theice.com, "NYSE Group Announces 2026, 2027 and 2028 Holiday and
+  // Early Closings Calendar"), corroborated against independent
+  // market-hours aggregators. Added 2026-09-25, well before this file's own
+  // year-gate below would have started reporting 2027 as unknown: the
+  // gap between "today" and the next uncovered January 1st is exactly the
+  // silent-failure window this file's header comment warns about, so this
+  // was added while there was still time to actually verify it against a
+  // real page load, not right as it started mattering.
+  const MARKET_HOLIDAYS_2027 = new Set([
+    '2027-01-01', // New Year's Day
+    '2027-01-18', // Martin Luther King Jr. Day
+    '2027-02-15', // Washington's Birthday (Presidents Day)
+    '2027-03-26', // Good Friday
+    '2027-05-31', // Memorial Day
+    '2027-06-18', // Juneteenth National Independence Day (observed; June 19 falls on a Saturday)
+    '2027-07-05', // Independence Day (observed; July 4 falls on a Sunday)
+    '2027-09-06', // Labor Day
+    '2027-11-25', // Thanksgiving Day
+    '2027-12-24'  // Christmas Day (observed; December 25 falls on a Saturday)
+  ]);
+  // Only one recurring early close in 2027, not the usual two: Christmas Day
+  // falling on a Saturday means its observed holiday (Dec 24 above) is
+  // already a full closure, leaving no separate Christmas Eve early-close
+  // day that year.
+  const MARKET_EARLY_CLOSES_2027 = new Set([
+    '2027-11-26'
+  ]);
+
+  const MARKET_CALENDAR_YEARS = [2026, 2027];
+  // Union across every covered year, not just whichever one "today" happens
+  // to fall in: nextTradingDayFrom can walk forward across a year boundary
+  // (e.g. from late December into January), and needs next year's holidays
+  // already in scope for that walk to skip them correctly, weeks before
+  // that year actually starts as far as computeMarketStatus's own year gate
+  // below is concerned.
+  const ALL_KNOWN_HOLIDAYS = new Set([...MARKET_HOLIDAYS_2026, ...MARKET_HOLIDAYS_2027]);
+  const ALL_KNOWN_EARLY_CLOSES = new Set([...MARKET_EARLY_CLOSES_2026, ...MARKET_EARLY_CLOSES_2027]);
 
   // `date` defaults to the real current instant; a test passes a fixed Date
   // so the same holiday/early-close/weekend/after-hours branches can be
@@ -62,14 +99,14 @@
   }
 
   function isTradingDayKey(dateKey, weekday) {
-    return weekday !== 'Sat' && weekday !== 'Sun' && !MARKET_HOLIDAYS_2026.has(dateKey);
+    return weekday !== 'Sat' && weekday !== 'Sun' && !ALL_KNOWN_HOLIDAYS.has(dateKey);
   }
 
   // Walks forward a plain UTC calendar date (used only as a date, never as a
   // real instant) to find the next real trading day, skipping weekends and
-  // the fixed 2026 holiday list above. 14-day cap is just a safety bound;
-  // the longest real gap on the calendar (the Christmas/New Year stretch) is
-  // a handful of days.
+  // every known year's holiday list above. 14-day cap is just a safety
+  // bound; the longest real gap on the calendar (the Christmas/New Year
+  // stretch) is a handful of days.
   function nextTradingDayFrom(dateKey, includeSame) {
     let d = new Date(dateKey + 'T00:00:00Z');
     if (!includeSame) d = new Date(d.getTime() + 86400000);
@@ -91,18 +128,19 @@
     const p = nowInET(date);
     const dateKey = `${p.year}-${p.month}-${p.day}`;
     const weekday = p.weekday;
-    if (Number(p.year) !== MARKET_CALENDAR_YEAR) {
+    if (!MARKET_CALENDAR_YEARS.includes(Number(p.year))) {
+      const latestYear = Math.max(...MARKET_CALENDAR_YEARS);
       return {
         isOpen: false,
         isUnknown: true,
         label: 'Market status unknown',
-        detail: `Holiday calendar only covers ${MARKET_CALENDAR_YEAR}, open/closed can't be trusted past it. Update MARKET_HOLIDAYS_2026 and MARKET_EARLY_CLOSES_2026 in alpha/data/dates-core.js for ${p.year}.`
+        detail: `Holiday calendar only covers ${MARKET_CALENDAR_YEARS.join('/')}, open/closed can't be trusted past it. Add a MARKET_HOLIDAYS_${p.year}/MARKET_EARLY_CLOSES_${p.year} set to alpha/data/dates-core.js once NYSE publishes ${p.year > latestYear ? p.year : 'that year\'s'} calendar.`
       };
     }
     const minutesNow = Number(p.hour) * 60 + Number(p.minute);
-    const isHoliday = MARKET_HOLIDAYS_2026.has(dateKey);
+    const isHoliday = ALL_KNOWN_HOLIDAYS.has(dateKey);
     const isWeekend = weekday === 'Sat' || weekday === 'Sun';
-    const isEarlyClose = MARKET_EARLY_CLOSES_2026.has(dateKey);
+    const isEarlyClose = ALL_KNOWN_EARLY_CLOSES.has(dateKey);
     const tradingDay = isTradingDayKey(dateKey, weekday);
     const openMin = 9 * 60 + 30;
     const closeMin = isEarlyClose ? 13 * 60 : 16 * 60;
@@ -326,7 +364,9 @@
   return {
     MARKET_HOLIDAYS_2026,
     MARKET_EARLY_CLOSES_2026,
-    MARKET_CALENDAR_YEAR,
+    MARKET_HOLIDAYS_2027,
+    MARKET_EARLY_CLOSES_2027,
+    MARKET_CALENDAR_YEARS,
     nowInET,
     isTradingDayKey,
     nextTradingDayFrom,
