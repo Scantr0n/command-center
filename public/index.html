@@ -184,7 +184,12 @@
   .chip-info-btn {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
-    width: 18px;
+    /* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a pointer target needs at
+       least 24x24 CSS px. This was 18x21 (see sidebar.js's own .cc-sb-pin
+       fix for the same rule); the "?" glyph itself stays 9px, only the
+       clickable box grows. */
+    width: 24px;
+    min-height: 24px;
     border: none;
     border-radius: 0 5px 5px 0;
     background: rgba(255,255,255,0.06);
