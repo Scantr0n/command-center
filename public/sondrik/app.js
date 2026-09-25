@@ -16,6 +16,7 @@
   const downloadsBadgeBtn = document.getElementById('downloadsBadgeBtn');
   const copyStatusBtn = document.getElementById('copyStatusBtn');
   const copyPublicBtn = document.getElementById('copyPublicBtn');
+  const publicPostCharCount = document.getElementById('publicPostCharCount');
   const copyStatusLive = document.getElementById('copyStatusLive');
   const attentionPill = document.getElementById('attentionPill');
   const newSincePill = document.getElementById('newSincePill');
@@ -99,6 +100,11 @@
   // timeline) and how far the latest count sits from the next one (in
   // Traction).
   const DOWNLOAD_MILESTONES = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000];
+
+  // X's free-tier post limit, the platform the "Copy build-in-public post"
+  // button's own composed text is shaped for. A real, citable platform rule,
+  // not a guess.
+  const X_POST_CHAR_LIMIT = 280;
 
   function nextMilestone(count) {
     const m = DOWNLOAD_MILESTONES.find(v => v > count);
@@ -2067,9 +2073,20 @@
     const publicPostText = buildPublicPost(releasesData || {}, downloadsData || {}, leadsData || {});
     if (publicPostText) {
       // A plain length count of the real composed text, not a guess: lets
-      // Jack see at a glance whether it fits a platform's post limit (X's
-      // free-tier limit is 280 characters) before he pastes it anywhere.
-      copyPublicBtn.title = publicPostText.length + ' characters';
+      // Jack see whether it fits a platform's post limit (X's free-tier
+      // limit is 280 characters) before he pastes it anywhere. Shown as its
+      // own visible badge, not just this title tooltip, since a title only
+      // shows on hover, never on a touch device and never to a screen reader
+      // user who hasn't hovered this exact button.
+      const overLimit = publicPostText.length > X_POST_CHAR_LIMIT;
+      copyPublicBtn.title = publicPostText.length + ' characters' +
+        (overLimit ? ', over X\'s ' + X_POST_CHAR_LIMIT + '-character limit' : '');
+      if (publicPostCharCount) {
+        publicPostCharCount.hidden = false;
+        publicPostCharCount.textContent = publicPostText.length + ' / ' + X_POST_CHAR_LIMIT + ' chars' +
+          (overLimit ? ', OVER X LIMIT' : '');
+        publicPostCharCount.classList.toggle('char-count-over', overLimit);
+      }
       copyPublicBtn.addEventListener('click', () => {
         copyText(publicPostText).then(() => {
           const original = copyPublicBtn.textContent;
@@ -2082,6 +2099,7 @@
       });
     } else {
       copyPublicBtn.disabled = true;
+      if (publicPostCharCount) publicPostCharCount.hidden = true;
     }
 
     if (releasesData || downloadsData) {

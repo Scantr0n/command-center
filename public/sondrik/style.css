@@ -128,6 +128,20 @@ header.page-head .sub {
 }
 .print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
+/* copyPublicBtn's real composed-post length used to be visible only as the
+   button's hover title, which a touch device never shows and a mouse user
+   only sees by hovering exactly that button first, the opposite of the "see
+   at a glance whether it fits X's 280-char limit" the title text itself
+   claims. This surfaces the same real count next to the button so it reads
+   without hovering; aria-describedby on the button also gets it announced
+   on focus for a screen reader user who tabs to the button directly. */
+.char-count-badge {
+  font-size: 0.68rem;
+  color: var(--dim);
+  letter-spacing: 0.02em;
+}
+.char-count-badge.char-count-over { color: #E0A030; font-weight: 500; }
+
 .attention-pill {
   font-size: 0.75rem;
   color: #E0A030;
