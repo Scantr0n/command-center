@@ -491,11 +491,20 @@ section { margin-bottom: 36px; }
   padding-top: 8px;
   margin-top: 2px;
 }
+/* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a pointer target needs at
+   least 24x24 CSS px. This is the one real call-to-action on every lead
+   card (the actual link out to apply), and it was rendering at a
+   text-line-only 15px tall with no padding. */
 .lead-source {
   font-size: 0.78rem;
   color: var(--accent);
   text-decoration: none;
   margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 0;
+  box-sizing: border-box;
 }
 .lead-source:hover, .lead-source:focus-visible { text-decoration: underline; }
 
