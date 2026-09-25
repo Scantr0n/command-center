@@ -196,6 +196,46 @@
     return null;
   }
 
+  // Ties the sales log's own per-sale profit math (real cost basis and
+  // shipping cost, see renderSales in app.js) to the business expenses
+  // log's own total (computeExpenseAmount above) into the one number
+  // neither log shows on its own: real Schedule C net profit for the year,
+  // gross revenue minus what was actually spent to source, ship, and run
+  // the business. Same calendar-year scope as the 1099-K tracker above
+  // (real sales.json/expenses.json rows dated in "year" only) and the same
+  // "an unscoped row isn't silently counted" rule every other date-scoped
+  // total on this page already follows, since a sale or expense with no
+  // real date logged can't honestly be attributed to this year's total.
+  function computeYtdNetProfit(sales, expenses, year) {
+    const salesThisYear = sales.filter(s => s.saleDate && Number(s.saleDate.slice(0, 4)) === year);
+    const expensesThisYear = expenses.filter(e => e.date && Number(e.date.slice(0, 4)) === year);
+
+    const grossRevenue = salesThisYear.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+
+    // Only a sale with a real costBasis or shippingCost logged contributes
+    // to cost of goods sold, the same "hasEither" gate renderSales uses for
+    // its own per-row profit figure, so this total never silently treats a
+    // not-yet-logged cost as a real zero.
+    const cogsTrackedSales = salesThisYear.filter(s => s.costBasis != null || s.shippingCost != null);
+    const costOfGoodsSold = cogsTrackedSales.reduce((sum, s) => sum + (s.costBasis || 0) + (s.shippingCost || 0), 0);
+
+    const computedExpenseAmounts = expensesThisYear.map(computeExpenseAmount);
+    const businessExpenses = computedExpenseAmounts.reduce((sum, a) => sum + (a || 0), 0);
+    const expensesUncountedCount = computedExpenseAmounts.filter(a => a == null).length;
+
+    return {
+      year,
+      salesCount: salesThisYear.length,
+      grossRevenue,
+      costOfGoodsSold,
+      cogsTrackedCount: cogsTrackedSales.length,
+      businessExpenses,
+      expensesCount: expensesThisYear.length,
+      expensesUncountedCount,
+      netProfit: grossRevenue - costOfGoodsSold - businessExpenses
+    };
+  }
+
   // Real response-clock math for the two platforms with a published fixed
   // window (see the "Return & dispute handling, by platform" reference table
   // on the page, sourced from each platform's own help-center docs as of
@@ -438,6 +478,7 @@
     estimateNetPayout, ebayFinalValueRate,
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
     MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
+    computeYtdNetProfit,
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
     remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
     poshmarkWeightTier, bundleNetComparison,

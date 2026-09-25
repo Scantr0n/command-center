@@ -2073,6 +2073,30 @@
   </section>
 
   <section>
+    <h2 class="section-title">Net profit / Schedule C snapshot</h2>
+    <div class="callout">
+      <strong>Not tax advice.</strong> Ties the Sales log's own per-sale profit (real cost basis and shipping cost,
+      where logged) to the Business expenses log's own total above into the one number neither shows on its own:
+      real net profit for the year, after what it actually cost to source, ship, and run the business. This is a
+      different question than the 1099-K tracker above, which reports gross payments a platform sends the IRS,
+      not actual profit. Reads only real rows from <code>sales.json</code> and <code>expenses.json</code> dated in
+      the current calendar year, it does not estimate or project anything.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="netProfitTable">
+        <thead>
+          <tr>
+            <th>Line item</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody id="netProfitBody"></tbody>
+      </table>
+    </div>
+    <p class="tax-tracker-note" id="netProfitNote" hidden></p>
+  </section>
+
+  <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Sourcing / acquisitions log</h2>
       <button type="button" id="acquisitionsCsvBtn" class="print-btn font-mono">Export CSV</button>

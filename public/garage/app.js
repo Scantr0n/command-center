@@ -76,7 +76,7 @@ function syncUrl() {
 const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
   estimateNetPayout, minListingPriceForNet,
-  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
+  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
@@ -787,6 +787,8 @@ async function loadData() {
     expensesEmpty.textContent = "Couldn't load expenses data: " + expensesResult.reason.message;
     document.getElementById('expensesTotals').innerHTML = '';
   }
+
+  renderNetProfitSnapshot(salesLog, expensesLog);
 
   if (disputesData) {
     disputesLog = disputes;
@@ -2878,6 +2880,52 @@ function renderExpenses(expenses) {
       <span class="pace-result-figure">${formatUsd(total)}</span> total real expenses logged${categoryParts ? ' (' + escapeHtml(categoryParts) + ')' : ''}.
       ${uncounted ? `${uncounted} expense(s) not counted yet, missing a real amount or a usable mileage rate${rateTableGaps ? ` (${rateTableGaps} of them because this tool's mileage rate table itself needs a newer year added, not a logging gap)` : ''}.` : ''}
     </p>`;
+}
+
+// Ties the Sales log's own per-sale profit math and the Business expenses
+// log's own total together into the one real bottom-line number neither
+// shows on its own: this calendar year's actual Schedule C net profit.
+// Rebuilt from salesLog/expensesLog (never re-fetched) any time either one
+// changes, same as renderSales/renderExpenses above.
+function renderNetProfitSnapshot(sales, expenses) {
+  const body = document.getElementById('netProfitBody');
+  const note = document.getElementById('netProfitNote');
+  if (!body) return;
+  const year = new Date().getFullYear();
+  const r = computeYtdNetProfit(sales, expenses, year);
+
+  body.innerHTML = `
+    <tr>
+      <td>Gross revenue</td>
+      <td class="cell-value${r.grossRevenue === 0 ? ' empty' : ''}">${formatUsd(r.grossRevenue)}</td>
+    </tr>
+    <tr>
+      <td>Cost of goods sold</td>
+      <td class="cell-value${r.costOfGoodsSold === 0 ? ' empty' : ''}">-${formatUsd(r.costOfGoodsSold)}</td>
+    </tr>
+    <tr>
+      <td>Business expenses</td>
+      <td class="cell-value${r.businessExpenses === 0 ? ' empty' : ''}">-${formatUsd(r.businessExpenses)}</td>
+    </tr>
+    <tr class="net-profit-total-row">
+      <td>Net profit, ${year}</td>
+      <td class="cell-value${r.netProfit < 0 ? ' cell-value-loss' : ''}">${formatUsd(r.netProfit)}</td>
+    </tr>
+  `;
+
+  const gaps = [];
+  const salesMissingCost = r.salesCount - r.cogsTrackedCount;
+  if (salesMissingCost > 0) {
+    gaps.push(`${salesMissingCost} of this year's ${r.salesCount} sale(s) have no cost basis or shipping cost logged yet, so cost of goods sold is undercounted until they do.`);
+  }
+  if (r.expensesUncountedCount > 0) {
+    gaps.push(`${r.expensesUncountedCount} of this year's ${r.expensesCount} expense(s) aren't counted yet, missing a real amount or a usable mileage rate.`);
+  }
+  if (r.salesCount === 0 && r.expensesCount === 0) {
+    gaps.push(`No real sale or expense dated in ${year} yet, this stays at $0 until one is logged.`);
+  }
+  note.hidden = gaps.length === 0;
+  note.textContent = gaps.join(' ');
 }
 
 function renderDisputes(disputes) {

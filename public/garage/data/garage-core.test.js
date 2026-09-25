@@ -18,7 +18,7 @@ const {
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
-  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
+  irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
   ebayTrsProgress, depopTopSellerProgress,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
@@ -372,4 +372,47 @@ test('isSupplyLowStock treats a real zero count or zero threshold as a real logg
   assert.equal(isSupplyLowStock({ qtyOnHand: 0, reorderThreshold: 5 }), true, 'out of stock is the most low-stock case there is');
   assert.equal(isSupplyLowStock({ qtyOnHand: 0, reorderThreshold: 0 }), true, 'a reorder threshold of exactly 0 is still a real logged threshold, and 0 <= 0');
   assert.equal(isSupplyLowStock({ qtyOnHand: 5, reorderThreshold: 0 }), false, 'plenty on hand against a zero reorder point is not low stock');
+});
+
+test('computeYtdNetProfit: nets real gross revenue against real cost of goods sold and real business expenses, same year only', () => {
+  const sales = [
+    { saleDate: '2026-03-01', salePrice: 85, costBasis: 20, shippingCost: 8 }, // profit-tracked
+    { saleDate: '2026-06-15', salePrice: 75 }, // revenue counts, no cost data logged yet
+    { saleDate: '2025-12-20', salePrice: 500, costBasis: 10, shippingCost: 5 } // wrong year, excluded entirely
+  ];
+  const expenses = [
+    { date: '2026-02-01', category: 'supplies', amount: 15 },
+    { date: '2026-07-01', category: 'mileage', miles: 100 }, // computed at the real 76c/mi rate: $76
+    { date: '2025-01-01', category: 'other', amount: 999 } // wrong year, excluded entirely
+  ];
+  const result = computeYtdNetProfit(sales, expenses, 2026);
+  assert.equal(result.salesCount, 2);
+  assert.equal(result.grossRevenue, 160);
+  assert.equal(result.cogsTrackedCount, 1);
+  assert.equal(result.costOfGoodsSold, 28);
+  assert.equal(result.expensesCount, 2);
+  assert.equal(Math.round(result.businessExpenses * 100) / 100, 91);
+  assert.equal(result.expensesUncountedCount, 0);
+  assert.equal(Math.round(result.netProfit * 100) / 100, 41);
+});
+
+test('computeYtdNetProfit: an undated sale or expense is never silently counted toward any year', () => {
+  const sales = [{ salePrice: 999, costBasis: 1, shippingCost: 1 }]; // no saleDate at all
+  const expenses = [{ category: 'other', amount: 999 }]; // no date at all
+  const result = computeYtdNetProfit(sales, expenses, 2026);
+  assert.equal(result.salesCount, 0);
+  assert.equal(result.grossRevenue, 0);
+  assert.equal(result.expensesCount, 0);
+  assert.equal(result.netProfit, 0);
+});
+
+test('computeYtdNetProfit: an expense with no computable amount counts toward expensesUncountedCount, not as a real zero', () => {
+  const expenses = [
+    { date: '2026-05-01', category: 'other', amount: null }, // no amount logged
+    { date: '2027-01-01', category: 'mileage', miles: 50 } // real miles, but no rate published for 2027 yet
+  ];
+  const result = computeYtdNetProfit([], expenses, 2027);
+  assert.equal(result.expensesCount, 1, 'only the real 2027-dated row counts toward the 2027 total');
+  assert.equal(result.expensesUncountedCount, 1);
+  assert.equal(result.businessExpenses, 0);
 });
