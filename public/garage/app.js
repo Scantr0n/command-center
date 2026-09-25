@@ -442,6 +442,33 @@ function renderMarkdownFreshness() {
   el.title = 'Last hand-verified against each platform\'s own current price-drop tools and documented behavior on ' + MARKDOWN_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above, and the highest-stakes
+// one left without a badge: this callout's dollar figures (Poshmark's
+// $6.49/$11.49/$16.49 shipping tiers, eBay's 13.6%/15.3% final value fees)
+// feed directly into the bundle calculator's own math below, not just
+// prose, so a stale number here is a real risk of the calculator itself
+// producing a wrong net figure, the same class of bug the fee schedule and
+// authentication tables already had. Re-verified 2026-09-25 against
+// current Poshmark shipping-cost coverage (CLOSO, atoship, Voolist): the
+// $6.49/5lb, $11.49/5.1-10lb, $16.49/10.1-15lb tiers still hold. The eBay
+// 13.6%/15.3% final value fee figures are the same ones the fee schedule
+// table above tracks and re-verified 2026-09-23, still within this badge's
+// own window, so they're not re-checked separately here.
+const BUNDLE_REVIEWED_ON = '2026-09-25';
+const BUNDLE_STALE_AFTER_DAYS = 45;
+
+function renderBundleFreshness() {
+  const el = document.getElementById('bundleFreshness');
+  if (!el) return;
+  const age = daysSincePublished(BUNDLE_REVIEWED_ON);
+  const stale = age != null && age > BUNDLE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own current seller/shipping documentation on ' + BUNDLE_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5259,6 +5286,7 @@ renderPoshmarkShareFreshness();
 renderSeasonalGuideFreshness();
 renderSearchDiscoveryFreshness();
 renderMarkdownFreshness();
+renderBundleFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
