@@ -135,10 +135,11 @@
   <details class="schema-help">
     <summary>How this hub is kept up to date (until a backend is wired in)</summary>
     <div class="schema-help-body">
-      <p>This hub has no live backend and no quick-log form. The real source of truth is
+      <p>This hub has no live backend. The real source of truth is
         <code>Trackers/Job_Search_Tracker.md</code>. To refresh this page after that file changes, hand-edit the
-        matching JSON file under <code>public/job-search/data/</code>, transcribe faithfully (do not paraphrase pay
-        figures or dates, do not invent a status the tracker doesn't state), then run
+        matching JSON file under <code>public/job-search/data/</code> (the quick-log tool below only helps with a
+        new application row), transcribe faithfully (do not paraphrase pay figures or dates, do not invent a
+        status the tracker doesn't state), then run
         <code>node public/job-search/data/validate.js</code>.</p>
       <div class="schema-table-wrap">
       <table class="schema-table">
@@ -158,6 +159,42 @@
         </tbody>
       </table>
       </div>
+    </div>
+  </details>
+
+  <details class="schema-help" id="quickLogTool">
+    <summary>Quick log a new application (generates JSON to paste, saves nothing)</summary>
+    <div class="schema-help-body">
+      <p>Fills in the same fields as the Applications table above, then builds the exact JSON object to paste into
+        <code>applications.json</code>'s <code>applications</code> array yourself. This never writes a file or
+        sends anything, it only puts text on your clipboard, the same "generate paste-ready JSON, save nothing"
+        pattern CSM's, CGT's, Garage's, and Sondrik's own quick-log tools already use.</p>
+
+      <div class="quick-log-grid">
+        <form class="quick-log-form" id="quickApplicationForm">
+          <h3 class="quick-log-title font-mono">Application &rarr; applications.json</h3>
+          <div id="qaDraftBanner" class="quick-log-draft-banner" hidden>
+            <span>Restored an unsaved draft from <span id="qaDraftBannerTime"></span>, autosaved to this browser
+              only (never sent anywhere).</span>
+            <button type="button" id="qaDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+          </div>
+          <label class="quick-log-label" for="qaRole">Role</label>
+          <input class="quick-log-input" type="text" id="qaRole" placeholder="e.g. Marketing Intern" required>
+          <label class="quick-log-label" for="qaCompany">Company</label>
+          <input class="quick-log-input" type="text" id="qaCompany" required>
+          <label class="quick-log-label" for="qaLocation">Location</label>
+          <input class="quick-log-input" type="text" id="qaLocation" placeholder="e.g. NY (Remote)" required>
+          <label class="quick-log-label" for="qaPay">Pay</label>
+          <input class="quick-log-input" type="text" id="qaPay" placeholder="e.g. $20/hr, or a real quoted figure" required>
+          <label class="quick-log-label" for="qaAppliedDate">Applied date</label>
+          <input class="quick-log-input" type="date" id="qaAppliedDate" required>
+          <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+          <div class="quick-log-warnings" id="qaWarnings" role="alert"></div>
+          <textarea class="quick-log-output" id="qaOutput" readonly rows="8" hidden aria-label="Generated application JSON, ready to paste into applications"></textarea>
+          <button type="button" class="print-btn quick-log-copy" id="qaCopyBtn" hidden>Copy JSON</button>
+        </form>
+      </div>
+      <p class="sr-only-live" id="quickLogLive" role="status" aria-live="polite"></p>
     </div>
   </details>
 

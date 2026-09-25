@@ -410,6 +410,188 @@
     digestSourcingNote.textContent = data.sourcingNotes || '';
   }
 
+  // new Date().toISOString().slice(0, 10) reads the UTC calendar date, which
+  // rolls over to tomorrow while it is still today in any timezone behind
+  // UTC. Same fix as Sondrik's/CGT's own todayIso.
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-10000px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('execCommand copy failed'));
+    });
+  }
+
+  // Shared client-side draft-autosave for the quick-log form below: it has
+  // no backend to save a half-filled form to, so an accidental reload or
+  // navigation away would otherwise throw away real typed data with no way
+  // back. Same pattern CGT's/Garage's/Sondrik's own attachDraftGuard uses,
+  // reading whatever real input/select/textarea fields the given form
+  // actually has rather than a hand-maintained id list.
+  function attachDraftGuard(form, storageKey, opts) {
+    const bannerEl = document.getElementById(opts.bannerId);
+    const bannerTimeEl = document.getElementById(opts.timeId);
+    const discardBtn = document.getElementById(opts.discardId);
+    if (!bannerEl || !bannerTimeEl || !discardBtn) return { clearDraft() {} };
+
+    const fields = Array.from(form.querySelectorAll('input[id], select[id], textarea[id]'));
+    let saveTimer = null;
+
+    function readValues() {
+      const values = {};
+      fields.forEach(el => { values[el.id] = el.value; });
+      return values;
+    }
+    function hasAnyValue(values) {
+      return fields.some(el => (values[el.id] || '').trim() !== '');
+    }
+    function clearDraft() {
+      try { localStorage.removeItem(storageKey); } catch (e) { /* see saveDraft below */ }
+      bannerEl.hidden = true;
+    }
+    function saveDraft() {
+      try {
+        const values = readValues();
+        if (!hasAnyValue(values)) { clearDraft(); return; }
+        localStorage.setItem(storageKey, JSON.stringify({ savedAt: Date.now(), values }));
+      } catch (e) { /* localStorage unavailable (private window, blocked storage): draft protection just no-ops */ }
+    }
+
+    form.addEventListener('input', () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveDraft, 400);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') { clearTimeout(saveTimer); saveDraft(); }
+    });
+    window.addEventListener('pagehide', () => { clearTimeout(saveTimer); saveDraft(); });
+    discardBtn.addEventListener('click', () => {
+      clearDraft();
+      form.reset();
+      if (opts.onDiscard) opts.onDiscard();
+    });
+
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const draft = raw ? JSON.parse(raw) : null;
+      if (draft && hasAnyValue(draft.values || {})) {
+        fields.forEach(el => { if (el.id in draft.values) el.value = draft.values[el.id]; });
+        bannerTimeEl.textContent = new Date(draft.savedAt).toLocaleString();
+        bannerEl.hidden = false;
+      }
+    } catch (e) { /* see saveDraft above */ }
+
+    return { clearDraft };
+  }
+
+  // Quick-log tool: turns the form into the exact JSON object to paste into
+  // applications.json's applications array by hand, same "generate
+  // paste-ready JSON, save nothing" pattern CSM's/CGT's/Garage's/Sondrik's
+  // own quick-log tools already use. This is the one hub of the six that
+  // never had one (see the "How this hub is kept up to date" note). Never
+  // writes a file and never calls a server. Warnings mirror validate.js's
+  // own checks (missing fields, a future date, a duplicate company+role,
+  // an em dash) so a mistake surfaces before it's even pasted in.
+  function initQuickLogTool(applicationsData) {
+    const form = document.getElementById('quickApplicationForm');
+    if (!form) return;
+    const roleInput = document.getElementById('qaRole');
+    const companyInput = document.getElementById('qaCompany');
+    const locationInput = document.getElementById('qaLocation');
+    const payInput = document.getElementById('qaPay');
+    const dateInput = document.getElementById('qaAppliedDate');
+    const warningsEl = document.getElementById('qaWarnings');
+    const outputEl = document.getElementById('qaOutput');
+    const copyBtn = document.getElementById('qaCopyBtn');
+    const liveEl = document.getElementById('quickLogLive');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    dateInput.value = todayIso();
+    dateInput.max = todayIso();
+
+    // Without real applications data there's nothing to compute the next
+    // "num" or check for a duplicate company+role against, so the form stays
+    // disabled rather than risk generating a row with a guessed/wrong num.
+    if (!applicationsData) {
+      submitBtn.disabled = true;
+      warningsEl.textContent = 'Applications data failed to load, so a new entry number and duplicate check ' +
+        'can\'t be computed right now. Reload the page and try again.';
+      return;
+    }
+
+    const applications = applicationsData.applications || [];
+    const draftGuard = attachDraftGuard(form, 'job-search-qa-draft-v1', {
+      bannerId: 'qaDraftBanner', timeId: 'qaDraftBannerTime', discardId: 'qaDiscardDraftBtn',
+      onDiscard: () => { outputEl.hidden = true; copyBtn.hidden = true; warningsEl.textContent = ''; dateInput.value = todayIso(); }
+    });
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const role = roleInput.value.trim();
+      const company = companyInput.value.trim();
+      const location = locationInput.value.trim();
+      const pay = payInput.value.trim();
+      const appliedDate = dateInput.value;
+      const blockers = [];
+
+      if (!role) blockers.push('Role is required.');
+      if (!company) blockers.push('Company is required.');
+      if (!location) blockers.push('Location is required.');
+      if (!pay) blockers.push('Pay is required, use the real quoted figure or a direct quote like "Paid," no figure if that is all the posting says.');
+      if (!appliedDate) blockers.push('Applied date is required, this is when the application was actually submitted.');
+
+      if (blockers.length) {
+        warningsEl.textContent = blockers.join(' ');
+        outputEl.hidden = true;
+        copyBtn.hidden = true;
+        return;
+      }
+
+      const advisory = [];
+      if (JobSearchValidateCore.isFutureDate(appliedDate)) {
+        advisory.push('Applied date (' + appliedDate + ') is in the future, check for a typo.');
+      }
+      const nextNum = applications.reduce((max, a) => (typeof a.num === 'number' && a.num > max ? a.num : max), 0) + 1;
+      const obj = { num: nextNum, role, company, location, pay, appliedDate };
+      const dupeGroup = JobSearchValidateCore.findDuplicateApplications(applications.concat([obj]))
+        .find(group => group.includes(obj));
+      if (dupeGroup) {
+        const otherNums = dupeGroup.filter(a => a !== obj).map(a => '#' + a.num).join(', ');
+        advisory.push('Company + role already appears on ' + otherNums + ', check this isn\'t a duplicate transcription.');
+      }
+      JobSearchValidateCore.emDashFields(obj, ['role', 'company', 'location', 'pay']).forEach(f =>
+        advisory.push('"' + f + '" contains an em dash, this is a transcription field, check it against the source tracker.'));
+      warningsEl.textContent = advisory.join(' ');
+
+      outputEl.value = JSON.stringify(obj, null, 2) + ',';
+      outputEl.hidden = false;
+      copyBtn.hidden = false;
+    });
+
+    copyBtn.addEventListener('click', () => {
+      copyText(outputEl.value).then(() => {
+        const original = copyBtn.textContent;
+        copyBtn.textContent = 'Copied!';
+        liveEl.textContent = 'Application JSON copied to clipboard.';
+        draftGuard.clearDraft();
+        setTimeout(() => { copyBtn.textContent = original; }, 1800);
+      }).catch(() => { liveEl.textContent = 'Could not copy to clipboard.'; });
+    });
+  }
+
   // Each data file is a hand-edited record Jack (or a session working on his
   // behalf) can typo at any time, that's the whole point of validate.js. One
   // bad edit should only degrade the section(s) that actually depend on that
@@ -464,6 +646,7 @@
       applicationsTableWrap.innerHTML = '<div class="empty-state" role="alert">Failed to load applications data: ' +
         escapeHtml(applicationsResult.reason.message) + '</div>';
     }
+    initQuickLogTool(applicationsData);
 
     if (criteriaData) {
       renderCriteria(criteriaData);
