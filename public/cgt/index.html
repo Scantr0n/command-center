@@ -775,6 +775,15 @@
     <div class="data-quality-list" id="duplicatesList"></div>
   </section>
 
+  <section id="duplicateCandidatesSection" hidden>
+    <h2 class="section-title">Possible duplicate candidates</h2>
+    <p class="section-subtitle">The same card name, year, and sport logged on more than one raw (ungraded) candidate
+      row. Could be a genuinely owned second copy (candidates.json already tracks a few real ones this way, with a
+      "-copy-2" id suffix), or a row that got copy-pasted and only the id changed. Same check as "Possible
+      duplicates" above, applied to candidates before they have a grading company or grade of their own.</p>
+    <div class="data-quality-list" id="duplicateCandidatesList"></div>
+  </section>
+
   <section id="gradeLadderSection" hidden>
     <h2 class="section-title">Possible grade/price mix-ups</h2>
     <p class="section-subtitle">A higher numeric grade of the same real card (same name, year, sport, grading

@@ -124,6 +124,29 @@
       .map(([key, group]) => ({ key, cards: group }));
   }
 
+  // Same idea as findDuplicateGroups above, applied to the raw (ungraded)
+  // candidates list instead of graded cards: groups by cardName + year +
+  // sport, with gradingCompany/grade left out of the key entirely since a
+  // candidate has neither yet. Real multi-copy candidates already exist in
+  // candidates.json (Jack tracks a second physical copy of the same card
+  // with a "-copy-2" id suffix, e.g. the two Cam Neely rows), so this is a
+  // warning-level "double check" flag, not an error, exactly like the cards
+  // version: it could be a genuine second copy, or a row that got
+  // copy-pasted and only the id changed. Only returns groups with more than
+  // one candidate in them.
+  function findDuplicateCandidateGroups(candidates) {
+    const byCombo = new Map();
+    (candidates || []).forEach(c => {
+      if (!c.cardName || !c.sport) return;
+      const key = c.cardName.trim().toLowerCase() + '|' + (c.year ?? '') + '|' + c.sport;
+      if (!byCombo.has(key)) byCombo.set(key, []);
+      byCombo.get(key).push(c);
+    });
+    return [...byCombo.entries()]
+      .filter(([, group]) => group.length > 1)
+      .map(([key, group]) => ({ key, candidates: group }));
+  }
+
   function validateCards(cards) {
     const errors = [];
     const warnings = [];
@@ -644,12 +667,19 @@
         warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
     });
 
+    findDuplicateCandidateGroups(candidates).forEach(({ candidates: group }) => {
+      const ids = group.map(c => c.id || '(missing id)');
+      warnings.push('possible duplicate candidate: the same card name + year + sport appears on ' +
+        ids.length + ' rows (' + ids.join(', ') + '). Confirm these are really separate physical copies, not the ' +
+        'same raw card logged twice under two different ids.');
+    });
+
     return { errors, warnings };
   }
 
   return {
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findDuplicateCertGroups,
-    findGradeLadderInversions, findListingPriceMismatches,
+    findDuplicateCandidateGroups, findGradeLadderInversions, findListingPriceMismatches,
     isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
     SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };

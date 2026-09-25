@@ -564,6 +564,7 @@ async function loadCards() {
     renderDataQuality();
     renderStalePricing();
     renderDuplicates();
+    renderDuplicateCandidates();
     renderGradeLadderFlags();
     renderListingPriceFlags();
     renderAttentionBar();
@@ -1930,6 +1931,40 @@ function renderDuplicates() {
   });
 }
 
+// Same idea as renderDuplicates above, applied to the raw (ungraded)
+// candidates list via CGTValidateCore.findDuplicateCandidateGroups instead
+// of findDuplicateGroups: no gradingCompany/grade to key on yet, so this
+// groups by cardName/year/sport alone. Real multi-copy candidates already
+// exist in candidates.json (e.g. the two Cam Neely rows, "-copy-1"/
+// "-copy-2"), so this is a warning-level "double check" flag, not proof of
+// a mistake. Excludes the example row like every other real-data panel.
+function renderDuplicateCandidates() {
+  const section = document.getElementById('duplicateCandidatesSection');
+  const list = document.getElementById('duplicateCandidatesList');
+  if (!window.CGTValidateCore) {
+    section.hidden = true;
+    return;
+  }
+  const realCandidates = candidates.filter(c => !isExampleCandidate(c));
+  const groups = CGTValidateCore.findDuplicateCandidateGroups(realCandidates);
+
+  if (!groups.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = groups.map(({ candidates: group }) => group.map(c => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled candidate')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</span>
+      <span class="dq-meta">${escapeHtml(c.sport || '')}</span>
+      <span class="dq-why">${group.length} ROWS MATCH ON NAME/YEAR/SPORT</span>
+    </button>
+  `).join('')).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openCandidateModal(row.dataset.id));
+  });
+}
+
 // Reuses CGTValidateCore.findGradeLadderInversions, the same rule validate.js
 // runs on the command line, rendered as a clickable panel like the
 // duplicates one above. Flags a higher numeric grade of the same real card
@@ -2008,6 +2043,8 @@ function renderAttentionBar() {
   const stalePricingCount = buildStalePricingFlags().length;
   const duplicateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateGroups(realCards).length : 0;
   const duplicateCertCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateCertGroups(realCards).length : 0;
+  const realCandidatesForDupes = candidates.filter(c => !isExampleCandidate(c));
+  const duplicateCandidateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateCandidateGroups(realCandidatesForDupes).length : 0;
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
   const listingPriceCount = window.CGTValidateCore ? CGTValidateCore.findListingPriceMismatches(realCards).length : 0;
   // A candidate still being weighed (no decision logged yet) but missing
@@ -2070,6 +2107,9 @@ function renderAttentionBar() {
   }
   if (duplicateCount) {
     items.push({ n: duplicateCount, tone: 'warn', target: 'duplicatesSection', label: duplicateCount === 1 ? 'possible duplicate group' : 'possible duplicate groups' });
+  }
+  if (duplicateCandidateCount) {
+    items.push({ n: duplicateCandidateCount, tone: 'warn', target: 'duplicateCandidatesSection', label: duplicateCandidateCount === 1 ? 'possible duplicate candidate group' : 'possible duplicate candidate groups' });
   }
   if (gradeLadderCount) {
     items.push({ n: gradeLadderCount, tone: 'warn', target: 'gradeLadderSection', label: gradeLadderCount === 1 ? 'grade ladder inversion' : 'grade ladder inversions' });

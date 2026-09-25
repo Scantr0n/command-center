@@ -16,8 +16,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  isDateOrNull, findDuplicateGroups, findDuplicateCertGroups, findGradeLadderInversions, findListingPriceMismatches,
-  validateCards, validateSubmissions, validateCandidates
+  isDateOrNull, findDuplicateGroups, findDuplicateCertGroups, findDuplicateCandidateGroups, findGradeLadderInversions,
+  findListingPriceMismatches, validateCards, validateSubmissions, validateCandidates
 } = require('./validate-core.js');
 
 test('isDateOrNull accepts null and real calendar dates, rejects impossible ones', () => {
@@ -80,6 +80,33 @@ test('findDuplicateCertGroups skips rows missing certNumber or gradingCompany ra
     { id: 'b', cardName: 'Connor McDavid Rookie', gradingCompany: 'PSA', certNumber: null }
   ];
   assert.deepEqual(findDuplicateCertGroups(cards), []);
+});
+
+test('findDuplicateCandidateGroups flags the same card name/year/sport on two rows, ignoring grading fields the candidate does not have yet', () => {
+  const candidates = [
+    { id: 'a', cardName: 'Cam Neely', year: 1990, sport: 'hockey' },
+    { id: 'b', cardName: '  cam neely  ', year: 1990, sport: 'hockey' }
+  ];
+  const groups = findDuplicateCandidateGroups(candidates);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].candidates.map(c => c.id).sort(), ['a', 'b']);
+});
+
+test('findDuplicateCandidateGroups does not flag the same card name in a different year or sport', () => {
+  const candidates = [
+    { id: 'a', cardName: 'Cam Neely', year: 1990, sport: 'hockey' },
+    { id: 'b', cardName: 'Cam Neely', year: 1991, sport: 'hockey' },
+    { id: 'c', cardName: 'Cam Neely', year: 1990, sport: 'baseball' }
+  ];
+  assert.deepEqual(findDuplicateCandidateGroups(candidates), []);
+});
+
+test('findDuplicateCandidateGroups skips rows missing cardName or sport rather than grouping on a blank key', () => {
+  const candidates = [
+    { id: 'a', cardName: null, year: 1990, sport: 'hockey' },
+    { id: 'b', cardName: null, year: 1990, sport: 'hockey' }
+  ];
+  assert.deepEqual(findDuplicateCandidateGroups(candidates), []);
 });
 
 test('findGradeLadderInversions flags a higher grade priced below a lower grade of the same card', () => {
@@ -285,6 +312,14 @@ test('validateCandidates requires a labeled basis on rawValue and expectedGraded
     { id: 'a', cardName: 'X', sport: 'hockey', expectedGradedValue: 50, gradedValueBasis: null }
   ]);
   assert.ok(gradedOnly.errors.some(e => e.includes('gradedValueBasis')));
+});
+
+test('validateCandidates warns on a possible duplicate candidate (same card name/year/sport on two rows)', () => {
+  const { warnings } = validateCandidates([
+    { id: 'a', cardName: 'Cam Neely', year: 1990, sport: 'hockey' },
+    { id: 'b', cardName: 'Cam Neely', year: 1990, sport: 'hockey' }
+  ]);
+  assert.ok(warnings.some(w => w.includes('possible duplicate candidate') && w.includes('a') && w.includes('b')));
 });
 
 test('the real cards.json, submissions.json, and candidates.json on disk each validate clean', () => {
