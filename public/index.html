@@ -30,7 +30,27 @@
     --sub: #9A9FA6;
     --faint: #7C838C;
   }
-  body { background: var(--void); }
+  /* Real diagnosis after Jack called the whole app "a website from 2000":
+     it wasn't the type system (Manrope/Inter/JetBrains Mono already had a
+     real hierarchy) - it was that every surface sat on one flat, solid
+     #08090A with zero tonal variation. A totally flat black background is
+     one of the strongest tells of an unfinished dark UI versus a premium
+     one; every real reference here (Linear, Vercel, Arc, Stripe's own
+     marketing/dashboard surfaces) uses a subtle multi-stop gradient mesh
+     instead, not a flat fill. Fixed-position so it reads as ambient room
+     lighting behind the whole page rather than scrolling with content -
+     three soft, low-opacity glows (cool blue from directly overhead, warm
+     gold lower-right, a faint green lower-left) echoing this app's own
+     accent palette, restrained enough that panels/text still read as
+     clearly foreground against it. */
+  body {
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -15%, rgba(90, 130, 255, 0.10), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 100% 110%, rgba(217, 164, 65, 0.07), transparent 60%),
+      radial-gradient(ellipse 60% 45% at -5% 100%, rgba(61, 220, 132, 0.05), transparent 60%),
+      var(--void);
+    background-attachment: fixed;
+  }
   .hairline { border-color: var(--hairline) !important; }
   .hairline:hover { border-color: var(--hairlineHover) !important; }
   /* Cards carry their own accent color (category on grid cards, status on
@@ -38,12 +58,21 @@
      below can reference it in one shared rule, rather than fighting the
      .hairline class's `border-color !important` (which would otherwise win
      over a plain inline border-left-color). */
+  /* The inset top-highlight below (a subtle 1px light line along the
+     card's own top edge) is the same "glass panel" depth cue premium
+     dark-mode UI uses instead of a flat, single-tone fill - real,
+     concrete answer to Jack calling the whole app flat/dated. Layered
+     into the SAME box-shadow property as the existing left accent stripe
+     (comma-separated inset shadows both work, and multiple properties on
+     one element would fight harder against the .needs-attn/hover
+     overrides below, which redefine this whole property rather than
+     adding to it). */
   .cluster-card, .attn-card, .venture-card {
-    box-shadow: inset 3px 0 0 0 var(--cat, transparent);
+    box-shadow: inset 3px 0 0 0 var(--cat, transparent), inset 0 1px 0 0 rgba(255,255,255,0.06);
     transition: box-shadow 0.18s ease;
   }
   .cluster-card:hover, .attn-card:hover, .venture-card:hover {
-    box-shadow: inset 3px 0 0 0 var(--cat, transparent), 0 0 0 1px var(--cat, transparent), 0 14px 28px -12px var(--cat, transparent);
+    box-shadow: inset 3px 0 0 0 var(--cat, transparent), inset 0 1px 0 0 rgba(255,255,255,0.08), 0 0 0 1px var(--cat, transparent), 0 14px 28px -12px var(--cat, transparent);
   }
   /* Real research finding (badge/card-hierarchy patterns - Linear, Carbon
      Design System, Asana): every card here gets the same category-colored
@@ -54,10 +83,10 @@
      wider and switches to its real status color, so urgency visually reads
      over category the moment something needs attention. */
   .cluster-card.needs-attn {
-    box-shadow: inset 5px 0 0 0 var(--urgent, transparent);
+    box-shadow: inset 5px 0 0 0 var(--urgent, transparent), inset 0 1px 0 0 rgba(255,255,255,0.06);
   }
   .cluster-card.needs-attn:hover {
-    box-shadow: inset 5px 0 0 0 var(--urgent, transparent), 0 0 0 1px var(--urgent, transparent), 0 14px 28px -12px var(--urgent, transparent);
+    box-shadow: inset 5px 0 0 0 var(--urgent, transparent), inset 0 1px 0 0 rgba(255,255,255,0.08), 0 0 0 1px var(--urgent, transparent), 0 14px 28px -12px var(--urgent, transparent);
   }
   .cluster-card { transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease; }
   .cluster-card:hover { transform: translateY(-3px); }
@@ -255,7 +284,17 @@
     width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
   }
-  #statsRow { padding: 7px 14px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--panelLight); }
+  #statsRow { padding: 7px 14px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--panelLight); box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05); }
+  /* Same top-highlight depth cue as the card box-shadows above, applied to
+     every other flat panel surface (modals, the collapsible section
+     headers, the venture snapshot cards): box-shadow rather than
+     background-image deliberately, since every one of these already sets
+     `background` as an inline style, which (as a shorthand) resets
+     background-image to none and would silently win over any external
+     background-image rule on specificity. box-shadow has no such conflict. */
+  .corner-notch, details.collapsible-section {
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05);
+  }
 
   /* Four icon-badge tiles measure out wider than the old plain-number row
      did, and at real phone widths that pushed the whole toolbar chip to
@@ -450,6 +489,18 @@
     }
     body { background: #fff; }
     .max-w-7xl { max-width: none; padding: 0.3in 0.4in; }
+    /* The header's gradient-text treatment sets color:transparent and
+       clips a gradient to the glyph shapes via background-clip - on
+       screen that reads as light text, but printed on white paper with
+       nothing forcing a real color back, it would be genuinely invisible
+       (transparent text on white = blank). */
+    header h1 {
+      background: none !important;
+      -webkit-background-clip: initial !important;
+      background-clip: initial !important;
+      color: var(--ink) !important;
+      filter: none !important;
+    }
 
     #searchWrap, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner, #driveStatusBadge,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
@@ -563,7 +614,7 @@
   <div class="max-w-7xl mx-auto px-6 py-10">
     <header class="mb-7 pb-6 border-b hairline flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display font-extrabold text-3xl" style="letter-spacing: -0.02em; color: var(--ink)">COMMAND CENTER</h1>
+        <h1 class="font-display font-extrabold text-4xl" style="letter-spacing: -0.03em; background: linear-gradient(135deg, #FFFFFF 30%, #B8C4E0 65%, #7C90C4 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 24px rgba(120,150,255,0.25))">COMMAND CENTER</h1>
         <p class="text-sm mt-1 font-mono" style="color: var(--sub)">Jack Scanlon, every project in one view</p>
       </div>
       <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
@@ -1789,15 +1840,23 @@ function ensureGraphDefs() {
       </radialGradient>
     `;
   }).join('');
-  // Hub gets its own warm neutral glow/fill so it reads as the one true
-  // center of gravity rather than a plain flat panel-colored disc.
+  // Hub gets a real energy-core treatment, not a flat neutral-gray disc:
+  // this is the one true center of the whole app (literally the "Command
+  // Center" the app is named for), and a muted grayscale fill read as
+  // just another panel with text in it rather than the actual visual
+  // anchor. A cool blue/cyan core (the same accent used for the graph's
+  // rotating orbit ring elsewhere) plus a much larger, richer outer glow
+  // gives it real presence at a glance, before a viewer even reads what
+  // any of the orbiting nodes say.
   const hubGradients = `
     <radialGradient id="hub-glow">
-      <stop offset="0%" stop-color="var(--ink)" stop-opacity="0.22" />
-      <stop offset="100%" stop-color="var(--ink)" stop-opacity="0" />
+      <stop offset="0%" stop-color="#5A82FF" stop-opacity="0.35" />
+      <stop offset="45%" stop-color="#5A82FF" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#5A82FF" stop-opacity="0" />
     </radialGradient>
-    <radialGradient id="hub-fill" cx="38%" cy="30%">
-      <stop offset="0%" stop-color="var(--hairlineHover)" stop-opacity="0.5" />
+    <radialGradient id="hub-fill" cx="35%" cy="28%">
+      <stop offset="0%" stop-color="#7B9CFF" stop-opacity="0.9" />
+      <stop offset="35%" stop-color="#3D5AC0" stop-opacity="0.55" />
       <stop offset="100%" stop-color="var(--panel)" stop-opacity="1" />
     </radialGradient>
   `;
@@ -2100,14 +2159,14 @@ function renderGraph() {
     // giving the corner-of-a-viewfinder look rather than a plain diamond.
     const inX = cx + (bracketR - bracketLen) * Math.cos(rad), inY = cy + (bracketR - bracketLen) * Math.sin(rad);
     const tangX = -Math.sin(rad), tangY = Math.cos(rad);
-    return `<path d="M${(px + tangX * bracketLen).toFixed(1)},${(py + tangY * bracketLen).toFixed(1)} L${px.toFixed(1)},${py.toFixed(1)} L${inX.toFixed(1)},${inY.toFixed(1)}" fill="none" stroke="var(--hairlineHover)" stroke-width="1.5" opacity="0.6" />`;
+    return `<path d="M${(px + tangX * bracketLen).toFixed(1)},${(py + tangY * bracketLen).toFixed(1)} L${px.toFixed(1)},${py.toFixed(1)} L${inX.toFixed(1)},${inY.toFixed(1)}" fill="none" stroke="#7B9CFF" stroke-width="1.5" opacity="0.55" />`;
   }).join('');
 
   const hubHtml = `
-    <circle cx="${cx}" cy="${cy}" r="${hubR + 40}" fill="url(#hub-glow)" />
-    <circle cx="${cx}" cy="${cy}" r="${hubR + 24}" fill="none" stroke="var(--hairline)" stroke-width="1" stroke-dasharray="1,7" class="graph-orbit-ring" style="transform-origin: ${cx}px ${cy}px" />
+    <circle cx="${cx}" cy="${cy}" r="${hubR + 75}" fill="url(#hub-glow)" />
+    <circle cx="${cx}" cy="${cy}" r="${hubR + 24}" fill="none" stroke="#5A82FF" stroke-width="1" stroke-opacity="0.35" stroke-dasharray="1,7" class="graph-orbit-ring" style="transform-origin: ${cx}px ${cy}px" />
     ${bracketHtml}
-    <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="url(#hub-fill)" stroke="var(--hairlineHover)" stroke-width="1.5" class="hub-node" />
+    <circle cx="${cx}" cy="${cy}" r="${hubR}" fill="url(#hub-fill)" stroke="#7B9CFF" stroke-width="1.5" stroke-opacity="0.7" class="hub-node" />
     <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">COMMAND</text>
     <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="Manrope, sans-serif" font-weight="800" font-size="13" fill="var(--ink)" letter-spacing="0.5">CENTER</text>
   `;
