@@ -1632,20 +1632,31 @@ function readOptionalNonNegativeInput(el) {
 }
 
 // Same real-time em-dash catch CSM's own prospect-entry form just got: a
-// title or location pasted in with an em dash used to go uncaught until the
+// free-text field pasted in with an em dash used to go uncaught until the
 // next `node validate.js` run, since GarageValidateCore.emDashFields only
-// checked the file on disk, never what was actually typed into the
-// quick-log or edit forms. Shared between wireQuickLogTool and
-// wireListingEditForm so the same field list can't drift between the two.
+// ever checked the file on disk, never what was actually typed into one of
+// these quick-log or edit forms. One shared helper for every quick-log tool
+// below, so the warning text can't drift between entities the way the
+// hand-duplicated blocker/advisory checks already do in this file.
+function emDashAdvisory(obj, fields) {
+  const hits = GarageValidateCore.emDashFields(obj, fields);
+  return hits.length
+    ? ['"' + hits.join('", "') + '" contains an em dash, this tracker never uses one, check for a paste-in.']
+    : [];
+}
+
+// Listings also carry itemSpecifics, a nested object the plain emDashAdvisory
+// above can't reach on its own, so this adds that check with the same
+// "itemSpecifics.<field>" prefix validate.js already uses. Shared between
+// wireQuickLogTool and wireListingEditForm so the two can't drift.
 function listingEmDashAdvisory(candidate) {
-  const advisory = [];
   const hits = GarageValidateCore.emDashFields(candidate, ['title', 'location']);
-  const specificHits = GarageValidateCore.emDashFields(candidate.itemSpecifics, Object.keys(GarageValidateCore.ITEM_SPECIFIC_LABELS));
-  const allHits = hits.concat(specificHits.map(f => 'itemSpecifics.' + f));
-  if (allHits.length) {
-    advisory.push('"' + allHits.join('", "') + '" contains an em dash, this tracker never uses one, check for a paste-in.');
-  }
-  return advisory;
+  const specificHits = GarageValidateCore.emDashFields(candidate.itemSpecifics, Object.keys(GarageValidateCore.ITEM_SPECIFIC_LABELS))
+    .map(f => 'itemSpecifics.' + f);
+  const allHits = hits.concat(specificHits);
+  return allHits.length
+    ? ['"' + allHits.join('", "') + '" contains an em dash, this tracker never uses one, check for a paste-in.']
+    : [];
 }
 
 function renderCalc() {
@@ -4414,6 +4425,7 @@ function wireQuickLogSaleTool() {
       saleDate
     };
 
+    advisory.push(...emDashAdvisory(sale, ['title']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(sale, null, 2) + ',';
     output.hidden = false;
@@ -4506,6 +4518,7 @@ function wireQuickLogExpenseTool() {
         ' miles at the real IRS rate for ' + expense.date + '.');
     }
 
+    advisory.push(...emDashAdvisory(expense, ['description']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(expense, null, 2) + ',';
     output.hidden = false;
@@ -4596,6 +4609,7 @@ function wireQuickLogDisputeTool() {
       if (respondInfo) advisory.push('Real response window: ' + respondInfo.text + '.');
     }
 
+    advisory.push(...emDashAdvisory(dispute, ['title', 'outcome', 'notes']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(dispute, null, 2) + ',';
     output.hidden = false;
@@ -4676,6 +4690,7 @@ function wireQuickLogSupplyTool() {
       advisory.push('Already at or below the reorder point, this will show as low stock right away.');
     }
 
+    advisory.push(...emDashAdvisory(supply, ['name', 'notes']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(supply, null, 2) + ',';
     output.hidden = false;
@@ -4753,6 +4768,7 @@ function wireQuickLogAcquisitionTool() {
 
     const acquisition = { id, source, sourceName, date, pricePaid, itemCount, listingIds, notes };
 
+    advisory.push(...emDashAdvisory(acquisition, ['sourceName', 'notes']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(acquisition, null, 2) + ',';
     output.hidden = false;
