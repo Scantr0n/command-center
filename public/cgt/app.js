@@ -7,6 +7,12 @@ let rawCandidatesData = null;
 let changelogDriftStatus = null;
 let activeCard = null;
 let lastFocusedEl = null;
+// Set once from a real ?card=<id>/?submission=<id> URL param and consumed
+// once, right after that file loads below, same one-shot "open this exact
+// record from a link" pattern CSM's initialProspectId and Garage's
+// initialListingId use.
+let initialCardId = null;
+let initialSubmissionId = null;
 let searchTerm = '';
 let activeSport = 'all';
 let activeBasis = 'all';
@@ -49,6 +55,10 @@ function restoreStateFromUrl() {
   const candSport = params.get('candSport');
   const candVerdict = params.get('candVerdict');
   const candStatus = params.get('candStatus');
+  const card = params.get('card');
+  if (card) initialCardId = card;
+  const submission = params.get('submission');
+  if (submission) initialSubmissionId = submission;
   if (q) searchTerm = q;
   if (sport && VALID_SPORTS.includes(sport)) activeSport = sport;
   if (basis && VALID_BASES.includes(basis)) activeBasis = basis;
@@ -575,6 +585,8 @@ async function loadCards() {
     renderFooterStatus();
     applyFiltersAndRender();
     initTableScrollShadows();
+    if (initialCardId && cards.some(c => c.id === initialCardId)) openModal(initialCardId);
+    if (initialSubmissionId && submissions.some(s => s.id === initialSubmissionId)) openSubmissionModal(initialSubmissionId);
   } catch (e) {
     cards = [];
     rawCardsData = null;
