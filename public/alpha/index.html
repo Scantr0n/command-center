@@ -134,7 +134,7 @@
           <tr><th scope="row">live.regime</th><td>Current detected market regime label, or <code>null</code>. The server sends only this single current value, never a history; the "Regime history" section below builds its own log of real transitions this browser has actually observed (a new value that differs from the last one it saw), timestamped and kept in this browser's own <code>localStorage</code>, labeled "recorded by this browser only" for the same reason as the connectivity-check history above. Nothing estimated or backfilled, only real observed changes.</td></tr>
           <tr><th scope="row">live.killSwitch.engaged</th><td><code>true</code> / <code>false</code> / <code>null</code> if unknown.</td></tr>
           <tr><th scope="row">live.killSwitch.lastTriggeredAt</th><td>ISO datetime of the most recent real false-to-true flip in <code>connection.history[].paused</code>, or <code>null</code> until this server has actually observed one. Derived server-side in <code>server.js</code> from that same shared history, same "since this server started observing" honesty as everything else built from it: it never claims "never triggered" just because a transition predates this history existing, and never guesses at a transition that happened while the daemon was unreachable (a gap where <code>paused</code> is <code>null</code> on either side breaks the comparison rather than assuming one).</td></tr>
-          <tr><th scope="row">live.positionSizing.activeMode</th><td>Which sizing rule is currently driving position size (e.g. <code>"drawdown-based"</code>), or <code>null</code>.</td></tr>
+          <tr><th scope="row">live.positionSizing.activeMode</th><td>Which sizing rule is currently driving position size (e.g. <code>"drawdown-based"</code>), or <code>null</code>. The server sends only this single current value, never a history, same gap <code>live.regime</code> has; the "Sizing mode history" list under Position sizing builds its own log of real transitions this browser has actually observed (a value that differs from the last one it saw), timestamped and kept in this browser's own <code>localStorage</code>, labeled "recorded by this browser only" for the same reason as the regime and connectivity histories above. Nothing estimated or backfilled, only real observed changes.</td></tr>
           <tr><th scope="row">live.positionSizing.currentDrawdownPct</th><td>Current drawdown as a number from 0 to 100, or <code>null</code>. Drives the drawdown meter, never a dollar figure.</td></tr>
           <tr><th scope="row">live.positionSizing.maxDrawdownPct</th><td>Deepest peak-to-trough drawdown observed, 0 to 100, or <code>null</code>. Always &gt;= currentDrawdownPct when both are set, since it can only be as small as the current reading. Shown as its own meter so a shallow current reading is never mistaken for a shallow episode.</td></tr>
           <tr><th scope="row">live.positionSizing.robustnessScore</th><td>Current reading from Alpha's robustness-based sizing, 0 to 100, or <code>null</code>. Robustness-based sizing is a named architecture feature in its own right (see Architecture below), distinct from drawdown-based sizing, so it gets its own meter here rather than being folded into the drawdown fields above.</td></tr>
@@ -242,6 +242,16 @@
   <section>
     <h2 class="section-title">Position sizing <span class="lastknown-tag" id="psLastKnownTag" hidden></span></h2>
     <div class="ps-panel" id="positionSizingPanel"></div>
+    <div class="regime-history-wrap">
+      <div class="section-toolbar">
+        <div class="regime-history-label font-mono">
+          SIZING MODE HISTORY
+          <span class="regime-history-source">(recorded by this browser only, real transitions it has actually observed)</span>
+        </div>
+        <button type="button" id="sizingModeHistoryCsvBtn" class="refresh-btn font-mono" disabled title="No sizing mode changes recorded yet.">Export CSV</button>
+      </div>
+      <ol class="regime-history-list" id="sizingModeHistoryList"></ol>
+    </div>
   </section>
 
   <section>

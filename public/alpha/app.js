@@ -475,12 +475,56 @@ function renderMeterSparkline(history, title) {
   `;
 }
 
+// live.positionSizing.activeMode has the same gap live.regime had before
+// CLIENT_REGIME_HISTORY_KEY above: Alpha's live feed sends only the current
+// sizing mode, never a history, even though which mode is actively driving
+// size (drawdown-based vs robustness-based, see system.features) is a real,
+// named architecture distinction, not just an implementation detail. Same
+// fix, same honesty constraints: this browser keeps its own append-only log
+// of real transitions it has actually observed, timestamped, in
+// localStorage, never backfilled or guessed. Only records while genuinely
+// connected with a real mode string, same reasoning as
+// recordClientRegimeObservation above.
+const CLIENT_SIZING_MODE_HISTORY_KEY = 'alpha:clientSizingModeHistory';
+const CLIENT_SIZING_MODE_HISTORY_CAP = 200;
+
+function loadClientSizingModeHistory() {
+  try {
+    const raw = localStorage.getItem(CLIENT_SIZING_MODE_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function recordClientSizingModeObservation(connected, mode) {
+  const history = loadClientSizingModeHistory();
+  if (!connected || !mode) return history;
+  const last = history[history.length - 1];
+  if (last && last.mode === mode) return history;
+  const next = [...history, { at: new Date().toISOString(), mode }].slice(-CLIENT_SIZING_MODE_HISTORY_CAP);
+  try {
+    localStorage.setItem(CLIENT_SIZING_MODE_HISTORY_KEY, JSON.stringify(next));
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // other client-side histories above, the section just stays empty.
+  }
+  return next;
+}
+
 // computeRegimeSegments and regimeSegmentEndMs now live in regime-core.js
 // (see AlphaRegimeCore above), so this segmenting math can be unit-tested
 // outside the browser instead of only ever running live against whatever
-// transitions this browser happens to have recorded.
+// transitions this browser happens to have recorded. Reused below for the
+// sizing-mode history too: despite the "regime" naming, that function is
+// generic start-timestamp-plus-label segmenting, exactly what a sizing-mode
+// transition log needs, so the mode value is mapped onto its `regime` field
+// at the call site rather than forking a near-duplicate helper file for the
+// same math.
 
 const REGIME_HISTORY_LIMIT = 10;
+const SIZING_MODE_HISTORY_LIMIT = 10;
 
 // Kept purely so the Regime history "Export CSV" button can build its file
 // from the same real, already-computed segments just rendered, never a
@@ -490,6 +534,10 @@ const REGIME_HISTORY_LIMIT = 10;
 // "export the full real set, not just the glance-sized view" convention as
 // lastIncidentsSnapshot and lastEventLogSnapshot elsewhere on this page.
 let lastRegimeHistorySnapshot = [];
+
+// Same "export the full real set" reasoning as lastRegimeHistorySnapshot
+// above, for the Sizing mode history list's own CSV export.
+let lastSizingModeHistorySnapshot = [];
 
 function regimeSegmentItem(seg) {
   const startAbs = formatAbsolute(seg.start);
@@ -568,6 +616,52 @@ function renderRegimeDistribution(segments) {
       </li>
     `;
   }).join('');
+}
+
+// Same list row shape as regimeSegmentItem above, reused verbatim rather
+// than duplicated: a segment here has a `regime` field holding the real
+// sizing-mode string (see the CLIENT_SIZING_MODE_HISTORY_KEY comment for why
+// computeRegimeSegments is reused for this too), so the rendering has
+// nothing regime-specific left in it once the segment is built. Kept as its
+// own function anyway, rather than calling regimeSegmentItem directly, so
+// the "regime-history-item" CSS classes below can be revisited independently
+// of the Regime history section without the two accidentally diverging.
+function sizingModeSegmentItem(seg) {
+  const startAbs = formatAbsolute(seg.start);
+  const endMs = regimeSegmentEndMs(seg);
+  const durationText = formatDuration(endMs - new Date(seg.start).getTime()) || 'under 1m';
+  const rangeText = seg.current
+    ? (seg.frozenAsOf ? 'Since ' + startAbs + ', last confirmed ' + formatAbsolute(seg.frozenAsOf) : 'Since ' + startAbs)
+    : startAbs + ' to ' + formatAbsolute(seg.end);
+  const label = seg.current ? (seg.frozenAsOf ? 'Last confirmed · ' : 'Current · ') : '';
+  return `
+    <li class="regime-history-item${seg.current && !seg.frozenAsOf ? ' regime-history-current' : ''}">
+      <span class="regime-history-label-value font-mono">${escapeHtml(seg.regime)}</span>
+      <span class="regime-history-duration font-mono">${label}${escapeHtml(durationText)}</span>
+      <span class="regime-history-range">${escapeHtml(rangeText)}</span>
+    </li>
+  `;
+}
+
+function renderSizingModeHistory(clientSizingModeHistory, frozenAsOf) {
+  const list = document.getElementById('sizingModeHistoryList');
+  const csvBtn = document.getElementById('sizingModeHistoryCsvBtn');
+  if (!list) return;
+  const segments = computeRegimeSegments(
+    (clientSizingModeHistory || []).map(e => ({ at: e.at, regime: e.mode })),
+    frozenAsOf
+  );
+  lastSizingModeHistorySnapshot = segments;
+  if (csvBtn) {
+    csvBtn.disabled = !segments.length;
+    csvBtn.title = segments.length ? '' : 'No sizing mode changes recorded yet.';
+  }
+  if (!segments.length) {
+    list.innerHTML = `<li class="regime-history-empty font-mono">No sizing mode changes observed by this browser yet.</li>`;
+    return;
+  }
+  const recent = [...segments].reverse().slice(0, SIZING_MODE_HISTORY_LIMIT);
+  list.innerHTML = recent.map(sizingModeSegmentItem).join('');
 }
 
 // Returns the connection-freshness class ('down'/'live'/'stale') so the
@@ -1694,7 +1788,7 @@ function diagnosticRow(label, status, badgeText, detail) {
   return `<tr><th scope="row">${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
 }
 
-function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount) {
+function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount, sizingModeObservationCount) {
   const body = document.getElementById('browserDiagnosticsBody');
   if (!body) return;
 
@@ -1723,7 +1817,9 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latenc
     diagnosticRow('Fetch latency samples recorded', storageOk ? 'ok' : 'blocked', String(latencySampleCount),
       'Real round-trip timings of this browser\'s own requests to Command Center (see the Connection strip above).'),
     diagnosticRow('Drawdown/robustness trend samples recorded', storageOk ? 'ok' : 'blocked', String((drawdownSampleCount || 0) + (robustnessSampleCount || 0)),
-      'Real position-sizing meter readings this browser has actually polled (see the sparklines under Position sizing above).')
+      'Real position-sizing meter readings this browser has actually polled (see the sparklines under Position sizing above).'),
+    diagnosticRow('Sizing mode changes recorded', storageOk ? 'ok' : 'blocked', String(sizingModeObservationCount || 0),
+      'Real drawdown-based/robustness-based sizing mode transitions this browser has actually observed (see Sizing mode history under Position sizing above).')
   ];
   body.innerHTML = rows.join('');
 }
@@ -1991,6 +2087,7 @@ async function loadStatus() {
     const livePs = data.live && data.live.positionSizing;
     const clientDrawdownHistory = recordClientMeterReading(CLIENT_DRAWDOWN_HISTORY_KEY, connectedNow, livePs && livePs.currentDrawdownPct);
     const clientRobustnessHistory = recordClientMeterReading(CLIENT_ROBUSTNESS_HISTORY_KEY, connectedNow, livePs && livePs.robustnessScore);
+    const clientSizingModeHistory = recordClientSizingModeObservation(connectedNow, livePs && livePs.activeMode);
     // Only the three sections built from the cached fields (stats,
     // position sizing, genealogy) read effectiveData; connection, account
     // and positions always read the real `data` so those never show a
@@ -2033,10 +2130,11 @@ async function loadStatus() {
     renderAccount(data);
     renderPositions(data);
     renderPositionSizing(effectiveData, clientDrawdownHistory, clientRobustnessHistory);
+    renderSizingModeHistory(clientSizingModeHistory, lastKnown && lastKnown.asOf);
     renderArchitecture(data);
     renderGenealogy(effectiveData);
     renderEventLog(data);
-    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length, clientDrawdownHistory.length, clientRobustnessHistory.length);
+    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length, clientDrawdownHistory.length, clientRobustnessHistory.length, clientSizingModeHistory.length);
   } catch (e) {
     if (requestId !== latestStatusRequestId) return;
     // Distinct from "down" (Alpha has no live feed yet, an expected,
@@ -2068,13 +2166,14 @@ window.addEventListener('storage', (e) => {
   if (!lastRawData || !e.key) return;
   if (![
     CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY,
-    CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY
+    CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY, CLIENT_SIZING_MODE_HISTORY_KEY
   ].includes(e.key)) return;
   const connHistory = loadClientConnHistory();
   const latencyHistory = loadClientLatencyHistory();
   const regimeHistory = loadClientRegimeHistory();
   const drawdownHistory = loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY);
   const robustnessHistory = loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY);
+  const sizingModeHistory = loadClientSizingModeHistory();
   renderConnection(lastRawData, connHistory, latencyHistory);
   renderConnectionHistory(lastRawData, connHistory);
   renderDailyUptime(lastRawData, connHistory);
@@ -2094,7 +2193,8 @@ window.addEventListener('storage', (e) => {
   if (lastStatusData) {
     renderPositionSizing(lastStatusData, drawdownHistory, robustnessHistory);
   }
-  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length);
+  renderSizingModeHistory(sizingModeHistory, regimeFrozenAsOf);
+  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length, sizingModeHistory.length);
 });
 
 // Status-page UX guidance is consistent that a manual refresh action should
@@ -2194,10 +2294,11 @@ copyStatusBtn.addEventListener('click', async () => {
 
 // Every other hub (CGT/CSM/Garage/Sondrik) has a "Download backup (.json)"
 // button; Alpha had none, even though this browser's own connectivity,
-// fetch-latency, regime-observation, and drawdown/robustness-trend logs
-// (CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY,
-// CLIENT_REGIME_HISTORY_KEY, CLIENT_DRAWDOWN_HISTORY_KEY,
-// CLIENT_ROBUSTNESS_HISTORY_KEY above) live only in
+// fetch-latency, regime-observation, drawdown/robustness-trend, and
+// sizing-mode-observation logs (CLIENT_CONN_HISTORY_KEY,
+// CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY,
+// CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY,
+// CLIENT_SIZING_MODE_HISTORY_KEY above) live only in
 // localStorage, with no export path if site data is ever cleared. Local
 // download only, nothing is sent anywhere, and read-only like everything
 // else on this page: it only ever reads state already recorded, never
@@ -2214,7 +2315,8 @@ backupBtn.addEventListener('click', () => {
     clientLatencyHistory: loadClientLatencyHistory(),
     clientRegimeHistory: loadClientRegimeHistory(),
     clientDrawdownHistory: loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY),
-    clientRobustnessHistory: loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY)
+    clientRobustnessHistory: loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY),
+    clientSizingModeHistory: loadClientSizingModeHistory()
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -2358,6 +2460,41 @@ document.getElementById('regimeHistoryCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'alpha-regime-history-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const SIZING_MODE_HISTORY_CSV_COLUMNS = [
+  ['mode', 'Sizing mode'], ['start', 'Start'], ['end', 'End'], ['status', 'Status'], ['durationMinutes', 'Duration (min)']
+];
+
+// Same real-rows-export pattern as Regime history above, for the Sizing
+// mode history list: every real activeMode transition this browser has
+// actually observed (see lastSizingModeHistorySnapshot), not just the
+// SIZING_MODE_HISTORY_LIMIT-capped glance view the list itself renders.
+document.getElementById('sizingModeHistoryCsvBtn').addEventListener('click', () => {
+  if (!lastSizingModeHistorySnapshot.length) return;
+  const rows = [...lastSizingModeHistorySnapshot].reverse().map(seg => {
+    const endMs = regimeSegmentEndMs(seg);
+    const durationMinutes = Math.round((endMs - new Date(seg.start).getTime()) / 60000);
+    return {
+      mode: seg.regime,
+      start: formatAbsolute(seg.start),
+      end: seg.current ? 'Ongoing' : formatAbsolute(seg.end),
+      status: seg.current ? 'Ongoing' : 'Ended',
+      durationMinutes
+    };
+  });
+  const header = SIZING_MODE_HISTORY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(r => SIZING_MODE_HISTORY_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-sizing-mode-history-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2652,7 +2789,7 @@ updateOfflineBanner();
 // Renders once immediately, independent of the /api/alpha/live fetch below,
 // so this table is accurate even if that fetch itself fails; loadStatus()
 // re-renders it with fresh counts on every successful tick after this.
-renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length, loadClientLatencyHistory().length, loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY).length, loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY).length);
+renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length, loadClientLatencyHistory().length, loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY).length, loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY).length, loadClientSizingModeHistory().length);
 // Same "render immediately, independent of the network fetch" reasoning as
 // the diagnostics call above: market open/closed has no dependency on
 // /api/alpha/live succeeding at all, so it shouldn't wait on it.
