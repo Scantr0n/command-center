@@ -307,8 +307,11 @@ function renderAuthenticationRulesFreshness() {
 // The retail box prices and the July 12, 2026 effective date were
 // re-verified 2026-09-25 against current USPS/shipping-industry rate
 // trackers: $13.65/$24.80/$34.00 for Small/Medium/Large Flat Rate boxes
-// still hold, no rate change since. No content changed, only the missing
-// freshness badge added.
+// still hold as the year-round baseline. That first pass missed a real,
+// PRC-approved (Sept 9, 2026) temporary peak-season surcharge stacked on
+// top of these rates from Oct 4, 2026 through Jan 17, 2027, added as its
+// own callout below rather than folded into this date, since it's a
+// separate, time-boxed change, not a revision to the July 12 baseline.
 const SHIPPING_COST_REVIEWED_ON = '2026-09-25';
 const SHIPPING_COST_STALE_AFTER_DAYS = 45;
 
