@@ -273,6 +273,14 @@
         if (p.has(id)) p.delete(id); else p.add(id);
         setPinned(p);
         renderHubs(hubs);
+        // renderHubs rebuilds this whole list via innerHTML, which destroys
+        // the very button a keyboard user just pressed Enter/Space on and
+        // drops focus all the way to <body>, forcing them to Tab back down
+        // from the top of the page to keep going. The re-rendered list still
+        // has a pin button for this same hub id (just moved to the other
+        // group), so refocus it there instead of leaving focus stranded.
+        const refocused = hubsEl.querySelector(`.cc-sb-pin[data-pin-id="${CSS.escape(id)}"]`);
+        if (refocused) refocused.focus();
       });
     });
   }
