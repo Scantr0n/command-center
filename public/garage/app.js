@@ -292,6 +292,29 @@ function renderAuthenticationRulesFreshness() {
   el.title = 'Last hand-verified against each platform\'s own authentication/verification program documentation on ' + AUTHENTICATION_RULES_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above, applied to the last
+// reference table on the page that still had prose claiming an "as of"
+// date (September 2026) with nothing tracking whether that claim aged out.
+// The retail box prices and the July 12, 2026 effective date were
+// re-verified 2026-09-25 against current USPS/shipping-industry rate
+// trackers: $13.65/$24.80/$34.00 for Small/Medium/Large Flat Rate boxes
+// still hold, no rate change since. No content changed, only the missing
+// freshness badge added.
+const SHIPPING_COST_REVIEWED_ON = '2026-09-25';
+const SHIPPING_COST_STALE_AFTER_DAYS = 45;
+
+function renderShippingCostFreshness() {
+  const el = document.getElementById('shippingCostFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SHIPPING_COST_REVIEWED_ON);
+  const stale = age != null && age > SHIPPING_COST_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against USPS\'s own published retail rate schedule on ' + SHIPPING_COST_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5112,6 +5135,7 @@ renderTaxTrackerFreshness();
 renderElectronicsRulesFreshness();
 renderPackagingRulesFreshness();
 renderAuthenticationRulesFreshness();
+renderShippingCostFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
