@@ -9,6 +9,7 @@ Jack's unified dashboard — one hub, one cluster per project, radial node-graph
 - Google Drive sync (`credentials/drive.js`) merges local cluster JSON with live snapshots, falls back to local-only silently if Drive is unreachable
 
 ## Commands
+- `npm test`: runs `validate`, `verify:css`, and every hub's `test:*` suite below in sequence, stops at the first failure; run this before trusting any change is done, it is every other command in this section chained into one
 - `npm start` — run the server
 - `npm run build:css` — rebuild Tailwind output after editing `src/input.css`, or after adding/removing any Tailwind class anywhere in `public/**/*.html`/`.js` (run this after any style change, output isn't watched — a class that never gets compiled in silently no-ops with zero console/visual signal, a real bug found three times this way)
 - `npm run verify:css` — rebuilds Tailwind to a scratch file and diffs it against the committed `public/style.css`, exits nonzero if they differ; run this before trusting a diff that touched any HTML/JS class, catches the exact `build:css` drift above without eyeballing the compiled output

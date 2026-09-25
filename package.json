@@ -17,7 +17,8 @@
     "test:job-search": "node --test public/job-search/data/*.test.js",
     "test:dashboard": "node --test public/data/*.test.js",
     "test:server": "node --test data/*.test.js",
-    "test:sidebar": "node --test public/sidebar-core.test.js"
+    "test:sidebar": "node --test public/sidebar-core.test.js",
+    "test": "npm run validate && npm run verify:css && npm run test:sondrik && npm run test:cgt && npm run test:alpha && npm run test:garage && npm run test:csm && npm run test:job-search && npm run test:dashboard && npm run test:server && npm run test:sidebar"
   },
   "license": "ISC",
   "type": "commonjs",
