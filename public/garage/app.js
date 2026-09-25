@@ -1117,6 +1117,7 @@ function renderAttentionBar() {
   const duplicateCount = window.GarageValidateCore ? GarageValidateCore.findDuplicateListings(listings).length : 0;
   const relistDueCount = buildRelistReminders(listings).filter(r => r.date <= today).length;
   const disputeDueCount = buildDisputeReminders(disputesLog).filter(r => r.date <= today).length;
+  const lowStockCount = suppliesLog.filter(isSupplyLowStock).length;
 
   const items = [];
   // A drifted changelog is misinformation already live on the page (a real
@@ -1149,6 +1150,9 @@ function renderAttentionBar() {
   }
   if (relistDueCount) {
     items.push({ n: relistDueCount, tone: 'warn', target: 'relistSection', label: relistDueCount === 1 ? 'relist reminder is due' : 'relist reminders are due' });
+  }
+  if (lowStockCount) {
+    items.push({ n: lowStockCount, tone: 'warn', target: 'suppliesSection', label: lowStockCount === 1 ? 'shipping supply is at or below its reorder point' : 'shipping supplies are at or below their reorder point' });
   }
 
   if (!items.length) {
