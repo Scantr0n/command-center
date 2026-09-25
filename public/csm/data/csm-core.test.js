@@ -25,7 +25,8 @@ const {
   escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany,
-  missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
+  missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
+  emDashFields, emDashHits
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -1022,6 +1023,34 @@ test('computeDataQualityFlags catches a malformed nextNudgeDate', () => {
   const p = { stage: 'researched', nextNudgeDate: '2026-9-5' };
   const flagged = computeDataQualityFlags([], [p]);
   assert.deepEqual(flagged[0].reasons, ['NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING']);
+});
+
+const EM_DASH = String.fromCharCode(8212);
+
+test('emDashFields only reports the fields that actually contain an em dash', () => {
+  assert.deepEqual(emDashFields({ name: 'Jane' + EM_DASH + 'Doe', company: 'Real Co' }, ['name', 'company']), ['name']);
+  assert.deepEqual(emDashFields({ name: 'Jane Doe' }, ['name']), []);
+  assert.deepEqual(emDashFields(null, ['name']), []);
+});
+
+test('emDashHits checks the top-level fields, contactChannel.detail, and every outreachLog/contentIdeas entry', () => {
+  assert.deepEqual(emDashHits({ name: 'Jane' + EM_DASH + 'Doe' }), ['name']);
+  assert.deepEqual(emDashHits({ name: 'Jane Doe', contactChannel: { detail: 'via' + EM_DASH + 'form' } }), ['contactChannel.detail']);
+  assert.deepEqual(
+    emDashHits({ name: 'Jane Doe', outreachLog: [{ note: 'clean' }, { note: 'follow up' + EM_DASH + 'soon' }] }),
+    ['outreachLog[1].note']
+  );
+  assert.deepEqual(
+    emDashHits({ name: 'Jane Doe', contentIdeas: [{ idea: 'idea' + EM_DASH + 'one' }] }),
+    ['contentIdeas[0].idea']
+  );
+  assert.deepEqual(emDashHits({ name: 'Jane Doe' }), []);
+});
+
+test('computeDataQualityFlags flags a pasted-in em dash and names the field it is in', () => {
+  const p = { stage: 'researched', name: 'Jane Doe', nextAction: 'Call them' + EM_DASH + 'soon' };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.deepEqual(flagged[0].reasons, ['EM DASH IN NEXTACTION, CHECK FOR A PASTE-IN']);
 });
 
 test('slugifyProspectId builds a real, readable id from a real name and company', () => {
