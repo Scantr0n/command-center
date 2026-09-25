@@ -388,6 +388,32 @@ function renderSeasonalGuideFreshness() {
   el.title = 'Last hand-verified against current reseller-community seasonal-calendar research on ' + SEASONAL_GUIDE_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. This table directly
+// drives what actually goes in the 48-draft Depop backlog's titles and
+// descriptions before publish, so a stale ranking claim here risks
+// optimizing for a signal a platform no longer weighs. Re-verified
+// 2026-09-25 against current platform-SEO reseller-tooling coverage
+// (Frooition, Webinterpret, Vintefy, Redrip, CLOSO, Flipsail) for all four
+// platforms: eBay's Cassini still weighs title keywords plus complete Item
+// Specifics over hashtags (which it doesn't use), Poshmark still rewards
+// keyword-rich structured titles/descriptions over hashtags, and Depop's
+// up-to-5-hashtags-as-real-keywords mechanic is unchanged. No content
+// changed, only the missing freshness badge added.
+const SEARCH_DISCOVERY_REVIEWED_ON = '2026-09-25';
+const SEARCH_DISCOVERY_STALE_AFTER_DAYS = 45;
+
+function renderSearchDiscoveryFreshness() {
+  const el = document.getElementById('searchDiscoveryFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SEARCH_DISCOVERY_REVIEWED_ON);
+  const stale = age != null && age > SEARCH_DISCOVERY_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own documented search-ranking behavior on ' + SEARCH_DISCOVERY_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5203,6 +5229,7 @@ renderFeeScheduleFreshness();
 renderBestTimeFreshness();
 renderPoshmarkShareFreshness();
 renderSeasonalGuideFreshness();
+renderSearchDiscoveryFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
