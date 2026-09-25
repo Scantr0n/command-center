@@ -205,7 +205,23 @@
     }
     const cls = freshnessClass(asOf, now);
     if (cls === 'down') return { level: 'awaiting', text: 'Connected, reading stale', asOf };
-    if (cls === 'stale') return { level: 'caution', text: 'Connected, reading aging', asOf };
+    // A real stuck-agent anomaly is worth surfacing here too, not only on the
+    // Summary tile further down the page: this headline is the one glance a
+    // background tab (or a phone screenshot) actually gives, same "match the
+    // highest-impact signal, never understate it" rule real status pages
+    // apply to their own top-line badge. A null stuckCount (the /anomalies
+    // subrequest itself failed, see live.anomalies.* in the schema table) is
+    // never treated as "0 stuck agents" here either, same honest-unknown
+    // rule the Summary tile already follows: only a real positive count
+    // moves this headline off "good".
+    const stuckCount = live.anomalies && live.anomalies.stuckCount;
+    const anomalyText = typeof stuckCount === 'number' && stuckCount > 0
+      ? stuckCount + ' stuck agent' + (stuckCount === 1 ? '' : 's') + ' detected'
+      : null;
+    if (cls === 'stale') {
+      return { level: 'caution', text: anomalyText ? 'Connected, reading aging, ' + anomalyText : 'Connected, reading aging', asOf };
+    }
+    if (anomalyText) return { level: 'caution', text: 'Connected, ' + anomalyText, asOf };
     return { level: 'good', text: 'Connected', asOf };
   }
 

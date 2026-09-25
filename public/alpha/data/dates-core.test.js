@@ -290,3 +290,40 @@ test('computeHeadline: connected but truly stale (15+ minutes) reads awaiting, n
   const result = computeHeadline(data, false, NOW);
   assert.deepEqual(result, { level: 'awaiting', text: 'Connected, reading stale', asOf: OLD_ASOF });
 });
+
+test('computeHeadline: connected and fresh with a real stuck-agent count reads caution, not a false-calm good', () => {
+  const data = { connection: { connected: true }, live: { asOf: FRESH_ASOF, anomalies: { stuckCount: 2 } } };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'caution', text: 'Connected, 2 stuck agents detected', asOf: FRESH_ASOF });
+});
+
+test('computeHeadline: singular stuck agent gets singular wording', () => {
+  const data = { connection: { connected: true }, live: { asOf: FRESH_ASOF, anomalies: { stuckCount: 1 } } };
+  const result = computeHeadline(data, false, NOW);
+  assert.equal(result.text, 'Connected, 1 stuck agent detected');
+});
+
+test('computeHeadline: a zero stuck-agent count (a real check that found nothing) stays good', () => {
+  const data = { connection: { connected: true }, live: { asOf: FRESH_ASOF, anomalies: { stuckCount: 0 } } };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'good', text: 'Connected', asOf: FRESH_ASOF });
+});
+
+test('computeHeadline: a null stuck-agent count (the /anomalies check itself failed) is never treated as zero', () => {
+  const data = { connection: { connected: true }, live: { asOf: FRESH_ASOF, anomalies: { stuckCount: null } } };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'good', text: 'Connected', asOf: FRESH_ASOF });
+});
+
+test('computeHeadline: aging reading with a real stuck-agent count combines both facts', () => {
+  const data = { connection: { connected: true }, live: { asOf: AGING_ASOF, anomalies: { stuckCount: 3 } } };
+  const result = computeHeadline(data, false, NOW);
+  assert.deepEqual(result, { level: 'caution', text: 'Connected, reading aging, 3 stuck agents detected', asOf: AGING_ASOF });
+});
+
+test('computeHeadline: kill switch engaged still wins over a stuck-agent count', () => {
+  const data = { connection: { connected: true }, live: { asOf: FRESH_ASOF, killSwitch: { engaged: true }, anomalies: { stuckCount: 5 } } };
+  const result = computeHeadline(data, false, NOW);
+  assert.equal(result.level, 'critical');
+  assert.equal(result.text, 'KILL SWITCH ENGAGED');
+});
