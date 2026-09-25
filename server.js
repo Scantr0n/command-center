@@ -894,6 +894,70 @@ const SEARCH_SOURCES = [
     // application right now ("NY (Remote)", "Goa, India (Remote)", etc.), a
     // real plausible thing to search by ("what did I apply to in India").
     fields: a => [a.company, a.role, a.location]
+  },
+  // Below: the same real-record search extended to every other hand-tracked
+  // entity, not just each hub's one "primary" record type above. A real gap
+  // this closes: "find that dispute about the black boots" or "which goal is
+  // set for downloads" had no answer at all, only the entity type that got
+  // this search first when it was built. Same "small, deliberately chosen
+  // real fields" rule as above; several of these files (Garage's sales/
+  // expenses/disputes/supplies/acquisitions) have zero real rows logged yet,
+  // same as when card-grading/csm/garage/sondrik/job-search above were first
+  // added with data still thin, this just means no matches until real rows
+  // exist, not a fabricated placeholder now.
+  {
+    hub: 'cgt', clusterId: 'card-grading', file: 'submissions.json', key: 'submissions', type: 'submission',
+    label: s => s.description, detail: s => s.gradingCompany || '',
+    fields: s => [s.description, s.gradingCompany],
+    // The one seeded placeholder row still sitting in submissions.json
+    // (see isExampleSubmission in app.js): without this, typing "PSA" would
+    // surface "(example row, not real data)" as if it were a real submission.
+    exclude: s => s.id === 'example-submission-not-real'
+  },
+  {
+    hub: 'cgt', clusterId: 'card-grading', file: 'candidates.json', key: 'candidates', type: 'candidate',
+    label: c => c.cardName, detail: c => c.sport || '',
+    fields: c => [c.cardName, c.sport, c.targetGradingCompany]
+  },
+  {
+    hub: 'garage', clusterId: 'garage', file: 'sales.json', key: 'sales', type: 'sale',
+    label: s => s.title, detail: s => s.platform ? s.platform.toUpperCase() : '',
+    fields: s => [s.title]
+  },
+  {
+    hub: 'garage', clusterId: 'garage', file: 'expenses.json', key: 'expenses', type: 'expense',
+    label: e => e.description, detail: e => e.category || '',
+    fields: e => [e.description]
+  },
+  {
+    hub: 'garage', clusterId: 'garage', file: 'disputes.json', key: 'disputes', type: 'dispute',
+    label: d => d.title, detail: d => d.platform ? d.platform.toUpperCase() : '',
+    fields: d => [d.title, d.outcome]
+  },
+  {
+    hub: 'garage', clusterId: 'garage', file: 'supplies.json', key: 'supplies', type: 'supply',
+    label: s => s.name, detail: s => s.category || '',
+    fields: s => [s.name]
+  },
+  {
+    hub: 'garage', clusterId: 'garage', file: 'acquisitions.json', key: 'acquisitions', type: 'acquisition',
+    label: a => a.sourceName || a.source, detail: a => a.source || '',
+    fields: a => [a.sourceName, a.source]
+  },
+  {
+    hub: 'sondrik', clusterId: 'sondrik', file: 'channels.json', key: 'channels', type: 'channel',
+    label: c => c.name, detail: c => c.status || '',
+    fields: c => [c.name]
+  },
+  {
+    hub: 'sondrik', clusterId: 'sondrik', file: 'releases.json', key: 'releases', type: 'release',
+    label: r => r.version, detail: r => r.summary || '',
+    fields: r => [r.version, r.summary, r.type]
+  },
+  {
+    hub: 'sondrik', clusterId: 'sondrik', file: 'goals.json', key: 'goals', type: 'goal',
+    label: g => g.label, detail: g => g.metric || '',
+    fields: g => [g.label]
   }
 ];
 const SEARCH_RESULT_CAP = 20;
@@ -913,6 +977,7 @@ app.get('/api/search', (req, res) => {
     const items = Array.isArray(data[source.key]) ? data[source.key] : [];
     for (const item of items) {
       if (results.length >= SEARCH_RESULT_CAP) break;
+      if (source.exclude && source.exclude(item)) continue;
       const matched = source.fields(item).some(f => typeof f === 'string' && f.toLowerCase().includes(term));
       if (!matched) continue;
       results.push({
