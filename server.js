@@ -984,6 +984,13 @@ app.get('/api/search', (req, res) => {
         hub: source.hub,
         clusterId: source.clusterId,
         type: source.type,
+        // Real record id, so a click can deep-link into that hub's own page
+        // straight to this record (see recordHref in index.html) instead of
+        // just opening the hub's generic project-summary modal, which never
+        // referenced the clicked record again. Not every source item has a
+        // real id today (releases key off version, applications off num),
+        // so this stays null there rather than fabricating one.
+        id: item.id || null,
         label: source.label(item) || 'Untitled',
         detail: source.detail(item) || ''
       });

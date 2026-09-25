@@ -3036,13 +3036,27 @@ function paletteRecordProjectName(clusterId) {
   return c ? c.name : clusterId;
 }
 
-// paletteResultsCache entries are { kind: 'project', c } or { kind: 'record',
-// r }, never a bare cluster object with its own .id the way this cache used
-// to work before record results existed, so anything that needs "the real
-// cluster id to open" goes through this instead of reading .id directly off
-// a cache entry.
-function paletteItemId(item) {
-  return item.kind === 'project' ? item.c.id : item.r.clusterId;
+// A record result used to just call openModal(r.clusterId), opening that
+// hub's generic project-summary modal, the SAME modal a plain project result
+// opens. The specific card/prospect/listing/lead/application someone typed
+// and clicked was never referenced again, no highlight, no filter, nothing,
+// defeating the point of searching real records in the first place. This
+// instead routes straight into that hub's own page, using whichever
+// deep-link query param that hub's own app.js already supports (confirmed
+// against each hub's real restoreStateFromUrl, not guessed): CSM opens the
+// exact prospect via ?prospect=<id>, CGT/Garage pre-fill their real search
+// box via ?q=/?candQ= so the matching row is right there on load. Sondrik
+// and job-search don't support any record-level URL state yet, so those
+// just land on the right hub page rather than the wrong modal, still a real
+// fix even without a pre-filled filter.
+function recordHref(r) {
+  const base = '/' + r.hub + '/';
+  const params = new URLSearchParams();
+  if (r.type === 'prospect' && r.id) params.set('prospect', r.id);
+  else if (r.type === 'card' || r.type === 'listing') params.set('q', r.label);
+  else if (r.type === 'candidate') params.set('candQ', r.label);
+  const qs = params.toString();
+  return base + (qs ? '?' + qs : '');
 }
 
 function renderPaletteResults() {
@@ -3118,7 +3132,7 @@ function renderPaletteResults() {
     if (item.kind === 'project') {
       const c = item.c;
       return `
-        <div class="palette-item" role="option" id="palette-opt-${i}" data-id="${escapeHtml(c.id)}" aria-selected="${i === paletteSelectedIndex}">
+        <div class="palette-item" role="option" id="palette-opt-${i}" aria-selected="${i === paletteSelectedIndex}">
           <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${categoryColor(c.category)}"></span>
           <span class="palette-item-name">${escapeHtml(c.name)}</span>
           <span class="palette-item-cat">${escapeHtml((c.category || 'Uncategorized').toUpperCase())}</span>
@@ -3129,7 +3143,7 @@ function renderPaletteResults() {
     const r = item.r;
     const projectName = paletteRecordProjectName(r.clusterId);
     return `
-      <div class="palette-item palette-item-record" role="option" id="palette-opt-${i}" data-id="${escapeHtml(r.clusterId)}" aria-selected="${i === paletteSelectedIndex}">
+      <div class="palette-item palette-item-record" role="option" id="palette-opt-${i}" aria-selected="${i === paletteSelectedIndex}">
         <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:var(--faint)"></span>
         <span class="palette-record-body">
           <span class="palette-item-name">${escapeHtml(r.label)}</span>
@@ -3149,7 +3163,7 @@ function renderPaletteResults() {
   list.innerHTML = projectHtml + recordHtml;
   document.getElementById('paletteInput').setAttribute('aria-activedescendant', `palette-opt-${paletteSelectedIndex}`);
   list.querySelectorAll('.palette-item').forEach(el => {
-    el.addEventListener('click', () => activatePaletteItem(el.dataset.id));
+    el.addEventListener('click', () => activatePaletteItem(Number(el.id.replace('palette-opt-', ''))));
     el.addEventListener('mouseenter', () => {
       paletteSelectedIndex = Number(el.id.replace('palette-opt-', ''));
       renderPaletteResults();
@@ -3165,9 +3179,12 @@ function paletteMove(delta) {
   renderPaletteResults();
 }
 
-function activatePaletteItem(id) {
+function activatePaletteItem(index) {
+  const item = paletteResultsCache[index];
+  if (!item) return;
   closePalette();
-  openModal(id);
+  if (item.kind === 'project') { openModal(item.c.id); return; }
+  location.href = recordHref(item.r);
 }
 
 function openPalette() {
@@ -3479,8 +3496,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowUp') { e.preventDefault(); paletteMove(-1); return; }
     if (e.key === 'Enter') {
       e.preventDefault();
-      const target = paletteResultsCache[paletteSelectedIndex];
-      if (target) activatePaletteItem(paletteItemId(target));
+      if (paletteResultsCache[paletteSelectedIndex]) activatePaletteItem(paletteSelectedIndex);
       return;
     }
     if (e.key === 'Tab') { trapTabInside('paletteOverlay', e); return; }
