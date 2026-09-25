@@ -13,6 +13,7 @@ let lastFocusedEl = null;
 // initialListingId use.
 let initialCardId = null;
 let initialSubmissionId = null;
+let initialCandidateId = null;
 let searchTerm = '';
 let activeSport = 'all';
 let activeBasis = 'all';
@@ -59,6 +60,8 @@ function restoreStateFromUrl() {
   if (card) initialCardId = card;
   const submission = params.get('submission');
   if (submission) initialSubmissionId = submission;
+  const candidateId = params.get('candidate');
+  if (candidateId) initialCandidateId = candidateId;
   if (q) searchTerm = q;
   if (sport && VALID_SPORTS.includes(sport)) activeSport = sport;
   if (basis && VALID_BASES.includes(basis)) activeBasis = basis;
@@ -587,6 +590,7 @@ async function loadCards() {
     initTableScrollShadows();
     if (initialCardId && cards.some(c => c.id === initialCardId)) openModal(initialCardId);
     if (initialSubmissionId && submissions.some(s => s.id === initialSubmissionId)) openSubmissionModal(initialSubmissionId);
+    if (initialCandidateId && candidates.some(c => c.id === initialCandidateId)) openCandidateModal(initialCandidateId);
   } catch (e) {
     cards = [];
     rawCardsData = null;

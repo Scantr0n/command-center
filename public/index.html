@@ -3043,25 +3043,20 @@ function paletteRecordProjectName(clusterId) {
 // defeating the point of searching real records in the first place. This
 // instead routes straight into that hub's own page, using whichever
 // deep-link query param that hub's own app.js already supports (confirmed
-// against each hub's real restoreStateFromUrl, not guessed): CSM opens the
-// exact prospect via ?prospect=<id>, CGT/Garage pre-fill their real search
-// box via ?q=/?candQ= so the matching row is right there on load. Sondrik
-// and job-search don't support any record-level URL state yet, so those
-// just land on the right hub page rather than the wrong modal, still a real
-// fix even without a pre-filled filter.
+// against each hub's real restoreStateFromUrl, not guessed): CSM/Garage/CGT
+// all now open the exact record by id (?prospect=/?listing=/?card=/
+// ?submission=/?candidate=<id>). Sondrik and job-search don't support any
+// record-level URL state yet, so those just land on the right hub page
+// rather than the wrong modal, still a real fix even without a deep link.
 function recordHref(r) {
   const base = '/' + r.hub + '/';
   const params = new URLSearchParams();
-  if (r.type === 'prospect' && r.id) params.set('prospect', r.id);
-  // Garage and CGT now support the same "open this one exact record" deep
-  // link as CSM (?listing=/?card=<id>, restoreStateFromUrl in garage/app.js
-  // and cgt/app.js), an id match rather than a label substring search, so a
-  // title that collides with another (or contains characters ?q= would
-  // filter oddly on) still opens the right one.
-  else if (r.type === 'listing' && r.id) params.set('listing', r.id);
-  else if (r.type === 'card' && r.id) params.set('card', r.id);
-  else if (r.type === 'submission' && r.id) params.set('submission', r.id);
-  else if (r.type === 'candidate') params.set('candQ', r.label);
+  if (!r.id) return base;
+  if (r.type === 'prospect') params.set('prospect', r.id);
+  else if (r.type === 'listing') params.set('listing', r.id);
+  else if (r.type === 'card') params.set('card', r.id);
+  else if (r.type === 'submission') params.set('submission', r.id);
+  else if (r.type === 'candidate') params.set('candidate', r.id);
   const qs = params.toString();
   return base + (qs ? '?' + qs : '');
 }
