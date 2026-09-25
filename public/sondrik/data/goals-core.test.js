@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   daysBetween, addDays, isValidDateStr, downloadsPerDayRate, recentDownloadsPerDayRate,
-  goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
+  goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay
 } = require('./goals-core.js');
 
 test('daysBetween counts whole days between two local dates', () => {
@@ -140,4 +140,26 @@ test('computeGoalPaceStatus tiers behind/on/ahead at the +-10 point thresholds',
   assert.equal(computeGoalPaceStatus('2026-09-01', '2026-09-11', 39, '2026-09-06').tier, 'behind');
   assert.equal(computeGoalPaceStatus('2026-09-01', '2026-09-11', 45, '2026-09-06').tier, 'on');
   assert.equal(computeGoalPaceStatus('2026-09-01', '2026-09-11', 61, '2026-09-06').tier, 'ahead');
+});
+
+test('computeRequiredPerDay divides what is left by the days left', () => {
+  const req = computeRequiredPerDay(150, 15, '2026-12-31', '2026-09-25');
+  assert.equal(req.daysLeft, 97);
+  assert.equal(req.remaining, 135);
+  assert.ok(Math.abs(req.perDay - 135 / 97) < 1e-9);
+});
+
+test('computeRequiredPerDay is null once the target is already met', () => {
+  assert.equal(computeRequiredPerDay(150, 150, '2026-12-31', '2026-09-25'), null, 'exactly met');
+  assert.equal(computeRequiredPerDay(150, 200, '2026-12-31', '2026-09-25'), null, 'exceeded');
+});
+
+test('computeRequiredPerDay is null with an invalid targetDate instead of dividing by a bad span', () => {
+  assert.equal(computeRequiredPerDay(150, 15, null, '2026-09-25'), null, 'missing targetDate');
+  assert.equal(computeRequiredPerDay(150, 15, '2026-12-1', '2026-09-25'), null, 'non-zero-padded targetDate');
+});
+
+test('computeRequiredPerDay is null once the deadline itself has passed, the overdue banner already covers that', () => {
+  assert.equal(computeRequiredPerDay(150, 15, '2026-09-01', '2026-09-25'), null, 'targetDate before today');
+  assert.equal(computeRequiredPerDay(150, 15, '2026-09-25', '2026-09-25'), null, 'due today, no days left to spread the rate over');
 });

@@ -34,7 +34,7 @@
   // live in one place a test suite can actually exercise.
   const {
     daysBetween, addDays, isValidDateStr, recentDownloadsPerDayRate,
-    goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus
+    goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay
   } = window.SondrikGoalsCore;
 
   // Shared, unit-tested bugfix-checkin date math (release-core.js), same
@@ -829,6 +829,41 @@
       // 0.94/day lifetime average (0 to 8 in 3 days, then 8 to 15 over the
       // next 13) was overstating the real, slower 0.54/day pace the most
       // recent check actually shows.
+      // A third, distinct forward-look from paceStatusHtml and projectionHtml
+      // above. paceStatusHtml compares progress to elapsed time; projectionHtml
+      // projects an ETA from the recent trend. Neither answers the question
+      // that's actually actionable starting today: what rate does hitting the
+      // real targetDate require from here, period, independent of any trend?
+      // Real goal-tracking dashboards surface this specifically because a raw
+      // percent-of-target reads as abstract while "~1.4/day for 97 days" reads
+      // as an instruction. Shown only once there's a real, positive amount
+      // still needed against a real remaining window (computeRequiredPerDay
+      // itself returns null for an already-met target or a passed/invalid
+      // targetDate, both already covered by achievedHtml/paceHtml above).
+      let requiredPaceHtml = '';
+      if (!achieved) {
+        const required = computeRequiredPerDay(g.target, currentCount, g.targetDate, todayIso());
+        if (required) {
+          const recent = g.metric === 'downloads' ? recentDownloadsPerDayRate(downloadsData) : null;
+          let tierClass = '';
+          let tierNote = '';
+          if (recent) {
+            if (recent.perDay >= required.perDay) {
+              tierClass = ' goal-required-pace-ontrack';
+              tierNote = ', RECENT PACE (~' + recent.perDay.toFixed(1) + '/DAY) ALREADY CLEARS THIS';
+            } else {
+              tierClass = ' goal-required-pace-behind';
+              tierNote = ', RECENT PACE IS ONLY ~' + recent.perDay.toFixed(1) + '/DAY';
+            }
+          }
+          requiredPaceHtml = '<div class="goal-required-pace' + tierClass + ' font-mono" ' +
+            'title="' + escapeHtml(required.remaining + ' more needed over ' + required.daysLeft + ' remaining ' +
+              (required.daysLeft === 1 ? 'day' : 'days') + ' to reach the ' + fmtDate(g.targetDate) + ' target date.') + '">' +
+            'NEEDS ~' + required.perDay.toFixed(1) + '/DAY FROM HERE TO HIT ' + fmtDate(g.targetDate).toUpperCase() + tierNote +
+            '</div>';
+        }
+      }
+
       let projectionHtml = '';
       if (g.metric === 'downloads' && currentCount < g.target) {
         const rate = recentDownloadsPerDayRate(downloadsData);
@@ -869,6 +904,7 @@
         achievedHtml +
         paceHtml +
         paceStatusHtml +
+        requiredPaceHtml +
         projectionHtml +
         (g.note ? '<div class="goal-note">' + escapeHtml(g.note) + '</div>' : '') +
         '</div>';

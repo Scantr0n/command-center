@@ -1228,6 +1228,14 @@ section { margin-bottom: 52px; }
   letter-spacing: 0.02em;
 }
 .goal-projection-flat { color: #E0A030; }
+.goal-required-pace {
+  font-size: 0.68rem;
+  color: var(--dim);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.goal-required-pace-ontrack { color: #3DDC84; }
+.goal-required-pace-behind { color: #E0A030; }
 .goal-note {
   font-size: 0.75rem;
   color: var(--sub);
@@ -1484,7 +1492,7 @@ footer.page-foot {
   .snapshot-chip-meta { color: #555; }
   .release-date, .release-relative, .stat-source, .lead-source, .lead-note, .scope-note, .compare-bar-date, .freshness-badge,
   .timeline-date, .timeline-detail, .timeline-undated-label, .stat-rate, .stat-cadence, .stat-milestone, .trend-caveat, .last-updated, .last-updated-stale, .channel-note,
-  .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-projection, .goal-note, .goal-achieved,
+  .channel-value-empty, .goal-set-date, .goal-current, .goal-pace, .goal-pace-status, .goal-projection, .goal-required-pace, .goal-note, .goal-achieved,
   .changelog-author, .changelog-generated-note { color: #555; }
   .stat-delta { color: #111; }
   .lead-type { border-color: #999; color: #333; }
@@ -1526,12 +1534,12 @@ footer.page-foot {
      clear 4.5:1 on white, not arbitrary picks. */
   .bugfix-checkin-due, .bugfix-checkin-missed, .bugfix-checkin-upcoming,
   .last-updated-stale, .freshness-aging, .freshness-stale,
-  .goal-pace-overdue, .goal-pace-status-behind, .goal-projection-flat,
+  .goal-pace-overdue, .goal-pace-status-behind, .goal-projection-flat, .goal-required-pace-behind,
   .timeline-title-reset, .empty-state.file-error, .stat-milestone, .stat-cadence,
   .section-title-meta.warn {
     color: #8a5a00;
   }
-  .goal-pace-status-ahead, .goal-achieved {
+  .goal-pace-status-ahead, .goal-achieved, .goal-required-pace-ontrack {
     color: #176b3a;
   }
 }

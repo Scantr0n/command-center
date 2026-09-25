@@ -145,6 +145,28 @@
     return { totalDays, elapsedDays, clampedElapsedDays, expectedPct, diff, tier };
   }
 
+  // The forward-looking counterpart to computeGoalPaceStatus above.
+  // computeGoalPaceStatus asks "given time elapsed so far, am I on track?";
+  // this instead asks "given time left, what rate do I actually need from
+  // here?" ((target - current) / days left), the number that answers what
+  // Jack would actually have to do starting today, not just how far behind
+  // he already is. Real product-goal dashboards surface this specifically
+  // because a raw percent-of-target reads as abstract while a concrete
+  // per-day figure reads as an instruction.
+  // Returns null once there's nothing honest left to say with it: an
+  // invalid/missing targetDate, a deadline that's already passed (the
+  // overdue case is already covered by the caller's own goal-pace banner,
+  // a second "you needed X/day" here would just be noise), or a target
+  // already met (remaining <= 0, achievedHtml already covers that state).
+  function computeRequiredPerDay(target, currentCount, targetDate, todayIsoStr) {
+    if (!isValidDateStr(targetDate)) return null;
+    const remaining = target - currentCount;
+    if (!(remaining > 0)) return null;
+    const daysLeft = daysBetween(todayIsoStr, targetDate);
+    if (!(daysLeft > 0)) return null;
+    return { daysLeft, remaining, perDay: remaining / daysLeft };
+  }
+
   return {
     daysBetween,
     addDays,
@@ -153,6 +175,7 @@
     recentDownloadsPerDayRate,
     goalReachedDate,
     computeGoalProgressPct,
-    computeGoalPaceStatus
+    computeGoalPaceStatus,
+    computeRequiredPerDay
   };
 });

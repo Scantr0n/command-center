@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-22T15:45:55.773Z",
+  "generatedAt": "2026-09-25T20:21:48.067Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "f384460",
+      "fullHash": "f384460b540ef787f905959248f9d87402bb406f",
+      "date": "2026-09-25",
+      "author": "Claude",
+      "subject": "Sondrik: add X (Twitter) as a tracked-gap channel card and norms row",
+      "historyReset": false,
+      "files": [
+        "channels.json"
+      ]
+    },
     {
       "hash": "91b990c",
       "fullHash": "91b990cf68114e800de8632e31db46ae72fc7f28",
