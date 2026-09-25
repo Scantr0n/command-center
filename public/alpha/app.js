@@ -128,9 +128,9 @@ function fmtDate(dateOnly) {
 // priority here it takes everywhere else on this page (see computeHeadline):
 // a background tab showing a calm green dot while the kill switch is engaged
 // would defeat the entire point of a glance indicator.
-const GLANCE_COLORS = { live: '#3DDC84', stale: '#E0A030', down: '#7B8188', error: '#E05050', critical: '#E05050' };
+const GLANCE_COLORS = { live: '#3DDC84', stale: '#E0A030', anomaly: '#E0A030', down: '#7B8188', error: '#E05050', critical: '#E05050' };
 const GLANCE_TEXT = {
-  live: 'connected', stale: 'connected, stale', down: 'awaiting connection', error: 'error', critical: 'kill switch engaged'
+  live: 'connected', stale: 'connected, stale', anomaly: 'connected, anomaly detected', down: 'awaiting connection', error: 'error', critical: 'kill switch engaged'
 };
 
 function updateGlanceIndicators(cls) {
@@ -2003,8 +2003,17 @@ async function loadStatus() {
     renderRegimeHistory(clientRegimeHistory, lastKnown && lastKnown.asOf);
     // Kill switch engaged outranks plain connection freshness for the one
     // glance a background tab gives Jack, same priority it gets everywhere
-    // else on this page.
-    updateGlanceIndicators(headline.level === 'critical' ? 'critical' : connCls);
+    // else on this page. A real stuck-agent anomaly needs the same override
+    // when the reading is otherwise fresh (connCls === 'live'): computeHeadline
+    // already turns the on-page headline amber for that case, and without this
+    // the favicon/tab-title, the actual mechanism for checking without
+    // switching tabs, would keep showing a false-calm green the whole time.
+    // When the anomaly coincides with an aging reading, connCls is already
+    // 'stale' (the same amber), so this only changes the label, not the color.
+    const glanceCls = headline.level === 'critical'
+      ? 'critical'
+      : (headline.level === 'caution' && connCls === 'live' ? 'anomaly' : connCls);
+    updateGlanceIndicators(glanceCls);
     renderStats(effectiveData);
     renderAccount(data);
     renderPositions(data);
