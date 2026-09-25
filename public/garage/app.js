@@ -414,6 +414,34 @@ function renderSearchDiscoveryFreshness() {
   el.title = 'Last hand-verified against each platform\'s own documented search-ranking behavior on ' + SEARCH_DISCOVERY_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. This table's numbers
+// (Vinted's ~5% liker-notify threshold, Poshmark's 10%-below-lowest-price
+// threshold, eBay Markdown Manager's Store-subscription requirement) are
+// exactly the kind of platform mechanic that already drifted wrong twice
+// elsewhere on this page (the fee schedule, the authentication thresholds),
+// so a stale one here risks a price drop that either wastes a discount
+// below the real notify threshold or silently fails to trigger it at all.
+// Re-verified 2026-09-25 against current platform-tooling coverage
+// (VintSale, SuperDS, PageCrawl) plus eBay's own Discounts Manager help
+// page: Vinted's roughly-5% favoriter-notify threshold, eBay Markdown
+// Manager's Store-subscription (Starter+) requirement and strikethrough/
+// watcher-notify mechanic, and Depop's bulk price-drop badge/notify tool
+// all still hold, no change needed.
+const MARKDOWN_REVIEWED_ON = '2026-09-25';
+const MARKDOWN_STALE_AFTER_DAYS = 45;
+
+function renderMarkdownFreshness() {
+  const el = document.getElementById('markdownFreshness');
+  if (!el) return;
+  const age = daysSincePublished(MARKDOWN_REVIEWED_ON);
+  const stale = age != null && age > MARKDOWN_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own current price-drop tools and documented behavior on ' + MARKDOWN_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5230,6 +5258,7 @@ renderBestTimeFreshness();
 renderPoshmarkShareFreshness();
 renderSeasonalGuideFreshness();
 renderSearchDiscoveryFreshness();
+renderMarkdownFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
