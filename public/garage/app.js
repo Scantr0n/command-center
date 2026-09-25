@@ -315,6 +315,32 @@ function renderShippingCostFreshness() {
   el.title = 'Last hand-verified against USPS\'s own published retail rate schedule on ' + SHIPPING_COST_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. The "Best time to post"
+// table drives real posting-schedule decisions on the 48-draft Depop
+// backlog, so a stale claim here is a real risk of Jack posting into a dead
+// window instead of the platform's own peak one, not just a cosmetic
+// reference going stale. Re-verified 2026-09-25 against current
+// reseller-tooling coverage (CLOSO, Vendy Studio, TopDown Trading,
+// PoshSidekick) for all four platforms: the eBay Sunday-evening peak, the
+// Vinted weekday-evening/Wednesday-6:30pm/Sunday-afternoon windows, the
+// Poshmark lunch/evening/Sunday windows plus the 3x/day sharing cadence,
+// and the Depop weekday-lunch/evening/weekend-morning windows all still
+// match current guidance, no change needed.
+const BEST_TIME_REVIEWED_ON = '2026-09-25';
+const BEST_TIME_STALE_AFTER_DAYS = 45;
+
+function renderBestTimeFreshness() {
+  const el = document.getElementById('bestTimeFreshness');
+  if (!el) return;
+  const age = daysSincePublished(BEST_TIME_REVIEWED_ON);
+  const stale = age != null && age > BEST_TIME_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current reseller-community posting-time research on ' + BEST_TIME_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5127,6 +5153,7 @@ wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();
 renderFeeScheduleFreshness();
+renderBestTimeFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
