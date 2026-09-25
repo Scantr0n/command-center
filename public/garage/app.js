@@ -341,6 +341,30 @@ function renderBestTimeFreshness() {
   el.title = 'Last hand-verified against current reseller-community posting-time research on ' + BEST_TIME_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. This callout drives the
+// actual sharing-cadence guidance the manual log below is measured against
+// (once/twice daily, diminishing returns past ~4x/day), so a stale claim
+// here risks Jack under- or over-sharing against a bar that's moved.
+// Re-verified 2026-09-25 against current Poshmark reseller-tooling coverage
+// (PoshSidekick, CLOSO, Reeva): sharing the full closet 3x/day (morning,
+// midday, evening) still captures the great majority of the visibility
+// benefit, and sharing beyond roughly 4x/day still shows diminishing
+// returns, no change needed.
+const POSHMARK_SHARE_REVIEWED_ON = '2026-09-25';
+const POSHMARK_SHARE_STALE_AFTER_DAYS = 45;
+
+function renderPoshmarkShareFreshness() {
+  const el = document.getElementById('poshmarkShareFreshness');
+  if (!el) return;
+  const age = daysSincePublished(POSHMARK_SHARE_REVIEWED_ON);
+  const stale = age != null && age > POSHMARK_SHARE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current Poshmark reseller-community sharing-cadence guidance on ' + POSHMARK_SHARE_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5154,6 +5178,7 @@ initPhotoAudit();
 renderSeasonalCalendarHighlight();
 renderFeeScheduleFreshness();
 renderBestTimeFreshness();
+renderPoshmarkShareFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
