@@ -130,8 +130,26 @@
   @keyframes spokeFlow { to { stroke-dashoffset: -14; } }
   .hub-node text, .graph-node text { pointer-events: none; user-select: none; }
   .view-toggle-btn { transition: all 0.15s ease; }
-  .view-toggle-btn.active { background: var(--ink); color: var(--void); }
+  /* Ties the active view toggle into the same blue accent as the hub's
+     own energy-core treatment (a plain white/black invert read as
+     disconnected from the rest of the new color language) - real color,
+     not grayscale, plus a matching glow so it reads as "lit up" rather
+     than just inverted. */
+  .view-toggle-btn.active { background: linear-gradient(135deg, #5A82FF, #3D5AC0); color: #fff; box-shadow: 0 0 12px -2px rgba(90,130,255,0.5); }
   .view-toggle-btn:not(.active) { background: transparent; color: var(--sub); }
+  /* Same "glass panel" depth (inset top-highlight) as every other panel
+     surface this pass touched, plus a real hover-lift so these read as
+     tactile controls, not flat labels - box-shadow/transform only, never
+     `background`, since every one of these already sets that inline
+     (a shorthand that would silently reset any background-image layer). */
+  #searchInput, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn {
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+  #paletteBtn:hover, #backupBtn:not(:disabled):hover, #printBtn:hover, #shortcutsBtn:hover {
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.09), 0 6px 16px -6px rgba(0,0,0,0.5);
+    transform: translateY(-1px);
+  }
   /* Collapsed-by-default sections (Recent Commits, Venture Snapshot):
      real research finding (dashboard progressive-disclosure patterns -
      Grafana's collapsed row panels, Notion's toggle headings) is that
