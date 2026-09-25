@@ -826,6 +826,23 @@ section { margin-bottom: 52px; }
   color: var(--dim);
   text-align: center;
 }
+/* Release/deploy-annotation marker under whichever bar is the first real
+   check logged on or after a release actually shipped (see release-core.js's
+   releaseMarkersForChecks). Reuses the same amber/gold the Timeline's own
+   RELEASE badge already uses (.timeline-kind-release .timeline-badge), so a
+   release reads as the same real event whether it's seen in the Timeline
+   feed or annotated here on the download chart. */
+.compare-bar-release-marker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #E0A030;
+  background: rgba(224,160,48,0.1);
+  border: 1px solid rgba(224,160,48,0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
 .compare-gap-note {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.62rem;
@@ -1473,7 +1490,7 @@ footer.page-foot {
   .lead-type { border-color: #999; color: #333; }
   .release-badge, .timeline-badge, .timeline-milestone-badge,
   .timeline-kind-release .timeline-badge, .timeline-kind-check .timeline-badge, .timeline-kind-lead .timeline-badge,
-  .timeline-kind-goal .timeline-badge {
+  .timeline-kind-goal .timeline-badge, .compare-bar-release-marker {
     border-color: #999; background: none; color: #111;
   }
   .compare-bar { border-color: #ccc; }

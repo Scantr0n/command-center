@@ -179,6 +179,44 @@
     return reminders.sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  // Attaches each real, dated release to the earliest real download check
+  // logged on or after it shipped, so the Traction chart can mark "a release
+  // went out around here" on the same axis as the download counts instead of
+  // only listing the two kinds of events separately in the Timeline feed.
+  // This is the standard release/deploy-annotation pattern from metrics
+  // dashboards (e.g. Grafana annotations): overlay a ship-date marker on the
+  // metric chart so a real bump (or lack of one) can actually be read next
+  // to the release that might explain it, rather than asking the reader to
+  // cross-reference two dates by eye.
+  //
+  // Deliberately approximate, not exact-day: Sondrik logs download counts on
+  // whatever days someone actually pulls a fresh one, not daily, so a
+  // release that shipped between two checks has no bar of its own to sit on.
+  // Attaching it to the next real check after it (rather than inventing an
+  // interpolated point) keeps every marker tied to a real logged count, never
+  // a fabricated one. A release with no later check yet (shipped after the
+  // most recent one on file) gets no marker; there is nothing real to attach
+  // it to until the next check is logged.
+  //
+  // Returns an array parallel to the sorted `checks` input: markers[i] is
+  // the list of releases attached to checks[i], possibly empty. `checks` and
+  // `releases` must already be real arrays (not wrapped in .metric/.releases),
+  // and `checks` must already be sorted ascending by date, same contract
+  // renderTraction's own `checks` variable already satisfies.
+  function releaseMarkersForChecks(releases, checks) {
+    const sortedChecks = (checks || []).filter(c => c && c.date);
+    const markers = sortedChecks.map(() => []);
+    const dated = (releases || [])
+      .filter(r => r && r.date && isValidDateStr(r.date))
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date));
+    dated.forEach(release => {
+      const idx = sortedChecks.findIndex(c => c.date >= release.date);
+      if (idx !== -1) markers[idx].push(release);
+    });
+    return markers;
+  }
+
   return {
     daysBetween,
     addDays,
@@ -187,6 +225,7 @@
     BUGFIX_CHECKPOINT_GRACE_DAYS,
     bugfixCheckinStatus,
     suggestedCheckCadence,
-    computeReminders
+    computeReminders,
+    releaseMarkersForChecks
   };
 });

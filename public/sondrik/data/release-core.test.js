@@ -15,7 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   daysBetween, addDays, isValidDateStr, BUGFIX_CHECKPOINTS, bugfixCheckinStatus,
-  suggestedCheckCadence, computeReminders
+  suggestedCheckCadence, computeReminders, releaseMarkersForChecks
 } = require('./release-core.js');
 
 const identity = iso => iso;
@@ -193,4 +193,53 @@ test('computeReminders sorts a real mix of bugfix and cadence reminders chronolo
   const dates = reminders.map(r => r.date);
   assert.deepEqual(dates, [...dates].sort(), 'reminders come back in real chronological order');
   assert.deepEqual(dates, ['2026-09-21', '2026-09-27', '2026-10-04']);
+});
+
+test('releaseMarkersForChecks attaches a release to the earliest real check on or after its ship date, the real v0.3.7 case', () => {
+  const checks = [{ date: '2026-09-04', count: 0 }, { date: '2026-09-07', count: 8 }, { date: '2026-09-20', count: 15 }];
+  const releases = [{ version: '0.3.7', date: '2026-09-07', summary: 'Fixed default CRM seed data' }];
+  const markers = releaseMarkersForChecks(releases, checks);
+  assert.equal(markers.length, 3, 'one entry per check, parallel arrays');
+  assert.deepEqual(markers[0], [], 'the 09-04 check is before the release, no marker');
+  assert.equal(markers[1].length, 1, 'the 09-07 check is the real ship date itself');
+  assert.equal(markers[1][0].version, '0.3.7');
+  assert.deepEqual(markers[2], []);
+});
+
+test('releaseMarkersForChecks attaches a release that shipped between two checks to the next check after it, never an invented one', () => {
+  const checks = [{ date: '2026-09-01', count: 5 }, { date: '2026-09-15', count: 20 }];
+  const releases = [{ version: '0.4.0', date: '2026-09-10' }];
+  const markers = releaseMarkersForChecks(releases, checks);
+  assert.deepEqual(markers[0], []);
+  assert.equal(markers[1].length, 1, 'the 09-15 check is the first real check on or after the 09-10 ship date');
+  assert.equal(markers[1][0].version, '0.4.0');
+});
+
+test('releaseMarkersForChecks drops a release shipped after the most recent check, no real check to attach it to yet', () => {
+  const checks = [{ date: '2026-09-01', count: 5 }];
+  const releases = [{ version: '0.4.0', date: '2026-09-10' }];
+  const markers = releaseMarkersForChecks(releases, checks);
+  assert.deepEqual(markers[0], []);
+});
+
+test('releaseMarkersForChecks skips an undated or malformed-date release rather than crashing', () => {
+  const checks = [{ date: '2026-09-01', count: 5 }];
+  const releases = [{ version: '0.3.6', date: null }, { version: '0.3.5', date: '2026-9-1' }];
+  const markers = releaseMarkersForChecks(releases, checks);
+  assert.deepEqual(markers[0], []);
+});
+
+test('releaseMarkersForChecks attaches two releases shipped in the same gap to the same next check, both kept', () => {
+  const checks = [{ date: '2026-09-01', count: 5 }, { date: '2026-09-20', count: 30 }];
+  const releases = [{ version: '0.4.0', date: '2026-09-05' }, { version: '0.4.1', date: '2026-09-08' }];
+  const markers = releaseMarkersForChecks(releases, checks);
+  assert.equal(markers[1].length, 2);
+  assert.deepEqual(markers[1].map(r => r.version), ['0.4.0', '0.4.1'], 'in real chronological ship order');
+});
+
+test('releaseMarkersForChecks returns an all-empty parallel array for no releases or no checks, not undefined/null entries', () => {
+  const checks = [{ date: '2026-09-01', count: 5 }];
+  assert.deepEqual(releaseMarkersForChecks([], checks), [[]]);
+  assert.deepEqual(releaseMarkersForChecks(null, checks), [[]]);
+  assert.deepEqual(releaseMarkersForChecks([{ version: '0.3.7', date: '2026-09-01' }], []), []);
 });

@@ -42,7 +42,7 @@
   // has already produced two real bugs (a NaN-date crash, a silently
   // dropped missed-checkpoint) now lives in one place a test suite can
   // actually exercise. See release-core.js's own header for both bugs.
-  const { bugfixCheckinStatus, suggestedCheckCadence, computeReminders: computeRemindersCore } = window.SondrikReleaseCore;
+  const { bugfixCheckinStatus, suggestedCheckCadence, computeReminders: computeRemindersCore, releaseMarkersForChecks } = window.SondrikReleaseCore;
 
   // Shared, unit-tested CSV/ICS serialization (export-core.js): csvField's
   // CSV/formula-injection guard and icsFoldLine's UTF-8-byte-aware line
@@ -518,7 +518,7 @@
       '</div>';
   }
 
-  function renderTraction(data) {
+  function renderTraction(data, releasesData) {
     const metric = data.metric || {};
     const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     if (checks.length === 0) {
@@ -601,6 +601,15 @@
       (isStale ? ', RE-CHECK GITHUB API' : isAging ? ', CHECK AGAIN SOON' : '') +
       '</div>';
 
+    // Which real, dated releases attached to which real check, the standard
+    // release/deploy-annotation pattern (see release-core.js's own comment
+    // on releaseMarkersForChecks): so a real download bump can actually be
+    // read next to the release that might explain it instead of only
+    // listing the two kinds of events separately in the Timeline feed.
+    const releaseMarkers = releaseMarkersForChecks((releasesData && releasesData.releases) || [], checks);
+    const releaseLabel = list => list.map(r => 'v' + r.version).join(', ');
+    const releaseTitle = list => list.map(r => 'v' + r.version + (r.summary ? ': ' + r.summary : '')).join('; ');
+
     // The gap note between two bars should reflect the real span between those
     // two specific checks, not a fixed claim, since consecutive daily checks
     // (gap of exactly 1 day) do have daily tracking between them.
@@ -613,22 +622,31 @@
           gapNote = '<span class="compare-gap-note" aria-hidden="true">' + gap + ' days between checks, no daily tracking</span>';
         }
       }
+      const releasesAtCheck = releaseMarkers[i] || [];
+      const releaseMarkerHtml = releasesAtCheck.length
+        ? '<span class="compare-bar-release-marker font-mono" title="' + escapeHtml(releaseTitle(releasesAtCheck)) + ' shipped">' +
+          escapeHtml(releaseLabel(releasesAtCheck)) + '</span>'
+        : '';
       return gapNote + '<div class="compare-bar-col">' +
         '<span class="compare-bar-count font-mono">' + c.count + '</span>' +
         '<div class="compare-bar" style="height:70px">' +
         '<div class="compare-bar-fill" style="height:' + heightPct + '%"></div>' +
         '</div>' +
         '<span class="compare-bar-date">' + fmtDate(c.date) + '</span>' +
+        releaseMarkerHtml +
         '</div>';
     }).join('');
 
     // The bars are decorative only, aria-hidden, since a screen reader user
     // gets the same numbers (and the exact dates, which the bars round off
     // visually) from the chartSummary sentence and the linked data table.
-    const chartSummary = checks.map(c => fmtDate(c.date) + ': ' + c.count).join(', ');
-    const tableRowsHtml = checks.map(c =>
+    const chartSummary = checks.map((c, i) =>
+      fmtDate(c.date) + ': ' + c.count + ((releaseMarkers[i] || []).length ? ' (' + releaseLabel(releaseMarkers[i]) + ' shipped)' : '')
+    ).join(', ');
+    const tableRowsHtml = checks.map((c, i) =>
       '<tr><th scope="row">' + fmtDate(c.date) + '</th><td>' + c.count +
-      (c.note ? ' - ' + escapeHtml(c.note) : '') + '</td></tr>'
+      (c.note ? ' - ' + escapeHtml(c.note) : '') + '</td>' +
+      '<td>' + ((releaseMarkers[i] || []).length ? escapeHtml(releaseLabel(releaseMarkers[i])) : '') + '</td></tr>'
     ).join('');
 
     tractionSection.innerHTML =
@@ -657,7 +675,7 @@
       '</div>' +
       '<table class="sr-only-table">' +
       '<caption>' + escapeHtml(metric.label || 'downloads') + ', full check history</caption>' +
-      '<thead><tr><th scope="col">Check date</th><th scope="col">Count</th></tr></thead>' +
+      '<thead><tr><th scope="col">Check date</th><th scope="col">Count</th><th scope="col">Release shipped by this check</th></tr></thead>' +
       '<tbody>' + tableRowsHtml + '</tbody>' +
       '</table>' +
       (metric.scope ? '<div class="scope-note">' + escapeHtml(metric.scope) + '</div>' : '');
@@ -1997,7 +2015,7 @@
     }
 
     if (downloadsData) {
-      renderTraction(downloadsData);
+      renderTraction(downloadsData, releasesData || {});
       csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
       const badgeSvg = buildDownloadsBadgeSvg(downloadsData);
       if (badgeSvg) {
