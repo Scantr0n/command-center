@@ -317,6 +317,16 @@
     <div class="data-quality-list" id="duplicatesList"></div>
   </section>
 
+  <section id="duplicateHooksSection" hidden>
+    <h2 class="section-title">Reused verified hook</h2>
+    <p class="section-note">The exact same <code>verifiedHook</code> text logged on more than one prospect.
+      <code>verifiedHook</code> exists to record a real, checked, per-prospect reason someone actually fits, not a
+      template, so the same sentence reused across different people is usually a sign one of them was never really
+      researched on its own, not a genuine coincidence. Same normalize-and-group check <code>validate.js</code>
+      runs.</p>
+    <div class="data-quality-list" id="duplicateHooksList"></div>
+  </section>
+
   <section id="dataQualitySection" hidden>
     <h2 class="section-title">Needs backfill</h2>
     <div class="data-quality-list" id="dataQualityList"></div>

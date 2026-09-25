@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /*
- * Regression tests for validate-core.js, the shared duplicate-prospect and
- * casing-drift rules the CLI validator (validate.js) and the dashboard's own
- * "Possible duplicates" / "Casing drift" panels (app.js) both rely on. No
+ * Regression tests for validate-core.js, the shared duplicate-prospect,
+ * casing-drift, and reused-hook rules the CLI validator (validate.js) and the
+ * dashboard's own "Possible duplicates" / "Casing drift" / "Reused verified
+ * hook" panels (app.js) both rely on. No
  * test framework or dependency: node:test and node:assert ship with Node
  * itself, matching this repo's own no-extra-dependency convention (see
  * public/cgt/data/validate-core.test.js and public/garage/data/*.test.js for
@@ -12,7 +13,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { findDuplicateProspects, findCasingDrift } = require('./validate-core.js');
+const { findDuplicateProspects, findCasingDrift, findDuplicateHooks } = require('./validate-core.js');
 
 test('findDuplicateProspects flags the same name/company logged under two ids', () => {
   const prospects = [
@@ -104,7 +105,44 @@ test('findCasingDrift still flags real cross-prospect drift on a multi-valued fi
   assert.deepEqual(drift[0].prospects.map(p => p.id).sort(), ['a', 'b']);
 });
 
-test('the real prospects.json on disk has no duplicate prospects or casing drift', () => {
+test('findDuplicateHooks flags the same hook text logged on two different prospects', () => {
+  const prospects = [
+    { id: 'a', verifiedHook: 'Runs a Douyin fitness account with real engagement in our niche.' },
+    { id: 'b', verifiedHook: '  RUNS A DOUYIN FITNESS ACCOUNT WITH REAL ENGAGEMENT IN OUR NICHE.  ' }
+  ];
+  const groups = findDuplicateHooks(prospects);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].map(p => p.id).sort(), ['a', 'b']);
+});
+
+test('findDuplicateHooks collapses internal whitespace differences, not just casing', () => {
+  const prospects = [
+    { id: 'a', verifiedHook: 'Real  hook   text' },
+    { id: 'b', verifiedHook: 'real hook text' }
+  ];
+  const groups = findDuplicateHooks(prospects);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].map(p => p.id).sort(), ['a', 'b']);
+});
+
+test('findDuplicateHooks does not flag two real, distinct hooks', () => {
+  const prospects = [
+    { id: 'a', verifiedHook: 'Real hook for prospect A.' },
+    { id: 'b', verifiedHook: 'Real hook for prospect B.' }
+  ];
+  assert.deepEqual(findDuplicateHooks(prospects), []);
+});
+
+test('findDuplicateHooks skips prospects with no verifiedHook rather than grouping them on a blank key', () => {
+  const prospects = [
+    { id: 'a', verifiedHook: null },
+    { id: 'b', verifiedHook: '' },
+    { id: 'c', verifiedHook: '   ' }
+  ];
+  assert.deepEqual(findDuplicateHooks(prospects), []);
+});
+
+test('the real prospects.json on disk has no duplicate prospects, casing drift, or reused hooks', () => {
   const data = require('./prospects.json');
   const prospects = data.prospects || [];
   assert.deepEqual(findDuplicateProspects(prospects), []);
@@ -113,4 +151,5 @@ test('the real prospects.json on disk has no duplicate prospects or casing drift
     findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s.platform)),
     []
   );
+  assert.deepEqual(findDuplicateHooks(prospects), []);
 });

@@ -2,9 +2,10 @@
  * Pure validation-support rules for a CSM prospects array, with no Node-only
  * APIs (no fs/path), so the exact same rules run in two places: the CLI
  * validator (public/csm/data/validate.js, which reads prospects.json off disk
- * and calls this) and the dashboard's own "Possible duplicates" and "Casing
- * drift" panels (public/csm/app.js), which need the real prospect objects to
- * render clickable rows, not just a pre-formatted warning string. Keeping one
+ * and calls this) and the dashboard's own "Possible duplicates", "Casing
+ * drift", and "Reused verified hook" panels (public/csm/app.js), which need
+ * the real prospect objects to render clickable rows, not just a
+ * pre-formatted warning string. Keeping one
  * copy of the grouping logic means the two can never quietly drift apart, the
  * same reasoning CGT's own validate-core.js already documents.
  */
@@ -70,5 +71,25 @@
     return [...byNorm.values()].filter(entry => entry.variants.size > 1);
   }
 
-  return { findDuplicateProspects, findCasingDrift };
+  // Groups by verifiedHook text, case/whitespace-insensitive, to catch a hook
+  // copy-pasted across more than one prospect. verifiedHook exists to record
+  // the real, checked reason a specific person/brand fits (see index.html's
+  // schema help), so the exact same sentence logged on two different
+  // prospects is a sign one of them was never actually researched on its own
+  // terms, not a real coincidence. Returns every group of two or more
+  // prospects sharing the same normalized hook text; a prospect with no
+  // verifiedHook is skipped rather than grouped under an empty key.
+  function findDuplicateHooks(prospects) {
+    const byNorm = new Map();
+    (prospects || []).forEach(p => {
+      if (!p.verifiedHook || typeof p.verifiedHook !== 'string') return;
+      const norm = p.verifiedHook.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!norm) return;
+      if (!byNorm.has(norm)) byNorm.set(norm, []);
+      byNorm.get(norm).push(p);
+    });
+    return [...byNorm.values()].filter(group => group.length > 1);
+  }
+
+  return { findDuplicateProspects, findCasingDrift, findDuplicateHooks };
 });

@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findDuplicateProspects, findCasingDrift } = require('./validate-core.js');
+const { findDuplicateProspects, findCasingDrift, findDuplicateHooks } = require('./validate-core.js');
 const { emDashFields } = require('./csm-core.js');
 
 const DATA_DIR = __dirname;
@@ -378,6 +378,19 @@ function main() {
     warnings.push('possible duplicate prospect: ' + group.map(p => p.id).join(', ') +
       ' all share the same name and company ("' + group[0].name +
       (group[0].company ? ', ' + group[0].company : '') + '"). If this is really the same person, merge into one entry.');
+  });
+
+  // verifiedHook exists to record a real, checked, per-prospect reason
+  // ("why this person/brand fits, for real"), so the exact same sentence
+  // logged on two different prospects usually means one of them was never
+  // actually researched on its own, not a genuine coincidence. Grouping
+  // logic shared with app.js's own "Reused verified hook" panel via
+  // CSMValidateCore, same reasoning as the two checks above.
+  findDuplicateHooks(prospects).forEach(group => {
+    warnings.push('verifiedHook is identical across ' + group.length + ' prospects (' +
+      group.map(p => p.id).join(', ') + '): "' + group[0].verifiedHook.trim() + '". A hook copy-pasted across ' +
+      'different prospects is not a real, per-prospect verified reason, double check each one was actually ' +
+      'researched individually.');
   });
 
   checkChangelogFreshness(warnings);

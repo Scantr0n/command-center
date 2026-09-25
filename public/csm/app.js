@@ -429,6 +429,11 @@
     // checks (category, social platform).
     const casingDriftCount = CSMValidateCore.findCasingDrift(prospects, p => [p.category]).length +
       CSMValidateCore.findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform)).length;
+    // Same "silently misleading, not caught by validate.js's own errors"
+    // reasoning as the duplicate/casing-drift counts above: a reused hook
+    // passes every other check, since both copies are individually valid
+    // strings.
+    const duplicateHookCount = CSMValidateCore.findDuplicateHooks(prospects).length;
 
     const items = [];
     // Same reasoning as Sondrik's own Next Steps widget: a drifted changelog
@@ -476,6 +481,12 @@
       items.push({
         n: casingDriftCount, tone: 'warn', target: 'casingDriftList',
         label: casingDriftCount === 1 ? 'spelling inconsistency across prospects' : 'spelling inconsistencies across prospects'
+      });
+    }
+    if (duplicateHookCount) {
+      items.push({
+        n: duplicateHookCount, tone: 'warn', target: 'duplicateHooksList',
+        label: duplicateHookCount === 1 ? 'group with a reused verified hook' : 'groups with a reused verified hook'
       });
     }
 
@@ -550,6 +561,37 @@
       '</button>'
     ).join('')).join('');
     wireRowsToModal(duplicatesEl);
+  }
+
+  const duplicateHooksEl = document.getElementById('duplicateHooksList');
+  const duplicateHooksSection = document.getElementById('duplicateHooksSection');
+
+  // verifiedHook is supposed to be a real, checked, per-prospect reason (see
+  // its own schema-help row), so the exact same sentence reused on two
+  // different prospects is a sign one of them copy-pasted the field rather
+  // than actually researching it. Grouping logic lives in CSMValidateCore,
+  // shared with validate.js so the two can never drift apart, same pattern
+  // as renderDuplicates/renderCasingDrift above.
+  function renderDuplicateHooks(prospects) {
+    const groups = CSMValidateCore.findDuplicateHooks(prospects);
+    if (groups.length === 0) {
+      duplicateHooksSection.hidden = true;
+      return;
+    }
+    duplicateHooksSection.hidden = false;
+    duplicateHooksEl.innerHTML = groups.map(group => {
+      const hookText = group[0].verifiedHook.trim();
+      const shown = hookText.length > 80 ? hookText.slice(0, 80) + '…' : hookText;
+      return group.map(p =>
+        '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
+        '<strong>' + escapeHtml(p.name) + '</strong>' +
+        '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+        '<span class="dq-why">SAME HOOK AS ' + (group.length - 1) + ' OTHER' + (group.length - 1 === 1 ? '' : 'S') +
+        ': &ldquo;' + escapeHtml(shown) + '&rdquo;</span>' +
+        '</button>'
+      ).join('');
+    }).join('');
+    wireRowsToModal(duplicateHooksEl);
   }
 
   const casingDriftEl = document.getElementById('casingDriftList');
@@ -3569,6 +3611,7 @@
       renderStalled(allStages, allProspects);
       renderColdSignal(allStages, allProspects);
       renderDuplicates(allProspects);
+      renderDuplicateHooks(allProspects);
       renderCasingDrift(allProspects);
       renderDataQuality(allStages, allProspects);
       renderActivityFeed(allProspects, allStages);
