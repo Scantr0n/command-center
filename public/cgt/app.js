@@ -268,13 +268,13 @@ const PRICE_STALE_AFTER_DAYS = 180;
 // not data-file driven, so nothing else in the app notices when it goes
 // stale -- the SGC $15->$50/card hike and the BGS-vs-SGC turnaround mixup
 // (see the 42b8f58/e0ab607 fixes) both shipped as silent inaccuracies until
-// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-17"
+// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-25"
 // claim already made in that section's callout prose; keep the two in sync by
 // hand whenever the table is re-verified. 30 days, not the 180 used for card
 // prices above: grading-company fee/tier changes have moved multiple times
 // within weeks of each other this year, so this table goes stale far faster
 // than a book value does.
-const GRADING_REFERENCE_REVIEWED_ON = '2026-09-17';
+const GRADING_REFERENCE_REVIEWED_ON = '2026-09-25';
 const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 
 // Local calendar date as YYYY-MM-DD, same convention as turnaround-core.js's
