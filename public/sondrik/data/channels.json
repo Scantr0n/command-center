@@ -41,6 +41,13 @@
       "linkedMetric": null,
       "status": "not-tracked",
       "note": "No milestone post made yet. Norms researched below, not launched here."
+    },
+    {
+      "id": "x-twitter",
+      "name": "X (Twitter)",
+      "linkedMetric": null,
+      "status": "not-tracked",
+      "note": "No post made yet. The 'Copy build-in-public post' button already composes text sized to X's 280-character limit, but no real post has actually gone out there. Norms researched below, not launched here."
     }
   ]
 }
