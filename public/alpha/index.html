@@ -70,9 +70,9 @@
     <strong>Live feed connected.</strong> When Command Center runs on this Mac, <code>server.js</code> reads
     Alpha's real daemon directly at <code>127.0.0.1:3847</code> through a fixed, GET-only whitelist
     (<code>/health</code>, <code>/state</code>, <code>/evolution-history</code>, <code>/anomalies</code>,
-    <code>/debates</code>). The daemon's <code>/cmd</code> endpoint, which can pause trading or close positions,
-    is never called from here. A field still reading "awaiting connection" below means the daemon genuinely
-    doesn't expose that value yet, not that one was skipped.
+    <code>/debates</code>, <code>/equity-history</code>). The daemon's <code>/cmd</code> endpoint, which can pause
+    trading or close positions, is never called from here. A field still reading "awaiting connection" below
+    means the daemon genuinely doesn't expose that value yet, not that one was skipped.
   </div>
 
   <details class="schema-help">
