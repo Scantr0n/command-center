@@ -280,8 +280,8 @@
     border-radius: 16px;
     box-shadow: inset 0 0 90px rgba(0,0,0,0.55);
   }
-  .search-input { transition: border-color 0.15s ease, background 0.15s ease; }
-  .search-input:focus { border-color: var(--hairlineHover) !important; }
+  .search-input { transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease; box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05); }
+  .search-input:focus { border-color: #5A82FF99 !important; box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05), 0 0 0 3px rgba(90,130,255,0.15) !important; }
   /* Same "/" -focuses-search hint GitHub's own search box shows, so the
      shortcut the keydown handler below already implements is actually
      discoverable instead of only working for someone who already knew. */
@@ -302,6 +302,7 @@
   .stat-badge {
     width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.08);
   }
   #statsRow { padding: 7px 14px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--panelLight); box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05); }
   /* Same top-highlight depth cue as the card box-shadows above, applied to
@@ -1277,7 +1278,7 @@ function renderStats() {
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-tile flex items-center gap-2">
-      <span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--sub)">${statIcon(ICON_GRID)}</span>
+      <span class="stat-badge" style="background: linear-gradient(135deg, #5A82FF33, #5A82FF14); color: #7B9CFF">${statIcon(ICON_GRID)}</span>
       <div class="text-left">
         <div class="font-display font-bold text-lg leading-none" style="color: var(--ink)">${total}</div>
         <div class="text-[9.5px] font-mono mt-1 tracking-wide" style="color:var(--faint)">PROJECTS</div>
