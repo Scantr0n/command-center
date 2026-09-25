@@ -5091,6 +5091,7 @@ function wirePhotoDraftTool() {
   const generateBtn = document.getElementById('pdGenerateBtn');
   const output = document.getElementById('pdOutput');
   const copyBtn = document.getElementById('pdCopyBtn');
+  const live = document.getElementById('quickLogLive');
 
   let stagedImages = []; // [{mediaType, dataBase64, name}]
   let lastDraft = null;
@@ -5256,6 +5257,12 @@ function wirePhotoDraftTool() {
     copyText(output.value).then(() => {
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
+      // Every other quick-log copy button in this app announces success
+      // through this same shared live region (see wireQuickLogTool above);
+      // this one only had a failure announcement (via warningsBox, role=alert),
+      // making a successful copy read as silence to a screen reader, worse
+      // than the failure path.
+      if (live) live.textContent = 'Draft listing JSON copied to clipboard.';
       setTimeout(() => { copyBtn.textContent = original; }, 1800);
     }).catch(() => { warningsBox.textContent = 'Could not copy to clipboard.'; });
   });
