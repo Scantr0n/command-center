@@ -12,10 +12,11 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
-    csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+    escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
-    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
+    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
+    emDashHits
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -25,6 +26,7 @@
   const nudgeEl = document.getElementById('nudgeQueue');
   const statsEl = document.getElementById('statsBar');
   const snapshotStripEl = document.getElementById('snapshotStrip');
+  const dataErrorBannerEl = document.getElementById('dataErrorBanner');
   const searchInput = document.getElementById('searchInput');
   const channelFilterEl = document.getElementById('channelFilter');
   const categoryFilterEl = document.getElementById('categoryFilter');
@@ -251,17 +253,6 @@
       return '<span class="badge badge-generic">GENERIC INBOX</span>';
     }
     return '<span class="badge badge-unknown">' + escapeHtml(channel.type).toUpperCase() + '</span>';
-  }
-
-  // div.textContent/innerHTML round-trip only escapes &amp;/&lt;/&gt; in text
-  // content, not quotes, so a hand-typed value with a " or ' in it (a stage
-  // color, a category name, an id) could break out of an attribute like
-  // style="..." or data-foo="...". Same regex-based escape CGT and Garage
-  // already use for exactly that reason.
-  function escapeHtml(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
   }
 
   // Lets the "Stalled in stage" and "Needs backfill" rows jump straight to the
@@ -1263,41 +1254,63 @@
   // computeDataQualityFlags, CSMValidateCore.findDuplicateProspects), so
   // this card's numbers can never drift from what the attention bar itself
   // shows for the same real data.
-  function renderSnapshot(stages, prospects) {
+  // loadStatus (prospectsFailed / stagesFailed) reflects which source file,
+  // if any, actually failed to load this pass (set by the Promise.allSettled
+  // handler below). On a failed load, `stages`/`prospects` here are already
+  // whatever partial data did load, empty arrays if neither did, the same
+  // shape a real, genuinely-empty pipeline has. Without loadStatus, every
+  // count below would silently read "0, nothing flagged" on a real fetch
+  // failure, indistinguishable from actually having no prospects.
+  function renderSnapshot(stages, prospects, loadStatus) {
+    loadStatus = loadStatus || {};
+    const dataIncomplete = !!(loadStatus.prospectsFailed || loadStatus.stagesFailed);
+    const failedFile = loadStatus.prospectsFailed ? 'prospects.json' : (loadStatus.stagesFailed ? 'stages.json' : null);
     const nudgeRows = computeNudgeRows(prospects);
     const overdueCount = nudgeRows.filter(r => r.days <= 0).length;
     const attentionCount = overdueCount + computeStalled(stages, prospects).length +
       computeColdSignal(prospects).active.length + computeDataQualityFlags(stages, prospects).length +
       CSMValidateCore.findDuplicateProspects(prospects).length;
 
-    updateDocumentTitle(overdueCount);
-    updateFavicon(overdueCount);
+    // Skipped on a failed load rather than called with the empty-array
+    // overdueCount of 0: that would quietly replace a real "nudges due"
+    // title/favicon dot from the last successful load with a false
+    // all-clear instead of just leaving the last known real state in place.
+    if (!dataIncomplete) {
+      updateDocumentTitle(overdueCount);
+      updateFavicon(overdueCount);
+    }
 
     const chips = [
       {
         kind: 'prospects',
-        number: prospects.length,
-        label: prospects.length === 1 ? 'prospect in the pipeline' : 'prospects in the pipeline',
-        meta: null
+        number: loadStatus.prospectsFailed ? null : prospects.length,
+        label: loadStatus.prospectsFailed ? 'prospect count unknown'
+          : (prospects.length === 1 ? 'prospect in the pipeline' : 'prospects in the pipeline'),
+        meta: loadStatus.prospectsFailed ? 'prospects.json failed to load' : null
       },
       {
         kind: 'nudges',
-        number: overdueCount,
-        label: overdueCount === 1 ? 'nudge due or overdue' : 'nudges due or overdue',
-        meta: nudgeRows.length ? nudgeRows.length + ' total on the queue' : 'no nudge dates logged yet'
+        number: dataIncomplete ? null : overdueCount,
+        label: dataIncomplete ? 'nudges due unknown'
+          : (overdueCount === 1 ? 'nudge due or overdue' : 'nudges due or overdue'),
+        meta: dataIncomplete ? failedFile + ' failed to load'
+          : (nudgeRows.length ? nudgeRows.length + ' total on the queue' : 'no nudge dates logged yet')
       },
       {
         kind: 'attention',
-        number: attentionCount,
-        label: attentionCount === 1 ? 'item needs attention' : 'items need attention',
-        meta: attentionCount ? 'stalled, cold, backfill, or duplicate flags' : 'nothing flagged right now'
+        number: dataIncomplete ? null : attentionCount,
+        label: dataIncomplete ? 'attention count unknown'
+          : (attentionCount === 1 ? 'item needs attention' : 'items need attention'),
+        meta: dataIncomplete ? failedFile + ' failed to load'
+          : (attentionCount ? 'stalled, cold, backfill, or duplicate flags' : 'nothing flagged right now')
       }
     ];
 
     snapshotStripEl.innerHTML = chips.map(c =>
-      '<a href="#' + SNAPSHOT_TARGET[c.kind] + '" class="snapshot-chip snapshot-chip-' + c.kind + '" data-target="' + SNAPSHOT_TARGET[c.kind] + '">' +
+      '<a href="#' + SNAPSHOT_TARGET[c.kind] + '" class="snapshot-chip snapshot-chip-' + c.kind +
+      (c.number === null ? ' snapshot-chip-unknown' : '') + '" data-target="' + SNAPSHOT_TARGET[c.kind] + '">' +
       '<div class="snapshot-chip-icon"><svg viewBox="-10 -10 20 20" width="18" height="18" aria-hidden="true">' + SNAPSHOT_ICON[c.kind] + '</svg></div>' +
-      '<div class="snapshot-chip-number font-display">' + escapeHtml(String(c.number)) + '</div>' +
+      '<div class="snapshot-chip-number font-display">' + escapeHtml(c.number === null ? 'Unknown' : String(c.number)) + '</div>' +
       '<div class="snapshot-chip-label">' + escapeHtml(c.label) + '</div>' +
       (c.meta ? '<div class="snapshot-chip-meta">' + escapeHtml(c.meta) + '</div>' : '') +
       '</a>'
@@ -2105,6 +2118,15 @@
     if (categoryClash) {
       warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
         categoryClash + '", they would render as separate filter chips. Pick one spelling.');
+    }
+    // Same em-dash paste-in catch the "Log new prospect" forms already got
+    // (see emDashHits' own header comment): this edit form was the one real
+    // prospect-entry path that still missed it, so a pasted-in em dash on an
+    // existing prospect only surfaced on the next validate.js run.
+    const emDashHitFields = emDashHits(edited);
+    if (emDashHitFields.length) {
+      warnings.push('Em dash found in ' + emDashHitFields.join(', ') + '. This board never uses one, check ' +
+        'whether that field was pasted in from somewhere else rather than typed.');
     }
     return warnings;
   }
@@ -3190,6 +3212,11 @@
         outreachLog: [],
         notes: null
       };
+      const emDashHitFields = emDashHits(p);
+      if (emDashHitFields.length) {
+        warnings.push('Em dash found in ' + emDashHitFields.join(', ') + '. This board never uses one, check ' +
+          'whether that field was pasted in from somewhere else rather than typed.');
+      }
       results.push({ p, warnings });
     });
     return results;
@@ -3294,6 +3321,11 @@
       warnings.push('An existing entry already has this same name and company ("' + nameMatch.name +
         (nameMatch.company ? ', ' + nameMatch.company : '') + '", id "' + nameMatch.id + '"). If this is really the same ' +
         'person, edit that entry instead of adding a second one.');
+    }
+    const emDashHitFields = emDashHits(p);
+    if (emDashHitFields.length) {
+      warnings.push('Em dash found in ' + emDashHitFields.join(', ') + '. This board never uses one, check ' +
+        'whether that field was pasted in from somewhere else rather than typed.');
     }
     return warnings;
   }
@@ -3514,9 +3546,21 @@
     const failures = [];
     if (stagesResult.status === 'rejected') failures.push('stages.json: ' + stagesResult.reason.message);
     if (prospectsResult.status === 'rejected') failures.push('prospects.json: ' + prospectsResult.reason.message);
+    const loadStatus = { stagesFailed: stagesResult.status === 'rejected', prospectsFailed: prospectsResult.status === 'rejected' };
+
+    // Placed at the very top of the page (see index.html), not just as the
+    // "Showing partial data" note inside the board below: the At a glance
+    // tiles and attention bar are both above the board and, without this,
+    // both loaded first and silently read as a real "0, nothing flagged"
+    // that whole time.
+    dataErrorBannerEl.hidden = failures.length === 0;
+    if (failures.length) {
+      dataErrorBannerEl.innerHTML = '<strong>Pipeline data failed to load: ' + escapeHtml(failures.join('; ')) +
+        '.</strong> Counts and lists below reflect only what did load, not a real empty pipeline.';
+    }
 
     if (stagesData || prospectsData) {
-      renderSnapshot(allStages, allProspects);
+      renderSnapshot(allStages, allProspects, loadStatus);
       renderAttentionBar(allStages, allProspects, driftStatus);
       renderNudgeQueue(allProspects);
       renderStats(allStages, allProspects);

@@ -405,6 +405,7 @@ header.page-head .sub {
   margin-bottom: 14px;
 }
 .section-toolbar .section-title { margin: 0; }
+.section-toolbar .incident-list-label { margin: 0; }
 
 .section-note {
   font-size: 0.78rem;

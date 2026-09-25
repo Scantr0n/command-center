@@ -15,7 +15,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { findDuplicateLeads } = require('./validate-core.js');
+const { findDuplicateLeads, emDashFields } = require('./validate-core.js');
 
 test('empty and single-lead input never flags a duplicate', () => {
   assert.deepEqual(findDuplicateLeads([]), []);
@@ -72,4 +72,37 @@ test('three-way duplicate returns all three in one group, not pairwise', () => {
 test('the real leads.json on disk has no duplicate lead logged twice', () => {
   const leadsData = require('./leads.json');
   assert.deepEqual(findDuplicateLeads(leadsData.leads || []), []);
+});
+
+test('emDashFields flags only the fields that actually contain an em dash', () => {
+  const lead = { summary: 'Offered to test the product ' + String.fromCharCode(8212) + ' interested', source: 'Reddit' };
+  assert.deepEqual(emDashFields(lead, ['summary', 'source']), ['summary']);
+});
+
+test('emDashFields skips a non-string field rather than throwing', () => {
+  assert.deepEqual(emDashFields({ label: 42 }, ['label']), []);
+});
+
+test('emDashFields returns no hits for a missing object, same as CSM\'s and Garage\'s copies', () => {
+  assert.deepEqual(emDashFields(null, ['label']), []);
+  assert.deepEqual(emDashFields(undefined, ['label']), []);
+});
+
+test('the real releases.json, downloads.json, leads.json, channels.json, and goals.json have no em dash pasted into a free-text field', () => {
+  const releases = require('./releases.json').releases || [];
+  assert.deepEqual(releases.filter(r => emDashFields(r, ['summary', 'notes']).length), []);
+
+  const downloads = require('./downloads.json');
+  const checks = (downloads.metric && downloads.metric.checks) || [];
+  assert.deepEqual(checks.filter(c => emDashFields(c, ['note']).length), []);
+
+  const leadsData = require('./leads.json').leads || [];
+  assert.deepEqual(leadsData.filter(l => emDashFields(l, ['summary', 'sourceDetail', 'source', 'type']).length), []);
+  assert.deepEqual(leadsData.filter(l => emDashFields(l.outreach, ['note', 'draftText']).length), []);
+
+  const channels = require('./channels.json').channels || [];
+  assert.deepEqual(channels.filter(c => emDashFields(c, ['name', 'note']).length), []);
+
+  const goals = require('./goals.json').goals || [];
+  assert.deepEqual(goals.filter(g => emDashFields(g, ['label', 'note']).length), []);
 });

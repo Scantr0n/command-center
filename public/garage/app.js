@@ -258,6 +258,40 @@ function renderPackagingRulesFreshness() {
   el.title = 'Last hand-verified against each platform\'s own shipping/seller documentation on ' + PACKAGING_RULES_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. Found a real error while
+// re-verifying this one 2026-09-24: the eBay row lumped sneakers, handbags,
+// jewelry, and watches under one flat "$500+" threshold. That's wrong for
+// two of the four. Watches only auto-qualify at $2,000+ (Wristwatches and
+// Pocket Watches categories; $500-$1,999.99 is an optional add-on, not
+// automatic) per eBay's own Authenticity Guarantee help page, and sneakers
+// now start as low as $75+ and are brand/model-dependent, not a flat $500
+// at all, a seller can only tell whether a given pair qualifies by what the
+// listing form itself shows (eBay's own sneaker Authenticity Guarantee
+// pages, corroborated by third-party seller-tooling coverage). Handbags and
+// eligible-brand jewelry are the two categories actually at $500+ automatic
+// (with a $200-$499.99 optional add-on tier below that), so the row now
+// says so instead of overstating a $500 floor on watches and understating
+// how low sneakers can actually go. This table's callout already warns a
+// threshold "can trigger automatically... with no opt-in and no way to back
+// out", so a wrong number here is a real risk of Jack being surprised by an
+// authentication hold he didn't expect, or not budgeting for one he should
+// have. Poshmark, Vinted, and Depop rows re-checked against their own
+// current help pages too; no change needed on those three.
+const AUTHENTICATION_RULES_REVIEWED_ON = '2026-09-24';
+const AUTHENTICATION_RULES_STALE_AFTER_DAYS = 45;
+
+function renderAuthenticationRulesFreshness() {
+  const el = document.getElementById('authenticationRulesFreshness');
+  if (!el) return;
+  const age = daysSincePublished(AUTHENTICATION_RULES_REVIEWED_ON);
+  const stale = age != null && age > AUTHENTICATION_RULES_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own authentication/verification program documentation on ' + AUTHENTICATION_RULES_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -313,11 +347,10 @@ function disputeResponseInfo(d) {
   return null;
 }
 
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
+// Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+// regression test instead of only ever running live in a browser, same
+// shared-core pattern already used for csvField (see GarageExportCore).
+const escapeHtml = GarageHtmlCore.escapeHtml;
 
 // A net payout can go negative on a cheap Poshmark listing (its flat $2.95
 // fee under $15 exceeds the price), and '$' + (-1.95) renders as the
@@ -1596,6 +1629,34 @@ function readOptionalNonNegativeInput(el) {
   if (raw === '') return null;
   const n = Number(raw);
   return Number.isNaN(n) || n < 0 ? undefined : n;
+}
+
+// Same real-time em-dash catch CSM's own prospect-entry form just got: a
+// free-text field pasted in with an em dash used to go uncaught until the
+// next `node validate.js` run, since GarageValidateCore.emDashFields only
+// ever checked the file on disk, never what was actually typed into one of
+// these quick-log or edit forms. One shared helper for every quick-log tool
+// below, so the warning text can't drift between entities the way the
+// hand-duplicated blocker/advisory checks already do in this file.
+function emDashAdvisory(obj, fields) {
+  const hits = GarageValidateCore.emDashFields(obj, fields);
+  return hits.length
+    ? ['"' + hits.join('", "') + '" contains an em dash, this tracker never uses one, check for a paste-in.']
+    : [];
+}
+
+// Listings also carry itemSpecifics, a nested object the plain emDashAdvisory
+// above can't reach on its own, so this adds that check with the same
+// "itemSpecifics.<field>" prefix validate.js already uses. Shared between
+// wireQuickLogTool and wireListingEditForm so the two can't drift.
+function listingEmDashAdvisory(candidate) {
+  const hits = GarageValidateCore.emDashFields(candidate, ['title', 'location']);
+  const specificHits = GarageValidateCore.emDashFields(candidate.itemSpecifics, Object.keys(GarageValidateCore.ITEM_SPECIFIC_LABELS))
+    .map(f => 'itemSpecifics.' + f);
+  const allHits = hits.concat(specificHits);
+  return allHits.length
+    ? ['"' + allHits.join('", "') + '" contains an em dash, this tracker never uses one, check for a paste-in.']
+    : [];
 }
 
 function renderCalc() {
@@ -3378,6 +3439,7 @@ function wireListingEditForm(l) {
       itemSpecifics
     });
 
+    advisory.push(...listingEmDashAdvisory(edited));
     warningsEl.innerHTML = advisory.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
     outputEl.textContent = JSON.stringify(edited, null, 2) + ',';
     resultEl.hidden = false;
@@ -3667,17 +3729,11 @@ copyLinkBtn.addEventListener('click', () => {
     });
 });
 
-function csvField(v) {
-  let s = v == null ? '' : String(v);
-  // CSV/formula injection (OWASP): a hand-typed note starting with
-  // =, +, -, @, tab, or a carriage return is read as a live formula by
-  // Excel/Sheets when this export is opened there, not as plain text.
-  // A leading single quote is the standard mitigation both recommend, and
-  // matters here specifically since the sales/expenses CSVs get opened in
-  // a spreadsheet for real Schedule C bookkeeping.
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+// Shared, unit-tested CSV serialization (export-core.js): csvField's
+// CSV/formula-injection guard now has a real regression test instead of
+// only ever running live in a browser, same shared-core pattern already
+// used for GarageValidateCore above.
+const csvField = GarageExportCore.csvField;
 
 const CSV_COLUMNS = [
   ['title', 'Item'], ['price', 'Price'], ['costBasis', 'Cost basis'], ['platforms', 'Platforms'], ['soldOn', 'Sold elsewhere'],
@@ -4271,6 +4327,7 @@ function wireQuickLogTool() {
       itemSpecifics
     };
 
+    advisory.push(...listingEmDashAdvisory(candidate));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(candidate, null, 2) + ',';
     output.hidden = false;
@@ -4368,6 +4425,7 @@ function wireQuickLogSaleTool() {
       saleDate
     };
 
+    advisory.push(...emDashAdvisory(sale, ['title']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(sale, null, 2) + ',';
     output.hidden = false;
@@ -4460,6 +4518,7 @@ function wireQuickLogExpenseTool() {
         ' miles at the real IRS rate for ' + expense.date + '.');
     }
 
+    advisory.push(...emDashAdvisory(expense, ['description']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(expense, null, 2) + ',';
     output.hidden = false;
@@ -4550,6 +4609,7 @@ function wireQuickLogDisputeTool() {
       if (respondInfo) advisory.push('Real response window: ' + respondInfo.text + '.');
     }
 
+    advisory.push(...emDashAdvisory(dispute, ['title', 'outcome', 'notes']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(dispute, null, 2) + ',';
     output.hidden = false;
@@ -4630,6 +4690,7 @@ function wireQuickLogSupplyTool() {
       advisory.push('Already at or below the reorder point, this will show as low stock right away.');
     }
 
+    advisory.push(...emDashAdvisory(supply, ['name', 'notes']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(supply, null, 2) + ',';
     output.hidden = false;
@@ -4707,6 +4768,7 @@ function wireQuickLogAcquisitionTool() {
 
     const acquisition = { id, source, sourceName, date, pricePaid, itemCount, listingIds, notes };
 
+    advisory.push(...emDashAdvisory(acquisition, ['sourceName', 'notes']));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(acquisition, null, 2) + ',';
     output.hidden = false;
@@ -5037,6 +5099,7 @@ renderSellerStandardsFreshness();
 renderTaxTrackerFreshness();
 renderElectronicsRulesFreshness();
 renderPackagingRulesFreshness();
+renderAuthenticationRulesFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch

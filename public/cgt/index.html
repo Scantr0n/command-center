@@ -86,28 +86,28 @@
       <div class="table-wrap">
       <table class="schema-table">
         <tbody>
-          <tr><th>id</th><td>Unique slug, e.g. <code>"2021-topps-chrome-julio-rodriguez-psa10"</code></td></tr>
-          <tr><th>cardName</th><td>Full card description, e.g. <code>"2021 Topps Chrome Julio Rodriguez RC"</code></td></tr>
-          <tr><th>sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
-          <tr><th>gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
-          <tr><th>grade</th><td>The grade as shown on the slab label, e.g. <code>"10"</code> or <code>"9.5"</code></td></tr>
-          <tr><th class="wrap">subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
-          <tr><th>certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
-          <tr><th>storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
-          <tr><th>estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
-          <tr><th>valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
-          <tr><th>compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
-          <tr><th>sourceNote</th><td>Where the price came from, e.g. <code>"eBay sold listings, 3 comps, Aug 2026"</code></td></tr>
-          <tr><th>imageUrl</th><td>Optional URL to a real photo of this exact card, for the detail view and the insurance/appraisal print summary. Real collectibles-insurance guidance treats photos plus cert numbers as the core of an insurance file, so this is worth filling in once a card actually has a photo somewhere reachable by URL. Leave <code>null</code> until a real photo exists, never a stock/placeholder image.</td></tr>
-          <tr><th>costBasis</th><td>USD number, what was actually paid for the card. Optional and independent of <code>estimatedValue</code>: log it when known, leave <code>null</code> when not. Powers the "Unrealized gain / loss" summary tile and the detail view, only computed for cards where both this and <code>estimatedValue</code> are on record.</td></tr>
-          <tr><th>acquisitionDate</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually bought/acquired. Optional and independent of <code>datePriced</code> (when it was researched) and <code>costBasis</code> (what was paid); log it when known, leave <code>null</code> when not. This is what lets a later real sale be classified long-term (held more than one year, federal collectibles gains capped at 28% under 26 U.S.C. 1(h)(5)) vs. short-term (ordinary income rates, no cap) in the detail view's "Est. max federal tax on this gain" and the "Est. max collectibles tax" summary tile -- without it, a sold card with a real gain just shows as unclassified rather than guessing which one it was.</td></tr>
-          <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
-          <tr><th>soldDate</th><td>ISO date this card was actually sold. Leave <code>null</code> while still owned. Once set, the card counts as sold: it drops out of the portfolio value, breakdowns, and insurance summary (nothing left to insure), but stays in the file as a permanent record. <strong>Required together with <code>soldPrice</code></strong>, one without the other is a validation error. Must not be before <code>acquisitionDate</code> when both are set, a card can't be sold before it was acquired.</td></tr>
-          <tr><th>soldPrice</th><td>USD number, what the card actually sold for. <strong>Required together with <code>soldDate</code>.</strong> Independent of <code>estimatedValue</code> (the last researched estimate before the sale) and <code>costBasis</code> (what was paid); logging both <code>costBasis</code> and <code>soldPrice</code> is what powers the "Realized gain / loss" summary tile and the detail view.</td></tr>
-          <tr><th>listedDate</th><td>ISO date this card actually went up for sale somewhere (eBay, etc), while still unsold. Leave <code>null</code> when not currently listed. <strong>Required together with <code>listedPrice</code></strong>, one without the other is a validation error. Clear both once the card actually sells, that's what <code>soldDate</code>/<code>soldPrice</code> are for.</td></tr>
-          <tr><th>listedPrice</th><td>USD number, the real current asking price. <strong>Required together with <code>listedDate</code>.</strong> Independent of <code>estimatedValue</code> (the researched number, not the ask); a listing 50%+ off the card's own <code>estimatedValue</code> in either direction shows up on the dashboard under "Listing price check" as a nudge to double-check the ask, not an error.</td></tr>
-          <tr><th>backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
-          <tr><th>priceHistory</th><td>Optional array of <code>{ "value": number, "date": "YYYY-MM-DD", "basis": "recent-sale" | "comp-estimate" }</code> objects, one per prior real price this card has had, each dated before the current <code>datePriced</code>. Leave off or empty until the card has actually been re-priced once; see the note above on how to fill it in when that happens. Powers the up/down indicator next to the value in the table, the price-history list in the detail view, and the "Price trend since last check" summary tile.</td></tr>
+          <tr><th scope="row">id</th><td>Unique slug, e.g. <code>"2021-topps-chrome-julio-rodriguez-psa10"</code></td></tr>
+          <tr><th scope="row">cardName</th><td>Full card description, e.g. <code>"2021 Topps Chrome Julio Rodriguez RC"</code></td></tr>
+          <tr><th scope="row">sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
+          <tr><th scope="row">gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
+          <tr><th scope="row">grade</th><td>The grade as shown on the slab label, e.g. <code>"10"</code> or <code>"9.5"</code></td></tr>
+          <tr><th scope="row" class="wrap">subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
+          <tr><th scope="row">certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
+          <tr><th scope="row">storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
+          <tr><th scope="row">estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
+          <tr><th scope="row">valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
+          <tr><th scope="row">compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
+          <tr><th scope="row">sourceNote</th><td>Where the price came from, e.g. <code>"eBay sold listings, 3 comps, Aug 2026"</code></td></tr>
+          <tr><th scope="row">imageUrl</th><td>Optional URL to a real photo of this exact card, for the detail view and the insurance/appraisal print summary. Real collectibles-insurance guidance treats photos plus cert numbers as the core of an insurance file, so this is worth filling in once a card actually has a photo somewhere reachable by URL. Leave <code>null</code> until a real photo exists, never a stock/placeholder image.</td></tr>
+          <tr><th scope="row">costBasis</th><td>USD number, what was actually paid for the card. Optional and independent of <code>estimatedValue</code>: log it when known, leave <code>null</code> when not. Powers the "Unrealized gain / loss" summary tile and the detail view, only computed for cards where both this and <code>estimatedValue</code> are on record.</td></tr>
+          <tr><th scope="row">acquisitionDate</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually bought/acquired. Optional and independent of <code>datePriced</code> (when it was researched) and <code>costBasis</code> (what was paid); log it when known, leave <code>null</code> when not. This is what lets a later real sale be classified long-term (held more than one year, federal collectibles gains capped at 28% under 26 U.S.C. 1(h)(5)) vs. short-term (ordinary income rates, no cap) in the detail view's "Est. max federal tax on this gain" and the "Est. max collectibles tax" summary tile -- without it, a sold card with a real gain just shows as unclassified rather than guessing which one it was.</td></tr>
+          <tr><th scope="row">datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this card was actually researched, not today's date by default</td></tr>
+          <tr><th scope="row">soldDate</th><td>ISO date this card was actually sold. Leave <code>null</code> while still owned. Once set, the card counts as sold: it drops out of the portfolio value, breakdowns, and insurance summary (nothing left to insure), but stays in the file as a permanent record. <strong>Required together with <code>soldPrice</code></strong>, one without the other is a validation error. Must not be before <code>acquisitionDate</code> when both are set, a card can't be sold before it was acquired.</td></tr>
+          <tr><th scope="row">soldPrice</th><td>USD number, what the card actually sold for. <strong>Required together with <code>soldDate</code>.</strong> Independent of <code>estimatedValue</code> (the last researched estimate before the sale) and <code>costBasis</code> (what was paid); logging both <code>costBasis</code> and <code>soldPrice</code> is what powers the "Realized gain / loss" summary tile and the detail view.</td></tr>
+          <tr><th scope="row">listedDate</th><td>ISO date this card actually went up for sale somewhere (eBay, etc), while still unsold. Leave <code>null</code> when not currently listed. <strong>Required together with <code>listedPrice</code></strong>, one without the other is a validation error. Clear both once the card actually sells, that's what <code>soldDate</code>/<code>soldPrice</code> are for.</td></tr>
+          <tr><th scope="row">listedPrice</th><td>USD number, the real current asking price. <strong>Required together with <code>listedDate</code>.</strong> Independent of <code>estimatedValue</code> (the researched number, not the ask); a listing 50%+ off the card's own <code>estimatedValue</code> in either direction shows up on the dashboard under "Listing price check" as a nudge to double-check the ask, not an error.</td></tr>
+          <tr><th scope="row">backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
+          <tr><th scope="row">priceHistory</th><td>Optional array of <code>{ "value": number, "date": "YYYY-MM-DD", "basis": "recent-sale" | "comp-estimate" }</code> objects, one per prior real price this card has had, each dated before the current <code>datePriced</code>. Leave off or empty until the card has actually been re-priced once; see the note above on how to fill it in when that happens. Powers the up/down indicator next to the value in the table, the price-history list in the detail view, and the "Price trend since last check" summary tile.</td></tr>
         </tbody>
       </table>
       </div>
@@ -250,17 +250,17 @@
       <div class="table-wrap">
       <table class="schema-table">
         <tbody>
-          <tr><th>id</th><td>Unique slug, e.g. <code>"2026-08-psa-regular-batch-1"</code></td></tr>
-          <tr><th>description</th><td>Plain text describing what's in the batch, e.g. <code>"12 cards, 2021 hockey rookies"</code></td></tr>
-          <tr><th>gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
-          <tr><th>serviceLevel</th><td>Optional, the paid tier as billed, e.g. <code>"Regular"</code>, <code>"Express"</code>, <code>"Value Bulk"</code></td></tr>
-          <tr><th>cardCount</th><td>Optional whole number, how many cards are in this batch</td></tr>
-          <tr><th>submittedDate</th><td>ISO date (<code>YYYY-MM-DD</code>) this batch was actually shipped out</td></tr>
-          <tr><th>trackingNumber</th><td>Optional, the shipping tracking number for this batch</td></tr>
-          <tr><th>status</th><td>One of: <code>submitted</code>, <code>in-queue</code>, <code>grading</code>, <code>shipped-back</code>, <code>returned</code></td></tr>
-          <tr><th>returnedDate</th><td>ISO date this batch actually arrived back. Required once <code>status</code> is <code>returned</code>, otherwise leave <code>null</code></td></tr>
-          <tr><th>cost</th><td>USD number, what was actually paid to the grading company for this batch (service fee plus shipping/insurance if bundled into one charge). Optional and independent of any card's own <code>costBasis</code> in <code>cards.json</code>: a grading fee applies to the whole batch, not one specific card, so it is not split across the cards that come back from it. Leave <code>null</code> until the real invoiced amount is known. Powers the "Grading fees paid" summary tile.</td></tr>
-          <tr><th>notes</th><td>Free-text notes</td></tr>
+          <tr><th scope="row">id</th><td>Unique slug, e.g. <code>"2026-08-psa-regular-batch-1"</code></td></tr>
+          <tr><th scope="row">description</th><td>Plain text describing what's in the batch, e.g. <code>"12 cards, 2021 hockey rookies"</code></td></tr>
+          <tr><th scope="row">gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
+          <tr><th scope="row">serviceLevel</th><td>Optional, the paid tier as billed, e.g. <code>"Regular"</code>, <code>"Express"</code>, <code>"Value Bulk"</code></td></tr>
+          <tr><th scope="row">cardCount</th><td>Optional whole number, how many cards are in this batch</td></tr>
+          <tr><th scope="row">submittedDate</th><td>ISO date (<code>YYYY-MM-DD</code>) this batch was actually shipped out</td></tr>
+          <tr><th scope="row">trackingNumber</th><td>Optional, the shipping tracking number for this batch</td></tr>
+          <tr><th scope="row">status</th><td>One of: <code>submitted</code>, <code>in-queue</code>, <code>grading</code>, <code>shipped-back</code>, <code>returned</code></td></tr>
+          <tr><th scope="row">returnedDate</th><td>ISO date this batch actually arrived back. Required once <code>status</code> is <code>returned</code>, otherwise leave <code>null</code></td></tr>
+          <tr><th scope="row">cost</th><td>USD number, what was actually paid to the grading company for this batch (service fee plus shipping/insurance if bundled into one charge). Optional and independent of any card's own <code>costBasis</code> in <code>cards.json</code>: a grading fee applies to the whole batch, not one specific card, so it is not split across the cards that come back from it. Leave <code>null</code> until the real invoiced amount is known. Powers the "Grading fees paid" summary tile.</td></tr>
+          <tr><th scope="row">notes</th><td>Free-text notes</td></tr>
         </tbody>
       </table>
       </div>
@@ -372,25 +372,25 @@
       <div class="table-wrap">
       <table class="schema-table">
         <tbody>
-          <tr><th>id</th><td>Unique slug, e.g. <code>"2022-upper-deck-rookie-raw"</code></td></tr>
-          <tr><th>cardName</th><td>Full card description</td></tr>
-          <tr><th>year</th><td>Card year</td></tr>
-          <tr><th>sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
-          <tr><th>rawValue</th><td>USD number, what the card is worth ungraded right now. Leave <code>null</code> until actually researched.</td></tr>
-          <tr><th>rawValueBasis</th><td><strong>Required whenever rawValue is set.</strong> <code>"recent-sale"</code> or <code>"comp-estimate"</code>, same rule as cards.json's <code>valuationBasis</code>.</td></tr>
-          <tr><th>rawValueNote</th><td><strong>Required when rawValueBasis is comp-estimate.</strong> What the estimate is based on.</td></tr>
-          <tr><th>targetGradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code>, whichever is being considered</td></tr>
-          <tr><th>targetServiceLevel</th><td>Optional, e.g. <code>"Regular"</code>, <code>"Express"</code></td></tr>
-          <tr><th>estimatedGradingCost</th><td>USD number, the grading company's real posted service fee for that tier. Leave <code>null</code> until checked against their real fee schedule.</td></tr>
-          <tr><th>shippingCost</th><td>Optional USD number, round-trip shipping and insurance if known separately from the service fee</td></tr>
-          <tr><th>expectedGrade</th><td>Plain text, the realistically expected grade or range, e.g. <code>"9"</code> or <code>"9-10"</code>, not an assumed perfect 10</td></tr>
-          <tr><th>expectedGradedValue</th><td>USD number, what the card would likely sell for at the expected grade. Leave <code>null</code> until actually researched.</td></tr>
-          <tr><th>gradedValueBasis</th><td><strong>Required whenever expectedGradedValue is set.</strong> <code>"recent-sale"</code> or <code>"comp-estimate"</code></td></tr>
-          <tr><th>gradedValueNote</th><td><strong>Required when gradedValueBasis is comp-estimate.</strong> What the estimate is based on.</td></tr>
-          <tr><th>datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this candidate was actually researched</td></tr>
-          <tr><th>decision</th><td>Optional, one of: <code>submit</code>, <code>hold</code>, <code>sell-raw</code>, <code>pass</code>. Leave <code>null</code> while still weighing it.</td></tr>
-          <tr><th>decisionNote</th><td>Optional free text, e.g. the real <code>submissions.json</code> id this turned into once shipped</td></tr>
-          <tr><th>notes</th><td>Free-text notes</td></tr>
+          <tr><th scope="row">id</th><td>Unique slug, e.g. <code>"2022-upper-deck-rookie-raw"</code></td></tr>
+          <tr><th scope="row">cardName</th><td>Full card description</td></tr>
+          <tr><th scope="row">year</th><td>Card year</td></tr>
+          <tr><th scope="row">sport</th><td>One of: <code>hockey</code>, <code>baseball</code>, <code>football</code></td></tr>
+          <tr><th scope="row">rawValue</th><td>USD number, what the card is worth ungraded right now. Leave <code>null</code> until actually researched.</td></tr>
+          <tr><th scope="row">rawValueBasis</th><td><strong>Required whenever rawValue is set.</strong> <code>"recent-sale"</code> or <code>"comp-estimate"</code>, same rule as cards.json's <code>valuationBasis</code>.</td></tr>
+          <tr><th scope="row">rawValueNote</th><td><strong>Required when rawValueBasis is comp-estimate.</strong> What the estimate is based on.</td></tr>
+          <tr><th scope="row">targetGradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code>, whichever is being considered</td></tr>
+          <tr><th scope="row">targetServiceLevel</th><td>Optional, e.g. <code>"Regular"</code>, <code>"Express"</code></td></tr>
+          <tr><th scope="row">estimatedGradingCost</th><td>USD number, the grading company's real posted service fee for that tier. Leave <code>null</code> until checked against their real fee schedule.</td></tr>
+          <tr><th scope="row">shippingCost</th><td>Optional USD number, round-trip shipping and insurance if known separately from the service fee</td></tr>
+          <tr><th scope="row">expectedGrade</th><td>Plain text, the realistically expected grade or range, e.g. <code>"9"</code> or <code>"9-10"</code>, not an assumed perfect 10</td></tr>
+          <tr><th scope="row">expectedGradedValue</th><td>USD number, what the card would likely sell for at the expected grade. Leave <code>null</code> until actually researched.</td></tr>
+          <tr><th scope="row">gradedValueBasis</th><td><strong>Required whenever expectedGradedValue is set.</strong> <code>"recent-sale"</code> or <code>"comp-estimate"</code></td></tr>
+          <tr><th scope="row">gradedValueNote</th><td><strong>Required when gradedValueBasis is comp-estimate.</strong> What the estimate is based on.</td></tr>
+          <tr><th scope="row">datePriced</th><td>ISO date (<code>YYYY-MM-DD</code>) this candidate was actually researched</td></tr>
+          <tr><th scope="row">decision</th><td>Optional, one of: <code>submit</code>, <code>hold</code>, <code>sell-raw</code>, <code>pass</code>. Leave <code>null</code> while still weighing it.</td></tr>
+          <tr><th scope="row">decisionNote</th><td>Optional free text, e.g. the real <code>submissions.json</code> id this turned into once shipped</td></tr>
+          <tr><th scope="row">notes</th><td>Free-text notes</td></tr>
         </tbody>
       </table>
       </div>
@@ -599,14 +599,15 @@
       submission history (see "Avg. grading turnaround" under Value breakdown for that once real returned
       submissions are logged) -- they drift, and posted turnaround is never a guarantee. PSA paused its four
       Value tiers to new submissions on 2026-06-02 and, as of this review, keeps them paused until its public
-      backlog tracker falls to 5 million cards (it stood at 9.9 million as of 2026-09-08); PSA also reorganized
+      backlog tracker falls to 5 million cards (it stood at 9 million as of 2026-09-22, down from 9.9 million
+      two weeks earlier); PSA also reorganized
       its other tiers on 2026-09-14, renaming Walk-Through to Premier and Regular to Priority, adding a new
       cheaper Standard tier, and switching from "priced by declared value" to flat per-card fees with a
       published max insured value per tier -- the rows below reflect that reorg. Beckett closed its two
       cheapest tiers (Base, Standard) to new
       online submissions on 2026-08-08 and reopened them as planned around 2026-09-15, but beckett.com and its
       app then went offline separately on 2026-09-09 for infrastructure work and were still down as of this
-      review (2026-09-17); Base, Standard, and Express submissions are being taken through Beckett's temporary
+      review (2026-09-25); Base, Standard, and Express submissions are being taken through Beckett's temporary
       Jotform in the meantime, not the normal site. SGC raised its entry-level tier's price from $15/card to
       $50/card effective 2026-09-02, a roughly 233% increase it attributed to rising demand and expanding
       turnaround times, and said further service-level adjustments should be expected between late 2026 and
@@ -618,7 +619,7 @@
     <div class="table-wrap">
       <table class="card-table">
         <thead>
-          <tr><th>Company</th><th>Tier</th><th>Price</th><th>Est. turnaround</th><th>Notes</th></tr>
+          <tr><th scope="col">Company</th><th scope="col">Tier</th><th scope="col">Price</th><th scope="col">Est. turnaround</th><th scope="col">Notes</th></tr>
         </thead>
         <tbody>
           <tr><td>PSA</td><td>Premier</td><td>$599/card</td><td>7-10 business days</td><td>Renamed from Walk-Through, 2026-09-14; max insured value $10,000/card</td></tr>
@@ -626,10 +627,10 @@
           <tr><td>PSA</td><td>Express</td><td>$149/card</td><td>20-30 business days</td><td>Max insured value $2,500/card</td></tr>
           <tr><td>PSA</td><td>Priority</td><td>$79.99/card</td><td>70-80 business days</td><td>Renamed from Regular, 2026-09-14; max insured value $1,500/card</td></tr>
           <tr><td>PSA</td><td>Standard</td><td>$59.99/card</td><td>90-100 business days</td><td>New tier added 2026-09-14; max insured value $1,000/card; not a replacement for the paused Value tiers below</td></tr>
-          <tr><td>PSA</td><td>Value Max</td><td>Was priced by declared value, see psacard.com</td><td>40-50 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9.9M as of 2026-09-08)</td></tr>
-          <tr><td>PSA</td><td>Value Plus</td><td>Was priced by declared value, see psacard.com</td><td>60-80 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9.9M as of 2026-09-08)</td></tr>
-          <tr><td>PSA</td><td>Value</td><td>Was priced by declared value, see psacard.com</td><td>100-120 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9.9M as of 2026-09-08)</td></tr>
-          <tr><td>PSA</td><td>Value Bulk</td><td>Was priced by declared value, see psacard.com</td><td>140-160 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9.9M as of 2026-09-08)</td></tr>
+          <tr><td>PSA</td><td>Value Max</td><td>Was priced by declared value, see psacard.com</td><td>40-50 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9M as of 2026-09-22)</td></tr>
+          <tr><td>PSA</td><td>Value Plus</td><td>Was priced by declared value, see psacard.com</td><td>60-80 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9M as of 2026-09-22)</td></tr>
+          <tr><td>PSA</td><td>Value</td><td>Was priced by declared value, see psacard.com</td><td>100-120 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9M as of 2026-09-22)</td></tr>
+          <tr><td>PSA</td><td>Value Bulk</td><td>Was priced by declared value, see psacard.com</td><td>140-160 business days</td><td>Paused to new submissions since 2026-06-02, tied to PSA's public backlog tracker (5M-card reopen target, 9M as of 2026-09-22)</td></tr>
           <tr><td>BGS</td><td>Base</td><td>$14.95/card ($17.95 with all 4 subgrades)</td><td>75+ business days</td><td>Reopened ~2026-09-15 as planned, but only reachable via Beckett's temporary Jotform since beckett.com/app went offline 2026-09-09 for infrastructure work</td></tr>
           <tr><td>BGS</td><td>Standard</td><td>$34.95/card, subgrades included</td><td>45 business days</td><td>Reopened ~2026-09-15 as planned, but only reachable via Beckett's temporary Jotform since beckett.com/app went offline 2026-09-09 for infrastructure work</td></tr>
           <tr><td>BGS</td><td>Express</td><td>$79.95/card</td><td>15 business days</td><td>Also only reachable via Beckett's temporary Jotform while beckett.com/app is down for infrastructure work since 2026-09-09</td></tr>
@@ -684,12 +685,12 @@
       <table class="card-table" id="taxTrackerTable">
         <thead>
           <tr>
-            <th>Platform</th>
-            <th>Gross sales, <span id="taxTrackerYear"></span></th>
-            <th>Toward $20,000</th>
-            <th>Transactions</th>
-            <th>Toward 200</th>
-            <th>1099-K status</th>
+            <th scope="col">Platform</th>
+            <th scope="col">Gross sales, <span id="taxTrackerYear"></span></th>
+            <th scope="col">Toward $20,000</th>
+            <th scope="col">Transactions</th>
+            <th scope="col">Toward 200</th>
+            <th scope="col">1099-K status</th>
           </tr>
         </thead>
         <tbody id="taxTrackerBody"></tbody>
@@ -822,13 +823,13 @@
       <table class="card-table" id="cardTable">
         <thead>
           <tr>
-            <th class="sortable" data-sort="cardName" tabindex="0" aria-sort="none">Card</th>
-            <th class="sortable" data-sort="sport" tabindex="0" aria-sort="none">Sport</th>
-            <th class="sortable" data-sort="gradingCompany" tabindex="0" aria-sort="none">Grader</th>
-            <th class="sortable" data-sort="grade" tabindex="0" aria-sort="none">Grade</th>
-            <th class="sortable" data-sort="estimatedValue" tabindex="0" aria-sort="none">Est. value</th>
-            <th>Basis</th>
-            <th class="sortable" data-sort="datePriced" tabindex="0" aria-sort="none">Date priced</th>
+            <th class="sortable" data-sort="cardName" tabindex="0" aria-sort="none" scope="col">Card</th>
+            <th class="sortable" data-sort="sport" tabindex="0" aria-sort="none" scope="col">Sport</th>
+            <th class="sortable" data-sort="gradingCompany" tabindex="0" aria-sort="none" scope="col">Grader</th>
+            <th class="sortable" data-sort="grade" tabindex="0" aria-sort="none" scope="col">Grade</th>
+            <th class="sortable" data-sort="estimatedValue" tabindex="0" aria-sort="none" scope="col">Est. value</th>
+            <th scope="col">Basis</th>
+            <th class="sortable" data-sort="datePriced" tabindex="0" aria-sort="none" scope="col">Date priced</th>
           </tr>
         </thead>
         <tbody id="cardTableBody"></tbody>
@@ -899,7 +900,10 @@
 <script src="/cgt/data/validate-core.js"></script>
 <script src="/cgt/data/grading-core.js"></script>
 <script src="/cgt/data/turnaround-core.js"></script>
+<script src="/cgt/data/export-core.js"></script>
+<script src="/cgt/data/html-core.js"></script>
 <script src="/cgt/app.js"></script>
+<script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>
 </body>

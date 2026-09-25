@@ -54,17 +54,11 @@
     URL.revokeObjectURL(url);
   });
 
-  // Same csvField escape the other 5 hubs already use, copied verbatim: CSV
-  // formula injection (OWASP) is a real risk here too, since a hand-typed
-  // note starting with =, +, -, @, tab, or a carriage return is read as a
-  // live formula by Excel/Sheets when this export is opened there, not as
-  // plain text. A leading single quote is the standard mitigation both
-  // recommend.
-  function csvField(v) {
-    let s = v == null ? '' : String(v);
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  }
+  // Shared, unit-tested CSV serialization (export-core.js): csvField's
+  // CSV/formula-injection guard now has a real regression test instead of
+  // only ever running live in a browser, same shared-core pattern
+  // Sondrik/Alpha/Garage/CGT already use.
+  const { csvField } = window.JobSearchExportCore;
 
   // Same real local CSV export the other 5 hubs already have, just never
   // shipped on this one. Exports the same 6 columns as the on-page
@@ -89,14 +83,10 @@
     URL.revokeObjectURL(url);
   });
 
-  // div.textContent round-trips escape &amp;/&lt;/&gt; but not quotes, so a
-  // hand-typed value with a " or ' could break out of an attribute. Same
-  // regex-based escape Sondrik/CGT/Garage all use for exactly that reason.
-  function escapeHtml(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  // Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+  // regression test instead of only ever running live in a browser, same
+  // shared-core pattern used for csvField above.
+  const { escapeHtml } = window.JobSearchHtmlCore;
 
   function fmtDate(iso) {
     if (!iso) return null;

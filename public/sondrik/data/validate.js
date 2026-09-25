@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findDuplicateLeads } = require('./validate-core.js');
+const { findDuplicateLeads, emDashFields } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -33,21 +33,6 @@ function isDateOrNull(v) {
   return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
 }
 
-// Every other real string on this page (release summaries, the traction
-// scope note, lead/channel/goal notes, the assistant's own chat replies per
-// server.js's system prompt) is written without em dashes, so a hand-typed
-// field that has one reads as a paste-in from somewhere else rather than
-// Jack's or this product's own voice. Warning-level only: an em dash never
-// breaks anything the page renders, this is a style nudge, not a data error.
-function emDashFields(obj, fields) {
-  const hits = [];
-  if (!obj) return hits;
-  fields.forEach(f => {
-    const v = obj[f];
-    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
-  });
-  return hits;
-}
 
 // Catches the most plausible hand-edit slip in a file with no other input
 // validation: typing last year's habit into the year field (e.g. "2025-09-07"

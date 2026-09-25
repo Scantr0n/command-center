@@ -1059,6 +1059,7 @@ table.card-table {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .cert-link:hover { border-color: var(--hairlineHover); color: var(--ink); }
+.field-note + .cert-link { margin-top: 8px; }
 
 .field-note {
   font-size: 0.7rem;

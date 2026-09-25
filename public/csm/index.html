@@ -38,6 +38,8 @@
     <strong>This device is offline.</strong> Showing the last cached snapshot of this data; it may not reflect the latest hand-edit.
   </div>
 
+  <div class="data-error-banner" id="dataErrorBanner" role="alert" aria-atomic="true" hidden></div>
+
   <div class="callout">
     <strong>Planning tool, not a send tool.</strong> Nothing on this page contacts anyone. There is no live backend
     connected yet, so every number here is either a real logged fact or an honest empty state, never a filled-in
@@ -585,6 +587,7 @@
 <script src="/csm/data/validate-core.js"></script>
 <script src="/csm/data/csm-core.js"></script>
 <script src="/csm/app.js"></script>
+<script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));</script>
 </body>

@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v39';
+const CACHE_VERSION = 'v49';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -13,22 +13,24 @@ const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 const SHELL_URLS = [
   '/', '/index.html', '/style.css', '/manifest.webmanifest',
   '/favicon.svg', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png',
-  '/vendor/d3-force-selection-zoom.min.js', '/sidebar.js', '/data/dashboard-core.js', '/data/graph-core.js',
+  '/vendor/d3-force-selection-zoom.min.js', '/sidebar.js', '/sidebar-core.js', '/data/dashboard-core.js', '/data/graph-core.js',
+  '/data/html-core.js',
   '/alpha/', '/alpha/index.html', '/alpha/app.js', '/alpha/style.css',
   '/alpha/data/account-core.js', '/alpha/data/dates-core.js', '/alpha/data/regime-core.js',
-  '/alpha/data/sparkline-core.js', '/alpha/data/export-core.js',
+  '/alpha/data/sparkline-core.js', '/alpha/data/export-core.js', '/alpha/data/html-core.js',
   '/cgt/', '/cgt/index.html', '/cgt/app.js', '/cgt/style.css',
   '/cgt/import.html', '/cgt/import.js', '/cgt/data/validate-core.js', '/cgt/data/grading-core.js',
-  '/cgt/data/turnaround-core.js', '/cgt/data/import-core.js',
+  '/cgt/data/turnaround-core.js', '/cgt/data/import-core.js', '/cgt/data/export-core.js',
+  '/cgt/data/html-core.js',
   '/csm/', '/csm/index.html', '/csm/app.js', '/csm/style.css', '/csm/data/validate-core.js',
   '/csm/data/csm-core.js',
   '/garage/', '/garage/index.html', '/garage/app.js', '/garage/style.css', '/garage/data/validate-core.js',
-  '/garage/data/garage-core.js',
+  '/garage/data/garage-core.js', '/garage/data/export-core.js', '/garage/data/html-core.js',
   '/sondrik/', '/sondrik/index.html', '/sondrik/app.js', '/sondrik/style.css', '/sondrik/data/validate-core.js',
   '/sondrik/data/goals-core.js', '/sondrik/data/release-core.js', '/sondrik/data/export-core.js',
-  '/sondrik/data/next-steps-core.js',
+  '/sondrik/data/next-steps-core.js', '/sondrik/data/html-core.js',
   '/job-search/', '/job-search/index.html', '/job-search/app.js', '/job-search/style.css',
-  '/job-search/data/validate-core.js'
+  '/job-search/data/validate-core.js', '/job-search/data/export-core.js', '/job-search/data/html-core.js'
 ];
 
 self.addEventListener('install', event => {

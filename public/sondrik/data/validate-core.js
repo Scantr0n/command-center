@@ -36,5 +36,25 @@
     return [...byKey.values()].filter(group => group.length > 1);
   }
 
-  return { findDuplicateLeads };
+  // Every real free-text field this product renders is written without em
+  // dashes, so a hand-typed or pasted-in field that has one reads as coming
+  // from somewhere else rather than Jack's or the product's own voice.
+  // Previously lived only in validate.js (CLI-only, no browser access), so a
+  // summary/note/label pasted in with an em dash through one of the
+  // quick-log forms in app.js went uncaught until the next
+  // `node validate.js` run; moved here so both sides share the same check,
+  // same fix CSM's and Garage's own emDashFields already got. Warning-level
+  // only: an em dash never breaks anything rendered, this is a style nudge,
+  // not a data error.
+  function emDashFields(obj, fields) {
+    const hits = [];
+    if (!obj) return hits;
+    fields.forEach(f => {
+      const v = obj[f];
+      if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+    });
+    return hits;
+  }
+
+  return { findDuplicateLeads, emDashFields };
 });

@@ -280,7 +280,7 @@ function renderPreview(dataset, mapping, imported) {
 
   if (!cols.length) { head.innerHTML = ''; body.innerHTML = ''; return; }
 
-  head.innerHTML = cols.map(f => `<th>${escapeHtml(f.label)}</th>`).join('');
+  head.innerHTML = cols.map(f => `<th scope="col">${escapeHtml(f.label)}</th>`).join('');
   body.innerHTML = imported.map(r => `
     <tr>${cols.map(f => `<td class="cell-muted">${r[f.key] != null ? escapeHtml(String(r[f.key])) : '<span class="cell-value empty">null</span>'}</td>`).join('')}</tr>
   `).join('');

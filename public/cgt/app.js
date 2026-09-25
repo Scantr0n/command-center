@@ -98,11 +98,10 @@ function syncUrl() {
   history.replaceState(null, '', url);
 }
 
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
+// Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+// regression test instead of only ever running live in a browser, same
+// shared-core pattern already used for csvField (see CgtExportCore).
+const escapeHtml = CgtHtmlCore.escapeHtml;
 
 // An empty state that just says "add one to whatever.json" is a dead end,
 // the matching quick-log tool already exists further up the page but stays
@@ -269,13 +268,13 @@ const PRICE_STALE_AFTER_DAYS = 180;
 // not data-file driven, so nothing else in the app notices when it goes
 // stale -- the SGC $15->$50/card hike and the BGS-vs-SGC turnaround mixup
 // (see the 42b8f58/e0ab607 fixes) both shipped as silent inaccuracies until
-// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-17"
+// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-25"
 // claim already made in that section's callout prose; keep the two in sync by
 // hand whenever the table is re-verified. 30 days, not the 180 used for card
 // prices above: grading-company fee/tier changes have moved multiple times
 // within weeks of each other this year, so this table goes stale far faster
 // than a book value does.
-const GRADING_REFERENCE_REVIEWED_ON = '2026-09-17';
+const GRADING_REFERENCE_REVIEWED_ON = '2026-09-25';
 const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 
 // Local calendar date as YYYY-MM-DD, same convention as turnaround-core.js's
@@ -401,6 +400,19 @@ function bookValueSearchLink(c) {
   const parts = [c.year, c.cardName].filter(Boolean);
   const url = 'https://www.sportscardspro.com/search-products?q=' + encodeURIComponent(parts.join(' ')) + '&type=prices';
   return { url, text: 'Search SportsCardsPro book value' };
+}
+
+// 130point.com runs a real, free keyword search across eBay sold listings
+// (plus Goldin, Fanatics Collect, and other marketplaces) and, unlike the
+// eBay searches above, does not require signing in to see sold results --
+// the exact gap compSearchLink/rawCompSearchLink's own field-notes flag.
+// Its real search page is confirmed at 130point.com/search, but it has no
+// documented URL query parameter for pre-filling a search term the way
+// eBay's _nkw does, so this links to the real search page itself rather
+// than guessing one, same "don't fabricate a link format" rule the
+// SGC/CGC/KSA landing-only entries in CERT_LOOKUP above already follow.
+function point130Link() {
+  return { url: 'https://130point.com/search', text: 'Search 130point (no eBay login needed)' };
 }
 
 function isStale(c) {
@@ -1500,9 +1512,11 @@ function openCandidateModal(id) {
   }
   const rawComp = rawCompSearchLink(c);
   if (rawComp) {
+    const point130 = point130Link();
     body += `<div class="field-row">
       <a href="${escapeHtml(rawComp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(rawComp.text)} &rarr;</a>
       <div class="field-note">Opens an eBay sold-listings search for the raw/ungraded card, for researching <code class="inline-code">rawValue</code>. eBay now requires you to be signed in to see sold results.</div>
+      <a href="${escapeHtml(point130.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(point130.text)} &rarr;</a>
     </div>`;
   }
   body += field('Estimated grading cost', c.estimatedGradingCost != null ? formatUsd(c.estimatedGradingCost) : null, c.estimatedGradingCost == null);
@@ -1519,9 +1533,11 @@ function openCandidateModal(id) {
   body += field('Expected graded value', c.expectedGradedValue != null ? formatUsd(c.expectedGradedValue) : null, c.expectedGradedValue == null);
   const gradedComp = compSearchLink({ cardName: c.cardName, year: c.year, gradingCompany: c.targetGradingCompany, grade: c.expectedGrade });
   if (gradedComp) {
+    const point130 = point130Link();
     body += `<div class="field-row">
       <a href="${escapeHtml(gradedComp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(gradedComp.text)} &rarr;</a>
       <div class="field-note">Opens an eBay sold-listings search for ${escapeHtml(c.targetGradingCompany)}${c.expectedGrade ? ' grade ' + escapeHtml(c.expectedGrade) : ''} comps, for researching <code class="inline-code">expectedGradedValue</code>. eBay now requires you to be signed in to see sold results.</div>
+      <a href="${escapeHtml(point130.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(point130.text)} &rarr;</a>
     </div>`;
   }
   body += field('Graded value basis', c.gradedValueBasis === 'recent-sale' ? 'Recent sale' : c.gradedValueBasis === 'comp-estimate' ? 'Comp-based estimate' : null, !c.gradedValueBasis);
@@ -2179,9 +2195,9 @@ function renderInsuranceSummary() {
     <table class="insurance-summary-table">
       <thead>
         <tr>
-          ${anyPhotos ? '<th>Photo</th>' : ''}
-          <th>Card</th><th>Sport</th><th>Grader</th><th>Grade</th><th>Cert #</th><th>Location</th>
-          <th class="num">Est. value</th><th>Basis</th><th>Date priced</th>
+          ${anyPhotos ? '<th scope="col">Photo</th>' : ''}
+          <th scope="col">Card</th><th scope="col">Sport</th><th scope="col">Grader</th><th scope="col">Grade</th><th scope="col">Cert #</th><th scope="col">Location</th>
+          <th scope="col" class="num">Est. value</th><th scope="col">Basis</th><th scope="col">Date priced</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -3121,9 +3137,11 @@ function openModal(id) {
   }
   const comp = compSearchLink(activeCard);
   if (comp) {
+    const point130 = point130Link();
     body += `<div class="field-row">
       <a href="${escapeHtml(comp.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(comp.text)} &rarr;</a>
       <div class="field-note">Opens an eBay sold-listings search built from this card's own name/year/grade. eBay now requires you to be signed in to see sold results.</div>
+      <a href="${escapeHtml(point130.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(point130.text)} &rarr;</a>
     </div>`;
   }
   body += field('Estimated value', activeCard.estimatedValue != null ? formatUsd(activeCard.estimatedValue) : null, activeCard.estimatedValue == null);
@@ -3633,15 +3651,10 @@ copyLinkBtn.addEventListener('click', () => {
     });
 });
 
-function csvField(v) {
-  let s = v == null ? '' : String(v);
-  // CSV/formula injection (OWASP): a hand-typed note starting with
-  // =, +, -, @, tab, or a carriage return is read as a live formula by
-  // Excel/Sheets when this export is opened there, not as plain text.
-  // A leading single quote is the standard mitigation both recommend.
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+// Shared, unit-tested CSV serialization (export-core.js): csvField's
+// CSV/formula-injection guard now has a real regression test instead of
+// only ever running live in a browser.
+const csvField = CgtExportCore.csvField;
 
 // Each column is [accessor, label] rather than [key, label] so a derived
 // column (gain/loss isn't a real field on the card, it's computed from two

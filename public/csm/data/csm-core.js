@@ -519,6 +519,41 @@
     return (p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p);
   }
 
+  // Every real free-text field on this board is written without em dashes
+  // (this project's own convention), so a hand-typed or pasted-in field that
+  // has one reads as coming from somewhere else rather than Jack's own
+  // voice. Used to live only in validate.js's own copy, checked solely from
+  // the command line; moved here so the same rule can also feed the live
+  // Data Quality panel, same shared-core-with-tests pattern as every other
+  // predicate above. Warning-level only: an em dash never breaks anything
+  // rendered, this is a style nudge, not a data error.
+  function emDashFields(obj, fields) {
+    const hits = [];
+    if (!obj) return hits;
+    fields.forEach(f => {
+      const v = obj[f];
+      if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
+    });
+    return hits;
+  }
+
+  // Same per-prospect field set validate.js already checks (top-level fields,
+  // contactChannel.detail, every outreachLog note, every contentIdeas idea),
+  // flattened into one list of human-readable field labels so a caller can
+  // report exactly which field(s) tripped it without re-deriving the field
+  // list itself.
+  function emDashHits(p) {
+    const hits = emDashFields(p, ['name', 'company', 'verifiedHook', 'nextAction']);
+    if (emDashFields(p.contactChannel, ['detail']).length) hits.push('contactChannel.detail');
+    (p.outreachLog || []).forEach((entry, i) => {
+      if (emDashFields(entry, ['note']).length) hits.push('outreachLog[' + i + '].note');
+    });
+    (p.contentIdeas || []).forEach((entry, i) => {
+      if (emDashFields(entry, ['idea']).length) hits.push('contentIdeas[' + i + '].idea');
+    });
+    return hits;
+  }
+
   // Per-prospect data-quality check: every real gap the board can actually
   // detect from a prospect's own fields, not just the stall/cold-signal/
   // duplicate checks that already get their own panels. Reasons are plain
@@ -542,9 +577,23 @@
         if (hasOutOfOrderDates(p.stageHistory)) reasons.push('STAGE HISTORY DATES OUT OF ORDER, CHECK FORMATTING');
         if (hasOutOfOrderDates(p.outreachLog)) reasons.push('OUTREACH LOG DATES OUT OF ORDER, CHECK FORMATTING');
         if (p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate)) reasons.push('NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING');
+        const emDashHitFields = emDashHits(p);
+        if (emDashHitFields.length) reasons.push('EM DASH IN ' + emDashHitFields.join(', ').toUpperCase() + ', CHECK FOR A PASTE-IN');
         return { p, reasons };
       })
       .filter(x => x.reasons.length > 0);
+  }
+
+  // Real XSS guard (OWASP): this page renders hand-editable JSON field
+  // values (a prospect's name, a note, a channel detail) straight into
+  // innerHTML, so a value containing "<script>" or an "onerror=" attribute
+  // has to come out as inert text rather than live markup. Ran untested in
+  // app.js since this hub's first version, same gap csvField below used to
+  // have before it moved into this file.
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
   }
 
   // CSV/formula injection (OWASP): a hand-typed note starting with
@@ -750,9 +799,10 @@
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    computeStalled, hasNudgePlan, computeDataQualityFlags, csvField, icsEscapeText, icsFoldLine,
+    computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
-    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
+    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
+    emDashFields, emDashHits
   };
 });

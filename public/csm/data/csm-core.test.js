@@ -22,10 +22,11 @@ const {
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
-  csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+  escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany,
-  missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
+  missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
+  emDashFields, emDashHits
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -755,6 +756,33 @@ test('hasNudgePlan treats an invalid hand-typed date as not a real plan', () => 
   assert.equal(hasNudgePlan({ nudgeSchedule: { doNotNudgeBefore: '2026-9-5' } }), false);
 });
 
+test('escapeHtml leaves an ordinary value untouched', () => {
+  assert.equal(escapeHtml('City Bound'), 'City Bound');
+});
+
+test('escapeHtml returns an empty string for null/undefined, never the literal "null"', () => {
+  assert.equal(escapeHtml(null), '');
+  assert.equal(escapeHtml(undefined), '');
+});
+
+test('escapeHtml neutralizes a script tag rather than letting it render as live markup', () => {
+  // Real XSS guard (OWASP): this page renders hand-editable JSON field
+  // values straight into innerHTML, so a prospect name or note containing
+  // "<script>" has to come out as inert text.
+  assert.equal(escapeHtml('<script>alert(1)</script>'), '&lt;script&gt;alert(1)&lt;/script&gt;');
+});
+
+test('escapeHtml neutralizes an attribute-breakout attempt', () => {
+  assert.equal(
+    escapeHtml('"><img src=x onerror=alert(1)>'),
+    '&quot;&gt;&lt;img src=x onerror=alert(1)&gt;'
+  );
+});
+
+test('escapeHtml escapes each of the five reserved characters', () => {
+  assert.equal(escapeHtml('& < > " \''), '&amp; &lt; &gt; &quot; &#39;');
+});
+
 test('csvField leaves an ordinary value untouched', () => {
   assert.equal(csvField('City Bound'), 'City Bound');
 });
@@ -995,6 +1023,34 @@ test('computeDataQualityFlags catches a malformed nextNudgeDate', () => {
   const p = { stage: 'researched', nextNudgeDate: '2026-9-5' };
   const flagged = computeDataQualityFlags([], [p]);
   assert.deepEqual(flagged[0].reasons, ['NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING']);
+});
+
+const EM_DASH = String.fromCharCode(8212);
+
+test('emDashFields only reports the fields that actually contain an em dash', () => {
+  assert.deepEqual(emDashFields({ name: 'Jane' + EM_DASH + 'Doe', company: 'Real Co' }, ['name', 'company']), ['name']);
+  assert.deepEqual(emDashFields({ name: 'Jane Doe' }, ['name']), []);
+  assert.deepEqual(emDashFields(null, ['name']), []);
+});
+
+test('emDashHits checks the top-level fields, contactChannel.detail, and every outreachLog/contentIdeas entry', () => {
+  assert.deepEqual(emDashHits({ name: 'Jane' + EM_DASH + 'Doe' }), ['name']);
+  assert.deepEqual(emDashHits({ name: 'Jane Doe', contactChannel: { detail: 'via' + EM_DASH + 'form' } }), ['contactChannel.detail']);
+  assert.deepEqual(
+    emDashHits({ name: 'Jane Doe', outreachLog: [{ note: 'clean' }, { note: 'follow up' + EM_DASH + 'soon' }] }),
+    ['outreachLog[1].note']
+  );
+  assert.deepEqual(
+    emDashHits({ name: 'Jane Doe', contentIdeas: [{ idea: 'idea' + EM_DASH + 'one' }] }),
+    ['contentIdeas[0].idea']
+  );
+  assert.deepEqual(emDashHits({ name: 'Jane Doe' }), []);
+});
+
+test('computeDataQualityFlags flags a pasted-in em dash and names the field it is in', () => {
+  const p = { stage: 'researched', name: 'Jane Doe', nextAction: 'Call them' + EM_DASH + 'soon' };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.deepEqual(flagged[0].reasons, ['EM DASH IN NEXTACTION, CHECK FOR A PASTE-IN']);
 });
 
 test('slugifyProspectId builds a real, readable id from a real name and company', () => {

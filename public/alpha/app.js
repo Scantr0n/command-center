@@ -1,8 +1,8 @@
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
+// Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
+// regression test instead of only ever running live in a browser, same
+// shared-core pattern already used for csvField (see AlphaExportCore
+// further down this file).
+const escapeHtml = AlphaHtmlCore.escapeHtml;
 
 // Market-calendar and uptime/incident date math lives in dates-core.js,
 // regime-segment/distribution math lives in regime-core.js, sparkline
@@ -796,18 +796,42 @@ function incidentItem(incident) {
   `;
 }
 
+// Kept purely so the Recent incidents "Export CSV" button can build its
+// file from the same real, already-computed incidents just rendered, never
+// a second computeIncidents call that could disagree with what's on
+// screen. Holds every incident this history covers, not just the
+// INCIDENT_LIST_LIMIT-capped slice the list itself shows, same "export the
+// full real set, not just the glance-sized view" convention as the
+// Activity log's own lastEventLogSnapshot above.
+let lastIncidentsSnapshot = [];
+
 function renderIncidents(data, clientHistory) {
   const list = document.getElementById('incidentList');
+  const csvBtn = document.getElementById('incidentsCsvBtn');
   if (!list) return;
   const history = effectiveConnHistory(data, clientHistory);
   if (!history.length) {
+    lastIncidentsSnapshot = [];
+    if (csvBtn) {
+      csvBtn.disabled = true;
+      csvBtn.title = 'No incidents recorded yet.';
+    }
     list.innerHTML = `<li class="incident-empty font-mono">No connectivity checks recorded yet.</li>`;
     return;
   }
   const incidents = computeIncidents(history);
+  lastIncidentsSnapshot = incidents;
   if (!incidents.length) {
+    if (csvBtn) {
+      csvBtn.disabled = true;
+      csvBtn.title = 'No downtime recorded in the covered history.';
+    }
     list.innerHTML = `<li class="incident-empty font-mono">No downtime recorded in the covered history.</li>`;
     return;
+  }
+  if (csvBtn) {
+    csvBtn.disabled = false;
+    csvBtn.title = '';
   }
   // Newest first, same convention as the activity log below it, capped to a
   // glance-sized list rather than every incident this browser has ever seen.
@@ -2234,6 +2258,43 @@ document.getElementById('eventLogCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'alpha-events-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const INCIDENTS_CSV_COLUMNS = [
+  ['start', 'Start'], ['end', 'End'], ['status', 'Status'], ['durationMinutes', 'Duration (min)']
+];
+
+// Same real-rows-export pattern as Positions/Activity log above, for the
+// Recent incidents list: every real down window this browser's connectivity
+// history has recorded (see lastIncidentsSnapshot), not just the
+// INCIDENT_LIST_LIMIT-capped glance view the list itself renders. An
+// ongoing incident's end/duration are computed against "now" at export
+// time, the exact same math incidentItem already uses for its on-screen
+// "Ongoing" row, never a guessed end time.
+document.getElementById('incidentsCsvBtn').addEventListener('click', () => {
+  if (!lastIncidentsSnapshot.length) return;
+  const rows = [...lastIncidentsSnapshot].reverse().map(incident => {
+    const endMs = incident.ongoing ? Date.now() : new Date(incident.end).getTime();
+    const durationMinutes = Math.round((endMs - new Date(incident.start).getTime()) / 60000);
+    return {
+      start: formatAbsolute(incident.start),
+      end: incident.ongoing ? 'Ongoing' : formatAbsolute(incident.end),
+      status: incident.ongoing ? 'Ongoing' : 'Resolved',
+      durationMinutes
+    };
+  });
+  const header = INCIDENTS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(r => INCIDENTS_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-incidents-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
