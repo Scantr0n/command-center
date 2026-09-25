@@ -365,6 +365,29 @@ function renderPoshmarkShareFreshness() {
   el.title = 'Last hand-verified against current Poshmark reseller-community sharing-cadence guidance on ' + POSHMARK_SHARE_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above. This calendar drives
+// real source-now-vs-list-now decisions every month, so a stale claim here
+// is a real risk of sourcing or listing into the wrong window, not just a
+// cosmetic reference going stale. Re-verified 2026-09-25 against current
+// reseller-community seasonal-calendar coverage (Voolist, Underpriced):
+// the general shape (post-Christmas clearance sourcing, spring-cleaning
+// donation surge, back-to-school in August, winter outerwear peaking
+// September through December) still matches, no change needed.
+const SEASONAL_GUIDE_REVIEWED_ON = '2026-09-25';
+const SEASONAL_GUIDE_STALE_AFTER_DAYS = 45;
+
+function renderSeasonalGuideFreshness() {
+  const el = document.getElementById('seasonalGuideFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SEASONAL_GUIDE_REVIEWED_ON);
+  const stale = age != null && age > SEASONAL_GUIDE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current reseller-community seasonal-calendar research on ' + SEASONAL_GUIDE_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5179,6 +5202,7 @@ renderSeasonalCalendarHighlight();
 renderFeeScheduleFreshness();
 renderBestTimeFreshness();
 renderPoshmarkShareFreshness();
+renderSeasonalGuideFreshness();
 renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
