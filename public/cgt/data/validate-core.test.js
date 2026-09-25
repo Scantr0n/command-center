@@ -138,6 +138,30 @@ test('validateCards requires soldDate and soldPrice together, not one without th
   assert.ok(missingPrice.errors.some(e => e.includes('soldPrice')));
 });
 
+test('validateCards rejects a negative or non-numeric sellingFees, accepts null', () => {
+  const negative = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', soldDate: '2026-08-08', soldPrice: 20, sellingFees: -1 }]);
+  assert.ok(negative.errors.some(e => e.includes('sellingFees')));
+
+  const nullOk = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', soldDate: '2026-08-08', soldPrice: 20, sellingFees: null }]);
+  assert.ok(!nullOk.errors.some(e => e.includes('sellingFees')));
+});
+
+test('validateCards errors when sellingFees is logged with no real sale to apply it to', () => {
+  const { errors } = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', soldPrice: null, soldDate: null, sellingFees: 5 }]);
+  assert.ok(errors.some(e => e.includes('sellingFees') && e.includes('soldPrice')));
+});
+
+test('validateCards warns, but does not error, when sellingFees meets or exceeds the gross soldPrice', () => {
+  const { errors, warnings } = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', soldDate: '2026-08-08', soldPrice: 20, sellingFees: 20 }]);
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some(w => w.includes('sellingFees') && w.includes('soldPrice')));
+});
+
+test('validateCards passes a real sale with a logged sellingFees clean', () => {
+  const { errors } = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', soldDate: '2026-08-08', soldPrice: 20, sellingFees: 2.75 }]);
+  assert.deepEqual(errors, []);
+});
+
 test('validateCards rejects a bad acquisitionDate but accepts null', () => {
   const bad = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', acquisitionDate: '2026-02-30' }]);
   assert.ok(bad.errors.some(e => e.includes('acquisitionDate')));

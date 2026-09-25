@@ -156,11 +156,22 @@
   // record, same "never guess at a missing side" rule as computeGainLoss's
   // unrealized version. A card sold with no logged costBasis has a real sale
   // price but no real realized gain/loss to compute against.
+  //
+  // soldPrice is the real gross sale price (what a buyer paid, matching a
+  // platform's own 1099-K gross-payment-volume figure), not what actually
+  // landed in Jack's payout: a marketplace's final-value fee comes out of
+  // that before it does. sellingFees, when logged, is the real fee amount
+  // from the actual payout statement (never an estimated rate, same
+  // never-guess convention as every other money field here), netted out
+  // here so a real profit isn't overstated by the fee the platform kept. An
+  // unlogged sellingFees (still null) falls back to 0, i.e. the same gross-
+  // only number this always computed before the field existed.
   function computeRealizedGainLoss(c) {
     if (!isSold(c) || c.costBasis == null || c.soldPrice == null) return null;
-    const abs = c.soldPrice - c.costBasis;
+    const netProceeds = c.soldPrice - (c.sellingFees || 0);
+    const abs = netProceeds - c.costBasis;
     const pct = c.costBasis > 0 ? (abs / c.costBasis) * 100 : null;
-    return { abs, pct };
+    return { abs, pct, netProceeds };
   }
 
   // Wraps estimateCollectiblesTax above with the two real numbers only

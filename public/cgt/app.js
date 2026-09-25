@@ -2691,8 +2691,9 @@ function cardEditFormHtml(c) {
     ceFieldRow('ceDatePriced', 'Date priced', c.datePriced, 'date') +
     '<div class="form-row-split">' +
     ceInputInner('ceSoldDate', 'Sold date (leave blank if still owned)', c.soldDate, 'date') +
-    ceInputInner('ceSoldPrice', 'Sold price, USD', c.soldPrice, 'number') +
+    ceInputInner('ceSoldPrice', 'Sold price, USD (gross, before fees)', c.soldPrice, 'number') +
     '</div>' +
+    ceFieldRow('ceSellingFees', 'Selling fees, USD (real fee actually charged, optional)', c.sellingFees, 'number') +
     '<div class="form-row-split">' +
     ceInputInner('ceListedDate', 'Listed date (leave blank if not currently for sale)', c.listedDate, 'date') +
     ceInputInner('ceListedPrice', 'Listed price, USD (real current asking price)', c.listedPrice, 'number') +
@@ -2980,6 +2981,7 @@ function wireCardEditForm(c) {
     const estimatedValueRaw = document.getElementById('ceEstimatedValue').value.trim();
     const costBasisRaw = document.getElementById('ceCostBasis').value.trim();
     const soldPriceRaw = document.getElementById('ceSoldPrice').value.trim();
+    const sellingFeesRaw = document.getElementById('ceSellingFees').value.trim();
     const listedPriceRaw = document.getElementById('ceListedPrice').value.trim();
     const subgrades = {};
     SUBGRADE_LABELS.forEach(([f]) => {
@@ -3005,6 +3007,7 @@ function wireCardEditForm(c) {
       datePriced: document.getElementById('ceDatePriced').value || null,
       soldDate: document.getElementById('ceSoldDate').value || null,
       soldPrice: soldPriceRaw === '' ? null : Number(soldPriceRaw),
+      sellingFees: sellingFeesRaw === '' ? null : Number(sellingFeesRaw),
       listedDate: document.getElementById('ceListedDate').value || null,
       listedPrice: listedPriceRaw === '' ? null : Number(listedPriceRaw),
       backlogBatch: ceVal('ceBacklogBatch'),
@@ -3151,9 +3154,11 @@ function openModal(id) {
   body += field('Acquisition date (when bought/acquired)', activeCard.acquisitionDate, !activeCard.acquisitionDate);
   if (isSold(activeCard)) {
     body += field('Sold date', activeCard.soldDate, !activeCard.soldDate);
-    body += field('Sold price', activeCard.soldPrice != null ? formatUsd(activeCard.soldPrice) : null, activeCard.soldPrice == null);
+    body += field('Sold price (gross)', activeCard.soldPrice != null ? formatUsd(activeCard.soldPrice) : null, activeCard.soldPrice == null);
+    body += field('Selling fees', activeCard.sellingFees != null ? formatUsd(activeCard.sellingFees) : null, activeCard.sellingFees == null);
     const rgl = computeRealizedGainLoss(activeCard);
     if (rgl) {
+      if (activeCard.sellingFees != null) body += field('Net proceeds (after fees)', formatUsd(rgl.netProceeds), false);
       body += field('Realized gain / loss', formatSignedUsd(rgl.abs) + (rgl.pct != null ? ' (' + (rgl.pct >= 0 ? '+' : '') + rgl.pct.toFixed(1) + '%)' : ''), false);
       if (rgl.abs > 0) {
         const taxEst = estimateCardCollectiblesTax(activeCard);
@@ -3675,7 +3680,8 @@ const CSV_COLUMNS = [
   [c => c.costBasis, 'Cost basis'],
   [c => c.acquisitionDate, 'Acquisition date'],
   [c => isSold(c) ? c.soldDate : null, 'Sold date'],
-  [c => isSold(c) ? c.soldPrice : null, 'Sold price'],
+  [c => isSold(c) ? c.soldPrice : null, 'Sold price (gross)'],
+  [c => isSold(c) ? c.sellingFees : null, 'Selling fees'],
   [c => !isSold(c) && isListed(c) ? c.listedDate : null, 'Listed date'],
   [c => !isSold(c) && isListed(c) ? c.listedPrice : null, 'Listed price'],
   // Realized once a card is sold (soldPrice vs costBasis), unrealized otherwise

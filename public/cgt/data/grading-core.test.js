@@ -179,6 +179,20 @@ test('computeRealizedGainLoss only counts a card that is actually sold with both
   const rgl = computeRealizedGainLoss({ soldDate: '2026-01-01', costBasis: 10, soldPrice: 30 });
   assert.equal(rgl.abs, 20);
   assert.equal(rgl.pct, 200);
+  assert.equal(rgl.netProceeds, 30, 'no sellingFees logged falls back to the gross soldPrice');
+});
+
+test('computeRealizedGainLoss nets a real logged sellingFees out of the gross soldPrice before comparing to costBasis', () => {
+  const rgl = computeRealizedGainLoss({ soldDate: '2026-01-01', costBasis: 10, soldPrice: 30, sellingFees: 4 });
+  assert.equal(rgl.netProceeds, 26, 'net proceeds is soldPrice minus the real fee');
+  assert.equal(rgl.abs, 16, 'gain is measured off net proceeds, not the gross sale price');
+  assert.equal(rgl.pct, 160);
+});
+
+test('computeRealizedGainLoss with sellingFees that would flip a gross gain into a net loss', () => {
+  const rgl = computeRealizedGainLoss({ soldDate: '2026-01-01', costBasis: 20, soldPrice: 22, sellingFees: 5 });
+  assert.equal(rgl.netProceeds, 17);
+  assert.equal(rgl.abs, -3, 'a fee can turn what looked like a gross profit into a real net loss');
 });
 
 test('estimateCardCollectiblesTax returns null for an unsold card, a loss, or a sale with no acquisitionDate', () => {

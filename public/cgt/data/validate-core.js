@@ -278,6 +278,26 @@
         errors.push(where + ': "soldDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.soldDate));
       }
 
+      // sellingFees is the real fee amount a marketplace actually withheld
+      // from this specific sale (an eBay final value fee, a PWCC auction
+      // commission, etc.), logged from the real payout statement, never an
+      // estimated rate. Only meaningful on a real sale, same "needs the
+      // event it modifies" rule as listedPrice/listedDate depending on each
+      // other below. A fee that meets or exceeds the gross soldPrice is
+      // possible in principle (e.g. a refunded/relisted sale) but rare
+      // enough to be worth a second look rather than silently accepted.
+      if (c.sellingFees !== null && c.sellingFees !== undefined) {
+        if (typeof c.sellingFees !== 'number' || Number.isNaN(c.sellingFees) || c.sellingFees < 0) {
+          errors.push(where + ': "sellingFees" must be a non-negative number or null');
+        }
+        if (c.soldPrice == null) {
+          errors.push(where + ': has "sellingFees" but no "soldPrice". A selling fee only applies to a real sale.');
+        } else if (typeof c.sellingFees === 'number' && c.sellingFees >= c.soldPrice) {
+          warnings.push(where + ': "sellingFees" (' + c.sellingFees + ') is greater than or equal to "soldPrice" (' +
+            c.soldPrice + '). Possible, but double-check this is the real fee and not a mistyped/misplaced number.');
+        }
+      }
+
       // Same "one event, two halves, neither optional alone" rule as
       // soldPrice/soldDate just above, for a card that is currently listed
       // for sale (not yet sold, just actively asking). Kept as its own pair
