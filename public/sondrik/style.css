@@ -727,6 +727,24 @@ section { margin-bottom: 52px; }
   font-weight: 500;
 }
 
+/* Same freshness-badge idea as above, but for a hand-verified static
+   reference table (channel/lead norms) instead of a logged data check: it
+   goes stale on its own re-verify clock, not tied to any data file. Sits
+   inline in the <summary> next to the section title, neutral until past the
+   stale-after threshold in app.js, then the same amber as .freshness-stale
+   so it reads as a real prompt to re-check rather than decoration. */
+.reference-freshness {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--dim);
+  margin-left: 8px;
+}
+.reference-freshness-stale {
+  color: #E0A030;
+  font-weight: 500;
+}
+
 /* The chart grows one column per logged download check with no cap, so once
    enough checks pile up it is wider than the page. Scrolls horizontally
    instead of forcing the whole page to, same fade-edge treatment already

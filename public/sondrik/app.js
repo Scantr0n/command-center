@@ -91,6 +91,33 @@
   const STALE_AFTER_DAYS = 7;
   const AGING_AFTER_DAYS = 4;
 
+  // Same freshness-badge idea as the download check above, applied to the
+  // two hand-verified static reference tables (channel norms, lead norms)
+  // instead of a logged data file: each one is a real fact-check against
+  // outside platform docs/threads on the date below, and platform norms
+  // (self-promo thresholds, launch-day mechanics, LTD scoping advice) do
+  // drift, so a reader should get a visible prompt to re-verify once it's
+  // been a while rather than silently trusting a table that says "reviewed
+  // September 2026" forever. Re-verified 2026-09-25 against the same class
+  // of sources already linked under each table (platform help pages, real
+  // founder threads); no correction needed this pass, both tables still
+  // hold up against current sources.
+  const CHANNEL_NORMS_REVIEWED_ON = '2026-09-25';
+  const LEAD_NORMS_REVIEWED_ON = '2026-09-25';
+  const REFERENCE_STALE_AFTER_DAYS = 45;
+
+  function renderReferenceFreshness(elId, reviewedOn) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const age = daysBetween(reviewedOn, todayIso());
+    const stale = age > REFERENCE_STALE_AFTER_DAYS;
+    const ageLabel = age <= 0 ? 'reviewed today' : 'reviewed ' + age + (age === 1 ? ' day' : ' days') + ' ago';
+    el.textContent = ageLabel.charAt(0).toUpperCase() + ageLabel.slice(1) +
+      (stale ? ', re-verify before relying on this' : '');
+    el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+    el.title = 'Last hand-verified against outside platform docs/threads on ' + reviewedOn + '.';
+  }
+
   // Round-number milestones a reader would naturally watch for as the real
   // download count grows, independent of goals.json (which stays empty
   // until Jack sets an actual target). Purely a derived read of the real
@@ -2440,4 +2467,7 @@
   window.addEventListener('offline', updateOfflineBanner);
   window.addEventListener('online', updateOfflineBanner);
   updateOfflineBanner();
+
+  renderReferenceFreshness('channelNormsFreshness', CHANNEL_NORMS_REVIEWED_ON);
+  renderReferenceFreshness('leadNormsFreshness', LEAD_NORMS_REVIEWED_ON);
 })();
