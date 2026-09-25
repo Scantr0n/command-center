@@ -389,6 +389,15 @@ header.page-head .sub {
 .coverage-result-note.positive strong { color: #3DDC84; }
 .coverage-result-note.negative strong { color: #E0503C; }
 .insurance-coverage-line { margin-top: 10px; }
+.coverage-over-item-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--sub);
+  line-height: 1.6;
+}
+.coverage-over-item-list strong { color: var(--ink); }
 
 /* Value breakdown: horizontal bar lists grouping real priced cards' value by
    sport / grading company. Single accent hue since these bars encode

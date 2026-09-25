@@ -570,6 +570,7 @@ async function loadCards() {
     renderBatchFilter();
     renderInsuranceSummary();
     renderCoverageCheck();
+    renderPerItemScheduleCheck();
     renderFooterStatus();
     applyFiltersAndRender();
     initTableScrollShadows();
@@ -2249,6 +2250,80 @@ function saveCoverageLimit(limit) {
   }
 }
 
+// Same self-reported, browser-only pattern as COVERAGE_LIMIT_STORAGE_KEY
+// above, but for a different real number: most homeowner's/renter's
+// policies also cap what a single unscheduled item pays out (often a few
+// thousand dollars or less per item) separately from the overall floater
+// total, so a collection can sit comfortably under its aggregate coverage
+// limit while still holding individual cards that would be underpaid on a
+// claim because none of them were ever scheduled on their own. This never
+// reads or guesses Jack's real per-item cap, only compares real logged
+// per-card estimatedValue figures against whatever number he types in.
+const PER_ITEM_LIMIT_STORAGE_KEY = 'cgt-insurance-per-item-limit';
+
+function loadPerItemLimit() {
+  try {
+    const raw = localStorage.getItem(PER_ITEM_LIMIT_STORAGE_KEY);
+    const n = raw == null ? null : Number(raw);
+    return n && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+function savePerItemLimit(limit) {
+  try {
+    localStorage.setItem(PER_ITEM_LIMIT_STORAGE_KEY, String(limit));
+  } catch {
+    // Storage unavailable, the limit just won't persist across visits.
+  }
+}
+
+function renderPerItemScheduleCheck() {
+  const result = document.getElementById('perItemScheduleResult');
+  if (!result) return;
+  const real = cards.filter(c => !isExample(c) && !isSold(c));
+  const priced = real.filter(c => c.estimatedValue != null);
+
+  if (!priced.length) {
+    result.innerHTML = '<p class="coverage-result-note">No cards with a researched value on record yet, nothing to check against a per-item limit.</p>';
+    return;
+  }
+
+  const input = document.getElementById('perItemLimitInput');
+  const raw = input ? input.value.trim() : '';
+  const limit = raw === '' ? null : Number(raw);
+
+  if (raw === '' || Number.isNaN(limit) || limit <= 0) {
+    result.innerHTML = '<p class="coverage-result-note">Enter your real per-item limit above to flag any single card that would need its own rider.</p>';
+    return;
+  }
+
+  const overLimit = priced.filter(c => c.estimatedValue > limit).sort((a, b) => b.estimatedValue - a.estimatedValue);
+  if (!overLimit.length) {
+    result.innerHTML = `<p class="coverage-result-note positive">No card is currently logged above your ${formatUsd(limit)} per-item limit.</p>`;
+    return;
+  }
+
+  const rows = overLimit.map(c => `<li>${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}: <strong>${formatUsd(c.estimatedValue)}</strong></li>`).join('');
+  result.innerHTML = `
+    <p class="coverage-result-note negative">${overLimit.length} card${overLimit.length === 1 ? '' : 's'} logged above your ${formatUsd(limit)} per-item limit, each would need its own rider or schedule entry to be fully covered:</p>
+    <ul class="coverage-over-item-list">${rows}</ul>
+  `;
+}
+
+function wirePerItemScheduleCheck() {
+  const input = document.getElementById('perItemLimitInput');
+  if (!input) return;
+  const saved = loadPerItemLimit();
+  if (saved) input.value = String(saved);
+  input.addEventListener('input', () => {
+    const raw = input.value.trim();
+    const limit = raw === '' ? null : Number(raw);
+    if (limit && limit > 0) savePerItemLimit(limit);
+    renderPerItemScheduleCheck();
+  });
+}
+
 function renderCoverageCheck() {
   const result = document.getElementById('coverageResult');
   if (!result) return;
@@ -3524,6 +3599,7 @@ document.getElementById('candidatesClearFiltersBtn').addEventListener('click', (
   document.getElementById('candidateSearchInput').focus();
 });
 wireCoverageCheck();
+wirePerItemScheduleCheck();
 
 // Resets search, all four chip groups (batch included, even though its own
 // chips are rebuilt per-load rather than static markup like the others), and

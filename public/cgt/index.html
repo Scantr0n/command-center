@@ -535,6 +535,21 @@
       </div>
       <div id="coverageResult" class="coverage-result" aria-live="polite"></div>
     </div>
+    <div class="callout">
+      Separate from the total above: most homeowner's/renter's policies also cap what an <em>individual</em> unscheduled
+      item pays out, often somewhere in the low thousands per item, regardless of how much headroom the overall
+      floater has. A single card worth more than that per-item cap needs its own rider or a listed schedule entry
+      to actually be covered for its full value. This does not know Jack's real per-item cap either, same
+      browser-only, self-reported pattern as the total limit above.
+    </div>
+    <div class="coverage-check">
+      <label for="perItemLimitInput" class="quick-log-label">Your policy's per-item limit without a rider, USD (optional)</label>
+      <div class="coverage-limit-input-wrap">
+        <input type="number" id="perItemLimitInput" class="quick-log-input" min="0" step="1"
+          inputmode="decimal" placeholder="e.g. 1500" aria-label="Insurance per-item limit without a rider, in USD">
+      </div>
+      <div id="perItemScheduleResult" class="coverage-result" aria-live="polite"></div>
+    </div>
   </section>
 
   <section id="candidatesSection">
