@@ -15,7 +15,8 @@
     escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
-    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan
+    missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
+    emDashHits
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -3202,6 +3203,11 @@
         outreachLog: [],
         notes: null
       };
+      const emDashHitFields = emDashHits(p);
+      if (emDashHitFields.length) {
+        warnings.push('Em dash found in ' + emDashHitFields.join(', ') + '. This board never uses one, check ' +
+          'whether that field was pasted in from somewhere else rather than typed.');
+      }
       results.push({ p, warnings });
     });
     return results;
@@ -3306,6 +3312,11 @@
       warnings.push('An existing entry already has this same name and company ("' + nameMatch.name +
         (nameMatch.company ? ', ' + nameMatch.company : '') + '", id "' + nameMatch.id + '"). If this is really the same ' +
         'person, edit that entry instead of adding a second one.');
+    }
+    const emDashHitFields = emDashHits(p);
+    if (emDashHitFields.length) {
+      warnings.push('Em dash found in ' + emDashHitFields.join(', ') + '. This board never uses one, check ' +
+        'whether that field was pasted in from somewhere else rather than typed.');
     }
     return warnings;
   }
