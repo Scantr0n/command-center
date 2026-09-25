@@ -14,7 +14,7 @@
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
     escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
     channelSortRank, listComparator, computeDataQualityFlags,
-    slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
+    slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     emDashHits
   } = CSMCore;
@@ -2161,6 +2161,13 @@
       warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
         categoryClash + '", they would render as separate filter chips. Pick one spelling.');
     }
+    const hookMatch = findHookReuseMatch(edited.verifiedHook, allProspects.filter(x => x.id !== p.id));
+    if (hookMatch) {
+      warnings.push('This verified hook is identical to the one already logged for "' + hookMatch.name +
+        (hookMatch.company ? ', ' + hookMatch.company : '') + '" (id "' + hookMatch.id + '"). A hook copy-pasted ' +
+        'across different prospects is not a real, per-prospect verified reason, double check this one is ' +
+        'actually researched on its own.');
+    }
     // Same em-dash paste-in catch the "Log new prospect" forms already got
     // (see emDashHits' own header comment): this edit form was the one real
     // prospect-entry path that still missed it, so a pasted-in em dash on an
@@ -3196,6 +3203,7 @@
     const results = [];
     const seenIdsThisBatch = new Set(Object.keys(byId));
     const seenKeysThisBatch = new Map();
+    const seenHooksThisBatch = new Map();
     rowsValues.forEach(values => {
       const name = values.name;
       if (!name) return;
@@ -3233,6 +3241,19 @@
         warnings.push('Category "' + category + '" differs in casing/spacing from existing category "' + categoryClash +
           '", they would render as separate filter chips. Pick one spelling.');
       }
+      const existingHookMatch = findHookReuseMatch(verifiedHook, allProspects);
+      const batchHookMatch = findHookReuseMatch(verifiedHook, [...seenHooksThisBatch.values()]);
+      if (existingHookMatch) {
+        warnings.push('This verified hook is identical to the one already logged for "' + existingHookMatch.name +
+          (existingHookMatch.company ? ', ' + existingHookMatch.company : '') + '" (id "' + existingHookMatch.id +
+          '"). A hook copy-pasted across different prospects is not a real, per-prospect verified reason, double ' +
+          'check this one is actually researched on its own.');
+      } else if (batchHookMatch) {
+        warnings.push('Another row in this same batch already has this exact verified hook ("' + batchHookMatch.name +
+          '"). A hook that fits more than one candidate the same way is usually not actually verified for either, ' +
+          'double check both were really researched individually.');
+      }
+      if (verifiedHook) seenHooksThisBatch.set(id, { name, verifiedHook });
 
       const p = {
         id,
@@ -3363,6 +3384,13 @@
       warnings.push('An existing entry already has this same name and company ("' + nameMatch.name +
         (nameMatch.company ? ', ' + nameMatch.company : '') + '", id "' + nameMatch.id + '"). If this is really the same ' +
         'person, edit that entry instead of adding a second one.');
+    }
+    const hookMatch = findHookReuseMatch(p.verifiedHook, allProspects);
+    if (hookMatch) {
+      warnings.push('This verified hook is identical to the one already logged for "' + hookMatch.name +
+        (hookMatch.company ? ', ' + hookMatch.company : '') + '" (id "' + hookMatch.id + '"). A hook copy-pasted ' +
+        'across different prospects is not a real, per-prospect verified reason, double check this one was ' +
+        'actually researched on its own.');
     }
     const emDashHitFields = emDashHits(p);
     if (emDashHitFields.length) {

@@ -711,6 +711,20 @@
       x.name.trim().toLowerCase() + '|' + (x.company || '').trim().toLowerCase() === key) || null;
   }
 
+  // Whether a candidate verifiedHook exactly matches one already logged on a
+  // different prospect (case/whitespace-insensitive), the entry-time version
+  // of CSMValidateCore.findDuplicateHooks: catches a copy-pasted, not-really-
+  // personalized hook before it is ever saved, rather than only after, when
+  // the "Reused verified hook" panel would flag it. Returns the matching
+  // existing prospect, or null.
+  function findHookReuseMatch(hook, existingProspects) {
+    if (!hook || typeof hook !== 'string') return null;
+    const norm = hook.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!norm) return null;
+    return existingProspects.find(x => x.verifiedHook && typeof x.verifiedHook === 'string' &&
+      x.verifiedHook.trim().toLowerCase().replace(/\s+/g, ' ') === norm) || null;
+  }
+
   // Warnings shown before drafting a real outreach message (the "Copy
   // outreach brief"/stage-move generators): missing the two fields most
   // predictive of a real reply, so a message goes out without either ever
@@ -801,7 +815,7 @@
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, channelSortRank, listComparator,
-    slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany,
+    slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     emDashFields, emDashHits
   };

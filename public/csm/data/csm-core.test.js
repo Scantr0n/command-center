@@ -24,7 +24,7 @@ const {
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
   escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
-  findCategoryCasingClash, findProspectByNameCompany,
+  findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   emDashFields, emDashHits
 } = require('./csm-core.js');
@@ -1134,6 +1134,19 @@ test('findProspectByNameCompany returns null when nothing real matches, or when 
   const existing = [{ id: 'city-bound-david-fraga', name: 'David Fraga', company: 'City Bound' }];
   assert.equal(findProspectByNameCompany('David Fraga', 'A Different Company', existing), null);
   assert.equal(findProspectByNameCompany(null, null, existing), null);
+});
+
+test('findHookReuseMatch flags a hook already logged on a different prospect, case/whitespace-insensitively', () => {
+  const existing = [{ id: 'a', verifiedHook: 'Runs a Douyin fitness account with real engagement.' }];
+  const match = findHookReuseMatch('  RUNS A DOUYIN FITNESS ACCOUNT WITH REAL ENGAGEMENT.  ', existing);
+  assert.equal(match.id, 'a');
+});
+
+test('findHookReuseMatch returns null for a genuinely distinct hook, or when there is no hook to match on', () => {
+  const existing = [{ id: 'a', verifiedHook: 'Real hook for prospect A.' }];
+  assert.equal(findHookReuseMatch('Real hook for prospect B.', existing), null);
+  assert.equal(findHookReuseMatch(null, existing), null);
+  assert.equal(findHookReuseMatch('Real hook for prospect A.', [{ id: 'b', verifiedHook: null }]), null);
 });
 
 test('missingContactChannelType is false while still researched, true once past it with nothing logged', () => {
