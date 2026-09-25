@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { escapeHtml } = require('./sidebar-core.js');
+const { escapeHtml, STATUS_COLOR } = require('./sidebar-core.js');
 
 test('escapeHtml leaves an ordinary value untouched', () => {
   assert.equal(escapeHtml('Command Center'), 'Command Center');
@@ -32,4 +32,12 @@ test('escapeHtml escapes each of the five reserved characters', () => {
 test('escapeHtml coerces a number to its plain string form', () => {
   assert.equal(escapeHtml(12.5), '12.5');
   assert.equal(escapeHtml(0), '0');
+});
+
+test('STATUS_COLOR has one real color for every status the dashboard renders', () => {
+  // The one real copy both index.html's statusColor() and sidebar.js's own
+  // nav-row dots read from, replacing two hand-copied literals that had
+  // already drifted to a slightly different shade once before.
+  assert.deepEqual(Object.keys(STATUS_COLOR).sort(), ['active', 'broken', 'done', 'stalled', 'unknown']);
+  Object.values(STATUS_COLOR).forEach(v => assert.match(v, /^#[0-9A-Fa-f]{6}$/));
 });

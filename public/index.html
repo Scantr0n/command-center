@@ -977,11 +977,13 @@ function makeCardClickable(el) {
   });
 }
 
+// Reads the shared palette off SidebarCore (sidebar-core.js, loaded before
+// this inline script's own render calls ever run) rather than keeping a
+// second hand-copied literal here: this one and sidebar.js's own nav-row
+// dots had already drifted to a slightly different shade once before both
+// were pinned to the one real copy.
 function statusColor(status) {
-  return {
-    active: '#3DDC84', done: '#4A9EDB', stalled: '#E0A030',
-    broken: '#E35959', unknown: '#838992'
-  }[status] || '#838992';
+  return window.SidebarCore.STATUS_COLOR[status] || window.SidebarCore.STATUS_COLOR.unknown;
 }
 
 // The graph's per-node status dot was color-only: active/done/stalled/

@@ -36,17 +36,10 @@
   // Shared, unit-tested XSS guard (sidebar-core.js): escapeHtml now has a
   // real regression test instead of only ever running live in a browser,
   // same shared-core pattern every hub's own escapeHtml already moved to.
-  const { escapeHtml } = window.SidebarCore;
-
-  // Same status palette as the main dashboard's own statusColor() (see
-  // index.html), copied by hand here since this file has no shared module
-  // to import it from. done/broken/unknown had each drifted to a slightly
-  // different shade, a status dot in the sidebar read as a different color
-  // than the same status's dot on the dashboard itself.
-  const STATUS_COLOR = {
-    active: '#3DDC84', done: '#4A9EDB', stalled: '#E0A030',
-    broken: '#E35959', unknown: '#838992'
-  };
+  // STATUS_COLOR is the same per-status dot palette the main dashboard's own
+  // statusColor() (index.html) reads from this same module, so the two can
+  // no longer drift apart the way their old hand-copied literals once did.
+  const { escapeHtml, STATUS_COLOR } = window.SidebarCore;
 
   const STYLE = `
     #ccSidebar {
