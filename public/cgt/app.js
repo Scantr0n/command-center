@@ -2932,6 +2932,14 @@ function wireCandidateEditForm(c) {
       const { errors, warnings } = window.CGTValidateCore.validateCandidates(merged);
       blockers = errors.filter(m => m.indexOf(where) === 0).map(strip);
       advisory = warnings.filter(m => m.indexOf(where) === 0).map(strip);
+
+      const dupGroups = window.CGTValidateCore.findDuplicateCandidateGroups(merged);
+      const ownGroup = dupGroups.find(g => g.candidates.includes(edited));
+      if (ownGroup) {
+        const others = ownGroup.candidates.filter(x => x !== edited).map(x => x.id).join(', ');
+        advisory.push('Same card name, year, and sport as an existing candidate (' + others +
+          '). Could be a real second copy, or a duplicate entry, double check before pasting this in.');
+      }
     }
 
     if (edited.decision === 'submit' && !edited.decisionNote) {
@@ -4339,6 +4347,14 @@ function initCandidateQuickLogTool() {
       const { errors, warnings } = window.CGTValidateCore.validateCandidates(merged);
       blockers = errors.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
       advisory = warnings.filter(m => m.indexOf(candidateWhere) === 0).map(strip);
+
+      const dupGroups = window.CGTValidateCore.findDuplicateCandidateGroups(merged);
+      const ownGroup = dupGroups.find(g => g.candidates.includes(candidate));
+      if (ownGroup) {
+        const others = ownGroup.candidates.filter(c => c !== candidate).map(c => c.id).join(', ');
+        advisory.push('Same card name, year, and sport as an existing candidate (' + others +
+          '). Could be a real second copy, or a duplicate entry, double check before pasting this in.');
+      }
     }
 
     if (blockers.length) {
