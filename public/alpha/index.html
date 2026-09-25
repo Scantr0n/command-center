@@ -228,9 +228,12 @@
       <ul class="regime-dist-legend" id="regimeDistLegend"></ul>
     </div>
     <div class="regime-history-wrap">
-      <div class="regime-history-label font-mono">
-        RECENT REGIME CHANGES
-        <span class="regime-history-source">(recorded by this browser only, real transitions it has actually observed)</span>
+      <div class="section-toolbar">
+        <div class="regime-history-label font-mono">
+          RECENT REGIME CHANGES
+          <span class="regime-history-source">(recorded by this browser only, real transitions it has actually observed)</span>
+        </div>
+        <button type="button" id="regimeHistoryCsvBtn" class="refresh-btn font-mono" disabled title="No regime changes recorded yet.">Export CSV</button>
       </div>
       <ol class="regime-history-list" id="regimeHistoryList"></ol>
     </div>

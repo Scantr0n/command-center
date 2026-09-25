@@ -482,6 +482,15 @@ function renderMeterSparkline(history, title) {
 
 const REGIME_HISTORY_LIMIT = 10;
 
+// Kept purely so the Regime history "Export CSV" button can build its file
+// from the same real, already-computed segments just rendered, never a
+// second computeRegimeSegments call that could disagree with what's on
+// screen. Holds every segment this browser has recorded, not just the
+// REGIME_HISTORY_LIMIT-capped slice the list itself shows, same
+// "export the full real set, not just the glance-sized view" convention as
+// lastIncidentsSnapshot and lastEventLogSnapshot elsewhere on this page.
+let lastRegimeHistorySnapshot = [];
+
 function regimeSegmentItem(seg) {
   const startAbs = formatAbsolute(seg.start);
   const endMs = regimeSegmentEndMs(seg);
@@ -501,9 +510,15 @@ function regimeSegmentItem(seg) {
 
 function renderRegimeHistory(clientRegimeHistory, frozenAsOf) {
   const list = document.getElementById('regimeHistoryList');
+  const csvBtn = document.getElementById('regimeHistoryCsvBtn');
   if (!list) return;
   const segments = computeRegimeSegments(clientRegimeHistory, frozenAsOf);
+  lastRegimeHistorySnapshot = segments;
   renderRegimeDistribution(segments);
+  if (csvBtn) {
+    csvBtn.disabled = !segments.length;
+    csvBtn.title = segments.length ? '' : 'No regime changes recorded yet.';
+  }
   if (!segments.length) {
     list.innerHTML = `<li class="regime-history-empty font-mono">No regime changes observed by this browser yet.</li>`;
     return;
@@ -2304,6 +2319,45 @@ document.getElementById('incidentsCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'alpha-incidents-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const REGIME_HISTORY_CSV_COLUMNS = [
+  ['regime', 'Regime'], ['start', 'Start'], ['end', 'End'], ['status', 'Status'], ['durationMinutes', 'Duration (min)']
+];
+
+// Same real-rows-export pattern as Positions/Activity log/Recent incidents
+// above, for the Regime history list: every real transition this browser
+// has actually observed (see lastRegimeHistorySnapshot), not just the
+// REGIME_HISTORY_LIMIT-capped glance view the list itself renders. The
+// current, still-open segment's end/duration are computed with the exact
+// same regimeSegmentEndMs the on-screen list and distribution bar already
+// use, never a guessed end time, and read "Ongoing" the same way an open
+// incident does.
+document.getElementById('regimeHistoryCsvBtn').addEventListener('click', () => {
+  if (!lastRegimeHistorySnapshot.length) return;
+  const rows = [...lastRegimeHistorySnapshot].reverse().map(seg => {
+    const endMs = regimeSegmentEndMs(seg);
+    const durationMinutes = Math.round((endMs - new Date(seg.start).getTime()) / 60000);
+    return {
+      regime: seg.regime,
+      start: formatAbsolute(seg.start),
+      end: seg.current ? 'Ongoing' : formatAbsolute(seg.end),
+      status: seg.current ? 'Ongoing' : 'Ended',
+      durationMinutes
+    };
+  });
+  const header = REGIME_HISTORY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(r => REGIME_HISTORY_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-regime-history-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

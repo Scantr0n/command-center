@@ -406,6 +406,7 @@ header.page-head .sub {
 }
 .section-toolbar .section-title { margin: 0; }
 .section-toolbar .incident-list-label { margin: 0; }
+.section-toolbar .regime-history-label { margin: 0; }
 
 .section-note {
   font-size: 0.78rem;
