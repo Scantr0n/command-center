@@ -407,6 +407,24 @@ header.page-head .sub {
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* Sentence-length freshness note next to a hand-verified reference's title,
+   e.g. the platform outreach reference table above: overrides
+   .section-title's uppercase/letter-spacing so it reads as normal prose,
+   not a second heading. Neutral until the review date passes the
+   stale-after threshold in app.js, then the same red used for a flagged
+   status elsewhere on this page, so it reads as a real prompt to
+   re-verify rather than decoration. Same pattern as CGT's/Garage's/
+   Sondrik's own .reference-freshness. */
+.reference-freshness {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--dim);
+}
+.reference-freshness-stale { color: #E5484D; }
 .section-details[open] > summary.section-title::before { content: '-'; }
 .section-details > summary.section-title:hover { color: var(--ink); }
 .section-details > summary.section-title:focus-visible {

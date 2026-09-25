@@ -1755,6 +1755,36 @@
     return PLATFORM_TIPS[platform.trim().toLowerCase()] || null;
   }
 
+  // Same freshness-badge pattern as CGT's GRADING_REFERENCE_REVIEWED_ON and
+  // Garage's per-table REVIEWED_ON constants: the "Platform outreach
+  // reference" table above states real per-platform marketplace mechanics
+  // (Xingtu, Pugongying, Weirenwu, Huahuo, Huxuan, Magnetic Juxing) as prose
+  // ("as of September 2026" in index.html's own callout), and those official
+  // creator-marketplace tools do change eligibility thresholds, commission
+  // rates, and naming over time, so a reader should get a visible prompt to
+  // re-verify once it's been a while rather than silently trusting a table
+  // that says "as of September 2026" forever. Verified 2026-09-25 against
+  // each platform's own current marketplace pages and documentation; no
+  // correction needed this pass, all six rows still hold up.
+  const PLATFORM_REFERENCE_REVIEWED_ON = '2026-09-25';
+  const PLATFORM_REFERENCE_STALE_AFTER_DAYS = 45;
+
+  // Independent of stages/prospects load state (no fetch involved, see
+  // PLATFORM_REFERENCE_REVIEWED_ON above), so this runs unconditionally at
+  // page load rather than from inside the Promise.allSettled load below.
+  function renderPlatformOutreachFreshness() {
+    const el = document.getElementById('platformOutreachFreshness');
+    if (!el) return;
+    const age = daysSince(PLATFORM_REFERENCE_REVIEWED_ON);
+    const stale = age != null && age > PLATFORM_REFERENCE_STALE_AFTER_DAYS;
+    el.textContent = age == null
+      ? 'Review date unknown'
+      : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+    el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+    el.title = 'Last hand-verified against each platform\'s own current marketplace pages/documentation on ' + PLATFORM_REFERENCE_REVIEWED_ON + '.';
+  }
+  renderPlatformOutreachFreshness();
+
   // Pulls everything needed to actually draft a real message to one prospect
   // into a single copyable block: the hook, the channel (and its matching
   // platform-specific contact guidance above), every logged social snapshot
