@@ -70,14 +70,18 @@
     return typeof policy === 'string' && SUSPICIOUS_EBAY_RETURN_POLICY_RE.test(policy);
   }
 
-  // eBay's own item-specifics documentation: once a buyer applies a search
-  // filter (brand, size, condition, color, etc.), Cassini excludes a listing
-  // from that filtered result set entirely when the field is missing, it
-  // doesn't just rank it lower. "brand" and "condition" are treated as
-  // universal, real buyer filters on every category this store lists in
-  // (shoes and electronics alike); "size" and "color" only meaningfully
-  // apply to the "shoes" category, so they're only required there, not on
-  // something like the swing analyzer.
+  // Not an eBay-only rule: eBay's own item-specifics documentation is the
+  // clearest public statement of it (Cassini excludes a listing from a
+  // buyer's filtered result set entirely once a brand/size/condition/color
+  // filter is applied and the field is missing, it doesn't just rank it
+  // lower), but Poshmark, Vinted, and Depop all expose the same brand/size/
+  // condition/color options as buyer search filters on their own listing
+  // and search pages, so a listing missing the field drops out of a
+  // filtered search there too, not just on eBay. "brand" and "condition"
+  // are treated as universal, real buyer filters on every category this
+  // store lists in (shoes and electronics alike); "size" and "color" only
+  // meaningfully apply to the "shoes" category, so they're only required
+  // there, not on something like the swing analyzer.
   const ITEM_SPECIFIC_LABELS = { brand: 'brand', size: 'size', color: 'color', condition: 'condition' };
   function requiredItemSpecificFields(listing) {
     const fields = ['brand', 'condition'];

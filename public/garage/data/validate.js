@@ -27,11 +27,14 @@
  * should, and a resolvedDate can't fall before its own openedDate. Every
  * supplies.json entry needs a real name and a real category; a logged
  * "qtyOnHand" with no "reorderThreshold" set can't ever trigger a low-stock
- * warning on the page, so that gap is flagged here too. Every live eBay
- * listing is checked for "itemSpecifics" (brand, condition, and for the
- * "shoes" category also size and color): eBay's Cassini search excludes a
- * listing entirely from a buyer's filtered results once one of those
- * filters is applied and the field is missing, not just ranks it lower.
+ * warning on the page, so that gap is flagged here too. Every live listing
+ * is checked for "itemSpecifics" (brand, condition, and for the "shoes"
+ * category also size and color) on whichever of eBay, Poshmark, Vinted, and
+ * Depop it's actually live on: all four expose those same fields as buyer
+ * search filters (eBay's Cassini is just the platform with the clearest
+ * public documentation of it), and a listing missing the field drops out
+ * of a buyer's filtered results entirely on that platform, not just ranks
+ * lower.
  * Every acquisitions.json entry needs a real source and, if logged,
  * "listingIds" must each match a real id in listings.json (a lot that's
  * only partly itemized so far is fine, that's just a warning); "itemCount"
@@ -227,11 +230,19 @@ function main() {
           'accessories/auto, the same wrong-template pattern as the real bug already caught once. Confirm this ' +
           'listing\'s actual eBay return policy and fix it if it really did inherit that template again.');
       }
+    }
+    // Not eBay-only: Poshmark, Vinted, and Depop all expose brand/size/
+    // condition/color as buyer search filters too (see the comment above
+    // ITEM_SPECIFIC_LABELS in validate-core.js), so this fires for a
+    // listing missing a required field on any platform it's actually live
+    // on, not only eBay.
+    if (l.status === 'live' && Array.isArray(l.platforms) && l.platforms.length) {
       const missingSpecifics = missingItemSpecifics(l);
       if (missingSpecifics.length) {
-        warnings.push(where + ': live on eBay with no "' + missingSpecifics.join('", "') + '" logged in ' +
-          '"itemSpecifics". eBay\'s Cassini search excludes a listing entirely from a buyer\'s filtered results ' +
-          'once that filter is applied and the field is missing, not just ranks it lower.');
+        warnings.push(where + ': live on ' + l.platforms.join(', ') + ' with no "' + missingSpecifics.join('", "') +
+          '" logged in "itemSpecifics". Each of those platforms lets a buyer filter search results by that ' +
+          'field (eBay calls its search Cassini), and a listing missing the field drops out of the filtered ' +
+          'results entirely there, it doesn\'t just rank lower.');
       }
     }
 

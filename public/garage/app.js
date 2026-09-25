@@ -1026,12 +1026,16 @@ function buildDataQualityFlags(listings, acquisitions) {
         } else if (GarageValidateCore.isSuspiciousEbayReturnPolicy(l.ebayReturnPolicy)) {
           reasons.push('EBAY RETURN POLICY "' + l.ebayReturnPolicy.toUpperCase() + '" LOOKS INHERITED FROM AN UNRELATED TEMPLATE, CONFIRM IT');
         }
-        const missingSpecifics = GarageValidateCore.missingItemSpecifics(l);
-        if (missingSpecifics.length) {
-          reasons.push('MISSING EBAY ITEM SPECIFICS: ' +
-            missingSpecifics.map(f => GarageValidateCore.ITEM_SPECIFIC_LABELS[f].toUpperCase()).join(', ') +
-            ' (CASSINI EXCLUDES THIS LISTING FROM FILTERED SEARCH RESULTS ON THESE)');
-        }
+      }
+      // Not eBay-only: Poshmark, Vinted, and Depop all expose the same
+      // brand/size/condition/color fields as buyer search filters, so a
+      // listing missing one drops out of a filtered search on whichever of
+      // those platforms it's actually live on, not just eBay's Cassini.
+      const missingSpecifics = GarageValidateCore.missingItemSpecifics(l);
+      if (missingSpecifics.length) {
+        reasons.push('MISSING ITEM SPECIFICS: ' +
+          missingSpecifics.map(f => GarageValidateCore.ITEM_SPECIFIC_LABELS[f].toUpperCase()).join(', ') +
+          ' (EXCLUDED FROM FILTERED SEARCH RESULTS ON ' + (l.platforms || []).map(p => (PLATFORM_LABELS[p] || p).toUpperCase()).join(', ') + ' FOR THESE)');
       }
       const missingUrlPlatforms = (l.platforms || []).filter(p =>
         !(l.soldOn || []).includes(p) && !(l.listingUrls && l.listingUrls[p])
@@ -3300,12 +3304,12 @@ function listingEditFormHtml(l) {
     leFieldRow('leLocation', 'Storage location', l.location) +
     leFieldRow('leEbayReturnPolicy', 'eBay return policy (the real policy set on the eBay listing, if any)', l.ebayReturnPolicy) +
     '<div class="form-row-split">' +
-    leInputInner('leBrand', 'Brand (eBay search filter)', l.itemSpecifics && l.itemSpecifics.brand) +
-    leInputInner('leCondition', 'Condition (eBay search filter)', l.itemSpecifics && l.itemSpecifics.condition) +
+    leInputInner('leBrand', 'Brand (eBay/Poshmark/Vinted/Depop search filter)', l.itemSpecifics && l.itemSpecifics.brand) +
+    leInputInner('leCondition', 'Condition (eBay/Poshmark/Vinted/Depop search filter)', l.itemSpecifics && l.itemSpecifics.condition) +
     '</div>' +
     '<div class="form-row-split">' +
-    leInputInner('leSize', 'Size (shoes only, eBay search filter)', l.itemSpecifics && l.itemSpecifics.size) +
-    leInputInner('leColor', 'Color (shoes only, eBay search filter)', l.itemSpecifics && l.itemSpecifics.color) +
+    leInputInner('leSize', 'Size (shoes only, eBay/Poshmark/Vinted/Depop search filter)', l.itemSpecifics && l.itemSpecifics.size) +
+    leInputInner('leColor', 'Color (shoes only, eBay/Poshmark/Vinted/Depop search filter)', l.itemSpecifics && l.itemSpecifics.color) +
     '</div>' +
     leFieldRow('leNotes', 'Notes', l.notes, 'textarea') +
     '</div>' +
@@ -3390,11 +3394,12 @@ function wireListingEditForm(l) {
       advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
         'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing.');
     }
-    if (platforms.includes('ebay')) {
+    if (platforms.length) {
       const missingSpecifics = GarageValidateCore.missingItemSpecifics(Object.assign({}, l, { platforms, itemSpecifics }));
       if (missingSpecifics.length) {
-        advisory.push('Missing "' + missingSpecifics.join('", "') + '" in item specifics. eBay\'s Cassini search ' +
-          'excludes this listing entirely from a buyer\'s filtered results on those fields, not just ranks it lower.');
+        advisory.push('Missing "' + missingSpecifics.join('", "') + '" in item specifics. Each of ' +
+          platforms.map(p => PLATFORM_LABELS[p] || p).join(', ') + ' lets a buyer filter by that field, and this ' +
+          'listing drops out of the filtered results entirely there, not just ranks lower.');
       }
     }
 
@@ -3635,7 +3640,9 @@ function openModal(id) {
         ? escapeHtml(l.ebayReturnPolicy) + ' <span class="badge badge-hold" title="Mentions parts/accessories/auto, the same wrong-template pattern as the real bug already caught once">check this</span>'
         : escapeHtml(l.ebayReturnPolicy);
     rows.push(fieldRow('eBay return policy', returnPolicyHtml, !l.ebayReturnPolicy || suspicious));
+  }
 
+  if ((l.platforms || []).length) {
     const specifics = l.itemSpecifics || {};
     const missingSpecifics = GarageValidateCore.missingItemSpecifics(l);
     const specHtml = ['brand', 'size', 'color', 'condition'].map(f => {
@@ -3643,7 +3650,7 @@ function openModal(id) {
       return escapeHtml(GarageValidateCore.ITEM_SPECIFIC_LABELS[f]) + ': ' +
         (val ? escapeHtml(val) : '<span class="cell-value empty">not logged</span>');
     }).join(' &middot; ');
-    rows.push(fieldRow('Item specifics (eBay search filters)', specHtml, missingSpecifics.length > 0));
+    rows.push(fieldRow('Item specifics (' + l.platforms.map(p => PLATFORM_LABELS[p] || p).join('/') + ' search filters)', specHtml, missingSpecifics.length > 0));
   }
 
   const compsHtml = l.title
@@ -4295,11 +4302,12 @@ function wireQuickLogTool() {
       advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
         'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing before publishing.');
     }
-    if (platforms.includes('ebay')) {
+    if (platforms.length) {
       const missingSpecifics = GarageValidateCore.missingItemSpecifics({ category, itemSpecifics });
       if (missingSpecifics.length) {
-        advisory.push('Missing "' + missingSpecifics.join('", "') + '" in item specifics. eBay\'s Cassini search ' +
-          'excludes this listing entirely from a buyer\'s filtered results on those fields, not just ranks it lower.');
+        advisory.push('Missing "' + missingSpecifics.join('", "') + '" in item specifics. Each of ' +
+          platforms.map(p => PLATFORM_LABELS[p] || p).join(', ') + ' lets a buyer filter by that field, and this ' +
+          'listing drops out of the filtered results entirely there, not just ranks lower.');
       }
     }
 
