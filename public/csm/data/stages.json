@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "note": "staleAfterDays is a stall threshold (days a prospect can sit in that stage before the board flags it), based on general sales-pipeline norms (mid-stage deals with no activity for 20+ days are commonly treated as stalled). It only fires when stageEnteredDate is actually logged on a prospect, never guessed. Every stage color below is checked against this app's actual panel backgrounds (#08090A/#101215/#16181C) for the WCAG 1.4.11 3:1 non-text contrast minimum, since these render as small dots the board relies on to convey stage at a glance.",
+  "note": "staleAfterDays is a stall threshold (days a prospect can sit in that stage before the board flags it), based on general sales-pipeline norms (mid-stage deals with no activity for 20+ days are commonly treated as stalled). It only fires when stageEnteredDate is actually logged on a prospect, never guessed. Every stage color below is checked against this app's actual panel backgrounds (#08090A/#101215/#16181C) for the WCAG 1.4.11 3:1 non-text contrast minimum, since these render as small dots the board relies on to convey stage at a glance. entryCriteria is a real, checkable sales-pipeline pattern (every stage has exit/entry criteria, not just a color and a description): each id names a structural field this board already tracks, checked live by CSMCore.stageEntryCriteriaStatus against a real prospect before a move into that stage is treated as ready, never a made-up gate.",
   "stages": [
     {
       "id": "researched",
@@ -8,7 +8,8 @@
       "shortLabel": "Researched",
       "description": "Identified as a real fit. No outreach sent yet.",
       "color": "#828890",
-      "staleAfterDays": 14
+      "staleAfterDays": 14,
+      "entryCriteria": []
     },
     {
       "id": "outreach-sent",
@@ -16,7 +17,11 @@
       "shortLabel": "Sent",
       "description": "First message sent. Waiting on a reply.",
       "color": "#4A9EDB",
-      "staleAfterDays": 10
+      "staleAfterDays": 10,
+      "entryCriteria": [
+        { "id": "verified-hook", "label": "verifiedHook logged, the real reason this person/brand fits" },
+        { "id": "contact-channel", "label": "contactChannel.type logged (named decision-maker vs. generic inbox)" }
+      ]
     },
     {
       "id": "silent-replied",
@@ -24,7 +29,10 @@
       "shortLabel": "Silent / Replied",
       "description": "Either no response after the nudge window, or a reply came in that has not moved to active exploration.",
       "color": "#E0A030",
-      "staleAfterDays": 21
+      "staleAfterDays": 21,
+      "entryCriteria": [
+        { "id": "send-logged", "label": "A real send is logged (sendDate or an outreachLog entry)" }
+      ]
     },
     {
       "id": "in-exploration",
@@ -32,7 +40,10 @@
       "shortLabel": "Exploring",
       "description": "Active back and forth about a real partnership or deal.",
       "color": "#3DDC84",
-      "staleAfterDays": 30
+      "staleAfterDays": 30,
+      "entryCriteria": [
+        { "id": "reply-logged", "label": "replyStatus logged, real evidence a reply actually came in" }
+      ]
     },
     {
       "id": "client",
@@ -40,7 +51,10 @@
       "shortLabel": "Client",
       "description": "Signed / working relationship in place.",
       "color": "#B084E0",
-      "staleAfterDays": null
+      "staleAfterDays": null,
+      "entryCriteria": [
+        { "id": "reply-logged", "label": "replyStatus logged, real evidence of an actual back-and-forth relationship" }
+      ]
     }
   ]
 }

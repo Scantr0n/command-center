@@ -956,6 +956,15 @@ header.page-head .sub {
   line-height: 1.4;
   margin-bottom: 6px;
 }
+.column-criteria {
+  font-size: 0.68rem;
+  color: var(--dim);
+  line-height: 1.4;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline);
+  font-style: italic;
+}
 
 /* Toggle for an empty column, same +/- text-marker convention as
    .section-details above. Sits between the stage name and its count, so
@@ -1605,8 +1614,9 @@ footer.page-foot {
     break-inside: avoid;
     margin-bottom: 14px;
   }
-  .column-head h2, .column-count, .column-desc { color: #111; }
-  .column-desc { color: #555; }
+  .column-head h2, .column-count, .column-desc, .column-criteria { color: #111; }
+  .column-desc, .column-criteria { color: #555; }
+  .column-criteria { border-bottom-color: #ccc; }
   /* Belt-and-braces alongside the JS forceExpandColumnsForPrint re-render:
      app.js already re-renders every column fully expanded before print, so
      this only guards a print triggered before that re-render has painted. */

@@ -22,7 +22,7 @@ const {
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
-  escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+  escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
@@ -872,6 +872,61 @@ test('outreachReadinessWarnings still flags a missing channel type when contactC
   const warnings = outreachReadinessWarnings(p);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /contactChannel\.type/);
+});
+
+test('stageEntryCriteriaStatus returns an empty list for a stage with no entryCriteria', () => {
+  assert.deepEqual(stageEntryCriteriaStatus({}, { entryCriteria: [] }), []);
+  assert.deepEqual(stageEntryCriteriaStatus({}, {}), []);
+});
+
+test('stageEntryCriteriaStatus marks a criterion unmet when the real field is missing', () => {
+  const stage = { entryCriteria: [{ id: 'verified-hook', label: 'verifiedHook logged' }] };
+  const status = stageEntryCriteriaStatus({}, stage);
+  assert.equal(status.length, 1);
+  assert.equal(status[0].met, false);
+  assert.equal(status[0].label, 'verifiedHook logged');
+});
+
+test('stageEntryCriteriaStatus marks a criterion met once the real field is logged', () => {
+  const stage = { entryCriteria: [{ id: 'verified-hook', label: 'verifiedHook logged' }] };
+  const status = stageEntryCriteriaStatus({ verifiedHook: 'Real, checked reason' }, stage);
+  assert.equal(status[0].met, true);
+});
+
+test('stageEntryCriteriaStatus checks contact-channel against contactChannel.type, not just the object existing', () => {
+  const stage = { entryCriteria: [{ id: 'contact-channel', label: 'contactChannel.type logged' }] };
+  assert.equal(stageEntryCriteriaStatus({ contactChannel: { detail: 'x@example.com' } }, stage)[0].met, false);
+  assert.equal(stageEntryCriteriaStatus({ contactChannel: { type: 'generic-inbox' } }, stage)[0].met, true);
+});
+
+test('stageEntryCriteriaStatus checks send-logged against either sendDate or a real outreachLog entry', () => {
+  const stage = { entryCriteria: [{ id: 'send-logged', label: 'A real send is logged' }] };
+  assert.equal(stageEntryCriteriaStatus({}, stage)[0].met, false);
+  assert.equal(stageEntryCriteriaStatus({ sendDate: '2026-09-01' }, stage)[0].met, true);
+  assert.equal(stageEntryCriteriaStatus({ outreachLog: [{ date: '2026-09-01', type: 'initial-send' }] }, stage)[0].met, true);
+  assert.equal(stageEntryCriteriaStatus({ outreachLog: [] }, stage)[0].met, false);
+});
+
+test('stageEntryCriteriaStatus checks reply-logged against a real replyStatus', () => {
+  const stage = { entryCriteria: [{ id: 'reply-logged', label: 'replyStatus logged' }] };
+  assert.equal(stageEntryCriteriaStatus({}, stage)[0].met, false);
+  assert.equal(stageEntryCriteriaStatus({ replyStatus: 'Real ongoing conversation.' }, stage)[0].met, true);
+});
+
+test('stageEntryCriteriaStatus reads an unknown criterion id as unmet instead of throwing', () => {
+  const stage = { entryCriteria: [{ id: 'not-a-real-checker', label: 'Something not wired up yet' }] };
+  const status = stageEntryCriteriaStatus({ anything: true }, stage);
+  assert.equal(status[0].met, false);
+});
+
+test('the real stages.json entryCriteria ids on disk all resolve to a real checker (no typo left unwired)', () => {
+  const stagesData = JSON.parse(fs.readFileSync(path.join(__dirname, 'stages.json'), 'utf8'));
+  const KNOWN_IDS = ['verified-hook', 'contact-channel', 'send-logged', 'reply-logged'];
+  (stagesData.stages || []).forEach(stage => {
+    (stage.entryCriteria || []).forEach(c => {
+      assert.ok(KNOWN_IDS.includes(c.id), stage.id + ' entryCriteria has unknown id "' + c.id + '"');
+    });
+  });
 });
 
 test('channelSortRank ranks a named decision-maker ahead of a generic inbox, ahead of no channel logged', () => {

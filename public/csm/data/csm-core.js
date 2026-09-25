@@ -742,6 +742,32 @@
     return warnings;
   }
 
+  // Generalizes the same "not ready yet" idea above (outreachReadinessWarnings
+  // is the outreach-sent-specific case of this, kept as-is since it already
+  // has its own tests and callers) to every other stage: a real, well-known
+  // sales-pipeline pattern is that every stage has entry/exit criteria, not
+  // just a color and a description. Each stage's entryCriteria in
+  // stages.json names a real structural field this board already tracks
+  // (never an invented one), and this checks a real prospect object against
+  // it. An id with no matching checker (a typo in stages.json, or a future
+  // criterion added there without a checker yet) reads as unmet rather than
+  // throwing, so a data-only edit can never crash the board.
+  const STAGE_ENTRY_CRITERIA_CHECKERS = {
+    'verified-hook': p => !!(p && p.verifiedHook),
+    'contact-channel': p => !!(p && p.contactChannel && p.contactChannel.type),
+    'send-logged': p => !!(p && (p.sendDate || (Array.isArray(p.outreachLog) && p.outreachLog.length > 0))),
+    'reply-logged': p => !!(p && p.replyStatus)
+  };
+
+  function stageEntryCriteriaStatus(p, stage) {
+    const criteria = (stage && stage.entryCriteria) || [];
+    return criteria.map(c => ({
+      id: c.id,
+      label: c.label,
+      met: typeof STAGE_ENTRY_CRITERIA_CHECKERS[c.id] === 'function' && STAGE_ENTRY_CRITERIA_CHECKERS[c.id](p)
+    }));
+  }
+
   // Table alternative to the kanban board: same filtered prospects, but
   // sortable across every stage at once instead of grouped into columns.
   // A named decision-maker contact is real, verified outreach leverage a
@@ -814,7 +840,7 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
-    outreachReadinessWarnings, channelSortRank, listComparator,
+    outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     emDashFields, emDashHits

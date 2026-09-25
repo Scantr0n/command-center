@@ -12,7 +12,7 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
-    escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+    escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
@@ -1005,6 +1005,20 @@
     }).join('');
   }
 
+  // Passive, always-visible version of the same entry-criteria concept the
+  // stage-move generator checks against a real prospect (see
+  // wireStageMoveGenerator below): shown right on the column itself, a real
+  // sales-pipeline pattern (every stage has entry/exit criteria), not
+  // something invented for this board. Labels only, no per-prospect met/unmet
+  // state here, that check only means something once a specific prospect is
+  // being moved.
+  function columnCriteriaHtml(stage) {
+    const criteria = stage.entryCriteria || [];
+    if (!criteria.length) return '';
+    return '<div class="column-criteria">Before entering: ' +
+      criteria.map(c => escapeHtml(c.label)).join('; ') + '.</div>';
+  }
+
   function renderBoard(stages, prospects, allProspects, displayQuery, filtering) {
     const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
     // Built once per render from the same computeNudgeRows the Nudge Queue
@@ -1043,7 +1057,8 @@
         toggleBtn +
         '<span class="column-count font-mono">' + inStage.length + '</span>' +
         '</div>' +
-        (collapsed ? '' : '<div class="column-desc">' + escapeHtml(stage.description) + '</div>' + cards) +
+        (collapsed ? '' : '<div class="column-desc">' + escapeHtml(stage.description) + '</div>' +
+          columnCriteriaHtml(stage) + cards) +
         '</div>';
     }).join('');
 
@@ -2423,6 +2438,18 @@
       }
       if (stage === 'outreach-sent') {
         warnParts.push(...outreachReadinessWarnings(p));
+      } else {
+        // Same "not ready yet" idea as outreachReadinessWarnings above, but
+        // generalized from stages.json's own entryCriteria instead of a
+        // hardcoded pair of fields, so every other real stage transition
+        // gets the same live check instead of only the one this project
+        // happened to add first.
+        const targetStage = allStages.find(s => s.id === stage);
+        const unmet = stageEntryCriteriaStatus(p, targetStage).filter(c => !c.met);
+        if (unmet.length) {
+          warnParts.push('Before logging this as a real move into "' + (targetStage ? targetStage.label : stage) +
+            '": ' + unmet.map(c => c.label).join('; ') + '.');
+        }
       }
       const warn = warnParts.join(' ');
       warnEl.hidden = !warn;
