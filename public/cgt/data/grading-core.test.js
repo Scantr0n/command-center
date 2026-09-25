@@ -12,7 +12,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  computeGradingMath, GRADING_RISK_MULTIPLE,
+  computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
   classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
   COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
@@ -27,28 +27,50 @@ test('missing rawValue, expectedGradedValue, or estimatedGradingCost returns nul
   assert.equal(computeGradingMath({}), null);
 });
 
-test('gross gain exactly at the 2x-margin threshold counts as worth grading, not marginal', () => {
-  // totalCost 10, gross gain must be >= 20 to hit the documented 2x rule.
-  const math = computeGradingMath({ rawValue: 5, expectedGradedValue: 25, estimatedGradingCost: 10, shippingCost: null });
+// expectedGradedValue is netted against TYPICAL_MARKETPLACE_FEE_RATE before
+// anything else runs, so these derive the raw expectedGradedValue input from
+// a target *net* graded value instead of hardcoding a pre-fee number, same
+// as computeGradingMath itself does. Keeps the tests correct regardless of
+// the exact published rate rather than baking today's 13.25% into every
+// expected number by hand.
+function gradedValueForNet(netGradedValue) {
+  return netGradedValue / (1 - TYPICAL_MARKETPLACE_FEE_RATE);
+}
+
+test('gross gain exactly at the 2x-margin threshold, net of the marketplace fee, counts as worth grading, not marginal', () => {
+  // totalCost 10, net-of-fee gross gain must be >= 20 to hit the documented 2x rule.
+  const math = computeGradingMath({ rawValue: 5, expectedGradedValue: gradedValueForNet(25), estimatedGradingCost: 10, shippingCost: null });
   assert.equal(math.totalCost, 10);
-  assert.equal(math.expectedGain, 10);
+  assert.ok(Math.abs(math.grossGain - 20) < 1e-9);
+  assert.ok(Math.abs(math.expectedGain - 10) < 1e-9);
   assert.equal(math.verdict, 'worth-grading');
 });
 
-test('gross gain one dollar under the 2x threshold is marginal, not worth-grading', () => {
-  const math = computeGradingMath({ rawValue: 5, expectedGradedValue: 24, estimatedGradingCost: 10, shippingCost: null });
+test('net-of-fee gross gain one dollar under the 2x threshold is marginal, not worth-grading', () => {
+  const math = computeGradingMath({ rawValue: 5, expectedGradedValue: gradedValueForNet(24), estimatedGradingCost: 10, shippingCost: null });
   assert.equal(math.verdict, 'marginal');
   assert.ok(math.expectedGain > 0, 'marginal still means a net positive expected gain');
 });
 
-test('expected gain at or below zero is not worth it', () => {
-  const breakEven = computeGradingMath({ rawValue: 5, expectedGradedValue: 15, estimatedGradingCost: 10, shippingCost: null });
-  assert.equal(breakEven.expectedGain, 0);
+test('expected gain at or below zero (after the marketplace fee) is not worth it', () => {
+  const breakEven = computeGradingMath({ rawValue: 5, expectedGradedValue: gradedValueForNet(15), estimatedGradingCost: 10, shippingCost: null });
+  assert.ok(Math.abs(breakEven.expectedGain) < 1e-9);
   assert.equal(breakEven.verdict, 'not-worth');
 
-  const losing = computeGradingMath({ rawValue: 5, expectedGradedValue: 10, estimatedGradingCost: 10, shippingCost: null });
+  const losing = computeGradingMath({ rawValue: 5, expectedGradedValue: gradedValueForNet(10), estimatedGradingCost: 10, shippingCost: null });
   assert.ok(losing.expectedGain < 0);
   assert.equal(losing.verdict, 'not-worth');
+});
+
+test('the marketplace fee is netted off expectedGradedValue only, never off rawValue', () => {
+  const math = computeGradingMath({ rawValue: 100, expectedGradedValue: 200, estimatedGradingCost: 10, shippingCost: null });
+  const expectedNet = 200 * (1 - TYPICAL_MARKETPLACE_FEE_RATE);
+  assert.ok(Math.abs(math.netGradedValue - expectedNet) < 1e-9);
+  assert.ok(Math.abs(math.grossGain - (expectedNet - 100)) < 1e-9);
+});
+
+test('the documented marketplace fee rate is eBay\'s real 13.25% Sports Trading Cards rate, not some other category\'s', () => {
+  assert.equal(TYPICAL_MARKETPLACE_FEE_RATE, 0.1325);
 });
 
 test('shippingCost is added into totalCost when present, and defaults to zero when null/omitted', () => {

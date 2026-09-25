@@ -368,7 +368,11 @@
         at least 2x before it counts as clearly worth it, since the card could come back at a lower grade than
         expected. That upside clearing the cost at all, but by less than 2x, shows as "Marginal" rather than "Worth
         grading"; the page's own "Expected gain" figure is the net number (upside minus total cost) and is what
-        candidates are sorted by, but it is not itself what the 2x threshold is measured against. Any candidate
+        candidates are sorted by, but it is not itself what the 2x threshold is measured against. Before any of that,
+        <code>expectedGradedValue</code> is netted against eBay's own real, published 13.25% Sports Trading Cards
+        final value fee (see <code>TYPICAL_MARKETPLACE_FEE_RATE</code> in <code>grading-core.js</code>), since that
+        is what a sale actually pays out, not the sticker price; <code>rawValue</code> is not fee-adjusted, since it
+        is the baseline the card is being upgraded from, not something being sold here. Any candidate
         missing one of the three real numbers the math needs (<code>rawValue</code>, <code>expectedGradedValue</code>,
         <code>estimatedGradingCost</code>) shows "Needs more data" rather than a guessed verdict.</p>
       <div class="table-wrap">
@@ -561,7 +565,9 @@
     <p class="section-subtitle">Raw cards being weighed against the real cost of grading them, before anything is
       shipped. Verdict uses the common "2x margin" rule (the real upside, graded value minus raw value, should clear
       the cost of grading and shipping by at least 2x, to leave room for coming back at a lower grade than
-      expected), applied only to real researched numbers, never a guess. See "Grading
+      expected), applied only to real researched numbers, never a guess. The graded value side is netted against
+      eBay's real published 13.25% Sports Trading Cards final value fee first, since that fee comes out before
+      anything actually lands in hand. See "Grading
       service tiers reference" below for current published per-tier pricing and turnaround to fill in
       <code class="inline-code">estimatedGradingCost</code> with a real number instead of a guess.</p>
     <input

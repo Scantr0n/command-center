@@ -31,22 +31,43 @@
   // yet, same "never guess at a missing input" rule as everything else here.
   const GRADING_RISK_MULTIPLE = 2;
 
+  // eBay's own real, published Final Value Fee for its "Sports Trading
+  // Cards" category: 13.25% of the sale total up to $7,500/item (2.35% on
+  // any portion above that, which a graded single card practically never
+  // reaches), confirmed on eBay's 2026 fee-by-category page and cross-
+  // checked against seller reports on community.ebay.com and
+  // sportscollectorsdaily.com. Lower than eBay's general 13.60% default rate
+  // the same way Garage's own real 15.3% shoes-category rate differs from
+  // its category default -- categories really do carry different real
+  // rates, this is trading cards' specific one, not the general figure.
+  // Applied only to expectedGradedValue, the card's own eventual sale once
+  // graded: rawValue is not itself being sold here, it is the baseline the
+  // card is being upgraded from, so it carries no sale fee of its own. This
+  // is a published rate applied to a number that, by definition, has not
+  // been sold yet (that is the whole question computeGradingMath answers),
+  // so there is no real logged fee to require the way computeRealizedGainLoss
+  // requires one for an actual sold card below -- same category of
+  // documented rule-of-thumb GRADING_RISK_MULTIPLE already is above, not a
+  // silent guess.
+  const TYPICAL_MARKETPLACE_FEE_RATE = 0.1325;
+
   function computeGradingMath(c) {
     if (c.rawValue == null || c.expectedGradedValue == null || c.estimatedGradingCost == null) return null;
     const totalCost = c.estimatedGradingCost + (c.shippingCost || 0);
-    // The "2x margin" rule above is about the raw upside (graded value over
-    // raw value) clearing the cost of grading by 2x, not the already-cost-net
-    // expectedGain clearing it a second time (that silently demanded a 3x
-    // margin instead of the documented 2x, since expectedGain is gross minus
-    // totalCost already). expectedGain itself stays net, it is the real
-    // "Expected gain" figure shown and sorted on elsewhere.
-    const grossGain = c.expectedGradedValue - c.rawValue;
+    const netGradedValue = c.expectedGradedValue * (1 - TYPICAL_MARKETPLACE_FEE_RATE);
+    // The "2x margin" rule above is about the raw upside (net-of-fee graded
+    // value over raw value) clearing the cost of grading by 2x, not the
+    // already-cost-net expectedGain clearing it a second time (that silently
+    // demanded a 3x margin instead of the documented 2x, since expectedGain
+    // is gross minus totalCost already). expectedGain itself stays net, it
+    // is the real "Expected gain" figure shown and sorted on elsewhere.
+    const grossGain = netGradedValue - c.rawValue;
     const expectedGain = grossGain - totalCost;
     let verdict;
     if (grossGain >= totalCost * GRADING_RISK_MULTIPLE) verdict = 'worth-grading';
     else if (expectedGain > 0) verdict = 'marginal';
     else verdict = 'not-worth';
-    return { totalCost, expectedGain, verdict };
+    return { totalCost, expectedGain, grossGain, netGradedValue, verdict };
   }
 
   // Collectibles get a different federal capital-gains treatment than stocks:
@@ -273,7 +294,7 @@
   }
 
   return {
-    computeGradingMath, GRADING_RISK_MULTIPLE,
+    computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
     classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
     COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
     isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,

@@ -1278,7 +1278,7 @@ function isExampleCandidate(c) {
 // loading the rest of this DOM-touching file. Pulled into bare identifiers
 // here so every existing call site below keeps working unchanged.
 const {
-  computeGradingMath, GRADING_RISK_MULTIPLE,
+  computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
   buildPortfolioValueTimeline: buildPortfolioValueTimelineCore
@@ -1562,6 +1562,10 @@ function openCandidateModal(id) {
   body += field('Graded value note', c.gradedValueNote, !c.gradedValueNote);
   if (math) {
     body += field('Total cost (grading + shipping)', formatUsd(math.totalCost), false);
+    body += field('Expected graded value, net of marketplace fee', formatUsd(math.netGradedValue), false);
+    body += `<div class="field-row">
+      <div class="field-note">Nets out eBay's real published ${(TYPICAL_MARKETPLACE_FEE_RATE * 100).toFixed(2)}% Sports Trading Cards final value fee, since that is what actually lands in hand from the eventual sale, not the sticker price. Only applied to the graded card's own future sale, never to rawValue.</div>
+    </div>`;
     body += field('Expected gain', formatSignedUsd(math.expectedGain), false);
   }
   body += field('Date priced', c.datePriced, !c.datePriced);
@@ -3894,6 +3898,7 @@ const CANDIDATES_CSV_COLUMNS = [
   [c => c.expectedGrade, 'Expected grade'], [c => c.expectedGradedValue, 'Expected graded value'],
   [c => c.gradedValueBasis, 'Graded value basis'], [c => c.gradedValueNote, 'Graded value note'],
   [c => computeGradingMath(c)?.totalCost ?? null, 'Total cost (grading + shipping)'],
+  [c => computeGradingMath(c)?.netGradedValue ?? null, 'Expected graded value, net of marketplace fee'],
   [c => computeGradingMath(c)?.expectedGain ?? null, 'Expected gain'],
   [c => CANDIDATE_VERDICT_META[computeGradingMath(c)?.verdict || 'needs-data'].label, 'Verdict'],
   [c => c.datePriced, 'Date priced'], [c => c.decision, 'Decision'], [c => c.decisionNote, 'Decision note'],
