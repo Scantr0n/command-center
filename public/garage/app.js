@@ -80,7 +80,8 @@ const {
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
-  offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress
+  offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
+  isSupplyLowStock
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -508,12 +509,9 @@ const ACQUISITION_SOURCE_LABELS = {
   'personal-item': 'Personal item', other: 'Other'
 };
 
-// Only fires once both real numbers are on file, same "leave it honestly
-// unknown rather than guess" rule as every other computed field on this
-// page: a count with no reorder point set yet can't be judged low or not.
-function isSupplyLowStock(s) {
-  return s.qtyOnHand != null && s.reorderThreshold != null && s.qtyOnHand <= s.reorderThreshold;
-}
+// isSupplyLowStock now lives in garage-core.js, the same reason every other
+// real fee/date rule on this page already does: a plain Node test can
+// exercise it directly.
 
 // Looks up the eBay category of the listing a sale references, so a sold
 // item's realized-profit math uses the same fee rate its live listing was

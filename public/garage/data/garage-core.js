@@ -422,6 +422,16 @@
     };
   }
 
+  // Only fires once both real numbers are on file, same "leave it honestly
+  // unknown rather than guess" rule as every other computed field on this
+  // page: a count with no reorder point set yet can't be judged low or not.
+  // Feeds the low-stock stat tile, the top attention bar, the supplies
+  // table's low-stock-first sort, and the CSV export, so one real bug here
+  // would misreport in all four places at once.
+  function isSupplyLowStock(s) {
+    return s.qtyOnHand != null && s.reorderThreshold != null && s.qtyOnHand <= s.reorderThreshold;
+  }
+
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
     POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
@@ -436,6 +446,7 @@
     offerTier, offerCounterAmount,
     EBAY_TRS_WINDOW_DAYS, EBAY_TRS_TRANSACTIONS_TARGET, EBAY_TRS_GROSS_SALES_TARGET,
     DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
-    ebayTrsProgress, depopTopSellerProgress
+    ebayTrsProgress, depopTopSellerProgress,
+    isSupplyLowStock
   };
 });

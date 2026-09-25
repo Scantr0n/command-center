@@ -21,7 +21,8 @@ const {
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
   ebayTrsProgress, depopTopSellerProgress,
-  RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT
+  RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
+  isSupplyLowStock
 } = require('./garage-core.js');
 
 test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
@@ -353,4 +354,22 @@ test('depopTopSellerProgress: sums real depop sales within the rolling 30 days o
   assert.equal(result.grossSales, 800);
   assert.equal(result.meetsCountTargets, false);
   assert.equal(depopTopSellerProgress([{ platform: 'depop', salePrice: 1000, saleDate: '2026-09-24' }], [], '2026-09-24').meetsCountTargets, true);
+});
+
+test('isSupplyLowStock only fires once both qtyOnHand and reorderThreshold are real logged numbers', () => {
+  assert.equal(isSupplyLowStock({ qtyOnHand: null, reorderThreshold: 5 }), false, 'no count logged yet, not judgeable');
+  assert.equal(isSupplyLowStock({ qtyOnHand: 3, reorderThreshold: null }), false, 'no reorder point set yet, not judgeable');
+  assert.equal(isSupplyLowStock({ qtyOnHand: null, reorderThreshold: null }), false);
+});
+
+test('isSupplyLowStock fires at or below the reorder threshold, not only strictly below it', () => {
+  assert.equal(isSupplyLowStock({ qtyOnHand: 5, reorderThreshold: 5 }), true, 'exactly at the reorder point counts as low, not just under it');
+  assert.equal(isSupplyLowStock({ qtyOnHand: 4, reorderThreshold: 5 }), true);
+  assert.equal(isSupplyLowStock({ qtyOnHand: 6, reorderThreshold: 5 }), false);
+});
+
+test('isSupplyLowStock treats a real zero count or zero threshold as a real logged number, not a missing one', () => {
+  assert.equal(isSupplyLowStock({ qtyOnHand: 0, reorderThreshold: 5 }), true, 'out of stock is the most low-stock case there is');
+  assert.equal(isSupplyLowStock({ qtyOnHand: 0, reorderThreshold: 0 }), true, 'a reorder threshold of exactly 0 is still a real logged threshold, and 0 <= 0');
+  assert.equal(isSupplyLowStock({ qtyOnHand: 5, reorderThreshold: 0 }), false, 'plenty on hand against a zero reorder point is not low stock');
 });
