@@ -2350,7 +2350,21 @@ function renderCategoryFilter() {
     return `<button type="button" class="tag-chip cat-filter-chip inline-flex items-center gap-1.5" data-category="${escapeHtml(cat)}" aria-pressed="${active}" style="background:${color}1F; color:${color}; ${active ? `outline: 1.5px solid ${color};` : ''}"><span class="w-1.5 h-1.5 rounded-full inline-block" style="background:${color}"></span>${escapeHtml(cat.toUpperCase())} (${g.items.length})</button>`;
   }).join('');
   row.querySelectorAll('.cat-filter-chip').forEach(el => {
-    el.addEventListener('click', () => toggleCategoryFilter(el));
+    el.addEventListener('click', () => {
+      const cat = el.getAttribute('data-category');
+      toggleCategoryFilter(el);
+      // toggleCategoryFilter rebuilds this whole row via innerHTML, which
+      // destroys the very chip a keyboard user just pressed Enter/Space on
+      // and drops focus to <body>, forcing them to Tab back down from the
+      // top of the page to keep going (the same real bug sidebar.js's own
+      // pin button had). Only wired here, on the filter row's own click
+      // handler, not inside toggleCategoryFilter itself: the graph's
+      // sector labels call that same function and are never destroyed by
+      // it, so refocusing them into this row instead would be a jump they
+      // never asked for.
+      const refocused = row.querySelector(`.cat-filter-chip[data-category="${CSS.escape(cat)}"]`);
+      if (refocused) refocused.focus();
+    });
   });
   initEdgeFade(row);
 }
