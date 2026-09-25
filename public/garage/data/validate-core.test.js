@@ -20,7 +20,8 @@ const {
   isSuspiciousEbayReturnPolicy,
   requiredItemSpecificFields,
   missingItemSpecifics,
-  isDepopIneligible
+  isDepopIneligible,
+  emDashFields
 } = require('./validate-core.js');
 
 test('PLATFORMS is the real 4-platform list, the single source validate.js and app.js both read', () => {
@@ -119,4 +120,25 @@ test('the real listings.json on disk has no electronics listing actually live on
   const listings = data.listings || [];
   const violations = listings.filter(l => isDepopIneligible(l) && (l.platforms || []).includes('depop'));
   assert.deepEqual(violations, []);
+});
+
+test('emDashFields flags only the fields that actually contain an em dash', () => {
+  const listing = { title: 'Nice Boots ' + String.fromCharCode(8212) + ' barely worn', location: 'Home' };
+  assert.deepEqual(emDashFields(listing, ['title', 'location']), ['title']);
+});
+
+test('emDashFields skips a non-string field rather than throwing', () => {
+  assert.deepEqual(emDashFields({ title: 42 }, ['title']), []);
+});
+
+test('emDashFields returns no hits for a missing object, same as CSM\'s copy', () => {
+  assert.deepEqual(emDashFields(null, ['title']), []);
+  assert.deepEqual(emDashFields(undefined, ['title']), []);
+});
+
+test('the real listings.json on disk has no em dash pasted into a title or location', () => {
+  const data = require('./listings.json');
+  const listings = data.listings || [];
+  const hits = listings.filter(l => emDashFields(l, ['title', 'location']).length);
+  assert.deepEqual(hits, []);
 });

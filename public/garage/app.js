@@ -1631,6 +1631,23 @@ function readOptionalNonNegativeInput(el) {
   return Number.isNaN(n) || n < 0 ? undefined : n;
 }
 
+// Same real-time em-dash catch CSM's own prospect-entry form just got: a
+// title or location pasted in with an em dash used to go uncaught until the
+// next `node validate.js` run, since GarageValidateCore.emDashFields only
+// checked the file on disk, never what was actually typed into the
+// quick-log or edit forms. Shared between wireQuickLogTool and
+// wireListingEditForm so the same field list can't drift between the two.
+function listingEmDashAdvisory(candidate) {
+  const advisory = [];
+  const hits = GarageValidateCore.emDashFields(candidate, ['title', 'location']);
+  const specificHits = GarageValidateCore.emDashFields(candidate.itemSpecifics, Object.keys(GarageValidateCore.ITEM_SPECIFIC_LABELS));
+  const allHits = hits.concat(specificHits.map(f => 'itemSpecifics.' + f));
+  if (allHits.length) {
+    advisory.push('"' + allHits.join('", "') + '" contains an em dash, this tracker never uses one, check for a paste-in.');
+  }
+  return advisory;
+}
+
 function renderCalc() {
   const input = document.getElementById('calcPriceInput');
   const costInput = document.getElementById('calcCostInput');
@@ -3411,6 +3428,7 @@ function wireListingEditForm(l) {
       itemSpecifics
     });
 
+    advisory.push(...listingEmDashAdvisory(edited));
     warningsEl.innerHTML = advisory.map(w => '<li>' + escapeHtml(w) + '</li>').join('');
     outputEl.textContent = JSON.stringify(edited, null, 2) + ',';
     resultEl.hidden = false;
@@ -4298,6 +4316,7 @@ function wireQuickLogTool() {
       itemSpecifics
     };
 
+    advisory.push(...listingEmDashAdvisory(candidate));
     warningsBox.textContent = advisory.join(' ');
     output.value = JSON.stringify(candidate, null, 2) + ',';
     output.hidden = false;

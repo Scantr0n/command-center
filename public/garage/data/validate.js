@@ -46,7 +46,8 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const {
-  PLATFORMS, TITLE_HARD_LIMITS, findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible
+  PLATFORMS, TITLE_HARD_LIMITS, findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible,
+  emDashFields
 } = require('./validate-core.js');
 const { irsMileageRateForDate } = require('./garage-core.js');
 
@@ -88,22 +89,6 @@ function isDateOrNull(v) {
   const [y, m, d] = v.split('-').map(Number);
   const parsed = new Date(y, m - 1, d);
   return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
-}
-
-// Every real free-text field this tracker renders is written without em
-// dashes, so a hand-typed or pasted-in field that has one reads as coming
-// from somewhere else rather than Jack's own voice. Same emDashFields
-// helper public/sondrik/data/validate.js already uses for this reason.
-// Warning-level only: an em dash never breaks anything rendered, this is a
-// style nudge, not a data error.
-function emDashFields(obj, fields) {
-  const hits = [];
-  if (!obj) return hits;
-  fields.forEach(f => {
-    const v = obj[f];
-    if (typeof v === 'string' && v.includes(String.fromCharCode(8212))) hits.push(f);
-  });
-  return hits;
 }
 
 function main() {
