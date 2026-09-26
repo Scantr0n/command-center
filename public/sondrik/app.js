@@ -969,7 +969,7 @@
   // and which are an honest "not tracked yet" gap. Reads its numbers from
   // downloads.json/leads.json rather than duplicating them in channels.json,
   // so a channel row can never drift out of sync with the section it links to.
-  function renderChannels(channelsData, downloadsData, leadsData) {
+  function renderChannels(channelsData, downloadsData, leadsData, releasesData) {
     const channels = channelsData.channels || [];
     if (channels.length === 0) {
       channelsSection.innerHTML = '<div class="empty-state">No channels logged yet.' +
@@ -1023,8 +1023,31 @@
                    : '') +
                  '</div>') +
         (c.note ? '<div class="channel-note">' + escapeHtml(c.note) + '</div>' : '') +
+        // Only shown where a real template exists (see CHANNEL_POST_BUILDERS)
+        // and only when there's real release/download data to build it from,
+        // otherwise a not-tracked channel with a template but nothing real
+        // logged yet would get a button that silently does nothing.
+        (CHANNEL_POST_BUILDERS[c.id] && buildChannelDraftPost(c.id, releasesData, downloadsData, leadsData)
+          ? '<button type="button" class="print-btn channel-draft-btn" data-copy-channel-draft="' +
+            escapeHtml(c.id) + '">Copy draft post</button>'
+          : '') +
         '</div>';
     }).join('') + '</div>';
+
+    channelsSection.querySelectorAll('[data-copy-channel-draft]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = buildChannelDraftPost(btn.getAttribute('data-copy-channel-draft'), releasesData, downloadsData, leadsData);
+        if (!text) return;
+        copyText(text).then(() => {
+          const original = btn.textContent;
+          btn.textContent = 'Copied!';
+          copyStatusLive.textContent = 'Draft post copied to clipboard.';
+          setTimeout(() => { btn.textContent = original; }, 1800);
+        }).catch(() => {
+          copyStatusLive.textContent = 'Could not copy to clipboard.';
+        });
+      });
+    });
   }
 
   // The download freshness badge only tracks how current the traction
@@ -1350,6 +1373,95 @@
 
     if (parts.length === 0) return '';
     return parts.join(' ');
+  }
+
+  // Turns the channel norms already researched in the "Distribution channel
+  // norms reference" table into an actual copy-paste starting point, one per
+  // not-tracked channel with no post made yet. Same discipline as
+  // buildPublicPost above: every sentence is built from a real logged fact
+  // (version, ship date, summary, download count, source), never an invented
+  // pitch or story. Where a real one-line pitch or narrative is genuinely
+  // needed and nothing logged here has it (Show HN and Product Hunt both
+  // require a short pitch line; r/SideProject and Indie Hackers Milestones
+  // both explicitly reward a real "why/what I learned" story per the norms
+  // table), this leaves an obvious bracketed placeholder rather than
+  // fabricating marketing copy, the same "leave it null/blank, don't guess"
+  // rule the schema-help section already applies to hand-edited JSON.
+  function realFactsLine(releasesData, downloadsData) {
+    const parts = [];
+    const releases = ((releasesData && releasesData.releases) || []).slice()
+      .filter(r => r.date)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    if (releases.length > 0) {
+      const r = releases[0];
+      parts.push('v' + r.version + ' shipped ' + fmtDate(r.date) + (r.summary ? ': ' + r.summary.replace(/\.$/, '') + '.' : '.'));
+    }
+    const metric = (downloadsData && downloadsData.metric) || {};
+    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (checks.length > 0) {
+      const latest = checks[checks.length - 1];
+      parts.push(latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date) +
+        (metric.source ? ' (' + metric.source + ')' : '') + '.');
+    }
+    return parts.join(' ');
+  }
+
+  const CHANNEL_POST_BUILDERS = {
+    'hacker-news': (releasesData, downloadsData) => {
+      const facts = realFactsLine(releasesData, downloadsData);
+      if (!facts) return null;
+      return {
+        title: 'Show HN: Sondrik - [one-line pitch, fill in before posting]',
+        body: 'I built Sondrik, a CRM tool. ' + facts +
+          '\n\n[Add why you built it, then post yourself once ready. HN\'s own guidelines ban generated/AI-edited replies in the comment thread, so any reply once this is live needs to actually be typed by you.]'
+      };
+    },
+    'product-hunt': (releasesData, downloadsData) => {
+      const facts = realFactsLine(releasesData, downloadsData);
+      if (!facts) return null;
+      return {
+        title: 'Tagline: Sondrik - [one-line pitch, fill in before posting]',
+        body: facts + '\n\n[Add a real screenshot or short clip before submitting, then plan to answer comments yourself the day it launches.]'
+      };
+    },
+    'r-sideproject': (releasesData, downloadsData) => {
+      const facts = realFactsLine(releasesData, downloadsData);
+      if (!facts) return null;
+      const releases = ((releasesData && releasesData.releases) || []);
+      const latest = releases.length ? releases[releases.length - 1] : null;
+      return {
+        title: 'Sondrik' + (latest ? ' v' + latest.version : '') + ' - [one-line pitch, fill in before posting]',
+        body: 'I\'ve been building Sondrik, a CRM tool. ' + facts +
+          '\n\n[Add the real story: why you built it, what you learned. r/SideProject removes low-effort link drops with no real description.]'
+      };
+    },
+    'indie-hackers-milestones': (releasesData, downloadsData) => {
+      const metric = (downloadsData && downloadsData.metric) || {};
+      const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      if (checks.length === 0) return null;
+      const latest = checks[checks.length - 1];
+      const facts = realFactsLine(releasesData, downloadsData);
+      return {
+        title: latest.count + ' ' + (metric.label || 'downloads') + ' for Sondrik',
+        body: facts + '\n\n[Add what you actually learned getting here. Milestone posts with a real story get far more engagement than a bare announcement, per Indie Hackers\' own posting guidance.]'
+      };
+    },
+    // Reuses the exact same real-facts composition the header's own "Copy
+    // build-in-public post" button already builds for X, rather than a
+    // second, possibly-drifting copy of the same logic. No separate title
+    // line, X has no title field.
+    'x-twitter': (releasesData, downloadsData, leadsData) => {
+      const text = buildPublicPost(releasesData || {}, downloadsData || {}, leadsData || {});
+      return text ? { title: null, body: text } : null;
+    }
+  };
+
+  function buildChannelDraftPost(channelId, releasesData, downloadsData, leadsData) {
+    const builder = CHANNEL_POST_BUILDERS[channelId];
+    if (!builder) return null;
+    const draft = builder(releasesData, downloadsData, leadsData);
+    if (!draft) return null;
+    return draft.title ? draft.title + '\n\n' + draft.body : draft.body;
   }
 
   // The real filter/date math now lives in release-core.js alongside
@@ -2164,7 +2276,7 @@
     }
 
     if (channelsData) {
-      renderChannels(channelsData, downloadsData, leadsData);
+      renderChannels(channelsData, downloadsData, leadsData, releasesData);
       channelsCsvBtn.addEventListener('click', () => exportChannelsCsv(channelsData, downloadsData, leadsData));
       highlightInitialRecord('channel');
     } else {

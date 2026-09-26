@@ -1143,6 +1143,12 @@ section { margin-bottom: 52px; }
   line-height: 1.5;
   margin-top: 6px;
 }
+.channel-draft-btn {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.72rem;
+  padding: 6px 12px;
+}
 
 /* Goal (target vs actual) */
 .goal-card {
