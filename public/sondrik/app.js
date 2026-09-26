@@ -65,6 +65,49 @@
 
   printBtn.addEventListener('click', () => window.print());
 
+  // A record-level deep link (?lead=<id>, ?channel=<id>, ?release=<version>,
+  // ?goal=<id>), the same one-shot "open this one real record from a link"
+  // pattern CSM's/Garage's/CGT's own initialProspectId/initialListingId/
+  // initialCardId already use (see each hub's own restoreStateFromUrl).
+  // index.html's own search-palette recordHref already documents this exact
+  // gap: Sondrik had no record-level URL state at all, so clicking a real
+  // lead/channel/release/goal from the hub's search always just landed on
+  // this page's top instead of at the actual record clicked. This page has
+  // no per-record modal like Garage's or CSM's (every lead/channel/release/
+  // goal already renders inline as its own card), so the equivalent "open"
+  // here is scroll-to-and-briefly-highlight instead of a modal open, reusing
+  // the exact .section-flash treatment the "at a glance" cards above already
+  // use for the same "you clicked through, here's where you landed"
+  // confirmation. Consumed once, right after the matching section first
+  // renders; never written back to the URL, this only ever answers "open
+  // this one record from a link", not ongoing page state to bookmark.
+  const INITIAL_RECORD = (function () {
+    const params = new URLSearchParams(location.search);
+    for (const type of ['lead', 'channel', 'release', 'goal']) {
+      const value = params.get(type);
+      if (value) return { type, value };
+    }
+    return null;
+  })();
+
+  function highlightInitialRecord(type) {
+    if (!INITIAL_RECORD || INITIAL_RECORD.type !== type) return;
+    let el = null;
+    try {
+      el = document.querySelector('[data-record-type="' + type + '"][data-record-id="' +
+        CSS.escape(INITIAL_RECORD.value) + '"]');
+    } catch (e) { /* CSS.escape unavailable/unsupported value: just skip the highlight */ }
+    if (!el) return;
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    // Two rAFs, same reason jumpToSection's own section-flash restart does:
+    // gives the browser a frame to apply a clean start before the animation
+    // class goes on.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.classList.add('section-flash');
+      setTimeout(() => el.classList.remove('section-flash'), 1600);
+    }));
+  }
+
   // "New since your last visit" is a per-browser convenience, not a second
   // copy of any real fact: it only compares real logged dates already on the
   // page (releases, download checks, leads, goals) against a plain date
@@ -456,7 +499,7 @@
       const rel = idx === 0 ? relativeDaysLabel(r.date) : null;
       const windowHtml = idx === 0 ? launchWindowHtml(r.date) : '';
       const checkinHtml = idx === 0 ? bugfixCheckinHtml(r) : '';
-      return '<div class="release-card">' +
+      return '<div class="release-card" data-record-type="release" data-record-id="' + escapeHtml(r.version) + '">' +
       '<span class="release-version font-display">v' + escapeHtml(r.version) + '</span>' +
       (r.date ? '<span class="release-date">' + fmtDate(r.date) +
         (rel ? ' <span class="release-relative font-mono">(' + rel + ')</span>' : '') + '</span>' : '') +
@@ -888,7 +931,7 @@
         ? 'Current: ' + currentCount + (current.asOf ? ' as of ' + fmtDate(current.asOf) : ', no date logged on the latest one')
         : 'No real data logged for this metric yet';
 
-      return '<div class="goal-card">' +
+      return '<div class="goal-card" data-record-type="goal" data-record-id="' + escapeHtml(g.id) + '">' +
         '<div class="goal-head">' +
         '<span class="goal-label">' + escapeHtml(g.label) + '</span>' +
         '<span class="goal-set-date font-mono">' + escapeHtml(setLabel) + '</span>' +
@@ -950,7 +993,7 @@
 
     channelsSection.innerHTML = '<div class="channel-grid">' + channels.map(c => {
       const value = linkedValue(c);
-      return '<div class="channel-card">' +
+      return '<div class="channel-card" data-record-type="channel" data-record-id="' + escapeHtml(c.id) + '">' +
         '<div class="channel-head">' +
         '<span class="channel-name">' + escapeHtml(c.name || 'Unnamed channel') + '</span>' +
         '<span class="channel-pill ' + (STATUS_CLASS[c.status] || '') + ' font-mono">' +
@@ -1061,7 +1104,7 @@
         }
       }
 
-      return '<div class="lead-card">' +
+      return '<div class="lead-card" data-record-type="lead" data-record-id="' + escapeHtml(l.id) + '">' +
         '<div class="lead-head">' +
         '<span class="lead-source">' + escapeHtml(l.sourceDetail || l.source || 'Unknown source') + '</span>' +
         (l.type ? '<span class="lead-type font-mono">' + escapeHtml(l.type.replace(/-/g, ' ').toUpperCase()) + '</span>' : '') +
@@ -2046,6 +2089,7 @@
     if (releasesData) {
       renderReleases(releasesData);
       releasesCsvBtn.addEventListener('click', () => exportReleasesCsv(releasesData));
+      highlightInitialRecord('release');
     } else {
       releaseSection.innerHTML = '<div class="empty-state" role="alert">Failed to load release data: ' +
         escapeHtml(releasesResult.reason.message) + '</div>';
@@ -2091,6 +2135,7 @@
     if (goalsData) {
       renderGoals(goalsData, downloadsData, leadsData);
       goalsCsvBtn.addEventListener('click', () => exportGoalsCsv(goalsData, downloadsData, leadsData));
+      highlightInitialRecord('goal');
     } else {
       goalsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load goal data: ' +
         escapeHtml(goalsResult.reason.message) + '</div>';
@@ -2100,6 +2145,7 @@
     if (channelsData) {
       renderChannels(channelsData, downloadsData, leadsData);
       channelsCsvBtn.addEventListener('click', () => exportChannelsCsv(channelsData, downloadsData, leadsData));
+      highlightInitialRecord('channel');
     } else {
       channelsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load channels data: ' +
         escapeHtml(channelsResult.reason.message) + '</div>';
@@ -2109,6 +2155,7 @@
     if (leadsData) {
       renderLeads(leadsData);
       leadsCsvBtn.addEventListener('click', () => exportLeadsCsv(leadsData));
+      highlightInitialRecord('lead');
     } else {
       leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
         escapeHtml(leadsResult.reason.message) + '</div>';
