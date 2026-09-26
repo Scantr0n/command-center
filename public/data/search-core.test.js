@@ -12,23 +12,37 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { RECORD_TYPE_PARAMS, recordHref } = require('./search-core.js');
+const { SEARCH_SOURCES } = require('../../data/search-sources-core.js');
 
-// Every type server.js's SEARCH_SOURCES currently emits, and whether that
-// hub's own app.js supports a record-level query param for it yet. Keep
-// this list in sync with server.js's SEARCH_SOURCES types: a new source
-// there should show up here as either `true` (once its hub's app.js reads
-// the matching param) or `false` with a real reason.
-const SERVER_SEARCH_SOURCE_TYPES = {
-  card: true, prospect: true, listing: true, lead: true, application: true,
-  submission: true, candidate: true, sale: false, expense: false,
-  dispute: false, supply: false, acquisition: false, channel: true,
-  release: true, goal: true
-};
+// Garage's five bulk-tracked entity types have no per-record modal or
+// highlight target on their own hub page yet, and (unlike every other real
+// type below) still have zero real rows logged in any of their five files,
+// so there is nothing real yet to jump to: a real, small, explicit allowlist
+// of intentional exceptions, not a silent skip. Requiring SEARCH_SOURCES
+// directly here (rather than a second hand-typed snapshot of "every type it
+// emits", which is exactly the kind of copy that drifted for Sondrik's own
+// lead/channel/release/goal types before search-core.js existed) means a
+// genuinely new type added there is real input to the assertion below on
+// its very next test run, not something this file also has to be told
+// about by hand.
+const INTENTIONALLY_UNLINKED_TYPES = new Set(['sale', 'expense', 'dispute', 'supply', 'acquisition']);
 
-test('every deep-linkable search source type has a real param mapping', () => {
-  Object.entries(SERVER_SEARCH_SOURCE_TYPES).forEach(([type, supported]) => {
-    if (supported) assert.ok(RECORD_TYPE_PARAMS[type], `${type} should map to a query param`);
-  });
+test('every real SEARCH_SOURCES type either has a param mapping or is a documented, intentional exception', () => {
+  const realTypes = [...new Set(SEARCH_SOURCES.map(s => s.type))];
+  assert.ok(realTypes.length > 0, 'sanity check: SEARCH_SOURCES actually loaded something');
+  for (const type of realTypes) {
+    const hasMapping = !!RECORD_TYPE_PARAMS[type];
+    const isDocumentedException = INTENTIONALLY_UNLINKED_TYPES.has(type);
+    assert.ok(hasMapping || isDocumentedException,
+      `"${type}" is a real SEARCH_SOURCES type with no param mapping and no documented exception, likely drift`);
+  }
+});
+
+test('RECORD_TYPE_PARAMS never carries a stale entry for a type SEARCH_SOURCES no longer emits', () => {
+  const realTypes = new Set(SEARCH_SOURCES.map(s => s.type));
+  for (const type of Object.keys(RECORD_TYPE_PARAMS)) {
+    assert.ok(realTypes.has(type), `"${type}" has a param mapping but SEARCH_SOURCES no longer emits it`);
+  }
 });
 
 test('recordHref builds a hub-relative link with the matching query param', () => {
