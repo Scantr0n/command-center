@@ -4239,6 +4239,14 @@ function initQuickLogTool() {
       costBasis: costBasisRaw === '' ? null : Number(costBasisRaw),
       acquisitionDate: document.getElementById('ncAcquisitionDate').value || null,
       datePriced: document.getElementById('ncDatePriced').value || null,
+      soldDate: null,
+      soldPrice: null,
+      sellingFees: null,
+      listedDate: document.getElementById('ncListedDate').value || null,
+      listedPrice: (() => {
+        const raw = document.getElementById('ncListedPrice').value.trim();
+        return raw === '' ? null : Number(raw);
+      })(),
       backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
       priceHistory: [],
       notes: document.getElementById('ncNotes').value.trim() || null
