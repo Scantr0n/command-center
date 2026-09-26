@@ -3619,7 +3619,7 @@ function listingEditFormHtml(l) {
     '</div>' +
     '<button type="button" id="leGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
     '<div id="leResult" class="np-result" hidden>' +
-    '<ul id="leWarnings" class="np-warnings"></ul>' +
+    '<ul id="leWarnings" class="np-warnings" role="alert"></ul>' +
     '<div class="np-output-head">' +
     '<span class="field-label" style="margin:0">Replace this listing&rsquo;s whole entry with</span>' +
     '<button type="button" id="leCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +

@@ -2983,7 +2983,7 @@ function cardEditFormHtml(c) {
     '</div>' +
     '<button type="button" id="ceGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
     '<div id="ceResult" class="np-result" hidden>' +
-    '<ul id="ceWarnings" class="np-warnings"></ul>' +
+    '<ul id="ceWarnings" class="np-warnings" role="alert"></ul>' +
     '<div class="np-output-head">' +
     '<span class="field-label" style="margin:0">Replace this card&rsquo;s whole entry with</span>' +
     '<button type="button" id="ceCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
@@ -3039,7 +3039,7 @@ function candidateEditFormHtml(c) {
     '</div>' +
     '<button type="button" id="cceGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
     '<div id="cceResult" class="np-result" hidden>' +
-    '<ul id="cceWarnings" class="np-warnings"></ul>' +
+    '<ul id="cceWarnings" class="np-warnings" role="alert"></ul>' +
     '<div class="np-output-head">' +
     '<span class="field-label" style="margin:0">Replace this candidate&rsquo;s whole entry with</span>' +
     '<button type="button" id="cceCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
@@ -3177,7 +3177,7 @@ function submissionEditFormHtml(s) {
     '</div>' +
     '<button type="button" id="sceGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
     '<div id="sceResult" class="np-result" hidden>' +
-    '<ul id="sceWarnings" class="np-warnings"></ul>' +
+    '<ul id="sceWarnings" class="np-warnings" role="alert"></ul>' +
     '<div class="np-output-head">' +
     '<span class="field-label" style="margin:0">Replace this submission&rsquo;s whole entry with</span>' +
     '<button type="button" id="sceCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
