@@ -969,13 +969,19 @@ const SEARCH_SOURCES = [
   }
 ];
 const SEARCH_RESULT_CAP = 20;
+// Applied per source, not against the shared total: SEARCH_SOURCES is
+// declared cgt-first, so a single popular term matching 20+ cards alone used
+// to fill the whole cap before csm/garage/sondrik/job-search ever got a
+// chance to contribute, on a term that had nothing to do with cards. Every
+// hub's data is thin today so this hasn't been visibly hit yet, but it's a
+// real starvation bug the moment any one source's real row count grows.
+const SEARCH_PER_SOURCE_CAP = 5;
 
 app.get('/api/search', (req, res) => {
   const term = String(req.query.q || '').trim().toLowerCase();
   if (term.length < 2) { res.json({ results: [] }); return; }
   const results = [];
   for (const source of SEARCH_SOURCES) {
-    if (results.length >= SEARCH_RESULT_CAP) break;
     let data;
     try {
       data = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', source.hub, 'data', source.file), 'utf8'));
@@ -983,8 +989,9 @@ app.get('/api/search', (req, res) => {
       continue;
     }
     const items = Array.isArray(data[source.key]) ? data[source.key] : [];
+    let sourceMatches = 0;
     for (const item of items) {
-      if (results.length >= SEARCH_RESULT_CAP) break;
+      if (sourceMatches >= SEARCH_PER_SOURCE_CAP) break;
       if (source.exclude && source.exclude(item)) continue;
       const matched = source.fields(item).some(f => typeof f === 'string' && f.toLowerCase().includes(term));
       if (!matched) continue;
@@ -1002,9 +1009,10 @@ app.get('/api/search', (req, res) => {
         label: source.label(item) || 'Untitled',
         detail: source.detail(item) || ''
       });
+      sourceMatches++;
     }
   }
-  res.json({ results });
+  res.json({ results: results.slice(0, SEARCH_RESULT_CAP) });
 });
 
 const PORT = process.env.PORT || 4488;
