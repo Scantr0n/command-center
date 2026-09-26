@@ -229,7 +229,7 @@
     const form = document.getElementById(formId);
     if (!details || !form) return;
     details.open = true;
-    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    form.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
     // Only quickLeadForm's qlChannel select has a real channel to preselect;
     // its options are already populated with real channel ids by the time
     // any card can be clicked, so this never sets a value with no matching
@@ -2679,7 +2679,7 @@
     if (target) {
       // The scroll-lock release above needs a frame to settle, starting the
       // smooth scroll before that clobbers it.
-      requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
     }
   });
 

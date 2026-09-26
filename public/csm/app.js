@@ -505,7 +505,7 @@
     attentionBarEl.querySelectorAll('[data-target]').forEach(btn => {
       btn.addEventListener('click', () => {
         const el = document.getElementById(btn.getAttribute('data-target'));
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (el) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
       });
     });
   }
@@ -1137,7 +1137,7 @@
     dateInput.value = todayIso();
     generateBtn.click();
     const resultEl = document.getElementById('modalMoveResult');
-    if (resultEl) resultEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (resultEl) resultEl.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
 
   // Table alternative to the kanban board: same filtered prospects, but shown
@@ -2895,7 +2895,7 @@
     if (target) {
       // The scroll-lock release above needs a frame to settle, starting the
       // smooth scroll before that clobbers it.
-      requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
     }
   });
 

@@ -1358,7 +1358,7 @@ function renderAttentionBar() {
   bar.querySelectorAll('[data-target]').forEach(btn => {
     btn.addEventListener('click', () => {
       const el = document.getElementById(btn.getAttribute('data-target'));
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (el) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
     });
   });
 }
@@ -3310,7 +3310,7 @@ document.getElementById('jumpNavList').addEventListener('click', (e) => {
   if (target) {
     // The scroll-lock release above needs a frame to settle, starting the
     // smooth scroll before that clobbers it.
-    requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
   }
 });
 

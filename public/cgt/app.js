@@ -128,7 +128,7 @@ function openQuickLogForm(detailsId, formId) {
   const form = document.getElementById(formId);
   if (!details || !form) return;
   details.open = true;
-  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  form.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   const firstField = form.querySelector('input, select, textarea');
   if (firstField) firstField.focus();
 }
@@ -2223,7 +2223,7 @@ function renderAttentionBar() {
   bar.querySelectorAll('[data-target]').forEach(btn => {
     btn.addEventListener('click', () => {
       const el = document.getElementById(btn.getAttribute('data-target'));
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (el) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
     });
   });
 }
@@ -3557,7 +3557,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   const details = document.getElementById('quickLogTool');
   details.open = true;
-  details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  details.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   document.getElementById('ncId').focus();
 });
 
@@ -3644,7 +3644,7 @@ document.getElementById('jumpNavList').addEventListener('click', (e) => {
   if (target) {
     // The scroll-lock release above needs a frame to settle, starting the
     // smooth scroll before that clobbers it.
-    requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
   }
 });
 

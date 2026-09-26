@@ -792,7 +792,7 @@
     e.preventDefault();
     const details = document.getElementById('quickLogTool');
     details.open = true;
-    details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    details.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
     document.getElementById('qaRole').focus();
   });
 
@@ -879,7 +879,7 @@
     if (target) {
       // The scroll-lock release above needs a frame to settle, starting the
       // smooth scroll before that clobbers it.
-      requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
     }
   });
 
