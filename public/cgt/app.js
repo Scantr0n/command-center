@@ -2734,7 +2734,7 @@ function renderCardGallery(filtered) {
         <div class="gallery-card-meta">${[c.year, c.sport, c.gradingCompany, c.grade != null ? 'Grade ' + c.grade : null].filter(Boolean).map(escapeHtml).join(' · ') || 'No details logged yet'}</div>
         <div class="gallery-card-value">
           <span class="cell-value${c.estimatedValue == null ? ' empty' : ''}">${c.estimatedValue != null ? formatUsd(c.estimatedValue) : 'not priced'}</span>
-          ${basisBadge(c)}
+          ${c.estimatedValue != null ? basisBadge(c) : ''}
         </div>
       </div>
       ${isSold(c) ? '<span class="badge badge-sold gallery-card-flag" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>'
