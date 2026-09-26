@@ -2315,9 +2315,16 @@
   // aspirational one. This page has no search box or custom list navigation
   // like CGT/Garage/CSM, so "C" opens the one real single-key action already
   // on the page (copy status update), the same pattern Alpha uses for its
-  // own single-key actions.
+  // own single-key actions. "L" is the same parity fix CSM's own "n" shortcut
+  // (Log a new prospect) just added there: this page's own fastest real
+  // recurring action is pulling a fresh download check (the freshness badge,
+  // the suggested check-in cadence, and the Next Steps item that fires once
+  // it ages past 4 days all exist because that's the thing Jack actually
+  // comes back to log most), but nothing was bound to a key for it, unlike
+  // "C" for the status copy.
   const SHORTCUTS = [
     { keys: ['C'], label: 'Copy status update' },
+    { keys: ['L'], label: 'Log a download check' },
     { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
     { keys: ['Esc'], label: 'Close the open dialog' },
     { keys: ['?'], label: 'Show this help' }
@@ -2401,6 +2408,10 @@
       if (copyStatusBtn.disabled) return;
       e.preventDefault();
       copyStatusBtn.click();
+    }
+    if (e.key === 'l' || e.key === 'L') {
+      e.preventDefault();
+      openQuickLogForm('quickCheckForm');
     }
   });
 
