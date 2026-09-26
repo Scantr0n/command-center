@@ -2629,6 +2629,13 @@ function reliabilityBarHtml(c) {
     </div>`;
 }
 
+// The toggleable OFF badge below uses a literal #80878F rather than
+// var(--faint) (#7C838C): its own rgba(255,255,255,0.04) pill fill lightens
+// the real backdrop under the text just enough to drop var(--faint) to a
+// 4.49:1 contrast ratio there, a real WCAG AA fail (4.5:1) axe-core only
+// catches once the badge is actually on screen, not on a bare page load.
+// Every other var(--faint) use in this card sits directly on the plain
+// --panel background, where it holds 4.9:1 and needs no override.
 function renderGrid() {
   const grid = document.getElementById('clusterGrid');
   grid.innerHTML = sortForGrid(clusters).map(c => {
@@ -2664,7 +2671,7 @@ function renderGrid() {
         <div class="flex items-center gap-2.5 flex-shrink-0">
           ${relatedCount ? `<span class="text-[10px] font-mono" style="color: var(--faint)" title="${relatedCount} related project${relatedCount === 1 ? '' : 's'}">⇄ ${relatedCount}</span>` : ''}
           ${reliabilityBarHtml(c)}
-          ${c.toggleable ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="color: ${c.enabled ? '#3DDC84' : 'var(--faint)'}; background: ${c.enabled ? '#3DDC841F' : 'rgba(255,255,255,0.04)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
+          ${c.toggleable ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="color: ${c.enabled ? '#3DDC84' : '#80878F'}; background: ${c.enabled ? '#3DDC841F' : 'rgba(255,255,255,0.04)'}">${c.enabled ? 'ON' : 'OFF'}</span>` : ''}
         </div>
       </div>
     </div>
