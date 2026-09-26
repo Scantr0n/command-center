@@ -16,7 +16,7 @@
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
-    emDashHits
+    missingNextAction, emDashHits
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -2218,6 +2218,10 @@
       warnings.push('Next nudge date is set but next action is not. A due date with no concrete next step is a ' +
         'common way real deals quietly stall.');
     }
+    if (missingNextAction({ stage: p.stage, nextAction: edited.nextAction })) {
+      warnings.push('Stage is "in-exploration" but next action is not logged. An active deal still needs a ' +
+        'concrete next step written down, not just a stage.');
+    }
     const categoryClash = findCategoryCasingClash(edited.category, allProspects.filter(x => x.id !== p.id));
     if (categoryClash) {
       warnings.push('Category "' + edited.category + '" differs in casing/spacing from existing category "' +
@@ -3481,6 +3485,10 @@
       warnings.push('Stage is "' + p.stage + '" but nothing is scheduled, no next nudge date, nudge point, or ' +
         'do-not-nudge-before. Without one of those this prospect will not show up anywhere the board flags a ' +
         'follow-up as due, log a real plan even if it is just a rough one.');
+    }
+    if (missingNextAction(p)) {
+      warnings.push('Stage is "in-exploration" but next action is not logged. An active deal still needs a ' +
+        'concrete next step written down, not just a stage.');
     }
     (p.socialSnapshots || []).forEach(snap => {
       if ((snap.followers != null || snap.engagementRate != null) && !snap.asOfDate) {

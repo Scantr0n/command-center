@@ -540,6 +540,18 @@
     return (p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p);
   }
 
+  // in-exploration is the one open stage missingFollowUpPlan above doesn't
+  // cover: an active back-and-forth usually isn't driven by a cold nudge
+  // date the way outreach-sent/silent-replied are, so hasNudgePlan doesn't
+  // fit it, but "every open deal needs a concrete next step" (real
+  // sales-pipeline practice, not specific to a nudge date) still applies.
+  // Scoped to just this one stage on purpose: outreach-sent/silent-replied
+  // already get their own check above, and researched/client aren't open
+  // deals waiting on a next step.
+  function missingNextAction(p) {
+    return p.stage === 'in-exploration' && !p.nextAction;
+  }
+
   // The opposite real gap from missingFollowUpPlan above: a nextNudgeDate is
   // still queued, but the most recently dated real touch in outreachLog is
   // already a "reply", so that queued cold nudge almost certainly predates
@@ -608,6 +620,9 @@
         }
         if (missingFollowUpPlan(p)) {
           reasons.push('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT');
+        }
+        if (missingNextAction(p)) {
+          reasons.push('IN ACTIVE EXPLORATION BUT NO NEXT ACTION LOGGED, AN OPEN DEAL STILL NEEDS A CONCRETE NEXT STEP');
         }
         if (hasStaleNudgePlanAfterReply(p)) {
           reasons.push('NEXT NUDGE DATE STILL SET BUT THE MOST RECENT LOGGED TOUCH IS A REPLY, RECONSIDER BEFORE COLD-NUDGING SOMEONE WHO ALREADY WROTE BACK');
@@ -883,7 +898,7 @@
     outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
-    hasStaleNudgePlanAfterReply,
+    missingNextAction, hasStaleNudgePlanAfterReply,
     emDashFields, emDashHits
   };
 });

@@ -104,6 +104,11 @@ function main() {
         'Backfill why this person/brand is a real fit once known.');
     }
 
+    if (p.stage === 'in-exploration' && !p.nextAction) {
+      warnings.push(where + ': stage is "in-exploration" but nextAction is not logged yet. ' +
+        'An open deal in active exploration still needs a concrete next step written down, not just a stage.');
+    }
+
     const stageDef = p.stage && stageById[p.stage];
     if (stageDef && stageDef.staleAfterDays != null && p.stageEnteredDate && DATE_RE.test(p.stageEnteredDate)) {
       const entered = new Date(p.stageEnteredDate + 'T00:00:00');

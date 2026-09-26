@@ -26,7 +26,7 @@ const {
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
-  hasStaleNudgePlanAfterReply,
+  missingNextAction, hasStaleNudgePlanAfterReply,
   emDashFields, emDashHits
 } = require('./csm-core.js');
 
@@ -1087,7 +1087,10 @@ test('computeDataQualityFlags flags a past-outreach prospect missing both contac
 });
 
 test('computeDataQualityFlags flags a contact channel type logged with no contact detail', () => {
-  const p = { stage: 'in-exploration', verifiedHook: 'real hook', contactChannel: { type: 'named-decision-maker', detail: null } };
+  const p = {
+    stage: 'in-exploration', verifiedHook: 'real hook', nextAction: 'Send updated proposal',
+    contactChannel: { type: 'named-decision-maker', detail: null }
+  };
   const flagged = computeDataQualityFlags([], [p]);
   assert.deepEqual(flagged[0].reasons, ['CONTACT CHANNEL TYPE LOGGED BUT NO CONTACT DETAIL']);
 });
@@ -1099,6 +1102,19 @@ test('computeDataQualityFlags flags an already-contacted prospect with no follow
   assert.ok(noPlan[0].reasons.includes('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT'));
   const withPlan = Object.assign({}, base, { nextNudgeDate: addDaysIso(todayIso(), 3) });
   assert.deepEqual(computeDataQualityFlags([], [withPlan]), []);
+});
+
+test('computeDataQualityFlags flags an in-exploration prospect with no next action, and clears once one is logged', () => {
+  const base = {
+    stage: 'in-exploration',
+    verifiedHook: 'real hook',
+    contactChannel: { type: 'named-decision-maker', detail: 'someone@example.com' }
+  };
+  const noAction = computeDataQualityFlags([], [base]);
+  assert.equal(noAction.length, 1);
+  assert.deepEqual(noAction[0].reasons, ['IN ACTIVE EXPLORATION BUT NO NEXT ACTION LOGGED, AN OPEN DEAL STILL NEEDS A CONCRETE NEXT STEP']);
+  const withAction = Object.assign({}, base, { nextAction: 'Send updated proposal' });
+  assert.deepEqual(computeDataQualityFlags([], [withAction]), []);
 });
 
 test('computeDataQualityFlags surfaces a stale social snapshot with its day count and uppercased platform', () => {
@@ -1275,6 +1291,15 @@ test('missingFollowUpPlan only fires once contacted with nothing scheduled, and 
   assert.equal(missingFollowUpPlan({ stage: 'outreach-sent' }), true);
   assert.equal(missingFollowUpPlan({ stage: 'silent-replied' }), true);
   assert.equal(missingFollowUpPlan({ stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), 3) }), false);
+});
+
+test('missingNextAction only fires in-exploration with nothing logged, and clears once a next action is', () => {
+  assert.equal(missingNextAction({ stage: 'researched' }), false);
+  assert.equal(missingNextAction({ stage: 'outreach-sent' }), false);
+  assert.equal(missingNextAction({ stage: 'silent-replied' }), false);
+  assert.equal(missingNextAction({ stage: 'client' }), false);
+  assert.equal(missingNextAction({ stage: 'in-exploration' }), true);
+  assert.equal(missingNextAction({ stage: 'in-exploration', nextAction: 'Follow up on contract redlines' }), false);
 });
 
 test('hasStaleNudgePlanAfterReply is false with no nextNudgeDate, no outreachLog, or the reply not being the latest touch', () => {
