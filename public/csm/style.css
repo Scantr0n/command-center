@@ -880,6 +880,7 @@ header.page-head .sub {
 
 /* Board */
 .board {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(5, minmax(220px, 1fr));
   gap: 14px;
@@ -887,6 +888,32 @@ header.page-head .sub {
   padding-bottom: 8px;
 }
 .board[hidden] { display: none; }
+/* Each column has a real fixed minmax floor (220px), so 5 of them already
+   overflow a common ~1200px browser width, not just a narrow phone, with
+   no other visual cue that there's more to scroll to. Same real gap
+   CGT/Garage/Sondrik's own wide tables already had a fade for (see each
+   hub's own .table-wrap), this is that same fix applied to the one
+   horizontally-scrolling element CSM has that isn't a <table>. */
+.board::before, .board::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 8px;
+  width: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.board::before {
+  left: 0;
+  background: linear-gradient(to right, var(--void), transparent);
+}
+.board::after {
+  right: 0;
+  background: linear-gradient(to left, var(--void), transparent);
+}
+.board.can-scroll-left::before { opacity: 1; }
+.board.can-scroll-right::after { opacity: 1; }
 @media (max-width: 1000px) {
   .board { grid-template-columns: 1fr; }
 }
@@ -1604,6 +1631,9 @@ footer.page-foot {
   .modal-overlay, .attention-bar, .view-toggle, .board-list-wrap, .jump-nav-fab {
     display: none !important;
   }
+  /* Same reason CGT's own .table-wrap::before/::after are print-hidden: a
+     scroll fade has no meaning once nothing on paper scrolls. */
+  .board::before, .board::after { display: none !important; }
 
   .callout {
     border-color: #bbb;

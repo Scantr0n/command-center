@@ -1094,6 +1094,25 @@
       });
     });
     wireCardDragAndDrop();
+    updateBoardScrollShadow();
+  }
+
+  // The board's 5 columns each have a real fixed 220px floor, so they
+  // already overflow a common ~1200px browser width, not just a narrow
+  // phone, with nothing to signal that. Same fade-at-the-scrolled-edge fix
+  // CGT/Garage/Sondrik's own wide tables already have, applied here since
+  // rendering never replaces boardEl itself, only its innerHTML, so the
+  // scroll/resize listeners only need binding once.
+  let boardScrollShadowBound = false;
+  function updateBoardScrollShadow() {
+    const maxScrollLeft = boardEl.scrollWidth - boardEl.clientWidth;
+    boardEl.classList.toggle('can-scroll-left', boardEl.scrollLeft > 1);
+    boardEl.classList.toggle('can-scroll-right', boardEl.scrollLeft < maxScrollLeft - 1);
+    if (!boardScrollShadowBound) {
+      boardScrollShadowBound = true;
+      boardEl.addEventListener('scroll', updateBoardScrollShadow, { passive: true });
+      window.addEventListener('resize', updateBoardScrollShadow);
+    }
   }
 
   // Kanban drag-to-restage, a standard pipeline-board interaction. Dragging a
