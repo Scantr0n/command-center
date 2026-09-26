@@ -17,6 +17,7 @@ const {
   timeAgo,
   freshnessClass,
   computeHeadline,
+  appendDedupedStringObservation,
   formatDuration,
   mostRecentConnectedAt,
   currentStateStartedAt,
@@ -356,4 +357,53 @@ test('computeHeadline: kill switch engaged still wins over a stuck-agent count',
   const result = computeHeadline(data, false, NOW);
   assert.equal(result.level, 'critical');
   assert.equal(result.text, 'KILL SWITCH ENGAGED');
+});
+
+// Shared decision logic behind recordClientRegimeObservation and
+// recordClientSizingModeObservation in app.js.
+test('appendDedupedStringObservation never records while disconnected or with a falsy value', () => {
+  const history = [{ at: '2026-01-01T00:00:00.000Z', regime: 'trending' }];
+  assert.equal(appendDedupedStringObservation(history, false, 'trending', 'regime', 200), history);
+  assert.equal(appendDedupedStringObservation(history, true, null, 'regime', 200), history);
+  assert.equal(appendDedupedStringObservation(history, true, '', 'regime', 200), history);
+});
+
+test('appendDedupedStringObservation skips a repeat of the last recorded value, returning the same array reference', () => {
+  const history = [{ at: '2026-01-01T00:00:00.000Z', regime: 'trending' }];
+  const result = appendDedupedStringObservation(history, true, 'trending', 'regime', 200, Date.now());
+  assert.equal(result, history, 'no real change, so the exact same reference comes back, not a new equal-looking array');
+});
+
+test('appendDedupedStringObservation appends a real new value with a real timestamp, keyed under the given field', () => {
+  const history = [{ at: '2026-01-01T00:00:00.000Z', regime: 'trending' }];
+  const now = new Date('2026-01-02T00:00:00.000Z').getTime();
+  const result = appendDedupedStringObservation(history, true, 'choppy', 'regime', 200, now);
+  assert.notEqual(result, history);
+  assert.equal(result.length, 2);
+  assert.deepEqual(result[1], { at: '2026-01-02T00:00:00.000Z', regime: 'choppy' });
+});
+
+test('appendDedupedStringObservation records the first observation into an empty history', () => {
+  const now = new Date('2026-01-01T00:00:00.000Z').getTime();
+  const result = appendDedupedStringObservation([], true, 'drawdown-based', 'mode', 200, now);
+  assert.deepEqual(result, [{ at: '2026-01-01T00:00:00.000Z', mode: 'drawdown-based' }]);
+});
+
+test('appendDedupedStringObservation caps the history to the most recent entries', () => {
+  const history = Array.from({ length: 5 }, (_, i) => ({ at: `2026-01-0${i + 1}T00:00:00.000Z`, mode: 'drawdown-based' }));
+  const now = new Date('2026-01-10T00:00:00.000Z').getTime();
+  const result = appendDedupedStringObservation(history, true, 'robustness-based', 'mode', 3, now);
+  assert.equal(result.length, 3);
+  assert.equal(result[result.length - 1].mode, 'robustness-based');
+});
+
+test('appendDedupedStringObservation records a real transition back to a previous value, not just forward ones', () => {
+  const history = [
+    { at: '2026-01-01T00:00:00.000Z', mode: 'drawdown-based' },
+    { at: '2026-01-02T00:00:00.000Z', mode: 'robustness-based' }
+  ];
+  const now = new Date('2026-01-03T00:00:00.000Z').getTime();
+  const result = appendDedupedStringObservation(history, true, 'drawdown-based', 'mode', 200, now);
+  assert.equal(result.length, 3);
+  assert.equal(result[2].mode, 'drawdown-based');
 });

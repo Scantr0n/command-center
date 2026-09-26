@@ -51,6 +51,7 @@ const {
   timeAgo,
   freshnessClass,
   computeHeadline,
+  appendDedupedStringObservation,
   formatDuration,
   mostRecentConnectedAt,
   currentStateStartedAt,
@@ -396,10 +397,8 @@ function loadClientRegimeHistory() {
 
 function recordClientRegimeObservation(connected, regime) {
   const history = loadClientRegimeHistory();
-  if (!connected || !regime) return history;
-  const last = history[history.length - 1];
-  if (last && last.regime === regime) return history;
-  const next = [...history, { at: new Date().toISOString(), regime }].slice(-CLIENT_REGIME_HISTORY_CAP);
+  const next = appendDedupedStringObservation(history, connected, regime, 'regime', CLIENT_REGIME_HISTORY_CAP);
+  if (next === history) return next;
   try {
     localStorage.setItem(CLIENT_REGIME_HISTORY_KEY, JSON.stringify(next));
   } catch (e) {
@@ -500,10 +499,8 @@ function loadClientSizingModeHistory() {
 
 function recordClientSizingModeObservation(connected, mode) {
   const history = loadClientSizingModeHistory();
-  if (!connected || !mode) return history;
-  const last = history[history.length - 1];
-  if (last && last.mode === mode) return history;
-  const next = [...history, { at: new Date().toISOString(), mode }].slice(-CLIENT_SIZING_MODE_HISTORY_CAP);
+  const next = appendDedupedStringObservation(history, connected, mode, 'mode', CLIENT_SIZING_MODE_HISTORY_CAP);
+  if (next === history) return next;
   try {
     localStorage.setItem(CLIENT_SIZING_MODE_HISTORY_KEY, JSON.stringify(next));
   } catch (e) {

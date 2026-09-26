@@ -263,6 +263,29 @@
     return { level: 'good', text: 'Connected', asOf };
   }
 
+  // Shared decision logic behind recordClientRegimeObservation and
+  // recordClientSizingModeObservation in app.js: both keep an honest,
+  // append-only, capped, client-side log of a real string value (regime,
+  // sizing mode) that Alpha's live feed only ever sends as a single current
+  // reading, never a history. Only records while genuinely connected with a
+  // real, truthy value (a last-known/frozen or awaiting-connection reading
+  // is not a new observation), and only when it actually differs from the
+  // last recorded entry, so a value that hasn't changed since the last
+  // check doesn't pad the log with identical repeats. Returns the exact same
+  // array reference when nothing changed, so a caller can tell "was this a
+  // real append" via `next !== history` without a separate flag. `field`
+  // names the property the value is stored under (e.g. 'regime', 'mode'),
+  // kept distinct rather than a single generic shape so each history's real
+  // persisted entries (and any already sitting in a real browser's
+  // localStorage from before this was extracted) keep the exact same shape.
+  function appendDedupedStringObservation(history, connected, value, field, cap, now) {
+    if (!connected || !value) return history;
+    const last = history[history.length - 1];
+    if (last && last[field] === value) return history;
+    const at = new Date(now == null ? Date.now() : now).toISOString();
+    return [...history, { at, [field]: value }].slice(-cap);
+  }
+
   function formatDuration(ms) {
     if (!Number.isFinite(ms) || ms < 0) return null;
     const mins = Math.floor(ms / 60000);
@@ -374,6 +397,7 @@
     timeAgo,
     freshnessClass,
     computeHeadline,
+    appendDedupedStringObservation,
     formatDuration,
     mostRecentConnectedAt,
     currentStateStartedAt,
