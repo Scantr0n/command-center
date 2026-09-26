@@ -1796,7 +1796,8 @@
   // re-verify once it's been a while rather than silently trusting a table
   // that says "as of September 2026" forever. Verified 2026-09-25 against
   // each platform's own current marketplace pages and documentation; no
-  // correction needed this pass, all six rows still hold up.
+  // correction needed this pass, all seven rows still hold up (six named
+  // marketplace tools plus plain WeChat, which has none).
   const PLATFORM_REFERENCE_REVIEWED_ON = '2026-09-25';
   const PLATFORM_REFERENCE_STALE_AFTER_DAYS = 45;
 
