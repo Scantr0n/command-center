@@ -37,11 +37,12 @@
     lead: 'lead',
     channel: 'channel',
     release: 'release',
-    goal: 'goal'
-    // application (job-search) has no record-level URL state yet, see
-    // job-search/app.js: intentionally absent, not an oversight.
-    // sale/expense/dispute/supply/acquisition (garage) same: those hand-
-    // tracked entities have no per-record modal or highlight target yet.
+    goal: 'goal',
+    application: 'application'
+    // sale/expense/dispute/supply/acquisition (garage) have no per-record
+    // modal or highlight target yet, and (unlike application above) still
+    // have zero real rows logged in any of the five files, so there's
+    // nothing real yet to jump to: intentionally absent, not an oversight.
   };
 
   function recordHref(r) {

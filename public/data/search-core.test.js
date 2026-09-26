@@ -19,7 +19,7 @@ const { RECORD_TYPE_PARAMS, recordHref } = require('./search-core.js');
 // there should show up here as either `true` (once its hub's app.js reads
 // the matching param) or `false` with a real reason.
 const SERVER_SEARCH_SOURCE_TYPES = {
-  card: true, prospect: true, listing: true, lead: true, application: false,
+  card: true, prospect: true, listing: true, lead: true, application: true,
   submission: true, candidate: true, sale: false, expense: false,
   dispute: false, supply: false, acquisition: false, channel: true,
   release: true, goal: true
@@ -42,10 +42,11 @@ test('recordHref builds a hub-relative link with the matching query param', () =
     '/sondrik/?goal=downloads-dec-31');
   assert.equal(recordHref({ hub: 'cgt', type: 'card', id: 'malkin-210' }),
     '/cgt/?card=malkin-210');
+  assert.equal(recordHref({ hub: 'job-search', type: 'application', id: '42' }),
+    '/job-search/?application=42');
 });
 
 test('recordHref falls back to the bare hub page for an unsupported type or a missing id', () => {
-  assert.equal(recordHref({ hub: 'job-search', type: 'application', id: 'app-42' }), '/job-search/');
   assert.equal(recordHref({ hub: 'garage', type: 'sale', id: 'sale-1' }), '/garage/');
   assert.equal(recordHref({ hub: 'cgt', type: 'card', id: null }), '/cgt/');
 });

@@ -29,6 +29,20 @@
 
   printBtn.addEventListener('click', () => window.print());
 
+  // A record-level deep link (?application=<num>), same "open this one real
+  // record from a link" pattern already fixed for Sondrik's own lead/
+  // channel/release/goal types (see search-core.js's RECORD_TYPE_PARAMS):
+  // the hub's global search already returns real application matches, but
+  // recordHref() had no param for this hub's one record type yet, so
+  // clicking one from search always just landed on this page's top instead
+  // of at the actual application clicked. jumpToApplicationRow already does
+  // the scroll-and-flash for the duplicates panel above, this just fires it
+  // once more on load for a real ?application=<num> in the URL. Consumed
+  // once, right after the applications table first renders; never written
+  // back to the URL, same "answers one link, not ongoing page state" rule
+  // as Sondrik's own INITIAL_RECORD.
+  const INITIAL_APPLICATION_NUM = new URLSearchParams(location.search).get('application');
+
   // Same real local-download-only backup the other 5 hubs already have;
   // this one just never got it when the hub shipped. Only bundles whatever
   // actually loaded, real honest gaps stay gaps rather than getting padded
@@ -311,6 +325,13 @@
       row.classList.add('row-flash');
       duplicateRowFlashTimer = setTimeout(() => row.classList.remove('row-flash'), 1600);
     }));
+  }
+
+  let initialApplicationConsumed = false;
+  function highlightInitialApplication() {
+    if (!INITIAL_APPLICATION_NUM || initialApplicationConsumed) return;
+    initialApplicationConsumed = true;
+    jumpToApplicationRow(INITIAL_APPLICATION_NUM);
   }
 
   function renderDuplicates(applications) {
@@ -642,6 +663,7 @@
     if (applicationsData) {
       renderApplications(applicationsData);
       renderDuplicates(applicationsData.applications || []);
+      highlightInitialApplication();
     } else {
       applicationsTableWrap.innerHTML = '<div class="empty-state" role="alert">Failed to load applications data: ' +
         escapeHtml(applicationsResult.reason.message) + '</div>';
