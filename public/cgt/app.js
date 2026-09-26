@@ -22,6 +22,7 @@ let activeBatch = 'all';
 let activeOwnership = 'all';
 let sortKey = null;
 let sortDir = 'asc';
+let inventoryView = 'table';
 let candidateSearchTerm = '';
 let activeCandidateSport = 'all';
 let activeCandidateVerdict = 'all';
@@ -2672,6 +2673,94 @@ function renderTableFooter(filtered) {
   `;
 }
 
+// Table view is the only real way to browse the collection until this: a
+// second, purely visual way to scan the same filtered/sorted rows, the same
+// "gallery" toggle CollX and Sports Card DB both ship (per Sept 2026
+// research into what these apps actually offer), useful here specifically
+// because imageUrl already exists on every card record but the table never
+// shows it. Browser-only preference, same persistence pattern as
+// COVERAGE_LIMIT_STORAGE_KEY above.
+const INVENTORY_VIEW_STORAGE_KEY = 'cgt-inventory-view';
+
+function loadInventoryView() {
+  try {
+    const raw = localStorage.getItem(INVENTORY_VIEW_STORAGE_KEY);
+    return raw === 'gallery' ? 'gallery' : 'table';
+  } catch {
+    return 'table';
+  }
+}
+function saveInventoryView(view) {
+  try {
+    localStorage.setItem(INVENTORY_VIEW_STORAGE_KEY, view);
+  } catch {
+    // Storage unavailable, the choice just won't persist across visits.
+  }
+}
+
+function setInventoryView(view) {
+  inventoryView = view === 'gallery' ? 'gallery' : 'table';
+  saveInventoryView(inventoryView);
+  document.getElementById('tableViewWrap').hidden = inventoryView !== 'table';
+  document.getElementById('cardGallery').hidden = inventoryView !== 'gallery';
+  document.getElementById('viewTableBtn').setAttribute('aria-pressed', String(inventoryView === 'table'));
+  document.getElementById('viewGalleryBtn').setAttribute('aria-pressed', String(inventoryView === 'gallery'));
+}
+
+function initInventoryViewToggle() {
+  setInventoryView(loadInventoryView());
+  document.getElementById('viewTableBtn').addEventListener('click', () => setInventoryView('table'));
+  document.getElementById('viewGalleryBtn').addEventListener('click', () => setInventoryView('gallery'));
+}
+
+// One tile per filtered/sorted card, same click-to-open-modal interaction as
+// a table row (see the row listeners at the end of applyFiltersAndRender
+// below) so switching views never changes what clicking a card does. A
+// missing/broken imageUrl falls back to a plain placeholder rather than a
+// broken-image icon, the same "on record but didn't load" distinction the
+// detail modal's own photo already makes.
+function renderCardGallery(filtered) {
+  const gallery = document.getElementById('cardGallery');
+  gallery.innerHTML = filtered.map(c => `
+    <div class="gallery-card" tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
+      <div class="gallery-photo-wrap">
+        ${c.imageUrl
+          ? `<img src="${escapeHtml(c.imageUrl)}" alt="" class="gallery-photo" loading="lazy">`
+          : ''}
+        <div class="gallery-photo-placeholder"${c.imageUrl ? ' hidden' : ''}>No photo</div>
+      </div>
+      <div class="gallery-card-body">
+        <div class="gallery-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}</div>
+        <div class="gallery-card-meta">${[c.year, c.sport, c.gradingCompany, c.grade != null ? 'Grade ' + c.grade : null].filter(Boolean).map(escapeHtml).join(' · ') || 'No details logged yet'}</div>
+        <div class="gallery-card-value">
+          <span class="cell-value${c.estimatedValue == null ? ' empty' : ''}">${c.estimatedValue != null ? formatUsd(c.estimatedValue) : 'not priced'}</span>
+          ${basisBadge(c)}
+        </div>
+      </div>
+      ${isSold(c) ? '<span class="badge badge-sold gallery-card-flag" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>'
+        : isListed(c) ? '<span class="badge badge-listed gallery-card-flag" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>' : ''}
+    </div>
+  `).join('');
+
+  gallery.querySelectorAll('.gallery-card').forEach(tile => {
+    tile.addEventListener('click', () => openModal(tile.dataset.id));
+    tile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openModal(tile.dataset.id);
+      }
+    });
+    const img = tile.querySelector('.gallery-photo');
+    if (img) {
+      img.addEventListener('error', () => {
+        img.hidden = true;
+        const placeholder = tile.querySelector('.gallery-photo-placeholder');
+        if (placeholder) placeholder.hidden = false;
+      });
+    }
+  });
+}
+
 function applyFiltersAndRender() {
   syncUrl();
   const filtered = sortRows(cards.filter(matchesFilters));
@@ -2684,6 +2773,7 @@ function applyFiltersAndRender() {
 
   if (!filtered.length) {
     tbody.innerHTML = '';
+    renderCardGallery(filtered);
     renderTableFooter(filtered);
     empty.hidden = false;
     empty.setAttribute('role', 'status');
@@ -2692,6 +2782,7 @@ function applyFiltersAndRender() {
     return;
   }
   empty.hidden = true;
+  renderCardGallery(filtered);
   renderTableFooter(filtered);
 
   // Same real reason as the candidate-row/submission-row aria-labels removed
@@ -3741,6 +3832,7 @@ document.getElementById('candidatesClearFiltersBtn').addEventListener('click', (
 });
 wireCoverageCheck();
 wirePerItemScheduleCheck();
+initInventoryViewToggle();
 
 // Resets search, all four chip groups (batch included, even though its own
 // chips are rebuilt per-load rather than static markup like the others), and

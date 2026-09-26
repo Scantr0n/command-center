@@ -862,6 +862,10 @@
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Inventory</h2>
       <button type="button" id="clearFiltersBtn" class="print-btn font-mono" hidden>Clear filters</button>
+      <div class="view-toggle" id="inventoryViewToggle" role="group" aria-label="Inventory view">
+        <button type="button" class="chip" id="viewTableBtn" data-view="table" aria-pressed="true">Table</button>
+        <button type="button" class="chip" id="viewGalleryBtn" data-view="gallery" aria-pressed="false">Gallery</button>
+      </div>
       <input
         type="search"
         id="searchInput"
@@ -902,7 +906,7 @@
       <button type="button" class="chip chip-sold" data-owned="sold" aria-pressed="false">Sold<span class="chip-count"></span></button>
     </div>
     <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
-    <div class="table-wrap">
+    <div class="table-wrap" id="tableViewWrap">
       <table class="card-table" id="cardTable">
         <thead>
           <tr>
@@ -918,8 +922,9 @@
         <tbody id="cardTableBody"></tbody>
         <tfoot id="cardTableFoot"></tfoot>
       </table>
-      <div class="table-empty" id="tableEmpty" hidden></div>
     </div>
+    <div class="card-gallery" id="cardGallery" hidden></div>
+    <div class="table-empty" id="tableEmpty" hidden></div>
   </section>
 
   <section>
