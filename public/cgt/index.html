@@ -573,7 +573,9 @@
       eBay's real published 13.25% Sports Trading Cards final value fee first, since that fee comes out before
       anything actually lands in hand. See "Grading
       service tiers reference" below for current published per-tier pricing and turnaround to fill in
-      <code class="inline-code">estimatedGradingCost</code> with a real number instead of a guess.</p>
+      <code class="inline-code">estimatedGradingCost</code> with a real number instead of a guess, and "Grading
+      standards reference" for published centering/corners/edges/surface criteria to sanity-check
+      <code class="inline-code">expectedGrade</code> before it gets typed in as a guess.</p>
     <input
       type="search"
       id="candidateSearchInput"
@@ -687,6 +689,49 @@
       <a href="https://www.cgccards.com/submit/services-fees/cgc-grading/" target="_blank" rel="noopener noreferrer">CGC services and fees</a>.
       HGA and KSA had no published turnaround/fee schedule found in this review, so they are left out of this table
       rather than guessed at.
+    </p>
+    </details>
+  </section>
+
+  <section id="gradingStandardsSection">
+    <details class="section-details" id="gradingStandardsDetails">
+    <summary class="section-title">Grading standards reference (PSA/BGS)
+      <span class="reference-freshness" id="gradingStandardsFreshness"></span>
+    </summary>
+    <div class="callout">
+      Real published centering/corners/edges/surface criteria from PSA and BGS's own grading info pages and
+      grading-industry guides, meant as a sanity check on a candidate's <code class="inline-code">expectedGrade</code>
+      before deciding whether to submit it, not a replacement for professional grading. Only the top of each scale is
+      covered (Gem Mint/Mint/NM-MT for PSA, the "10" subgrade tier and Black Label for BGS): a raw card that looks
+      worse than Near Mint by eye is very unlikely to clear the "Worth grading?" 2x-margin math above regardless of
+      its exact lower-grade description, so those lower grades aren't detailed here rather than filled in with a
+      guess. SGC, CGC, HGA, and KSA publish grading philosophies but not the same kind of itemized four-factor
+      breakdown PSA and BGS do, so they're left out of this table entirely instead of approximated. A phone-camera
+      self-check also can't fully replicate a grading company's own magnification and lighting, PSA's own guidance
+      says as much, so treat any grade estimated this way as a starting range, not a guarantee.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table">
+        <thead>
+          <tr><th scope="col">Grade</th><th scope="col">Centering (front / back)</th><th scope="col">Corners</th><th scope="col">Edges</th><th scope="col">Surface</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>PSA 10<br>Gem Mint</td><td>55/45 or better / 75/25 or better</td><td>Perfectly sharp under magnification, no whitening at all</td><td>No whitening, chipping, or roughness on any edge</td><td>No scratches, print defects, staining, or other visible imperfections</td></tr>
+          <tr><td>PSA 9<br>Mint</td><td>Up to 60/40 / up to 90/10</td><td>Minimal wear, at most one very minor imperfection</td><td>Minimal wear matching the corners</td><td>Faintest flaw only visible under magnification; slightly off-center printing allowed</td></tr>
+          <tr><td>PSA 8<br>NM-MT</td><td>Up to 65/35 / up to 90/10</td><td>Slightest fraying may appear at one or two corners on close inspection</td><td>Similar minimal wear to the corners</td><td>Very slight wax stain possible on the back; a minor printing imperfection or slightly off-white borders allowed</td></tr>
+          <tr><td>PSA 7<br>NM</td><td>Up to 70/30 / up to 90/10</td><td colspan="2">Not itemized on the pages reviewed for this grade</td><td>Not itemized on the pages reviewed for this grade</td></tr>
+          <tr><td>BGS 10<br>(each subgrade)</td><td>50/50 to 55/45 / 75/25</td><td>No fuzzing, rounding, dings, or peeling under magnification</td><td>No whitening, chipping, rough cuts, or layer separation, checked front and back</td><td>No scratches, print lines, ink spots, fingerprints, or holo scratches under BGS's grading lights</td></tr>
+          <tr><td>BGS Black Label</td><td colspan="4">All four subgrades above land at a 10 simultaneously. Printed in black instead of gold; fewer than 1% of BGS submissions reach it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="schema-help-body" style="margin-top:.75rem">
+      Sources: <a href="https://www.psacard.com/info/get-started" target="_blank" rel="noopener noreferrer">PSA, Getting Started With Grading</a>,
+      <a href="https://cardgrade.io/guides/psa-grades" target="_blank" rel="noopener noreferrer">PSA 10 meaning, standards, and grades 1-10</a>,
+      <a href="https://phantomdisplay.com/blogs/blog/psa-grading-guide-beginners" target="_blank" rel="noopener noreferrer">PSA grading scale explained</a>,
+      <a href="https://cardgrade.io/guides/psa-grades/psa-8" target="_blank" rel="noopener noreferrer">PSA 8 (NM-MT) standard</a>,
+      <a href="https://www.cardcenteringtool.com/grading-standards/bgs" target="_blank" rel="noopener noreferrer">BGS centering tolerances and subgrade math</a>,
+      <a href="https://pregradecards.com/blog/what-is-bgs-black-label" target="_blank" rel="noopener noreferrer">BGS Black Label explained</a>.
     </p>
     </details>
   </section>

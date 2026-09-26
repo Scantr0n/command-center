@@ -290,6 +290,14 @@ const PRICE_STALE_AFTER_DAYS = 180;
 const GRADING_REFERENCE_REVIEWED_ON = '2026-09-25';
 const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 
+// Same freshness-badge pattern as GRADING_REFERENCE_REVIEWED_ON just above,
+// but a much longer stale window: a grading company's published
+// centering/corners/edges/surface criteria are physical-condition standards,
+// not a fee schedule, and don't move on the weeks-to-months cadence PSA/BGS
+// pricing and tier names have shown this year.
+const GRADING_STANDARDS_REVIEWED_ON = '2026-09-26';
+const GRADING_STANDARDS_STALE_AFTER_DAYS = 365;
+
 // Local calendar date as YYYY-MM-DD, same convention as turnaround-core.js's
 // daysSince (and CSM's/Sondrik's own todayIso): new Date().toISOString().slice(0, 10)
 // reads the UTC calendar date, which rolls over to tomorrow while it is
@@ -645,6 +653,20 @@ function renderGradingReferenceFreshness() {
     : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
   el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
   el.title = 'Last hand-verified against each grader\'s own site on ' + GRADING_REFERENCE_REVIEWED_ON + '.';
+}
+
+// Same unconditional-at-load reasoning as renderGradingReferenceFreshness
+// just above (no fetch involved).
+function renderGradingStandardsFreshness() {
+  const el = document.getElementById('gradingStandardsFreshness');
+  if (!el) return;
+  const age = daysSince(GRADING_STANDARDS_REVIEWED_ON);
+  const stale = age != null && age > GRADING_STANDARDS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last checked against PSA/BGS grading-standards sources on ' + GRADING_STANDARDS_REVIEWED_ON + '.';
 }
 
 function renderStats() {
@@ -4477,6 +4499,7 @@ window.addEventListener('online', updateOfflineBanner);
 updateOfflineBanner();
 
 renderGradingReferenceFreshness();
+renderGradingStandardsFreshness();
 renderTaxTrackerFreshness();
 
 loadCards();
