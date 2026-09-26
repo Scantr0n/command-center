@@ -147,6 +147,7 @@
   // hold up against current sources.
   const CHANNEL_NORMS_REVIEWED_ON = '2026-09-25';
   const LEAD_NORMS_REVIEWED_ON = '2026-09-25';
+  const DOWNLOAD_COUNT_NORMS_REVIEWED_ON = '2026-09-26';
   const REFERENCE_STALE_AFTER_DAYS = 45;
 
   function renderReferenceFreshness(elId, reviewedOn) {
@@ -2717,4 +2718,5 @@
 
   renderReferenceFreshness('channelNormsFreshness', CHANNEL_NORMS_REVIEWED_ON);
   renderReferenceFreshness('leadNormsFreshness', LEAD_NORMS_REVIEWED_ON);
+  renderReferenceFreshness('downloadCountNormsFreshness', DOWNLOAD_COUNT_NORMS_REVIEWED_ON);
 })();

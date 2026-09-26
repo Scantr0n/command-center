@@ -284,6 +284,47 @@
       line; regenerate it here after each fresh download check to keep it from going stale.</p>
   </section>
 
+  <section id="downloadCountNormsSection">
+    <details class="schema-help">
+      <summary>What a GitHub release download count actually measures (general guidance, not Sondrik data)
+        <span class="reference-freshness" id="downloadCountNormsFreshness"></span>
+      </summary>
+      <div class="schema-help-body">
+        <p>General background on the one real number the Traction card above is built from, reviewed
+          September 2026 from GitHub's own release-asset API docs and outside write-ups of how the counter
+          actually behaves (sources linked below). This is <strong>not</strong> a claim about whether Sondrik's
+          own logged counts are wrong, they're pulled straight from the real API, it's context for reading them
+          correctly given how small they still are.</p>
+        <div class="schema-table-wrap">
+        <table class="schema-table">
+          <tbody>
+            <tr><th>It's a lifetime<br>running total</th><td>The API returns one cumulative number per asset,
+              not a per-day or per-week breakdown, which is exactly why this hub logs a dated check by hand each
+              time and computes the rate between two checks itself, rather than reading a daily figure straight
+              from GitHub.</td></tr>
+            <tr><th>Not the same as<br>a confirmed unique person</th><td>The counter increments on a fetch of the
+              asset, it doesn't distinguish a new real person from the same person re-downloading, or from an
+              automated fetch (a CI job, a package mirror, a security scanner) hitting the same release URL.
+              Outside write-ups of the same API describe it as easy for a misconfigured pipeline to inflate
+              without any real new user behind the extra count.</td></tr>
+            <tr><th>Matters more<br>at a small count</th><td>At Sondrik's current scale (single digits to low
+              tens), a handful of non-human fetches would be a meaningful share of the total. Not a reason to
+              distrust the confirmed number on this page, just a reason to read "N downloads" as "N asset fetches
+              logged by GitHub," not as "N confirmed new users," until the count is large enough for that gap to
+              wash out.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="schema-help-body" style="margin-top:.75rem; padding:0;">
+          Sources:
+          <a href="https://docs.github.com/en/rest/releases/assets" target="_blank" rel="noopener noreferrer">GitHub REST API docs, release assets</a>,
+          <a href="https://mostlynerdless.de/blog/2026/09/08/what-do-github-download-statistics-really-mean/" target="_blank" rel="noopener noreferrer">Mostly nerdless, what do GitHub download statistics really mean?</a>,
+          <a href="https://thore.io/posts/2025/04/getting-the-download-count-of-github-release-assets/" target="_blank" rel="noopener noreferrer">Thore Goebel, getting the download count of GitHub release assets</a>.
+        </p>
+      </div>
+    </details>
+  </section>
+
   <section>
     <div class="section-toolbar">
       <h2 class="section-title">Goal</h2>
