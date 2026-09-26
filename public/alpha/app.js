@@ -1348,7 +1348,11 @@ function renderAccount(data) {
 // performance is what matters at a glance, not just the raw number), and
 // green/red color coding so a scan across many rows reads winners and
 // losers instantly rather than requiring reading each sign. Sorted by
-// market value (server-side) so the biggest real exposure leads.
+// market value (server-side) by default so the biggest real exposure leads,
+// with every column now also click-to-sort client-side (see
+// sortPositionRows below), the one table on this page that had no way to
+// re-order it, unlike the same sortable-column convention already proven on
+// Garage/CGT/CSM/Job Search's own tables.
 // Single-position concentration risk is a standard trading/portfolio risk-
 // dashboard threshold (any single name above roughly 5% of the account gets
 // a second look, 10%+ is commonly flagged outright as concentrated), so the
@@ -1356,6 +1360,70 @@ function renderAccount(data) {
 // color as a stale connection or a pending architecture feature) at 10% and
 // above rather than inventing a new color for a new kind of warning.
 const POSITION_CONCENTRATION_CAUTION_PCT = 10;
+
+// One real column list driving both the <th> markup and the sort logic
+// below, so a column can never go sortable in the header without a matching
+// case in sortPositionRows, or vice versa. concPct isn't a raw field on the
+// position object the live feed sends (it's derived per-row against
+// account equity, same as the on-page % of equity cell itself), so it's
+// attached to each row once in renderPositions before sorting, never
+// recomputed per comparison.
+const POSITIONS_SORT_COLUMNS = [
+  ['symbol', 'Symbol'],
+  ['side', 'Side'],
+  ['qty', 'Qty'],
+  ['avgEntryPrice', 'Avg entry'],
+  ['currentPrice', 'Current'],
+  ['marketValue', 'Mkt value'],
+  ['unrealizedPl', 'Unrealized P&amp;L'],
+  ['concPct', '% of equity']
+];
+
+let positionsSortKey = null;
+let positionsSortDir = 'asc';
+
+// Same numeric-vs-string compare and same "unknown sinks to the bottom
+// regardless of direction" rule as every other hub's own sortRows
+// (Garage/CGT/CSM/Job Search's app.js): a missing price or P&L on one row
+// is not meaningfully high or low, so it should never jump to the top just
+// because descending order was picked.
+function sortPositionRows(rows) {
+  if (!positionsSortKey) return rows;
+  const dir = positionsSortDir === 'asc' ? 1 : -1;
+  const key = positionsSortKey;
+  return [...rows].sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+
+function handlePositionsSortActivate(key) {
+  if (positionsSortKey === key) {
+    positionsSortDir = positionsSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    positionsSortKey = key;
+    positionsSortDir = 'asc';
+  }
+  if (lastRawData) renderPositions(lastRawData);
+}
+
+function wirePositionsSortHeaders(panel) {
+  panel.querySelectorAll('th.sortable').forEach(th => {
+    const key = th.getAttribute('data-sort');
+    th.addEventListener('click', () => handlePositionsSortActivate(key));
+    th.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handlePositionsSortActivate(key);
+      }
+    });
+  });
+}
 
 function renderPositions(data) {
   const panel = document.getElementById('positionsPanel');
@@ -1383,14 +1451,28 @@ function renderPositions(data) {
     return;
   }
 
-  const rows = positions.map(p => {
+  // concPct is attached once here, before sorting, rather than recomputed
+  // per row below: it's not a real field the live feed sends (see the
+  // % of equity column comment further down), so sortPositionRows needs it
+  // sitting on the object the same way every other sortable field already
+  // does, not derived twice and risking the sort key and the rendered value
+  // silently disagreeing.
+  const enriched = positions.map(p => ({ ...p, concPct: positionConcentrationPct(p.marketValue, equity) }));
+  // lastPositionsSnapshot now holds whatever order is actually on screen
+  // (server-default market-value order, or a column sort the user picked),
+  // so Export CSV keeps matching what's rendered, same WYSIWYG-export
+  // convention already proven at CGT/Garage's own sortable tables.
+  const sortedPositions = sortPositionRows(enriched);
+  lastPositionsSnapshot = sortedPositions;
+
+  const rows = sortedPositions.map(p => {
     // Same nullable-number guard as renderAccount's dayChangeIsNumber above:
     // qty/pl come through Number() in server.js, which turns a missing or
     // malformed field into NaN, and `NaN >= 0` is false, so an unresolved
     // value's dash would have been colored red, falsely reading as "losing".
     const plIsNumber = typeof p.unrealizedPl === 'number' && Number.isFinite(p.unrealizedPl);
     const goodClass = plIsNumber ? (p.unrealizedPl >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
-    const concPct = positionConcentrationPct(p.marketValue, equity);
+    const concPct = p.concPct;
     const concHigh = concPct != null && concPct >= POSITION_CONCENTRATION_CAUTION_PCT;
     const concText = concPct != null ? concPct.toFixed(1) + '%' : '-';
     const concTitle = concPct != null
@@ -1438,19 +1520,34 @@ function renderPositions(data) {
     `;
   }
 
+  // Same sortable-column convention already proven on Garage/CGT/CSM/Job
+  // Search's own tables (data-sort + tabindex + aria-sort, click or
+  // Enter/Space to activate, see wirePositionsSortHeaders/
+  // handlePositionsSortActivate above): the one real, non-invented reason
+  // this page needed its own is that its table is inside a section that
+  // swaps to an empty-panel entirely when there are no positions, so the
+  // header markup lives here rather than static in index.html the way a
+  // table that's always present can.
+  const headerCells = POSITIONS_SORT_COLUMNS.map(([key, label]) => {
+    const ariaSort = positionsSortKey === key ? (positionsSortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+    const titleAttr = key === 'concPct'
+      ? ' title="Real position market value as a percentage of real account equity, computed client-side from the two figures this page already has"'
+      : '';
+    return `<th scope="col" class="sortable" data-sort="${key}" tabindex="0" aria-sort="${ariaSort}"${titleAttr}>${label}</th>`;
+  }).join('');
+
   panel.innerHTML = `
     <div class="pos-table-wrap">
       <table class="pos-table">
         <thead>
-          <tr>
-            <th scope="col">Symbol</th><th scope="col">Side</th><th scope="col">Qty</th><th scope="col">Avg entry</th><th scope="col">Current</th><th scope="col">Mkt value</th><th scope="col">Unrealized P&amp;L</th><th scope="col" title="Real position market value as a percentage of real account equity, computed client-side from the two figures this page already has">% of equity</th>
-          </tr>
+          <tr>${headerCells}</tr>
         </thead>
         <tbody>${rows}</tbody>
         ${totalsRow ? `<tfoot>${totalsRow}</tfoot>` : ''}
       </table>
     </div>
   `;
+  wirePositionsSortHeaders(panel);
 }
 
 // system.* has no daemon behind it to report its own freshness the way

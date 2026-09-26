@@ -1019,6 +1019,26 @@ header.page-head .sub {
   border-bottom: 1px solid var(--hairline);
   background: var(--panel);
 }
+/* Same click-to-sort convention already proven on Garage/CGT/CSM/Job
+   Search's own tables: a faint up/down arrow hints a column is sortable,
+   solid once it's the active sort key, direction shown by which arrow. */
+.pos-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+.pos-table th.sortable:hover,
+.pos-table th.sortable:focus-visible {
+  color: var(--ink);
+}
+.pos-table th.sortable:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: -2px; }
+.pos-table th.sortable::after {
+  content: '';
+  margin-left: 5px;
+  opacity: 0.35;
+}
+.pos-table th.sortable[aria-sort="ascending"]::after { content: '\2191'; opacity: 1; color: var(--ink); }
+.pos-table th.sortable[aria-sort="descending"]::after { content: '\2193'; opacity: 1; color: var(--ink); }
 .pos-table td {
   padding: 10px 14px;
   border-bottom: 1px solid var(--hairline);
@@ -1585,6 +1605,7 @@ footer.page-foot {
   .event-tag { border-color: #999; background: none !important; color: #111 !important; }
 
   .pos-table th { color: #333; border-color: #ccc; }
+  .pos-table th.sortable::after { content: none !important; }
   .pos-table td { border-color: #ddd; color: #111; }
   .pos-side-long, .pos-side-short { color: #111 !important; }
 
