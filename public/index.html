@@ -19,6 +19,7 @@
 <script src="/data/dashboard-core.js"></script>
 <script src="/data/graph-core.js"></script>
 <script src="/data/html-core.js"></script>
+<script src="/data/search-core.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -3102,25 +3103,14 @@ function paletteRecordProjectName(clusterId) {
 // against each hub's real restoreStateFromUrl, not guessed): CSM/Garage/CGT
 // all open the exact record by id (?prospect=/?listing=/?card=/
 // ?submission=/?candidate=<id>), Sondrik scrolls to and highlights it
-// (?lead=/?channel=/?release=/?goal=<id>, added after this function was
-// first written, see its own INITIAL_RECORD). Job-search doesn't support any
+// (?lead=/?channel=/?release=/?goal=<id>). Job-search doesn't support any
 // record-level URL state yet, so those just land on the right hub page
 // rather than the wrong modal, still a real fix even without a deep link.
+// The actual type-to-param list lives in data/search-core.js, tested there,
+// after the inline version of this function fell out of sync with Sondrik's
+// own deep-link support once (see that file's own comment).
 function recordHref(r) {
-  const base = '/' + r.hub + '/';
-  const params = new URLSearchParams();
-  if (!r.id) return base;
-  if (r.type === 'prospect') params.set('prospect', r.id);
-  else if (r.type === 'listing') params.set('listing', r.id);
-  else if (r.type === 'card') params.set('card', r.id);
-  else if (r.type === 'submission') params.set('submission', r.id);
-  else if (r.type === 'candidate') params.set('candidate', r.id);
-  else if (r.type === 'lead') params.set('lead', r.id);
-  else if (r.type === 'channel') params.set('channel', r.id);
-  else if (r.type === 'release') params.set('release', r.id);
-  else if (r.type === 'goal') params.set('goal', r.id);
-  const qs = params.toString();
-  return base + (qs ? '?' + qs : '');
+  return SearchCore.recordHref(r);
 }
 
 function renderPaletteResults() {
