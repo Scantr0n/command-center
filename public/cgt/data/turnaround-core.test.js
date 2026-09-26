@@ -13,9 +13,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  isPsaPausedValueTier, publishedTurnaroundDays, businessDaysToCalendarDays,
-  addDaysIso, daysSince, computeTurnaroundDays, buildTurnaroundByGrader,
-  estimatedReturnFor, PSA_VALUE_TIERS_PAUSED
+  isPsaPausedValueTier, isBgsPausedTier, isPausedTier, publishedTurnaroundDays,
+  businessDaysToCalendarDays, addDaysIso, daysSince, computeTurnaroundDays,
+  buildTurnaroundByGrader, estimatedReturnFor, PSA_VALUE_TIERS_PAUSED,
+  BGS_BASE_STANDARD_PAUSED
 } = require('./turnaround-core.js');
 
 test('publishedTurnaroundDays matches an exact tier name before falling back to substring matching', () => {
@@ -58,6 +59,27 @@ test('isPsaPausedValueTier does not flag an open PSA tier or a non-PSA grader', 
   assert.equal(isPsaPausedValueTier('PSA', 'Priority'), false);
   assert.equal(isPsaPausedValueTier('PSA', null), false);
   assert.equal(isPsaPausedValueTier('BGS', 'Value'), false);
+});
+
+test('isBgsPausedTier flags Beckett Base and Standard, both re-paused 2026-09-24', () => {
+  assert.equal(BGS_BASE_STANDARD_PAUSED, true, 'flip this in turnaround-core.js once Beckett reopens Base/Standard, not here');
+  assert.equal(isBgsPausedTier('BGS', 'Base'), true);
+  assert.equal(isBgsPausedTier('BGS', 'Standard'), true);
+});
+
+test('isBgsPausedTier does not flag Beckett Express (still open via the temporary Jotform) or a non-BGS grader', () => {
+  assert.equal(isBgsPausedTier('BGS', 'Express'), false);
+  assert.equal(isBgsPausedTier('BGS', 'Priority'), false);
+  assert.equal(isBgsPausedTier('BGS', null), false);
+  assert.equal(isBgsPausedTier('PSA', 'Standard'), false);
+});
+
+test('isPausedTier flags either grader\'s own paused tiers and nothing else', () => {
+  assert.equal(isPausedTier('PSA', 'Value'), true);
+  assert.equal(isPausedTier('BGS', 'Base'), true);
+  assert.equal(isPausedTier('PSA', 'Priority'), false);
+  assert.equal(isPausedTier('BGS', 'Express'), false);
+  assert.equal(isPausedTier('SGC', 'Standard'), false);
 });
 
 test('businessDaysToCalendarDays applies the documented 1.4x weekend factor', () => {

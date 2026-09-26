@@ -268,7 +268,7 @@ function shippingCarrierLinks(trackingNumber) {
 // Pulled into bare identifiers here so every existing call site below keeps
 // working unchanged.
 const {
-  isPsaPausedValueTier, addDaysIso, daysSince,
+  isPsaPausedValueTier, isBgsPausedTier, isPausedTier, addDaysIso, daysSince,
   computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor
 } = window.CGTTurnaroundCore;
 
@@ -282,13 +282,13 @@ const PRICE_STALE_AFTER_DAYS = 180;
 // not data-file driven, so nothing else in the app notices when it goes
 // stale -- the SGC $15->$50/card hike and the BGS-vs-SGC turnaround mixup
 // (see the 42b8f58/e0ab607 fixes) both shipped as silent inaccuracies until
-// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-25"
+// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-26"
 // claim already made in that section's callout prose; keep the two in sync by
 // hand whenever the table is re-verified. 30 days, not the 180 used for card
 // prices above: grading-company fee/tier changes have moved multiple times
 // within weeks of each other this year, so this table goes stale far faster
 // than a book value does.
-const GRADING_REFERENCE_REVIEWED_ON = '2026-09-25';
+const GRADING_REFERENCE_REVIEWED_ON = '2026-09-26';
 const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 
 // Same freshness-badge pattern as GRADING_REFERENCE_REVIEWED_ON just above,
@@ -1497,7 +1497,7 @@ function renderCandidates() {
     // actual submission (no decision yet, or already decided "submit"); a
     // candidate already decided hold/sell-raw/pass was never going to hit
     // PSA's Value-tier pause since it isn't going to be submitted at all.
-    const targetsPausedTier = (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel);
+    const targetsPausedTier = (c.decision == null || c.decision === 'submit') && isPausedTier(c.targetGradingCompany, c.targetServiceLevel);
     const stale = !isExampleCandidate(c) && isCandidateStale(c);
     const metaParts = [
       c.sport,
@@ -1521,7 +1521,7 @@ function renderCandidates() {
         <span class="submission-days font-mono${math && math.expectedGain < 0 ? ' submission-days-late' : ''}">${escapeHtml(gainText)}</span>
         <span class="badge ${meta.cls}">${escapeHtml(meta.label)}</span>
         ${decisionLabel ? `<span class="badge badge-decided">${escapeHtml(decisionLabel)}</span>` : ''}
-        ${targetsPausedTier ? `<span class="badge badge-paused" title="PSA ${escapeHtml(c.targetServiceLevel)} is currently paused to new submissions">tier paused</span>` : ''}
+        ${targetsPausedTier ? `<span class="badge badge-paused" title="${escapeHtml(c.targetGradingCompany)} ${escapeHtml(c.targetServiceLevel)} is currently paused to new submissions">tier paused</span>` : ''}
         ${stale ? `<span class="badge badge-stale" title="Priced more than 180 days ago, worth a re-check">stale</span>` : ''}
         <span class="submission-who">${escapeHtml(c.cardName || 'Untitled candidate')}${isExampleCandidate(c) ? ' <span class="badge badge-example">example</span>' : ''}</span>
         <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
@@ -1570,6 +1570,11 @@ function openCandidateModal(id) {
     body += `<div class="field-row">
       <span class="badge badge-paused">tier paused</span>
       <div class="field-note">PSA ${escapeHtml(c.targetServiceLevel)} has been closed to new submissions since 2026-06-02, tied to PSA's own public backlog tracker falling to 5 million cards. See the Grading service tiers reference below for the full writeup, or check <a href="https://www.psacard.com/info/backlog-tracker" target="_blank" rel="noopener noreferrer">psacard.com/info/backlog-tracker</a> directly before deciding to submit here.</div>
+    </div>`;
+  } else if ((c.decision == null || c.decision === 'submit') && isBgsPausedTier(c.targetGradingCompany, c.targetServiceLevel)) {
+    body += `<div class="field-row">
+      <span class="badge badge-paused">tier paused</span>
+      <div class="field-note">Beckett (BGS) ${escapeHtml(c.targetServiceLevel)} was re-paused to new submissions on 2026-09-24 (a waitlist, not the temporary Jotform), after reopening on 2026-09-15 from its original 2026-08-08 pause. Express is unaffected. See the Grading service tiers reference below for the full writeup and sources before deciding to submit here.</div>
     </div>`;
   }
   body += field('Year', c.year != null ? String(c.year) : null, c.year == null);
@@ -2160,11 +2165,12 @@ function renderAttentionBar() {
   // Same targetsPausedTier test as renderCandidates' own badge below: a
   // candidate still heading toward an actual submission (no decision, or
   // already decided "submit") whose target is one of PSA's four paused
-  // Value tiers. Worth a top-of-page flag since deciding "worth grading"
-  // on stale turnaround math for a tier that will not even accept the
-  // submission right now is a real, avoidable mistake, not just a data gap.
+  // Value tiers or Beckett's currently re-paused Base/Standard. Worth a
+  // top-of-page flag since deciding "worth grading" on stale turnaround
+  // math for a tier that will not even accept the submission right now is
+  // a real, avoidable mistake, not just a data gap.
   const pausedTierCandidatesCount = candidates
-    .filter(c => !isExampleCandidate(c) && (c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel))
+    .filter(c => !isExampleCandidate(c) && (c.decision == null || c.decision === 'submit') && isPausedTier(c.targetGradingCompany, c.targetServiceLevel))
     .length;
   // Same isCandidateStale rule as the "stale" badge on each candidate row
   // below, counted here so a re-check-worthy candidate shows up in the same
@@ -2238,8 +2244,8 @@ function renderAttentionBar() {
       tone: 'warn',
       target: 'candidatesSection',
       label: pausedTierCandidatesCount === 1
-        ? 'candidate targets a PSA Value tier currently paused to new submissions'
-        : 'candidates target a PSA Value tier currently paused to new submissions'
+        ? 'candidate targets a grading tier currently paused to new submissions'
+        : 'candidates target a grading tier currently paused to new submissions'
     });
   }
   if (staleCandidatesCount) {

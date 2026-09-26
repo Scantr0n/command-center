@@ -80,6 +80,31 @@
     return PSA_PAUSED_VALUE_TIER_NAMES.some(tierName => norm === tierName || norm.includes(tierName) || tierName.includes(norm));
   }
 
+  // Beckett (BGS) paused Base and Standard again on 2026-09-24 (a waitlist,
+  // not the temporary Jotform workaround) after reopening them on schedule
+  // on 2026-09-15 from their original 2026-08-08 six-week pause -- see the
+  // "Grading service tiers reference" section (index.html) for the full
+  // writeup and sources. Express is unaffected, still open through Beckett's
+  // temporary Jotform while beckett.com itself stays down for infrastructure
+  // work. Flip BGS_BASE_STANDARD_PAUSED to false once Beckett's own grading
+  // page (beckett.com/grading, when it's back) shows Base/Standard reopened
+  // -- do not leave this true past that date, same reasoning as PSA's flag
+  // above.
+  const BGS_BASE_STANDARD_PAUSED = true;
+  const BGS_PAUSED_TIER_NAMES = ['base', 'standard'];
+  function isBgsPausedTier(gradingCompany, serviceLevel) {
+    if (!BGS_BASE_STANDARD_PAUSED || gradingCompany !== 'BGS' || !serviceLevel) return false;
+    const norm = serviceLevel.toLowerCase().trim();
+    return BGS_PAUSED_TIER_NAMES.some(tierName => norm === tierName || norm.includes(tierName) || tierName.includes(norm));
+  }
+
+  // Either grader's currently-paused tiers, the one check app.js's paused-
+  // tier badge/count actually needs -- callers that care which company it
+  // was still have isPsaPausedValueTier/isBgsPausedTier directly above.
+  function isPausedTier(gradingCompany, serviceLevel) {
+    return isPsaPausedValueTier(gradingCompany, serviceLevel) || isBgsPausedTier(gradingCompany, serviceLevel);
+  }
+
   function publishedTurnaroundDays(gradingCompany, serviceLevel) {
     const entry = gradingCompany && PUBLISHED_TURNAROUND_DAYS[gradingCompany];
     if (!entry) return null;
@@ -205,7 +230,8 @@
 
   return {
     PUBLISHED_TURNAROUND_DAYS, PSA_VALUE_TIERS_PAUSED, PSA_PAUSED_VALUE_TIER_NAMES,
-    isPsaPausedValueTier, publishedTurnaroundDays, businessDaysToCalendarDays,
+    isPsaPausedValueTier, BGS_BASE_STANDARD_PAUSED, BGS_PAUSED_TIER_NAMES,
+    isBgsPausedTier, isPausedTier, publishedTurnaroundDays, businessDaysToCalendarDays,
     addDaysIso, daysSince, computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor
   };
 });
