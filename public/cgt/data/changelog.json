@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-26T08:40:30.828Z",
+  "generatedAt": "2026-09-26T17:49:49.496Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "f9e8d33",
+      "fullHash": "f9e8d337a56892eb6a7a8731f285097e06d20f28",
+      "date": "2026-09-26",
+      "author": "Claude",
+      "subject": "CGT: link a card back to the grading submission it came from",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
     {
       "hash": "b3be334",
       "fullHash": "b3be3346876e18f1c1a4d6313ef7b6d9953d8dfa",
