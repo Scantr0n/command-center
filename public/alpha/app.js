@@ -513,6 +513,42 @@ function recordClientSizingModeObservation(connected, mode) {
   return next;
 }
 
+// live.debatePanel.active has the same gap every other live.* field had
+// before its own client-side record above: the moment this real, named
+// architecture feature (see Architecture below) actually goes from pending
+// to active for good is a one-time milestone worth remembering, but Alpha's
+// live feed only ever sends the current true/false, never when it flipped.
+// Unlike regime/sizing-mode above this isn't a repeating history (a daemon's
+// debate panel doesn't flip back to pending once its API key exists), so a
+// single first-observed timestamp is the honest, proportionate record here,
+// not a growing list. Never backdated: if this browser wasn't open the
+// moment it actually happened, the real transition predates what gets
+// recorded, which is why every place this renders says "first observed by
+// this browser", not "activated at".
+const CLIENT_DEBATE_ACTIVATED_KEY = 'alpha:clientDebateActivatedAt';
+
+function loadClientDebateActivatedAt() {
+  try {
+    return localStorage.getItem(CLIENT_DEBATE_ACTIVATED_KEY) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function recordClientDebateActivation(connected, active) {
+  const existing = loadClientDebateActivatedAt();
+  if (existing || !connected || !active) return existing;
+  const now = new Date().toISOString();
+  try {
+    localStorage.setItem(CLIENT_DEBATE_ACTIVATED_KEY, now);
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // other client-side records above, the "first observed" note just never
+    // appears.
+  }
+  return now;
+}
+
 // computeRegimeSegments and regimeSegmentEndMs now live in regime-core.js
 // (see AlphaRegimeCore above), so this segmenting math can be unit-tested
 // outside the browser instead of only ever running live against whatever
@@ -1015,17 +1051,17 @@ function renderDailyUptime(data, clientHistory) {
   }
 }
 
-function statTile(value, label, sub, awaiting) {
+function statTile(value, label, sub, awaiting, subTitle) {
   return `
     <div class="stat-tile">
       <div class="stat-tile-value${awaiting ? ' awaiting' : ''}">${value}</div>
       <div class="stat-tile-label">${escapeHtml(label)}</div>
-      ${sub ? `<div class="stat-tile-sub">${escapeHtml(sub)}</div>` : ''}
+      ${sub ? `<div class="stat-tile-sub"${subTitle ? ` title="${escapeHtml(subTitle)}"` : ''}>${escapeHtml(sub)}</div>` : ''}
     </div>
   `;
 }
 
-function renderStats(data) {
+function renderStats(data, clientDebateActivatedAt) {
   const sys = data.system;
   const live = data.live;
   const awaiting = '<span class="font-mono">awaiting connection</span>';
@@ -1059,8 +1095,13 @@ function renderStats(data) {
     // per validate.js's own guards, and debatePanel was the one exception
     // that assumed it would always be present, which would throw the moment
     // it wasn't.
-    debateActive ? null : 'Blocked on: ' + ((live.debatePanel && live.debatePanel.blockedOn) || 'unknown'),
-    !debateActive
+    debateActive
+      ? (clientDebateActivatedAt ? 'First seen active ' + (timeAgo(clientDebateActivatedAt) || formatAbsolute(clientDebateActivatedAt)) : null)
+      : 'Blocked on: ' + ((live.debatePanel && live.debatePanel.blockedOn) || 'unknown'),
+    !debateActive,
+    debateActive && clientDebateActivatedAt
+      ? 'Recorded by this browser the first time it observed the debate panel active; the real switch to active may have happened earlier if this tab wasn\'t open yet.'
+      : undefined
   ));
 
   // Distinct from the everyday "awaiting connection" gray: a real stuckCount
@@ -1788,7 +1829,7 @@ function diagnosticRow(label, status, badgeText, detail) {
   return `<tr><th scope="row">${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
 }
 
-function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount, sizingModeObservationCount) {
+function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount, sizingModeObservationCount, debateActivationRecorded) {
   const body = document.getElementById('browserDiagnosticsBody');
   if (!body) return;
 
@@ -1819,7 +1860,11 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latenc
     diagnosticRow('Drawdown/robustness trend samples recorded', storageOk ? 'ok' : 'blocked', String((drawdownSampleCount || 0) + (robustnessSampleCount || 0)),
       'Real position-sizing meter readings this browser has actually polled (see the sparklines under Position sizing above).'),
     diagnosticRow('Sizing mode changes recorded', storageOk ? 'ok' : 'blocked', String(sizingModeObservationCount || 0),
-      'Real drawdown-based/robustness-based sizing mode transitions this browser has actually observed (see Sizing mode history under Position sizing above).')
+      'Real drawdown-based/robustness-based sizing mode transitions this browser has actually observed (see Sizing mode history under Position sizing above).'),
+    diagnosticRow('Debate panel activation recorded', storageOk ? 'ok' : 'blocked', debateActivationRecorded ? 'YES' : 'NOT YET',
+      debateActivationRecorded
+        ? 'This browser has observed the debate panel go active at least once (see Summary above).'
+        : 'The debate panel has not been observed active by this browser yet.')
   ];
   body.innerHTML = rows.join('');
 }
@@ -2088,6 +2133,7 @@ async function loadStatus() {
     const clientDrawdownHistory = recordClientMeterReading(CLIENT_DRAWDOWN_HISTORY_KEY, connectedNow, livePs && livePs.currentDrawdownPct);
     const clientRobustnessHistory = recordClientMeterReading(CLIENT_ROBUSTNESS_HISTORY_KEY, connectedNow, livePs && livePs.robustnessScore);
     const clientSizingModeHistory = recordClientSizingModeObservation(connectedNow, livePs && livePs.activeMode);
+    const clientDebateActivatedAt = recordClientDebateActivation(connectedNow, data.live && data.live.debatePanel && data.live.debatePanel.active);
     // Only the three sections built from the cached fields (stats,
     // position sizing, genealogy) read effectiveData; connection, account
     // and positions always read the real `data` so those never show a
@@ -2126,7 +2172,7 @@ async function loadStatus() {
       ? 'critical'
       : (headline.level === 'caution' && connCls === 'live' ? 'anomaly' : connCls);
     updateGlanceIndicators(glanceCls);
-    renderStats(effectiveData);
+    renderStats(effectiveData, clientDebateActivatedAt);
     renderAccount(data);
     renderPositions(data);
     renderPositionSizing(effectiveData, clientDrawdownHistory, clientRobustnessHistory);
@@ -2134,7 +2180,7 @@ async function loadStatus() {
     renderArchitecture(data);
     renderGenealogy(effectiveData);
     renderEventLog(data);
-    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length, clientDrawdownHistory.length, clientRobustnessHistory.length, clientSizingModeHistory.length);
+    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length, clientDrawdownHistory.length, clientRobustnessHistory.length, clientSizingModeHistory.length, !!clientDebateActivatedAt);
   } catch (e) {
     if (requestId !== latestStatusRequestId) return;
     // Distinct from "down" (Alpha has no live feed yet, an expected,
@@ -2166,7 +2212,8 @@ window.addEventListener('storage', (e) => {
   if (!lastRawData || !e.key) return;
   if (![
     CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY,
-    CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY, CLIENT_SIZING_MODE_HISTORY_KEY
+    CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY, CLIENT_SIZING_MODE_HISTORY_KEY,
+    CLIENT_DEBATE_ACTIVATED_KEY
   ].includes(e.key)) return;
   const connHistory = loadClientConnHistory();
   const latencyHistory = loadClientLatencyHistory();
@@ -2174,6 +2221,7 @@ window.addEventListener('storage', (e) => {
   const drawdownHistory = loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY);
   const robustnessHistory = loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY);
   const sizingModeHistory = loadClientSizingModeHistory();
+  const debateActivatedAt = loadClientDebateActivatedAt();
   renderConnection(lastRawData, connHistory, latencyHistory);
   renderConnectionHistory(lastRawData, connHistory);
   renderDailyUptime(lastRawData, connHistory);
@@ -2192,9 +2240,10 @@ window.addEventListener('storage', (e) => {
   // connection" just because a sibling tab wrote a history entry.
   if (lastStatusData) {
     renderPositionSizing(lastStatusData, drawdownHistory, robustnessHistory);
+    renderStats(lastStatusData, debateActivatedAt);
   }
   renderSizingModeHistory(sizingModeHistory, regimeFrozenAsOf);
-  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length, sizingModeHistory.length);
+  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length, sizingModeHistory.length, !!debateActivatedAt);
 });
 
 // Status-page UX guidance is consistent that a manual refresh action should
@@ -2244,7 +2293,12 @@ function buildStatusSummary(data) {
     '- Current drawdown: ' + (typeof ps.currentDrawdownPct === 'number' ? ps.currentDrawdownPct + '%' : awaiting),
     '- Max drawdown (peak to trough): ' + (typeof ps.maxDrawdownPct === 'number' ? ps.maxDrawdownPct + '%' : awaiting),
     '- Robustness score: ' + (typeof ps.robustnessScore === 'number' ? ps.robustnessScore + '/100' : awaiting),
-    '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active) ? 'Active' : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
+    '- Debate panel: ' + ((live.debatePanel && live.debatePanel.active)
+      ? 'Active' + (() => {
+          const at = loadClientDebateActivatedAt();
+          return at ? ' (first seen active ' + (timeAgo(at) || formatAbsolute(at)) + ')' : '';
+        })()
+      : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
     '- Active anomalies: ' + ((live.anomalies && live.anomalies.stuckCount != null) ? String(live.anomalies.stuckCount) : awaiting),
     '- Genealogy: ' + (() => {
       const g = live.genealogy || {};
@@ -2316,7 +2370,8 @@ backupBtn.addEventListener('click', () => {
     clientRegimeHistory: loadClientRegimeHistory(),
     clientDrawdownHistory: loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY),
     clientRobustnessHistory: loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY),
-    clientSizingModeHistory: loadClientSizingModeHistory()
+    clientSizingModeHistory: loadClientSizingModeHistory(),
+    clientDebateActivatedAt: loadClientDebateActivatedAt()
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
