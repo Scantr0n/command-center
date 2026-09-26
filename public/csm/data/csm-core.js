@@ -540,6 +540,22 @@
     return (p.stage === 'outreach-sent' || p.stage === 'silent-replied') && !hasNudgePlan(p);
   }
 
+  // The opposite real gap from missingFollowUpPlan above: a nextNudgeDate is
+  // still queued, but the most recently dated real touch in outreachLog is
+  // already a "reply", so that queued cold nudge almost certainly predates
+  // the reply and is stale, not a real intention to nudge someone who has
+  // already written back. Deliberately only fires when the reply is the
+  // single most recent dated entry (not just "a reply exists somewhere in
+  // the log"), so a real second cold patch after a reply went nowhere and
+  // more outbound touches followed isn't wrongly flagged as stale.
+  function hasStaleNudgePlanAfterReply(p) {
+    if (!p.nextNudgeDate || !isValidDateStr(p.nextNudgeDate)) return false;
+    const log = (p.outreachLog || []).filter(e => e && isValidDateStr(e.date));
+    if (log.length === 0) return false;
+    const latest = log.reduce((max, e) => (e.date > max.date ? e : max), log[0]);
+    return latest.type === 'reply';
+  }
+
   // Every real free-text field on this board is written without em dashes
   // (this project's own convention), so a hand-typed or pasted-in field that
   // has one reads as coming from somewhere else rather than Jack's own
@@ -592,6 +608,9 @@
         }
         if (missingFollowUpPlan(p)) {
           reasons.push('NO FOLLOW-UP SCHEDULED, ALREADY CONTACTED WITH NOTHING PLANNED NEXT');
+        }
+        if (hasStaleNudgePlanAfterReply(p)) {
+          reasons.push('NEXT NUDGE DATE STILL SET BUT THE MOST RECENT LOGGED TOUCH IS A REPLY, RECONSIDER BEFORE COLD-NUDGING SOMEONE WHO ALREADY WROTE BACK');
         }
         const snapStale = socialSnapshotsStaleInfo(p);
         if (snapStale) reasons.push(snapStale.days + 'D OLD ' + (snapStale.platform ? String(snapStale.platform).toUpperCase() + ' ' : '') + 'SNAPSHOT, DUE FOR REFRESH');
@@ -864,6 +883,7 @@
     outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
+    hasStaleNudgePlanAfterReply,
     emDashFields, emDashHits
   };
 });

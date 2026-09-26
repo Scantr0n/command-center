@@ -26,6 +26,7 @@ const {
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
+  hasStaleNudgePlanAfterReply,
   emDashFields, emDashHits
 } = require('./csm-core.js');
 
@@ -1274,6 +1275,29 @@ test('missingFollowUpPlan only fires once contacted with nothing scheduled, and 
   assert.equal(missingFollowUpPlan({ stage: 'outreach-sent' }), true);
   assert.equal(missingFollowUpPlan({ stage: 'silent-replied' }), true);
   assert.equal(missingFollowUpPlan({ stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), 3) }), false);
+});
+
+test('hasStaleNudgePlanAfterReply is false with no nextNudgeDate, no outreachLog, or the reply not being the latest touch', () => {
+  assert.equal(hasStaleNudgePlanAfterReply({}), false);
+  assert.equal(hasStaleNudgePlanAfterReply({ nextNudgeDate: '2026-10-01' }), false);
+  assert.equal(hasStaleNudgePlanAfterReply({
+    nextNudgeDate: '2026-10-01',
+    outreachLog: [{ date: '2026-09-01', type: 'reply' }, { date: '2026-09-08', type: 'nudge' }]
+  }), false);
+});
+
+test('hasStaleNudgePlanAfterReply fires once a queued nextNudgeDate is set but the most recent real touch is a reply', () => {
+  assert.equal(hasStaleNudgePlanAfterReply({
+    nextNudgeDate: '2026-10-01',
+    outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-08', type: 'reply' }]
+  }), true);
+});
+
+test('hasStaleNudgePlanAfterReply ignores an invalid nextNudgeDate rather than throwing', () => {
+  assert.equal(hasStaleNudgePlanAfterReply({
+    nextNudgeDate: '2026-13-40',
+    outreachLog: [{ date: '2026-09-08', type: 'reply' }]
+  }), false);
 });
 
 test('computeDataQualityFlags filters out every prospect with nothing wrong', () => {
