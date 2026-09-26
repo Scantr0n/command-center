@@ -1538,11 +1538,24 @@ function lineageCard(l) {
   `;
 }
 
+// Same real-rows-on-screen export pattern as Positions/Activity log/Regime
+// history/Sizing mode history above: the Genealogy wall was the one list-
+// shaped section on this page with no CSV button, purely because the wall
+// itself was built after those. Captured here so the button can export
+// exactly the real lineages just rendered, never a second read of data.live.
+let lastLineagesSnapshot = [];
+
 function renderGenealogy(data) {
   const g = data.live.genealogy;
   const panel = document.getElementById('genealogyPanel');
   const lineages = (g && Array.isArray(g.lineages)) ? g.lineages : [];
   const hasAggregate = g && (g.generation != null || g.lastBreedingEventAt != null);
+  lastLineagesSnapshot = lineages;
+  const csvBtn = document.getElementById('genealogyCsvBtn');
+  if (csvBtn) {
+    csvBtn.disabled = !lineages.length;
+    csvBtn.title = lineages.length ? '' : 'No lineage data to export yet.';
+  }
   if (!hasAggregate && !lineages.length) return; // keep the built-in "awaiting live connection" empty state
 
   panel.classList.remove('empty-panel');
@@ -2591,6 +2604,30 @@ document.getElementById('sizingModeHistoryCsvBtn').addEventListener('click', () 
   const a = document.createElement('a');
   a.href = url;
   a.download = 'alpha-sizing-mode-history-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const GENEALOGY_CSV_COLUMNS = [
+  ['id', 'Lineage ID'], ['label', 'Label'], ['generation', 'Generation'], ['agentCount', 'Agent count'],
+  ['status', 'Status'], ['lastEventAt', 'Last event at'], ['lastEventNote', 'Last event note']
+];
+
+// Same real-rows-on-screen export as every other CSV button on this page:
+// exactly the real lineages just rendered in the wall (lastLineagesSnapshot,
+// captured in renderGenealogy), never a second read of data.live.genealogy.
+document.getElementById('genealogyCsvBtn').addEventListener('click', () => {
+  if (!lastLineagesSnapshot.length) return;
+  const header = GENEALOGY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = lastLineagesSnapshot.map(l => GENEALOGY_CSV_COLUMNS.map(([key]) => csvField(l[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-genealogy-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
