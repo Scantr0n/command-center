@@ -863,7 +863,12 @@ const SEARCH_SOURCES = [
     // cards do I have" or "find my hockey cards" is a real, plausible search
     // too, and both are short structured fields already on every real card,
     // not free text that would return noisy partial matches.
-    fields: c => [c.cardName, c.sport, c.gradingCompany]
+    fields: c => [c.cardName, c.sport, c.gradingCompany],
+    // Same seeded-placeholder row submissions.json's own entry below already
+    // excludes (see isExample in app.js): without this, typing a common
+    // placeholder term could surface "(example row, not real data)" as if it
+    // were a real card.
+    exclude: c => c.id === 'example-row-not-real'
   },
   {
     hub: 'csm', clusterId: 'csm', file: 'prospects.json', key: 'prospects', type: 'prospect',
@@ -917,7 +922,10 @@ const SEARCH_SOURCES = [
   {
     hub: 'cgt', clusterId: 'card-grading', file: 'candidates.json', key: 'candidates', type: 'candidate',
     label: c => c.cardName, detail: c => c.sport || '',
-    fields: c => [c.cardName, c.sport, c.targetGradingCompany]
+    fields: c => [c.cardName, c.sport, c.targetGradingCompany],
+    // Same seeded-placeholder row (see isExampleCandidate in app.js), same
+    // reason as cards.json's own entry above.
+    exclude: c => c.id === 'example-candidate-not-real'
   },
   {
     hub: 'garage', clusterId: 'garage', file: 'sales.json', key: 'sales', type: 'sale',
