@@ -338,6 +338,18 @@ section { margin-bottom: 36px; }
   color: var(--ink);
   line-height: 1.1;
 }
+/* A text state like "not tracked yet" standing in for a number, same
+   dim/italic "not logged yet" convention as .cell-value.empty and
+   .field-value.empty elsewhere, sized to actually fit a 150px tile
+   instead of wrapping across 3 lines at the number styling's 1.6rem/800. */
+.stat-tile-value-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--dim);
+  line-height: 1.4;
+}
 .stat-tile-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.65rem;

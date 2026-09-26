@@ -969,13 +969,24 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions) 
     { value: acquisitions.length, label: 'Sourcing trips logged', sub: acquisitions.length ? formatUsd(totalSourcingSpend) + ' real total spent' : 'None yet' }
   ];
 
-  document.getElementById('statRow').innerHTML = tiles.map(t => `
+  document.getElementById('statRow').innerHTML = tiles.map(t => {
+    // A count or formatUsd() amount is always a single token (no spaces),
+    // so a value with a space in it is a text state like "not tracked yet"
+    // standing in for a number, never a number itself. The 1.6rem/800-weight
+    // display styling that a real number wants wraps a phrase like that onto
+    // 3 cramped lines in the narrowest grid tiles, real bug on the Realized
+    // profit / Net business income tiles before any sale has cost logged;
+    // this renders it as a smaller slanted note instead, same "not logged
+    // yet" convention as .cell-value.empty/.field-value.empty elsewhere.
+    const isTextState = typeof t.value === 'string' && t.value.includes(' ');
+    return `
     <div class="stat-tile${t.warn ? ' stat-tile-warn' : ''}">
-      <div class="stat-tile-value font-display">${escapeHtml(String(t.value))}</div>
+      <div class="stat-tile-value${isTextState ? ' stat-tile-value-text' : ' font-display'}">${escapeHtml(String(t.value))}</div>
       <div class="stat-tile-label">${escapeHtml(t.label)}</div>
       ${t.sub ? `<div class="stat-tile-sub">${escapeHtml(t.sub)}</div>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderPipeline(stages) {
