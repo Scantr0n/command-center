@@ -734,7 +734,10 @@
 
     <div id="noResultsMsg" class="hidden items-center justify-between gap-3 rounded-lg px-4 py-3 border hairline mb-4 text-sm" style="background: rgba(255,255,255,0.02); color: var(--sub)">
       <span id="noResultsText"></span>
-      <button type="button" id="clearFiltersBtn" class="text-xs font-mono px-3 py-1.5 rounded border hairline flex-shrink-0" style="color: var(--ink)">Clear filters</button>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button type="button" id="noResultsSearchAllBtn" class="hidden text-xs font-mono px-3 py-1.5 rounded border hairline" style="color: var(--ink)">Search everything</button>
+        <button type="button" id="clearFiltersBtn" class="text-xs font-mono px-3 py-1.5 rounded border hairline" style="color: var(--ink)">Clear filters</button>
+      </div>
     </div>
 
     <div id="graphView" style="position: relative;">
@@ -2464,6 +2467,15 @@ function applyFilters() {
     document.getElementById('noResultsText').textContent =
       `No projects match${activeCategory ? ` in ${activeCategory}` : ''}${term ? ` for "${term}"` : ''}.`;
   }
+  // This box only ever searches project names/summaries, unlike Jump to
+  // (Cmd/Ctrl+K) which also searches real records (cards, prospects,
+  // listings, leads, applications). Zero project matches for a typed term
+  // is exactly when a person is most likely typing something that real
+  // record search would actually find, so surface the way there rather
+  // than leaving them stuck on "no projects match".
+  const searchAllBtn = document.getElementById('noResultsSearchAllBtn');
+  searchAllBtn.classList.toggle('hidden', !(showNoResults && term));
+  searchAllBtn.dataset.term = term;
   syncFilterUrl();
 }
 
@@ -2475,6 +2487,9 @@ function clearAllFilters() {
   renderCategoryFilter();
 }
 document.getElementById('clearFiltersBtn').addEventListener('click', clearAllFilters);
+document.getElementById('noResultsSearchAllBtn').addEventListener('click', (e) => {
+  openPalette(e.target.dataset.term || '');
+});
 
 const searchInputEl = document.getElementById('searchInput');
 searchInputEl.addEventListener('input', (e) => {
@@ -3213,12 +3228,13 @@ function activatePaletteItem(index) {
   location.href = recordHref(item.r);
 }
 
-function openPalette() {
+function openPalette(prefill) {
   if (paletteOpen) return;
   paletteOpen = true;
   paletteSelectedIndex = 0;
   paletteLastFocusedEl = document.activeElement;
-  document.getElementById('paletteInput').value = '';
+  const paletteInput = document.getElementById('paletteInput');
+  paletteInput.value = prefill || '';
   paletteRecordResults = [];
   paletteRecordSearchPending = false;
   clearTimeout(paletteRecordDebounceTimer);
@@ -3226,7 +3242,11 @@ function openPalette() {
   document.getElementById('paletteOverlay').classList.add('flex');
   lockBodyScroll();
   renderPaletteResults();
-  document.getElementById('paletteInput').focus();
+  paletteInput.focus();
+  // Carries the term straight over instead of opening to a blank box: same
+  // input event the box's own listener already handles, so the debounced
+  // record-result fetch fires exactly like a person had typed it themselves.
+  if (prefill) paletteInput.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function closePalette() {
