@@ -1806,6 +1806,22 @@ function truncateLabel(name, max = 16) {
   return name.length > max ? name.slice(0, max - 1) + '…' : name;
 }
 
+// The graph's #graphSvg root is a fixed 900x900 viewBox with no overflow
+// override, so it clips at the edge like any other SVG. The hover-only full
+// name label and the spoke time badge below both center themselves on the
+// node/spoke position with no such clamp, so a node sitting near the low-
+// priority orbit's east/west extreme (nx up to ~795, see priorityOrbit in
+// graph-core.js) combined with a long enough real project name could push
+// the label's right edge past x=900 and silently clip mid-word on hover, no
+// visible sign anything's wrong. Not hit by any real project name today
+// (longest is 26 chars), but nothing stopped it from happening the moment a
+// longer one gets added. Shifts the label box itself, not the node, so the
+// rare clamped case reads as "label nudged to stay on screen" rather than
+// losing characters.
+function clampLabelCenterX(centerX, width, margin = 8) {
+  return Math.max(margin + width / 2, Math.min(900 - margin - width / 2, centerX));
+}
+
 // The flat 9-char cap this replaced truncated every node's label the same
 // regardless of its real on-screen size (top-priority nodes render at
 // r=34, low-priority at r=22, a real ~55% diameter difference the old
@@ -2115,9 +2131,9 @@ function renderGraph() {
     const badgeText = shortRelativeTime(c.lastUpdate);
     let badgeHtml = '';
     if (badgeText) {
-      const bx = hx + (nx - hx) * 0.42;
       const by = hy + (ny - hy) * 0.42;
       const bw = 10 + badgeText.length * 4.6;
+      const bx = clampLabelCenterX(hx + (nx - hx) * 0.42, bw);
       badgeHtml = `
         <g class="spoke-badge">
           <rect x="${(bx - bw / 2).toFixed(1)}" y="${(by - 7).toFixed(1)}" width="${bw.toFixed(1)}" height="14" rx="4" fill="var(--void)" stroke="var(--hairlineHover)" stroke-width="1" />
@@ -2144,11 +2160,12 @@ function renderGraph() {
     // actual problem this exists to fix).
     const fullLabelText = c.name;
     const flw = 12 + fullLabelText.length * 4.9;
+    const flx = clampLabelCenterX(nx, flw);
     const fly = ny + r + 16;
     const fullLabelHtml = `
       <g class="node-full-label">
-        <rect x="${(nx - flw / 2).toFixed(1)}" y="${(fly - 8).toFixed(1)}" width="${flw.toFixed(1)}" height="16" rx="4" fill="var(--void)" stroke="var(--hairlineHover)" stroke-width="1" />
-        <text x="${nx.toFixed(1)}" y="${(fly + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="var(--ink)" font-weight="500">${escapeHtml(fullLabelText)}</text>
+        <rect x="${(flx - flw / 2).toFixed(1)}" y="${(fly - 8).toFixed(1)}" width="${flw.toFixed(1)}" height="16" rx="4" fill="var(--void)" stroke="var(--hairlineHover)" stroke-width="1" />
+        <text x="${flx.toFixed(1)}" y="${(fly + 3.5).toFixed(1)}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="var(--ink)" font-weight="500">${escapeHtml(fullLabelText)}</text>
       </g>
     `;
 
