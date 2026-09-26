@@ -1223,13 +1223,39 @@ footer.page-foot {
 }
 .photo-audit-card:hover, .photo-audit-card:focus-visible { border-color: var(--hairlineHover); }
 .photo-audit-card.photo-audit-flagged { border-color: rgba(224,160,48,0.4); }
-.photo-audit-card img {
-  display: block;
-  width: 100%;
+.photo-audit-card-media {
+  position: relative;
   aspect-ratio: 1 / 1;
-  object-fit: cover;
+  overflow: hidden;
   background: var(--panelLight);
 }
+.photo-audit-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* The box a platform's cover-photo crop actually keeps, positioned by
+   applyCropOverlay() in app.js from crop-core.js's computeCropOverlay math.
+   The oversized box-shadow dims everything outside it without needing a
+   second element, clipped to the media box's own overflow: hidden. */
+.photo-audit-crop-overlay {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 999px rgba(10,10,14,0.62);
+}
+.photo-audit-crop-overlay.active { display: block; }
+.photo-audit-crop-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 10px;
+}
+.photo-audit-crop-select { width: auto; }
+.photo-audit-crop-hint { flex-basis: 100%; font-size: 0.74rem; line-height: 1.4; }
 .photo-audit-meta {
   padding: 8px 10px;
   display: flex;

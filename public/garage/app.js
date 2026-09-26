@@ -4395,11 +4395,26 @@ function wireChecklist() {
 // tall (the automated sideways/landscape check), plus a thumbnail grid so
 // the actual visual review pass that caught the Haggar pants bug can be
 // re-run on the next batch.
+// Which platform's cover-photo crop the grid is currently previewing,
+// shared with applyCropOverlay/swapPhotoAuditCard below. 'none' means show
+// each photo's full frame with no overlay.
+let photoAuditCropPlatform = 'none';
+
 function initPhotoAudit() {
   const input = document.getElementById('photoAuditInput');
   const grid = document.getElementById('photoAuditGrid');
   const summary = document.getElementById('photoAuditSummary');
+  const cropSelect = document.getElementById('photoAuditCropSelect');
   if (!input) return;
+
+  if (cropSelect) {
+    cropSelect.addEventListener('change', () => {
+      photoAuditCropPlatform = cropSelect.value;
+      // Every already-decoded photo just needs its overlay box recomputed,
+      // not a full re-render, the natural dimensions are already known.
+      grid.querySelectorAll('.photo-audit-crop-overlay').forEach(applyCropOverlay);
+    });
+  }
 
   // Large batches (the real 48-photo Depop audit this mirrors) take real
   // time to decode, so a re-selection made before the previous batch
@@ -4479,7 +4494,10 @@ function photoAuditCardHtml(r) {
   ].join('');
   return `
     <a class="photo-audit-card${(r.isLandscape || r.isSmall) ? ' photo-audit-flagged' : ''}" href="${r.url}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(r.file.name)} full-size">
-      <img src="${r.url}" alt="${escapeHtml(r.file.name)}" loading="lazy">
+      <div class="photo-audit-card-media">
+        <img src="${r.url}" alt="${escapeHtml(r.file.name)}" loading="lazy">
+        <div class="photo-audit-crop-overlay" data-w="${r.w}" data-h="${r.h}"></div>
+      </div>
       <div class="photo-audit-meta">
         <span class="photo-audit-name">${escapeHtml(r.file.name)}</span>
         <span class="photo-audit-dims">${r.w}&times;${r.h}${badges}</span>
@@ -4492,7 +4510,39 @@ function photoAuditCardHtml(r) {
 // of rebuilding every other already-resolved card's DOM on each callback.
 function swapPhotoAuditCard(i, r) {
   const slot = document.getElementById('paCard' + i);
-  if (slot) slot.outerHTML = photoAuditCardHtml(r);
+  if (!slot) return;
+  const grid = slot.parentElement;
+  slot.outerHTML = photoAuditCardHtml(r);
+  // outerHTML replaces the slot in place, so the new card lands at the same
+  // child index the slot held, no id needed to find it again.
+  if (!r.failed) applyCropOverlay(grid.children[i].querySelector('.photo-audit-crop-overlay'));
+}
+
+// Draws (or clears) the crop-preview box on one photo's overlay div, using
+// whatever platform photoAuditCropPlatform currently holds. overlayEl is the
+// .photo-audit-crop-overlay div itself; its data-w/data-h attributes are the
+// photo's own natural pixel dimensions, set once at render time so this can
+// re-run on a platform switch without re-touching the <img>.
+function applyCropOverlay(overlayEl) {
+  if (!overlayEl) return;
+  const platform = photoAuditCropPlatform;
+  const crop = platform !== 'none' && GarageCropCore.PLATFORM_CROPS[platform];
+  if (!crop) {
+    overlayEl.classList.remove('active');
+    return;
+  }
+  const w = Number(overlayEl.dataset.w);
+  const h = Number(overlayEl.dataset.h);
+  const box = GarageCropCore.computeCropOverlay(w, h, crop.ratio);
+  if (!box) {
+    overlayEl.classList.remove('active');
+    return;
+  }
+  overlayEl.style.left = box.leftPct + '%';
+  overlayEl.style.top = box.topPct + '%';
+  overlayEl.style.width = box.widthPct + '%';
+  overlayEl.style.height = box.heightPct + '%';
+  overlayEl.classList.add('active');
 }
 
 function renderPhotoAuditSummary(loaded, total, landscapeFlagged, smallFlagged) {

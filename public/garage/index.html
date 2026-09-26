@@ -2271,11 +2271,26 @@
       review pass that actually caught that bug, since the dimension check alone wouldn't have. Also flags any
       photo under eBay's own documented 500px-minimum-on-the-longest-side requirement (see the Title &amp;
       photo specs table below), the same class of silent-failure risk, a too-small photo that just looks fine
-      on screen. Click any photo to open it full-size. Re-run this before publishing the next batch out of the
-      48 ready-to-post drafts.
+      on screen. Click any photo to open it full-size, or use the crop preview below to see what Poshmark,
+      Vinted, or Depop will actually keep from each cover shot. Re-run this before publishing the next batch
+      out of the 48 ready-to-post drafts.
     </div>
     <label for="photoAuditInput" class="print-btn font-mono photo-audit-label">Choose photos to audit&hellip;</label>
     <input type="file" id="photoAuditInput" accept="image/*" multiple class="photo-audit-input" aria-label="Choose photos to audit">
+    <div class="photo-audit-crop-controls">
+      <label for="photoAuditCropSelect">Preview cover crop as</label>
+      <select id="photoAuditCropSelect" class="quick-log-input photo-audit-crop-select">
+        <option value="none">None (full photo)</option>
+        <option value="poshmark">Poshmark (3:4 portrait)</option>
+        <option value="vinted">Vinted (4:5 portrait)</option>
+        <option value="depop">Depop (1:1 square)</option>
+      </select>
+      <span class="cell-muted photo-audit-crop-hint">
+        Each of those three crops your cover photo to a fixed shape and cuts off whatever falls outside it,
+        the same silent-failure class as the Haggar pants bug above, just from the edges instead of the
+        wrong photo. eBay isn't listed, it doesn't force a fixed-ratio crop.
+      </span>
+    </div>
     <div id="photoAuditSummary" class="cell-muted photo-audit-summary"></div>
     <div class="photo-audit-grid" id="photoAuditGrid"></div>
   </section>
@@ -2399,6 +2414,7 @@
 <script src="/garage/data/validate-core.js"></script>
 <script src="/garage/data/export-core.js"></script>
 <script src="/garage/data/html-core.js"></script>
+<script src="/garage/data/crop-core.js"></script>
 <script src="/garage/app.js"></script>
 <script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>
