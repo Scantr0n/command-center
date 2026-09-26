@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-23T20:45:02.033Z",
+  "generatedAt": "2026-09-26T08:40:30.828Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "b3be334",
+      "fullHash": "b3be3346876e18f1c1a4d6313ef7b6d9953d8dfa",
+      "date": "2026-09-26",
+      "author": "Claude",
+      "subject": "CGT: backfill real listedPrice/listedDate onto the 3 real cards, add the fields to the new-card quick-log form",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
     {
       "hash": "a8251e8",
       "fullHash": "a8251e8dba59e597d5aae5516d74e4ec77aca321",
