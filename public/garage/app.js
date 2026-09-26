@@ -1431,7 +1431,16 @@ const DEPOP_SOFT_LIMIT = GarageValidateCore.DEPOP_TITLE_SOFT_LIMIT;
 // draft tool, not just a display table, so a stale cap is a real risk of a
 // missed rejection (or an over-cautious false warning, as the Vinted 70
 // bug above was) rather than just a cosmetic reference going out of date.
-const TITLE_SPECS_REVIEWED_ON = '2026-09-23';
+// Re-verified 2026-09-26: filled in the two missing photo-count maxes this
+// table never had (Vinted, Poshmark, and eBay's counts were already here;
+// Depop's and Vinted's weren't). Depop's real limit is a notably tight 4
+// photos per listing for most sellers (an 8-photo test is rolling out to a
+// subset of accounts), consistent across multiple current seller-guide
+// sources; Vinted's is 20. Neither is Depop/Vinted's own numeric API
+// documentation, so still worth a primary-source check on the next pass,
+// same caveat as the Depop refresh-ranking claim on the Listing upkeep
+// table above.
+const TITLE_SPECS_REVIEWED_ON = '2026-09-26';
 const TITLE_SPECS_STALE_AFTER_DAYS = 45;
 
 function renderTitleSpecsFreshness() {
