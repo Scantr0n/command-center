@@ -167,6 +167,30 @@
     return { daysLeft, remaining, perDay: remaining / daysLeft };
   }
 
+  // A real goal deadline (goals.json's own targetDate) is exactly the kind
+  // of forward-looking real date release-core.js's computeReminders already
+  // turns into a calendar event for bugfix check-ins and the next suggested
+  // download check, but that function has no goals.json input and so has
+  // never included it: Jack's actual "150 downloads by Dec 31" deadline
+  // currently only ever shows up if he happens to load this page again
+  // before then. Null for the same "nothing honest to remind on" cases
+  // computeRequiredPerDay/computeGoalPaceStatus above already guard: no
+  // valid targetDate, a deadline already passed (Next Steps' own overdue
+  // banner already covers that, a calendar reminder for a date already gone
+  // isn't useful), or a target goalReachedDate confirms was already hit
+  // (real, not estimated; an achieved goal needs no more reminding).
+  function goalReminder(g, downloadsData, leadsData, todayIsoStr) {
+    if (!g || !isValidDateStr(g.targetDate) || g.targetDate < todayIsoStr) return null;
+    if (goalReachedDate(g, downloadsData, leadsData)) return null;
+    return {
+      date: g.targetDate,
+      uid: 'sondrik-goal-' + g.id + '@command-center',
+      summary: 'Sondrik: "' + g.label + '" target date',
+      description: 'Real deadline for the goal set ' + (g.setDate ? g.setDate : 'earlier') +
+        ': ' + g.target + ' ' + g.metric + '.'
+    };
+  }
+
   return {
     daysBetween,
     addDays,
@@ -176,6 +200,7 @@
     goalReachedDate,
     computeGoalProgressPct,
     computeGoalPaceStatus,
-    computeRequiredPerDay
+    computeRequiredPerDay,
+    goalReminder
   };
 });

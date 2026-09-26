@@ -34,7 +34,7 @@
   // live in one place a test suite can actually exercise.
   const {
     daysBetween, addDays, isValidDateStr, recentDownloadsPerDayRate,
-    goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay
+    goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay, goalReminder
   } = window.SondrikGoalsCore;
 
   // Shared, unit-tested bugfix-checkin date math (release-core.js), same
@@ -1471,8 +1471,23 @@
   // silently drift. This wrapper just supplies "today" explicitly from the
   // real clock, since the core function takes it as a parameter rather than
   // reading Date.now() itself, so it stays deterministically testable.
-  function computeReminders(releasesData, downloadsData) {
-    return computeRemindersCore(releasesData, downloadsData, todayIso());
+  //
+  // goalsData/leadsData are folded in here rather than passed into
+  // release-core.js's own computeReminders: that module never took a
+  // goals.json input, and goalReminder's own "already reached" check already
+  // needs goalReachedDate/currentMetricValue-shaped data this file already
+  // has in scope for the Goals card, so there is no real reason to widen
+  // release-core.js's contract just to add one more reminder to the same
+  // list. Sorted back together since a goal deadline can land earlier or
+  // later than a bugfix check-in or download-check reminder.
+  function computeReminders(releasesData, downloadsData, goalsData, leadsData) {
+    const today = todayIso();
+    const reminders = computeRemindersCore(releasesData, downloadsData, today).slice();
+    ((goalsData && goalsData.goals) || []).forEach(g => {
+      const reminder = goalReminder(g, downloadsData, leadsData, today);
+      if (reminder) reminders.push(reminder);
+    });
+    return reminders.sort((a, b) => a.date.localeCompare(b.date));
   }
 
   // One all-day VEVENT per real reminder, never anything that contacts
@@ -2366,8 +2381,8 @@
       if (publicPostCharCount) publicPostCharCount.hidden = true;
     }
 
-    if (releasesData || downloadsData) {
-      const reminders = computeReminders(releasesData || {}, downloadsData || {});
+    if (releasesData || downloadsData || goalsData) {
+      const reminders = computeReminders(releasesData || {}, downloadsData || {}, goalsData || {}, leadsData || {});
       icsBtn.disabled = reminders.length === 0;
       if (reminders.length > 0) {
         icsBtn.addEventListener('click', () => {

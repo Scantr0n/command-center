@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   daysBetween, addDays, isValidDateStr, downloadsPerDayRate, recentDownloadsPerDayRate,
-  goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay
+  goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay, goalReminder
 } = require('./goals-core.js');
 
 test('daysBetween counts whole days between two local dates', () => {
@@ -162,4 +162,37 @@ test('computeRequiredPerDay is null with an invalid targetDate instead of dividi
 test('computeRequiredPerDay is null once the deadline itself has passed, the overdue banner already covers that', () => {
   assert.equal(computeRequiredPerDay(150, 15, '2026-09-01', '2026-09-25'), null, 'targetDate before today');
   assert.equal(computeRequiredPerDay(150, 15, '2026-09-25', '2026-09-25'), null, 'due today, no days left to spread the rate over');
+});
+
+test('goalReminder builds a calendar reminder for a real, unmet, future goal deadline', () => {
+  const g = { id: 'launch-push-eoy-2026', label: '150 v0.3.7 downloads by end of year', metric: 'downloads', target: 150, targetDate: '2026-12-31', setDate: '2026-09-20' };
+  const downloadsData = { metric: { checks: [{ date: '2026-09-20', count: 15 }] } };
+  const reminder = goalReminder(g, downloadsData, null, '2026-09-26');
+  assert.equal(reminder.date, '2026-12-31');
+  assert.equal(reminder.uid, 'sondrik-goal-launch-push-eoy-2026@command-center');
+  assert.match(reminder.summary, /150 v0\.3\.7 downloads by end of year/);
+  assert.match(reminder.description, /2026-09-20/);
+  assert.match(reminder.description, /150 downloads/);
+});
+
+test('goalReminder is null due today, the day the deadline itself falls is still a real reminder day, not before it', () => {
+  const g = { id: 'g1', label: 'X', metric: 'downloads', target: 150, targetDate: '2026-09-26', setDate: '2026-09-01' };
+  const reminder = goalReminder(g, { metric: { checks: [] } }, null, '2026-09-26');
+  assert.equal(reminder.date, '2026-09-26', 'today is still a valid reminder date, only a date already passed is excluded');
+});
+
+test('goalReminder is null with no valid targetDate', () => {
+  assert.equal(goalReminder({ id: 'g1', targetDate: null }, {}, null, '2026-09-26'), null, 'missing targetDate');
+  assert.equal(goalReminder({ id: 'g1', targetDate: '2026-12-1' }, {}, null, '2026-09-26'), null, 'non-zero-padded targetDate');
+});
+
+test('goalReminder is null once the deadline has already passed', () => {
+  const g = { id: 'g1', metric: 'downloads', target: 150, targetDate: '2026-09-01' };
+  assert.equal(goalReminder(g, { metric: { checks: [] } }, null, '2026-09-26'), null);
+});
+
+test('goalReminder is null once goalReachedDate confirms the target was already hit', () => {
+  const g = { id: 'g1', metric: 'downloads', target: 10, targetDate: '2026-12-31' };
+  const downloadsData = { metric: { checks: [{ date: '2026-09-07', count: 15 }] } };
+  assert.equal(goalReminder(g, downloadsData, null, '2026-09-26'), null, 'already reached, no more reminding needed');
 });
