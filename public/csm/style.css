@@ -1589,7 +1589,18 @@ footer.page-foot {
      on paper. */
   .section-details > summary.section-title::before { display: none; }
 
+  /* #platformOutreachSection is the same kind of content as .schema-help
+     right above it, a static how-this-works reference (Xingtu/Pugongying/
+     Weirenwu/Huahuo/WeChat/Huxuan/Magnetic Juxing), not real pipeline status.
+     It uses the same .section-details class as the real analytics sections
+     below it (funnel, velocity, channel/category effectiveness, social
+     reach), so app.js's beforeprint handler force-opens it like every other
+     one, and nothing here was excluding it: hitting Print/PDF added roughly
+     a full page of unchanging platform reference text ahead of the actual
+     nudge queue/board every time, confirmed via a real headless print render
+     (578px tall, 3268 characters) before this fix. */
   .print-btn, .back-link, .search-input, .channel-filter, .category-filter, .schema-help,
+  #platformOutreachSection,
   .modal-overlay, .attention-bar, .view-toggle, .board-list-wrap, .jump-nav-fab {
     display: none !important;
   }
