@@ -549,6 +549,41 @@ function recordClientDebateActivation(connected, active) {
   return now;
 }
 
+// Symmetric counterpart to CLIENT_DEBATE_ACTIVATED_KEY above: that one
+// records the moment this browser first sees the debate panel go active, but
+// nothing recorded the other half of that story, how long it had already
+// been sitting in "Pending, blocked on: API key" before this browser ever
+// looked. The Debate panel stat tile showed that blocked reason with no
+// sense of how long it's been true, unlike every other transition this page
+// tracks (regime, sizing mode, connectivity), which all pair a state with a
+// duration. Same one-time, never-backdated record as activation: once set,
+// never overwritten, and if this tab wasn't open the moment the real wait
+// actually started, the true start predates what gets recorded, same
+// "first observed by this browser" honesty every render of this value uses.
+const CLIENT_DEBATE_FIRST_PENDING_KEY = 'alpha:clientDebateFirstPendingAt';
+
+function loadClientDebateFirstPendingAt() {
+  try {
+    return localStorage.getItem(CLIENT_DEBATE_FIRST_PENDING_KEY) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function recordClientDebateFirstPending(connected, debatePanel) {
+  const existing = loadClientDebateFirstPendingAt();
+  if (existing || !connected || !debatePanel || debatePanel.active) return existing;
+  const now = new Date().toISOString();
+  try {
+    localStorage.setItem(CLIENT_DEBATE_FIRST_PENDING_KEY, now);
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // other client-side records above, the "pending since" note just never
+    // appears.
+  }
+  return now;
+}
+
 // computeRegimeSegments and regimeSegmentEndMs now live in regime-core.js
 // (see AlphaRegimeCore above), so this segmenting math can be unit-tested
 // outside the browser instead of only ever running live against whatever
@@ -1061,7 +1096,7 @@ function statTile(value, label, sub, awaiting, subTitle) {
   `;
 }
 
-function renderStats(data, clientDebateActivatedAt) {
+function renderStats(data, clientDebateActivatedAt, clientDebateFirstPendingAt) {
   const sys = data.system;
   const live = data.live;
   const awaiting = '<span class="font-mono">awaiting connection</span>';
@@ -1097,11 +1132,14 @@ function renderStats(data, clientDebateActivatedAt) {
     // it wasn't.
     debateActive
       ? (clientDebateActivatedAt ? 'First seen active ' + (timeAgo(clientDebateActivatedAt) || formatAbsolute(clientDebateActivatedAt)) : null)
-      : 'Blocked on: ' + ((live.debatePanel && live.debatePanel.blockedOn) || 'unknown'),
+      : 'Blocked on: ' + ((live.debatePanel && live.debatePanel.blockedOn) || 'unknown') +
+          (clientDebateFirstPendingAt ? ', pending since ' + (timeAgo(clientDebateFirstPendingAt) || formatAbsolute(clientDebateFirstPendingAt)) : ''),
     !debateActive,
     debateActive && clientDebateActivatedAt
       ? 'Recorded by this browser the first time it observed the debate panel active; the real switch to active may have happened earlier if this tab wasn\'t open yet.'
-      : undefined
+      : (!debateActive && clientDebateFirstPendingAt
+        ? 'Recorded by this browser the first time it observed the debate panel pending; the real wait may have started earlier if this tab wasn\'t open yet.'
+        : undefined)
   ));
 
   // Distinct from the everyday "awaiting connection" gray: a real stuckCount
@@ -2134,6 +2172,7 @@ async function loadStatus() {
     const clientRobustnessHistory = recordClientMeterReading(CLIENT_ROBUSTNESS_HISTORY_KEY, connectedNow, livePs && livePs.robustnessScore);
     const clientSizingModeHistory = recordClientSizingModeObservation(connectedNow, livePs && livePs.activeMode);
     const clientDebateActivatedAt = recordClientDebateActivation(connectedNow, data.live && data.live.debatePanel && data.live.debatePanel.active);
+    const clientDebateFirstPendingAt = recordClientDebateFirstPending(connectedNow, data.live && data.live.debatePanel);
     // Only the three sections built from the cached fields (stats,
     // position sizing, genealogy) read effectiveData; connection, account
     // and positions always read the real `data` so those never show a
@@ -2172,7 +2211,7 @@ async function loadStatus() {
       ? 'critical'
       : (headline.level === 'caution' && connCls === 'live' ? 'anomaly' : connCls);
     updateGlanceIndicators(glanceCls);
-    renderStats(effectiveData, clientDebateActivatedAt);
+    renderStats(effectiveData, clientDebateActivatedAt, clientDebateFirstPendingAt);
     renderAccount(data);
     renderPositions(data);
     renderPositionSizing(effectiveData, clientDrawdownHistory, clientRobustnessHistory);
@@ -2213,7 +2252,7 @@ window.addEventListener('storage', (e) => {
   if (![
     CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY,
     CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY, CLIENT_SIZING_MODE_HISTORY_KEY,
-    CLIENT_DEBATE_ACTIVATED_KEY
+    CLIENT_DEBATE_ACTIVATED_KEY, CLIENT_DEBATE_FIRST_PENDING_KEY
   ].includes(e.key)) return;
   const connHistory = loadClientConnHistory();
   const latencyHistory = loadClientLatencyHistory();
@@ -2222,6 +2261,7 @@ window.addEventListener('storage', (e) => {
   const robustnessHistory = loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY);
   const sizingModeHistory = loadClientSizingModeHistory();
   const debateActivatedAt = loadClientDebateActivatedAt();
+  const debateFirstPendingAt = loadClientDebateFirstPendingAt();
   renderConnection(lastRawData, connHistory, latencyHistory);
   renderConnectionHistory(lastRawData, connHistory);
   renderDailyUptime(lastRawData, connHistory);
@@ -2240,7 +2280,7 @@ window.addEventListener('storage', (e) => {
   // connection" just because a sibling tab wrote a history entry.
   if (lastStatusData) {
     renderPositionSizing(lastStatusData, drawdownHistory, robustnessHistory);
-    renderStats(lastStatusData, debateActivatedAt);
+    renderStats(lastStatusData, debateActivatedAt, debateFirstPendingAt);
   }
   renderSizingModeHistory(sizingModeHistory, regimeFrozenAsOf);
   renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length, sizingModeHistory.length, !!debateActivatedAt);
@@ -2298,7 +2338,10 @@ function buildStatusSummary(data) {
           const at = loadClientDebateActivatedAt();
           return at ? ' (first seen active ' + (timeAgo(at) || formatAbsolute(at)) + ')' : '';
         })()
-      : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '')),
+      : 'Pending' + (live.debatePanel && live.debatePanel.blockedOn ? ' (' + live.debatePanel.blockedOn + ')' : '') + (() => {
+          const at = loadClientDebateFirstPendingAt();
+          return at ? ' (pending since ' + (timeAgo(at) || formatAbsolute(at)) + ')' : '';
+        })()),
     '- Active anomalies: ' + ((live.anomalies && live.anomalies.stuckCount != null) ? String(live.anomalies.stuckCount) : awaiting),
     '- Genealogy: ' + (() => {
       const g = live.genealogy || {};
@@ -2371,7 +2414,8 @@ backupBtn.addEventListener('click', () => {
     clientDrawdownHistory: loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY),
     clientRobustnessHistory: loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY),
     clientSizingModeHistory: loadClientSizingModeHistory(),
-    clientDebateActivatedAt: loadClientDebateActivatedAt()
+    clientDebateActivatedAt: loadClientDebateActivatedAt(),
+    clientDebateFirstPendingAt: loadClientDebateFirstPendingAt()
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
