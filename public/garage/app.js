@@ -165,6 +165,36 @@ function renderScamPatternsFreshness() {
   el.title = 'Last hand-verified against each platform\'s own published fraud/protection documentation on ' + SCAM_PATTERNS_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above, added to the "Listing
+// upkeep" table: the one reference table on the page whose own callout says
+// "several old habits stopped working this year" (Poshmark's Bulk Sharing
+// removal, Depop Refresh no longer moving search rank) yet shipped with no
+// tracked verification date, the exact silent-drift gap this pattern exists
+// to catch. Re-verified 2026-09-26: Poshmark's Bulk Sharing tool removal is
+// confirmed current (Yahoo Lifestyle, CLOSO reselling coverage both report
+// it pulled from the app without warning); eBay Promoted Listings Standard's
+// pay-per-sale/no-charge-if-unclicked mechanics and Vinted Item Bump's paid
+// 3/7-day boost are unchanged from prior coverage. The Depop row (Refresh no
+// longer affecting search rank at all) has conflicting secondary-source
+// coverage as of this pass, some SEO/reselling-tool blogs claim refreshing
+// still nudges category-browse recency, none of it Depop's own official
+// seller documentation, so left as-is rather than guessed at; worth a closer
+// look against Depop's own help center on the next re-verify.
+const LISTING_UPKEEP_REVIEWED_ON = '2026-09-26';
+const LISTING_UPKEEP_STALE_AFTER_DAYS = 45;
+
+function renderListingUpkeepFreshness() {
+  const el = document.getElementById('listingUpkeepFreshness');
+  if (!el) return;
+  const age = daysSincePublished(LISTING_UPKEEP_REVIEWED_ON);
+  const stale = age != null && age > LISTING_UPKEEP_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own current seller guidance on ' + LISTING_UPKEEP_REVIEWED_ON + '.';
+}
+
 // Same freshness-badge pattern as the tables above: this one gates the
 // highest-stakes numbers on the page (the exact eBay Top Rated Seller and
 // Depop Top Seller thresholds "Real progress" is computed against below),
@@ -5376,6 +5406,7 @@ renderBestTimeFreshness();
 renderPoshmarkShareFreshness();
 renderSeasonalGuideFreshness();
 renderSearchDiscoveryFreshness();
+renderListingUpkeepFreshness();
 renderMarkdownFreshness();
 renderBundleFreshness();
 renderTitleSpecsFreshness();
