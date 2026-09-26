@@ -3225,8 +3225,22 @@ function renderPaletteResults() {
   document.getElementById('paletteInput').setAttribute('aria-activedescendant', `palette-opt-${paletteSelectedIndex}`);
   list.querySelectorAll('.palette-item').forEach(el => {
     el.addEventListener('click', () => activatePaletteItem(Number(el.id.replace('palette-opt-', ''))));
+    // The real bug this guard fixes: renderPaletteResults() below replaces
+    // list.innerHTML, tearing down and recreating every item including the
+    // one the cursor is already over. Chromium then re-evaluates what's
+    // under a stationary pointer after that DOM swap and fires mouseenter
+    // again on its replacement, which reran this same handler, which
+    // rebuilt the DOM again... an unbounded render loop the whole time the
+    // mouse just sat still over a result (confirmed: dozens of renders/sec).
+    // Worse, it kept swapping the element out from under a real mousedown
+    // before its matching mouseup could land on the same node, so a mouse
+    // click on a search result silently did nothing; only keyboard
+    // Enter still worked. Skipping the no-op case (already the selected
+    // index) breaks the loop and makes mouse clicks land again.
     el.addEventListener('mouseenter', () => {
-      paletteSelectedIndex = Number(el.id.replace('palette-opt-', ''));
+      const idx = Number(el.id.replace('palette-opt-', ''));
+      if (idx === paletteSelectedIndex) return;
+      paletteSelectedIndex = idx;
       renderPaletteResults();
     });
   });
