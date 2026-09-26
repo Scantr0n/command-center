@@ -1616,7 +1616,7 @@ footer.page-foot {
   .pos-table th { color: #333; border-color: #ccc; }
   .pos-table th.sortable::after { content: none !important; }
   .pos-table td { border-color: #ddd; color: #111; }
-  .pos-side-long, .pos-side-short { color: #111 !important; }
+  .pos-side-long, .pos-side-short, .pos-exposure-long, .pos-exposure-short { color: #111 !important; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }
