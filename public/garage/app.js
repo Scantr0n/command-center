@@ -1455,6 +1455,25 @@ function renderTitleSpecsFreshness() {
   el.title = 'Last hand-verified against each platform\'s own published title/photo specs on ' + TITLE_SPECS_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the title-specs table above, tracked
+// separately since a platform can change its description cap without
+// touching its title cap (Poshmark's 500-character description limit is
+// enforced independently of its 80-character title limit).
+const DESCRIPTION_SPECS_REVIEWED_ON = '2026-09-26';
+const DESCRIPTION_SPECS_STALE_AFTER_DAYS = 45;
+
+function renderDescriptionSpecsFreshness() {
+  const el = document.getElementById('descriptionSpecsFreshness');
+  if (!el) return;
+  const age = daysSincePublished(DESCRIPTION_SPECS_REVIEWED_ON);
+  const stale = age != null && age > DESCRIPTION_SPECS_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published description-field specs on ' + DESCRIPTION_SPECS_REVIEWED_ON + '.';
+}
+
 function titleFitCell(platform, title, platforms) {
   if (!(platforms || []).includes(platform)) {
     return '<span class="cell-value empty">not listed</span>';
@@ -5419,6 +5438,7 @@ renderListingUpkeepFreshness();
 renderMarkdownFreshness();
 renderBundleFreshness();
 renderTitleSpecsFreshness();
+renderDescriptionSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
 renderSellerStandardsFreshness();

@@ -529,6 +529,57 @@
     </div>
   </section>
 
+  <section id="descriptionSpecsSection">
+    <details class="section-details" id="descriptionSpecsDetails">
+    <summary class="section-title">Description length by platform
+      <span class="reference-freshness" id="descriptionSpecsFreshness"></span>
+    </summary>
+    <div class="callout">
+      Real published description-field character caps per platform, sourced from each platform's own seller
+      documentation as of September 2026. Poshmark enforces a hard 500-character cap on the description field and
+      won't accept text past it, the same class of silent-failure risk as the eBay return-policy bug logged above.
+      Depop doesn't have a separate description field at all: title and description share one combined
+      1,000-character field, so a long description eats into the same budget the opening keywords need for
+      search, something the title-fit table above doesn't capture since it only checks the visible-title portion.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Description limit</th>
+            <th>Watch for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>eBay</td>
+            <td>No meaningful character cap, free-form HTML field</td>
+            <td>The 80-character hard cap is on the title only; don't confuse the two fields</td>
+          </tr>
+          <tr>
+            <td>Vinted</td>
+            <td>No published hard cap</td>
+            <td>Title is still capped at 100 characters even though description isn't</td>
+          </tr>
+          <tr>
+            <td>Poshmark</td>
+            <td>500-character hard cap</td>
+            <td>Separate from the 80-character title cap; text past 500 characters isn't accepted, write a full
+              draft elsewhere and trim before pasting in</td>
+          </tr>
+          <tr>
+            <td>Depop</td>
+            <td>1,000-character cap, shared with the title</td>
+            <td>There's no separate title field on Depop, the "title" shown in search is just the opening words of
+              this same field, so a long description crowds out the keywords that need to lead it</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </details>
+  </section>
+
   <section id="searchDiscoverySection">
     <details class="section-details" id="searchDiscoveryDetails">
     <summary class="section-title">Search &amp; discovery, by platform
