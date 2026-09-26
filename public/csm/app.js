@@ -2723,6 +2723,7 @@
   // already added.
   const SHORTCUTS = [
     { keys: ['/'], label: 'Focus search' },
+    { keys: ['n'], label: 'Log a new prospect' },
     { keys: ['Enter', 'Space'], label: 'Open the focused prospect card, or activate a focused list column header to sort' },
     { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
     { keys: ['Esc'], label: 'Close the open dialog' },
@@ -2798,6 +2799,22 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
     e.preventDefault();
     openShortcuts();
+  });
+
+  // "n" opens "Log new prospect", the single action most likely to actually
+  // be reached for on this page (see index.html's own "fastest path" note),
+  // same disabled-button check the click handler already respects (data
+  // still loading, or stages.json/prospects.json failed to load) so this
+  // can never open a form with nowhere real to save to.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'n' && e.key !== 'N') return;
+    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen || jumpNavOpen) return;
+    const active = document.activeElement;
+    const tag = active && active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
+    if (document.getElementById('newProspectBtn').disabled) return;
+    e.preventDefault();
+    npOpen();
   });
 
   // Jump-to-section nav, same markup/behavior as Garage/Sondrik/CGT's: this
