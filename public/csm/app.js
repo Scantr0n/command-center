@@ -2169,7 +2169,7 @@
       '</div>' +
       '<button type="button" id="peGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
       '<div id="peResult" class="np-result" hidden>' +
-      '<ul id="peWarnings" class="np-warnings"></ul>' +
+      '<ul id="peWarnings" class="np-warnings" role="alert"></ul>' +
       '<div class="np-output-head">' +
       '<span class="field-label" style="margin:0">Replace this prospect&rsquo;s whole entry with</span>' +
       '<button type="button" id="peCopyBtn" class="print-btn font-mono" aria-live="polite">Copy JSON</button>' +
