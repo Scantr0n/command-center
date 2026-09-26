@@ -1699,7 +1699,8 @@
     ['doNotNudgeBefore', 'Do Not Nudge Before'], ['nudgePoint', 'Nudge Point'],
     ['replyStatus', 'Reply Status'],
     ['socialSnapshots', 'Social Snapshots'],
-    ['outreachLog', 'Outreach Touches'], ['contentIdeas', 'Content Ideas'], ['notes', 'Notes']
+    ['outreachLog', 'Outreach Touches'], ['daysToFirstReply', 'Days To First Reply'],
+    ['contentIdeas', 'Content Ideas'], ['notes', 'Notes']
   ];
 
   // Exports exactly what the board currently shows (search + channel + category
@@ -1730,6 +1731,7 @@
         .map(entry => (entry.date ? entry.date + ': ' : '') + (OUTREACH_TYPE_LABEL[entry.type] || entry.type) +
           (entry.note ? ' (' + entry.note + ')' : ''))
         .join('; '),
+      daysToFirstReply: daysToFirstReply(p),
       contentIdeas: (p.contentIdeas || [])
         .map(entry => (entry.date ? entry.date + ': ' : '') + entry.idea)
         .join('; '),
