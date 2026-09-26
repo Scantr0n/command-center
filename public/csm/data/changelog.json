@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-25T16:05:04.017Z",
+  "generatedAt": "2026-09-26T20:03:55.871Z",
   "generatedFrom": "git log over public/csm/data/{prospects.json,stages.json}, run node public/csm/data/changelog.js to refresh",
   "entries": [
     {
