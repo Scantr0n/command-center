@@ -537,6 +537,34 @@ function renderBundleFreshness() {
   el.title = 'Last hand-verified against each platform\'s own current seller/shipping documentation on ' + BUNDLE_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above, added to the "Offer
+// mechanics by platform" table: it shipped with real per-platform offer
+// deadlines but no tracked verification date, the same gap this pattern
+// exists to catch elsewhere on the page. Verifying it for the first time
+// (2026-09-26) found a real error, not just an aging claim: the Vinted row
+// said offers there have "no expiration... the only one of the four with no
+// time limit", but multiple independent seller-tool sources (VintSale's own
+// offer-countdown-timer feature description, general seller guidance) agree
+// Vinted offers do run on their own expiration countdown, roughly 72 hours
+// per one source, Vinted's own help page just doesn't publish an exact
+// figure. Fixed to say so rather than leave the wrong "no time limit" claim
+// in place; eBay, Poshmark, and Depop's rows were re-confirmed unchanged
+// against current seller-tool and platform-help coverage.
+const OFFER_GUIDE_REVIEWED_ON = '2026-09-26';
+const OFFER_GUIDE_STALE_AFTER_DAYS = 45;
+
+function renderOfferGuideFreshness() {
+  const el = document.getElementById('offerGuideFreshness');
+  if (!el) return;
+  const age = daysSincePublished(OFFER_GUIDE_REVIEWED_ON);
+  const stale = age != null && age > OFFER_GUIDE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own current offer/negotiation documentation on ' + OFFER_GUIDE_REVIEWED_ON + '.';
+}
+
 const STAGE_LABELS = { draft: 'Draft', 'ready-to-post': 'Ready to post', live: 'Live', sold: 'Sold' };
 const EVENT_TYPE_LABELS = { 'bug-fix': 'Bug fix', 'photo-audit': 'Photo audit', other: 'Other' };
 // Was its own separately-defined ['ebay', 'vinted', 'poshmark', 'depop'],
@@ -5529,6 +5557,7 @@ renderSearchDiscoveryFreshness();
 renderListingUpkeepFreshness();
 renderMarkdownFreshness();
 renderBundleFreshness();
+renderOfferGuideFreshness();
 renderTitleSpecsFreshness();
 renderDescriptionSpecsFreshness();
 renderReturnDisputeFreshness();
