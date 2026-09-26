@@ -17,7 +17,7 @@ const { emDashFields } = require('./csm-core.js');
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CHANNEL_TYPES = ['named-decision-maker', 'generic-inbox'];
-const OUTREACH_TYPES = ['initial-send', 'nudge'];
+const OUTREACH_TYPES = ['initial-send', 'nudge', 'reply'];
 // Matches SOCIAL_SNAPSHOT_STALE_DAYS in app.js: 90 days is a typical
 // social-audit refresh cadence, past which a manual follower/engagement pull
 // is old enough to be misleading if shown without a flag.
@@ -301,6 +301,31 @@ function main() {
           'entry. Backfill it, the touch-by-touch log (and the "3+ touches" flag it drives) undercounts real ' +
           'outreach without it.');
       }
+      // "reply" is the only outreachLog type that logs an inbound touch
+      // rather than an outbound one, so it is the only type that can be out
+      // of order relative to the rest of the log without tripping the
+      // generic prevLogDate check above (a reply dated the same day as, or
+      // just after, its outbound touch is normal). A reply with no outbound
+      // touch at all, or dated before the earliest one, is the real problem:
+      // daysToFirstReply in csm-core.js returns null for both rather than a
+      // fabricated or negative response time, so it is worth flagging here
+      // too instead of just silently going blank on the board.
+      const outboundDates = (p.outreachLog || [])
+        .filter(e => e && e.date && DATE_RE.test(e.date) && (e.type === 'initial-send' || e.type === 'nudge'))
+        .map(e => e.date);
+      const firstOutboundDate = outboundDates.length ? outboundDates.reduce((min, d) => (d < min ? d : min)) : null;
+      (p.outreachLog || []).forEach((entry, logIdx) => {
+        if (!entry || entry.type !== 'reply' || !entry.date || !DATE_RE.test(entry.date)) return;
+        const logWhere = where + '.outreachLog[' + logIdx + ']';
+        if (!firstOutboundDate) {
+          warnings.push(logWhere + ': a "reply" touch is logged but outreachLog has no outbound ' +
+            '("initial-send"/"nudge") touch at all. Backfill the outbound touch it was replying to.');
+        } else if (entry.date < firstOutboundDate) {
+          warnings.push(logWhere + ': a "reply" touch is dated ' + entry.date + ', before the earliest outbound ' +
+            'touch (' + firstOutboundDate + '). A reply cannot come before the outreach that prompted it, check ' +
+            'the date.');
+        }
+      });
     }
 
     if (!Array.isArray(p.stageHistory || [])) {

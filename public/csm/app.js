@@ -7,7 +7,7 @@
   const {
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-    nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
+    nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
@@ -302,7 +302,14 @@
     return { html: '<ul class="timeline-list">' + rowsHtml + '</ul>', empty: false };
   }
 
-  const OUTREACH_TYPE_LABEL = { 'initial-send': 'Initial send', 'nudge': 'Nudge' };
+  const OUTREACH_TYPE_LABEL = { 'initial-send': 'Initial send', 'nudge': 'Nudge', 'reply': 'Reply received' };
+  // Outbound touches (initial-send, nudge) and the one inbound type (reply)
+  // get visibly different dot colors in the timeline below, same idea as
+  // channelSortRank already applying to contact channel elsewhere: a reply
+  // is a fundamentally different, better signal than another outbound
+  // touch, and a log that's all one color would hide that at a glance.
+  const OUTREACH_TYPE_DOT_COLOR = { reply: '#3DDC84' };
+  const OUTREACH_TOUCH_DOT_COLOR = '#5EC8D8';
 
   // A prospect can be nudged more than once before it moves stage, so a
   // single sendDate/nextNudgeDate pair has no memory of what already went
@@ -322,8 +329,9 @@
       const gapDays = prev && prev.date && entry.date ? daysUntil(entry.date) - daysUntil(prev.date) : null;
       // Same out-of-order-date guard as renderStageHistory's dwellText above.
       const gapText = gapDays != null && gapDays >= 0 ? gapDays + 'd since last touch' : '';
+      const dotColor = OUTREACH_TYPE_DOT_COLOR[entry.type] || OUTREACH_TOUCH_DOT_COLOR;
       return '<li class="timeline-row">' +
-        '<span class="timeline-dot" style="background:#5EC8D8"></span>' +
+        '<span class="timeline-dot" style="background:' + dotColor + '"></span>' +
         '<span class="timeline-body">' +
         '<span class="timeline-stage">' + escapeHtml(label) + (entry.note ? ': ' + escapeHtml(entry.note) : '') + '</span>' +
         '<span class="timeline-date font-mono">' + escapeHtml(fmtDate(entry.date)) +
@@ -734,7 +742,7 @@
       (p.outreachLog || []).forEach(entry => {
         if (!entry.date) return;
         const label = (OUTREACH_TYPE_LABEL[entry.type] || entry.type || 'Touch') + (entry.note ? ': ' + entry.note : '');
-        events.push({ date: entry.date, type: 'touch', prospect: p, label });
+        events.push({ date: entry.date, type: entry.type === 'reply' ? 'reply' : 'touch', prospect: p, label });
       });
       // A logged social snapshot is just as real a research event as a
       // stage move, a touch, or a content idea, it just used to only ever
@@ -769,6 +777,8 @@
         ? '<span class="activity-tag activity-tag-stage" style="color:' + escapeHtml(ev.color) + ';border-color:' + escapeHtml(ev.color) + '66;background:' + escapeHtml(ev.color) + '14">MOVED</span>'
         : ev.type === 'touch'
         ? '<span class="activity-tag activity-tag-touch">TOUCH</span>'
+        : ev.type === 'reply'
+        ? '<span class="activity-tag activity-tag-reply">REPLY</span>'
         : ev.type === 'snapshot'
         ? '<span class="activity-tag activity-tag-snapshot">SNAPSHOT</span>'
         : '<span class="activity-tag activity-tag-idea">IDEA</span>';
@@ -2276,6 +2286,12 @@
     rows.push(fieldRow('Send date', p.sendDate ? fmtDate(p.sendDate) : 'Not logged yet', !p.sendDate));
     const outreachLogHtml = renderOutreachLog(p);
     rows.push(fieldRow('Outreach touch log', outreachLogHtml.html + outreachLogGeneratorHtml(), outreachLogHtml.empty));
+    const firstReplyDays = daysToFirstReply(p);
+    rows.push(fieldRow('Time to first reply',
+      firstReplyDays == null
+        ? 'Not logged yet, log a "Reply received" touch above once a real reply comes in'
+        : firstReplyDays + ' day' + (firstReplyDays === 1 ? '' : 's') + ' from first outbound touch to first reply',
+      firstReplyDays == null));
     rows.push(fieldRow('Next nudge date', p.nextNudgeDate ? fmtDate(p.nextNudgeDate) : 'Not scheduled yet', !p.nextNudgeDate));
     rows.push(fieldRow('Next action', p.nextAction ? escapeHtml(p.nextAction) : 'Not logged yet', !p.nextAction));
 
@@ -2399,6 +2415,7 @@
       '<select id="modalTouchType" class="np-input inline-gen-select">' +
       '<option value="initial-send">Initial send</option>' +
       '<option value="nudge">Nudge</option>' +
+      '<option value="reply">Reply received</option>' +
       '</select>' +
       '<label class="sr-only" for="modalTouchDate">Date of touch</label>' +
       '<input type="date" id="modalTouchDate" class="np-input inline-gen-date">' +
@@ -2551,12 +2568,18 @@
       }
       const log = p.outreachLog || [];
       const alreadySent = log.some(e => e.type === 'initial-send');
+      const outboundDates = log.filter(e => e && e.date && (e.type === 'initial-send' || e.type === 'nudge')).map(e => e.date);
       const warnParts = [];
       if (type === 'initial-send' && alreadySent) {
         warnParts.push('An "initial-send" touch is already logged for this prospect. If this is a follow-up, use "Nudge" instead.');
       }
       if (type === 'initial-send' && !alreadySent) {
         warnParts.push(...outreachReadinessWarnings(p));
+      }
+      if (type === 'reply' && outboundDates.length === 0) {
+        warnParts.push('No outbound touch ("initial-send"/"nudge") is logged for this prospect yet. Log that first, a reply needs something real to be a reply to.');
+      } else if (type === 'reply' && date < outboundDates.reduce((min, d) => (d < min ? d : min))) {
+        warnParts.push('This date is before the earliest outbound touch logged for this prospect. A reply cannot come before the outreach that prompted it, check the date.');
       }
       const warn = warnParts.join(' ');
       warnEl.hidden = !warn;
@@ -2565,6 +2588,21 @@
       if (note) entry.note = note;
       outputEl.textContent = JSON.stringify(entry, null, 2) + ',';
       resultEl.hidden = false;
+
+      if (type === 'reply') {
+        // A reply is a real, positive signal, not another step on the
+        // outbound cold-cadence this prospect has been on, so it gets no
+        // widening-gap cadence suggestion below, real research (a reply's
+        // own follow-up window is measured in hours, not the multi-day gaps
+        // an outbound cadence uses) backs a fast human follow-up, not a
+        // fabricated formula for one.
+        suggestActionInput.value = 'Reply back to ' + (p.name || 'this prospect') + ', a real reply is in, ' +
+          'response speed from here matters more than any outbound cadence.';
+        suggestDateInput.value = '';
+        refreshSuggestOutput();
+        suggestEl.hidden = false;
+        return;
+      }
 
       // Cadence suggestion for the touch AFTER this one, based on real
       // cold-outreach practice (widening follow-up gaps). This is a starting

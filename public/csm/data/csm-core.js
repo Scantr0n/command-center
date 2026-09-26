@@ -230,6 +230,27 @@
     return daysSince(lastDate);
   }
 
+  // Real, commonly tracked cold-outreach metric: how long from the first
+  // real outbound touch ("initial-send", or the earliest "nudge" if no
+  // initial-send was ever logged) to the first real inbound "reply" touch.
+  // Both ends come only from outreachLog's own dated entries, never from
+  // replyStatus (free text, no date) or nextNudgeDate (a plan, not a real
+  // event), so this stays null until an actual reply has actually been
+  // logged with a date. A reply dated before the earliest outbound touch is
+  // a data problem (validate.js already flags it as out of order), not a
+  // negative response time, so that also returns null rather than a
+  // fabricated negative number.
+  function daysToFirstReply(p) {
+    const log = (p.outreachLog || []).filter(e => e && isValidDateStr(e.date));
+    const outboundDates = log.filter(e => e.type === 'initial-send' || e.type === 'nudge').map(e => e.date);
+    const replyDates = log.filter(e => e.type === 'reply').map(e => e.date);
+    if (outboundDates.length === 0 || replyDates.length === 0) return null;
+    const firstOutbound = outboundDates.reduce((min, d) => (d < min ? d : min));
+    const firstReply = replyDates.reduce((min, d) => (d < min ? d : min));
+    const gap = daysUntil(firstReply) - daysUntil(firstOutbound);
+    return gap >= 0 ? gap : null;
+  }
+
   // Board column sort order: soonest real nextNudgeDate first, prospects
   // with no date logged pushed to the end, tied on name so the order is
   // deterministic either way. A prior version of this comparator returned 1
@@ -835,7 +856,7 @@
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-    nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
+    nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,

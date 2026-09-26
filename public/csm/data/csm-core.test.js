@@ -17,7 +17,7 @@ const assert = require('node:assert/strict');
 const {
   isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
-  nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch,
+  nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
@@ -296,6 +296,53 @@ test('daysSinceLastTouch uses the most recent of several logged touches, not the
     ]
   };
   assert.equal(daysSinceLastTouch(p), 5);
+});
+
+test('daysToFirstReply is null with no outbound touch, no reply touch, or neither', () => {
+  assert.equal(daysToFirstReply({}), null);
+  assert.equal(daysToFirstReply({ outreachLog: [{ date: '2026-09-01', type: 'initial-send' }] }), null);
+  assert.equal(daysToFirstReply({ outreachLog: [{ date: '2026-09-01', type: 'reply' }] }), null);
+});
+
+test('daysToFirstReply is the gap from the first outbound touch to the first reply', () => {
+  const p = {
+    outreachLog: [
+      { date: '2026-09-01', type: 'initial-send' },
+      { date: '2026-09-08', type: 'nudge' },
+      { date: '2026-09-10', type: 'reply' }
+    ]
+  };
+  assert.equal(daysToFirstReply(p), 9);
+});
+
+test('daysToFirstReply falls back to the earliest nudge when no initial-send was logged', () => {
+  const p = {
+    outreachLog: [
+      { date: '2026-09-05', type: 'nudge' },
+      { date: '2026-09-07', type: 'reply' }
+    ]
+  };
+  assert.equal(daysToFirstReply(p), 2);
+});
+
+test('daysToFirstReply is null, not negative, when a reply predates every outbound touch', () => {
+  const p = {
+    outreachLog: [
+      { date: '2026-09-10', type: 'initial-send' },
+      { date: '2026-09-05', type: 'reply' } // bad data, reply before the outbound touch
+    ]
+  };
+  assert.equal(daysToFirstReply(p), null);
+});
+
+test('daysToFirstReply skips entries with an invalid date, never NaN', () => {
+  const p = {
+    outreachLog: [
+      { date: '2026-9-1', type: 'initial-send' }, // non-zero-padded, invalid
+      { date: '2026-09-10', type: 'reply' }
+    ]
+  };
+  assert.equal(daysToFirstReply(p), null);
 });
 
 test('reachedActiveExploration is true for a prospect currently in-exploration or client', () => {
