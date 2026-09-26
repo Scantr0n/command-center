@@ -3833,10 +3833,30 @@ function renderKanban(listings, pipelineData) {
       // can never drift; "open to edit" kept at the end since that's real
       // added context (this is a drag target, but a plain click/Enter opens
       // the edit form too) the visible text alone doesn't convey.
+      // Keyboard/screen-reader equivalent of the drag-to-restage gesture
+      // below, same fix CSM's own kanban already has: dragging a card here
+      // never writes to listings.json either, a drop just opens the edit
+      // form with the target status pre-set and pre-generated, and until
+      // now that shortcut only existed for a mouse. A keyboard user could
+      // still open the card (Enter/Space above already supports that) and
+      // hunt inside the edit form for the same status field, but nothing on
+      // the card face offered the one-step version dragging gives a mouse.
+      const moveOptions = KANBAN_STAGE_ORDER.filter(s => s !== stageId)
+        .map(s => `<option value="${escapeHtml(s)}">${escapeHtml(STAGE_LABELS[s] || s)}</option>`)
+        .join('');
       return `
+      <div class="kanban-card-wrap">
       <div class="kanban-card" draggable="true" data-listing-id="${escapeHtml(l.id)}" tabindex="0" role="button" aria-label="${escapeHtml(l.title || 'Untitled item')}, ${escapeHtml(priceText)} &middot; ${escapeHtml(platformText)}, open to edit">
         <div class="kanban-card-title">${escapeHtml(l.title || 'Untitled item')}</div>
         <div class="kanban-card-sub">${escapeHtml(priceText)} &middot; ${escapeHtml(platformText)}</div>
+      </div>
+      <div class="kanban-card-move-row">
+        <label class="sr-only" for="kanbanMove-${escapeHtml(l.id)}">Move ${escapeHtml(l.title || 'this item')} to a different stage (keyboard alternative to dragging)</label>
+        <select class="kanban-card-move" id="kanbanMove-${escapeHtml(l.id)}" data-move-listing-id="${escapeHtml(l.id)}">
+          <option value="" selected>Move to stage&hellip;</option>
+          ${moveOptions}
+        </select>
+      </div>
       </div>
     `;
     }).join('') : '<div class="kanban-empty">No individually logged items in this stage.</div>';
@@ -3864,6 +3884,17 @@ function renderKanban(listings, pipelineData) {
       card.classList.add('card-dragging');
     });
     card.addEventListener('dragend', () => card.classList.remove('card-dragging'));
+  });
+
+  board.querySelectorAll('.kanban-card-move[data-move-listing-id]').forEach(sel => {
+    sel.addEventListener('click', e => e.stopPropagation());
+    sel.addEventListener('change', () => {
+      const id = sel.getAttribute('data-move-listing-id');
+      const targetStageId = sel.value;
+      sel.value = '';
+      if (!targetStageId) return;
+      openModalForStatusMove(id, targetStageId);
+    });
   });
 
   board.querySelectorAll('.kanban-column[data-stage-id]').forEach(column => {

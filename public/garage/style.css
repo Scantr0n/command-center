@@ -526,12 +526,12 @@ section { margin-bottom: 36px; }
   padding: 1px 7px;
   color: var(--dim);
 }
+.kanban-card-wrap { margin-bottom: 8px; }
 .kanban-card {
   background: var(--panelLight);
   border: 1px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: 8px 8px 0 0;
   padding: 10px 11px;
-  margin-bottom: 8px;
   cursor: grab;
   transition: border-color 0.12s ease;
 }
@@ -540,6 +540,28 @@ section { margin-bottom: 36px; }
 .kanban-card.card-dragging { opacity: 0.4; }
 .kanban-card-title { font-size: 0.78rem; color: var(--ink); font-weight: 500; margin-bottom: 4px; }
 .kanban-card-sub { font-size: 0.68rem; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+/* Keyboard/screen-reader equivalent of the drag-to-restage gesture above,
+   same convention as CSM's own .card-move-row: no border between the two
+   so the pair reads as one card, not two stacked elements. */
+.kanban-card-move-row {
+  border: 1px solid var(--hairline);
+  border-top: 1px dashed var(--hairline);
+  border-radius: 0 0 8px 8px;
+  background: var(--panelLight);
+  padding: 2px 11px 4px;
+}
+.kanban-card-move {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--sub);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.kanban-card-move:hover, .kanban-card-move:focus-visible { color: var(--ink); }
+.kanban-card-move option { background: var(--panel); color: var(--ink); }
 .kanban-more-note {
   font-size: 0.68rem;
   color: var(--dim);
@@ -1457,6 +1479,10 @@ textarea.np-input { resize: vertical; }
   .print-btn, .back-link, .search-input, .filter-row, .schema-help, .modal-overlay, .jump-nav-fab, #calcSection, #photoAuditSection, #paceSection, #poshmarkShareSection, .view-toggle-group, .attention-bar {
     display: none !important;
   }
+  /* A "Move to stage..." select does nothing on paper, same reason CSM's
+     own .card-move-row is print-hidden. */
+  .kanban-card-move-row { display: none !important; }
+  .kanban-card { border-radius: 8px; }
   .card-table thead th.sortable::after { content: none !important; }
 
   .callout { border-color: #bbb; background: none; color: #333; }
