@@ -687,6 +687,7 @@
   let shortcutsOpen = false;
   let shortcutsLastFocusedEl = null;
   const SHORTCUTS = [
+    { keys: ['n'], label: 'Log a new application' },
     { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
     { keys: ['Esc'], label: 'Close the open dialog' },
     { keys: ['?'], label: 'Show this help' }
@@ -774,6 +775,25 @@
       e.preventDefault();
       openShortcuts();
     }
+  });
+
+  // "n" opens the quick-log tool, the single action most likely to actually
+  // be reached for on this page, same disabled-button check the tool's own
+  // init already applies (applications data failed to load) so this can
+  // never open a form with no real entry number/duplicate check behind it.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'n' && e.key !== 'N') return;
+    if (shortcutsOpen || jumpNavOpen) return;
+    const active = document.activeElement;
+    const tag = active && active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
+    const submitBtn = document.querySelector('#quickApplicationForm button[type="submit"]');
+    if (!submitBtn || submitBtn.disabled) return;
+    e.preventDefault();
+    const details = document.getElementById('quickLogTool');
+    details.open = true;
+    details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('qaRole').focus();
   });
 
   // Jump-to-section nav, same markup/behavior as Garage/Sondrik/CGT/CSM's:
