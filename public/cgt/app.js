@@ -3461,6 +3461,7 @@ let shortcutsLastFocusedEl = null;
 // same overlay the main Command Center dashboard already added.
 const SHORTCUTS = [
   { keys: ['/'], label: 'Focus search' },
+  { keys: ['n'], label: 'Log a new card' },
   { keys: ['Enter', 'Space'], label: 'Open the focused row, or toggle the focused column sort' },
   { keys: ['Tab'], label: 'Cycle focus inside an open dialog' },
   { keys: ['Esc'], label: 'Close the open dialog' },
@@ -3540,6 +3541,24 @@ document.addEventListener('keydown', (e) => {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
   e.preventDefault();
   openShortcuts();
+});
+
+// "n" opens "Log a new card", the quick-log tool most likely to actually be
+// reached for on this page (the hub's core record type, the only one of the
+// three quick-log tools with unprefixed ids). Same guarded pattern as CSM's,
+// Sondrik's, and Job Search's own "n" shortcuts.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'n' && e.key !== 'N') return;
+  const modalOpen = !document.getElementById('modalOverlay').hidden;
+  if (modalOpen || shortcutsOpen || jumpNavOpen) return;
+  const active = document.activeElement;
+  const tag = active && active.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
+  e.preventDefault();
+  const details = document.getElementById('quickLogTool');
+  details.open = true;
+  details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('ncId').focus();
 });
 
 // Jump-to-section nav, same markup/behavior as Garage/Sondrik's: this page
