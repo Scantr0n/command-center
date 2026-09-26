@@ -195,6 +195,31 @@ function renderSellerStandardsFreshness() {
   el.title = 'Last hand-verified against each platform\'s own published seller-status documentation on ' + SELLER_STANDARDS_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above, added to the one
+// remaining reference table that shipped without it: the sales-tax table
+// states a real, checkable legal claim (all four platforms are marketplace
+// facilitators, collecting/remitting sales tax themselves) with no tracked
+// verification date, the same silent-drift gap this pattern exists to
+// catch elsewhere on the page. Verified 2026-09-26 against current
+// marketplace-facilitator-law coverage (Numeral, Miles Consulting Group,
+// Vinted's own seller/buyer help pages): still accurate for eBay, Poshmark,
+// Depop, and Vinted, tax is collected at checkout and added to the buyer's
+// total, never deducted from the seller's payout.
+const SALES_TAX_REVIEWED_ON = '2026-09-26';
+const SALES_TAX_STALE_AFTER_DAYS = 45;
+
+function renderSalesTaxFreshness() {
+  const el = document.getElementById('salesTaxFreshness');
+  if (!el) return;
+  const age = daysSincePublished(SALES_TAX_REVIEWED_ON);
+  const stale = age != null && age > SALES_TAX_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current marketplace-facilitator sales tax law/documentation on ' + SALES_TAX_REVIEWED_ON + '.';
+}
+
 // Same freshness-badge pattern as the tables above, applied to the one
 // number on this page that isn't platform policy at all: the federal
 // 1099-K threshold is set by Congress, not eBay/Vinted/Poshmark/Depop, and
@@ -5357,6 +5382,7 @@ renderTitleSpecsFreshness();
 renderReturnDisputeFreshness();
 renderScamPatternsFreshness();
 renderSellerStandardsFreshness();
+renderSalesTaxFreshness();
 renderTaxTrackerFreshness();
 renderElectronicsRulesFreshness();
 renderPackagingRulesFreshness();
