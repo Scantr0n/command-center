@@ -8,6 +8,12 @@
   --ink: #F5F6F7;
   --sub: #9A9FA6;
   --dim: #7B8188;
+  /* Same orange as Garage: both hubs are the "Reselling" category in the
+     main hub's CATEGORY_COLOR map. Was missing entirely, which silently
+     dropped the Sections jump-nav button's hover border and, worse, its
+     focus-visible outline below (var() with no fallback and no declared
+     property drops the whole declaration, not just this one value). */
+  --accent: #D97B41;
 }
 
 * { box-sizing: border-box; }
