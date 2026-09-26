@@ -224,23 +224,32 @@
   // state into a real CTA surface: it opens the <details>, scrolls the
   // matching form into view, and focuses its first field. Delegated on
   // document since the empty-state buttons are re-created on every render.
-  function openQuickLogForm(formId) {
+  function openQuickLogForm(formId, channelId) {
     const details = document.getElementById('quickLogTool');
     const form = document.getElementById(formId);
     if (!details || !form) return;
     details.open = true;
     form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Only quickLeadForm's qlChannel select has a real channel to preselect;
+    // its options are already populated with real channel ids by the time
+    // any card can be clicked, so this never sets a value with no matching
+    // <option> yet.
+    if (channelId && formId === 'quickLeadForm') {
+      const channelSelect = document.getElementById('qlChannel');
+      if (channelSelect) channelSelect.value = channelId;
+    }
     const firstField = form.querySelector('input, select, textarea');
     if (firstField) firstField.focus();
   }
   document.addEventListener('click', e => {
     const btn = e.target.closest('[data-open-quick-log]');
-    if (btn) openQuickLogForm(btn.getAttribute('data-open-quick-log'));
+    if (btn) openQuickLogForm(btn.getAttribute('data-open-quick-log'), btn.getAttribute('data-channel-id'));
   });
 
-  function emptyStateCta(formId, label) {
+  function emptyStateCta(formId, label, channelId) {
     return '<button type="button" class="print-btn empty-state-cta" data-open-quick-log="' +
-      escapeHtml(formId) + '">' + escapeHtml(label) + '</button>';
+      escapeHtml(formId) + '"' + (channelId ? ' data-channel-id="' + escapeHtml(channelId) + '"' : '') +
+      '>' + escapeHtml(label) + '</button>';
   }
 
   // Local calendar date as YYYY-MM-DD. daysBetween (like CSM's daysUntil)
@@ -1000,7 +1009,19 @@
         (STATUS_LABEL[c.status] || escapeHtml(c.status || 'UNKNOWN')) + '</span>' +
         '</div>' +
         (value ? '<div class="channel-value font-display">' + escapeHtml(value) + '</div>'
-               : '<div class="channel-value channel-value-empty">No number logged yet.</div>') +
+               // Was a flat dead end: no button, no link, even though the exact
+               // tool that would put a real number here already exists further
+               // up the page. linkedMetric decides which one, since downloads is
+               // one shared metric (any check helps every "downloads" channel)
+               // while leads are attributed per channel (needs this channel's id
+               // preselected, see openQuickLogForm above). No CTA at all when
+               // linkedMetric is null, an existing channel's own metadata isn't
+               // something these forms can edit, only add a new one.
+               : '<div class="channel-value channel-value-empty">No number logged yet.' +
+                 (c.linkedMetric === 'downloads' ? emptyStateCta('quickCheckForm', 'Log a download check')
+                   : c.linkedMetric === 'leads' ? emptyStateCta('quickLeadForm', 'Log a lead', c.id)
+                   : '') +
+                 '</div>') +
         (c.note ? '<div class="channel-note">' + escapeHtml(c.note) + '</div>' : '') +
         '</div>';
     }).join('') + '</div>';
