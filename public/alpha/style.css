@@ -1086,6 +1086,15 @@ header.page-head .sub {
    POSITION_CONCENTRATION_CAUTION_PCT comment in app.js). Scoped the same way
    as the rules above, for the same reason. */
 .pos-table td.pos-conc-high { color: #E0A030; font-weight: 600; }
+/* The long/short exposure footer row's own spans, not <td> elements
+   themselves, so they deliberately don't reuse the td-scoped
+   .pos-side-long/.pos-side-short selectors above: those require the
+   colored element to literally be a <td> (see this file's own comment on
+   the specificity bug that convention already caused once), and reusing
+   that exact selector name on a <span> here would silently fail the same
+   way again. Same two colors, genuinely different selector. */
+.pos-exposure-long { color: #3DDC84; }
+.pos-exposure-short { color: #E0A030; }
 
 /* Architecture cards */
 .arch-grid {

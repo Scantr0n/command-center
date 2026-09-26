@@ -105,5 +105,37 @@
     return (marketValue / equity) * 100;
   }
 
-  return { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct };
+  // Standard trading-dashboard risk convention (gross vs net exposure): the
+  // signed marketValue Alpaca already sends per position (positive for a
+  // long, negative for a short) sums to a real net figure in
+  // computePositionsTotals' totalMv above, but a net-only number hides a
+  // book that's actually long AND short at the same time, e.g. a $10k long
+  // plus a $10k short nets to $0 exposure even though there are two real
+  // open positions with real, opposite risk. This is the gross split of
+  // that same real signed field, grouped by the real `side` Alpaca reports,
+  // never a second guess at direction from the sign alone (a short's
+  // marketValue is expected to already read negative; this trusts the
+  // daemon's own `side` label instead of inferring it, so a feed that ever
+  // disagreed with itself surfaces as "unknown" rather than being silently
+  // resolved one way). Same all-or-nothing honesty rule as
+  // computePositionsTotals: one bad marketValue or an unrecognized side
+  // voids the whole breakdown rather than reporting a partial one.
+  function computeSideExposure(positions) {
+    const empty = { known: false, longMv: null, shortMv: null, netMv: null, longCount: 0, shortCount: 0 };
+    const list = positions || [];
+    if (!list.length) return empty;
+    const allNumeric = list.every(p => typeof p.marketValue === 'number' && Number.isFinite(p.marketValue));
+    const allSided = list.every(p => p.side === 'long' || p.side === 'short');
+    if (!allNumeric || !allSided) return empty;
+    const longs = list.filter(p => p.side === 'long');
+    const shorts = list.filter(p => p.side === 'short');
+    const longMv = longs.reduce((sum, p) => sum + p.marketValue, 0);
+    const shortMv = shorts.reduce((sum, p) => sum + p.marketValue, 0);
+    return { known: true, longMv, shortMv, netMv: longMv + shortMv, longCount: longs.length, shortCount: shorts.length };
+  }
+
+  return {
+    fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct,
+    computeSideExposure
+  };
 });

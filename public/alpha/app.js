@@ -1239,12 +1239,12 @@ function renderPositionSizing(data, clientDrawdownHistory, clientRobustnessHisto
 }
 
 // Account/position money math (fmtDollar, fmtPct, fmtQty, computeExposure,
-// computePositionsTotals) lives in account-core.js, loaded before this file
-// (see index.html), so it can be unit-tested outside the browser
-// (account-core.test.js) instead of only ever running live once a real
-// position feed exists. See that file's own header comment for the real bug
-// this already caused with no test coverage.
-const { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct } = AlphaAccountCore;
+// computePositionsTotals, computeSideExposure) lives in account-core.js,
+// loaded before this file (see index.html), so it can be unit-tested outside
+// the browser (account-core.test.js) instead of only ever running live once a
+// real position feed exists. See that file's own header comment for the real
+// bug this already caused with no test coverage.
+const { fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct, computeSideExposure } = AlphaAccountCore;
 
 // server.js's /equity-history proxy (see mapEquityCurve's own comment there)
 // forwards the raw real equity readings its drawdown calculation already
@@ -1520,6 +1520,29 @@ function renderPositions(data) {
     `;
   }
 
+  // A second footer row, gross long/short exposure, only once the book is
+  // genuinely both: with an all-long (or all-short) book this would only
+  // ever restate the Total row above under a new label (see the genealogy
+  // wall's own "Active lineages" comment for why this codebase doesn't add
+  // a tile that can only ever repeat a number shown elsewhere), so it stays
+  // hidden until there is a real opposite-direction position to net against.
+  const sideExposure = computeSideExposure(positions);
+  let exposureRow = '';
+  if (sideExposure.known && sideExposure.longCount > 0 && sideExposure.shortCount > 0) {
+    exposureRow = `
+      <tr class="pos-totals-row">
+        <td class="font-mono" colspan="5">Exposure (${sideExposure.longCount} long / ${sideExposure.shortCount} short)</td>
+        <td class="font-mono pos-num" colspan="3" title="Gross exposure per side, from each real position's own signed market value grouped by its real side; net is the same figure the Total row above already reports.">
+          <span class="pos-exposure-long">Long ${escapeHtml(fmtDollar(sideExposure.longMv) || '-')}</span>
+          &nbsp;/&nbsp;
+          <span class="pos-exposure-short">Short ${escapeHtml(fmtDollar(Math.abs(sideExposure.shortMv)) || '-')}</span>
+          &nbsp;/&nbsp;
+          Net ${escapeHtml(fmtDollar(sideExposure.netMv) || '-')}
+        </td>
+      </tr>
+    `;
+  }
+
   // Same sortable-column convention already proven on Garage/CGT/CSM/Job
   // Search's own tables (data-sort + tabindex + aria-sort, click or
   // Enter/Space to activate, see wirePositionsSortHeaders/
@@ -1543,7 +1566,7 @@ function renderPositions(data) {
           <tr>${headerCells}</tr>
         </thead>
         <tbody>${rows}</tbody>
-        ${totalsRow ? `<tfoot>${totalsRow}</tfoot>` : ''}
+        ${totalsRow ? `<tfoot>${totalsRow}${exposureRow}</tfoot>` : ''}
       </table>
     </div>
   `;

@@ -12,7 +12,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct
+  fmtDollar, fmtPct, fmtQty, computeExposure, computePositionsTotals, positionConcentrationPct,
+  computeSideExposure
 } = require('./account-core.js');
 
 test('fmtDollar formats positive/negative amounts with a fixed 2 decimals, null for non-numbers', () => {
@@ -124,4 +125,56 @@ test('positionConcentrationPct is honest-null (never 0) for a missing, zero, or 
   assert.equal(positionConcentrationPct(100, null), null);
   assert.equal(positionConcentrationPct(100, 0), null);
   assert.equal(positionConcentrationPct(100, -50), null);
+});
+
+test('computeSideExposure is honest-unknown (not $0) for an empty position list', () => {
+  const result = computeSideExposure([]);
+  assert.equal(result.known, false);
+  assert.equal(result.longMv, null);
+});
+
+test('computeSideExposure splits real signed market values by real side, all-long book', () => {
+  const positions = [
+    { side: 'long', marketValue: 300 },
+    { side: 'long', marketValue: 200 }
+  ];
+  const result = computeSideExposure(positions);
+  assert.equal(result.known, true);
+  assert.equal(result.longMv, 500);
+  assert.equal(result.shortMv, 0);
+  assert.equal(result.netMv, 500);
+  assert.equal(result.longCount, 2);
+  assert.equal(result.shortCount, 0);
+});
+
+test('computeSideExposure nets a real long and a real short, matching Alpaca\'s negative-short convention', () => {
+  const positions = [
+    { side: 'long', marketValue: 10000 },
+    { side: 'short', marketValue: -4000 }
+  ];
+  const result = computeSideExposure(positions);
+  assert.equal(result.known, true);
+  assert.equal(result.longMv, 10000);
+  assert.equal(result.shortMv, -4000);
+  assert.equal(result.netMv, 6000, 'a book that is both long and short must not net to the long side alone');
+  assert.equal(result.longCount, 1);
+  assert.equal(result.shortCount, 1);
+});
+
+test('computeSideExposure is all-or-nothing: one bad marketValue voids the whole breakdown', () => {
+  const positions = [
+    { side: 'long', marketValue: 100 },
+    { side: 'short', marketValue: null }
+  ];
+  const result = computeSideExposure(positions);
+  assert.equal(result.known, false, 'must not silently report the long side alone as the whole breakdown');
+});
+
+test('computeSideExposure is all-or-nothing: an unrecognized side voids the whole breakdown', () => {
+  const positions = [
+    { side: 'long', marketValue: 100 },
+    { side: 'flat', marketValue: 50 }
+  ];
+  const result = computeSideExposure(positions);
+  assert.equal(result.known, false, 'must not silently drop or misclassify a side this codebase has never seen the daemon send');
 });
