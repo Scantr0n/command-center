@@ -293,12 +293,25 @@
     return totals;
   }
 
+  // A card's optional submissionId links it back to the submissions.json
+  // batch it was actually graded in, so the submission detail view can list
+  // what came back from it instead of that link only working one direction
+  // (card -> submission, never submission -> its own cards). Plain filter,
+  // not worth a whole file of its own, but pulled out here anyway (rather
+  // than inlined in app.js) for the same reason costPerCard is: one real
+  // rule, unit-tested once, called from both the submission modal and
+  // wherever else needs it, instead of copied inline.
+  function cardsForSubmission(cards, submissionId) {
+    if (!submissionId) return [];
+    return (cards || []).filter(c => c.submissionId === submissionId);
+  }
+
   return {
     computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
     classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
     COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
     isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
     estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-    buildPortfolioValueTimeline
+    buildPortfolioValueTimeline, cardsForSubmission
   };
 });

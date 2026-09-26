@@ -268,6 +268,15 @@
       }
 
       // Same "wrong type passes clean and only shows up garbled on render"
+      // risk as storageLocation above. Whether submissionId actually points
+      // at a real row in submissions.json is a cross-file question this
+      // function can't answer (it only ever sees cards), so that check
+      // lives separately in findOrphanSubmissionRefs below instead of here.
+      if (c.submissionId !== null && c.submissionId !== undefined && typeof c.submissionId !== 'string') {
+        errors.push(where + ': "submissionId" must be a string or null');
+      }
+
+      // Same "wrong type passes clean and only shows up garbled on render"
       // risk as storageLocation above, since imageUrl also only ever gets
       // rendered as-is (an <img src>, never re-validated as a URL string at
       // render time). Deliberately not requiring an http(s) prefix: a real
@@ -498,6 +507,27 @@
     return flags;
   }
 
+  // A card's optional submissionId is meant to point at a real row in
+  // submissions.json (the batch it was actually graded in), so the
+  // submission's own detail view can list what came back from it. That's a
+  // cross-file question validateCards can't answer on its own (it only ever
+  // sees the cards array), so it lives here instead, called separately by
+  // the CLI (validate.js, which loads both files) and by the live page
+  // (app.js, which already has both loaded) the same way
+  // findDuplicateGroups/findListingPriceMismatches above are. A typo'd or
+  // stale submissionId is worth a warning, not an error: it never breaks
+  // anything rendered, the card's detail view just quietly shows no linked
+  // submission, the same "wrong type passes clean" risk the type check in
+  // validateCards above already flags for the field itself.
+  function findOrphanSubmissionRefs(cards, submissions) {
+    const knownIds = new Set((submissions || []).map(s => s.id));
+    const flags = [];
+    (cards || []).forEach(c => {
+      if (c.submissionId != null && !knownIds.has(c.submissionId)) flags.push(c);
+    });
+    return flags;
+  }
+
   // Validates the separate "cards sent off and not back yet" log
   // (public/cgt/data/submissions.json). This is a distinct real-world thing
   // from a graded card row: a submission is a batch shipped to a grading
@@ -679,7 +709,7 @@
 
   return {
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findDuplicateCertGroups,
-    findDuplicateCandidateGroups, findGradeLadderInversions, findListingPriceMismatches,
+    findDuplicateCandidateGroups, findGradeLadderInversions, findListingPriceMismatches, findOrphanSubmissionRefs,
     isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
     SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };

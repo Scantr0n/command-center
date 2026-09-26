@@ -17,7 +17,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   isDateOrNull, findDuplicateGroups, findDuplicateCertGroups, findDuplicateCandidateGroups, findGradeLadderInversions,
-  findListingPriceMismatches, validateCards, validateSubmissions, validateCandidates
+  findListingPriceMismatches, findOrphanSubmissionRefs, validateCards, validateSubmissions, validateCandidates
 } = require('./validate-core.js');
 
 test('isDateOrNull accepts null and real calendar dates, rejects impossible ones', () => {
@@ -274,6 +274,29 @@ test('findListingPriceMismatches does not flag a listing that is only modestly a
     { id: 'b', cardName: 'Y', estimatedValue: 100, listedPrice: 300, listedDate: '2026-08-08', soldDate: '2026-08-09', soldPrice: 290 }
   ];
   assert.deepEqual(findListingPriceMismatches(cards), []);
+});
+
+test('findOrphanSubmissionRefs flags a card whose submissionId does not match any real submission', () => {
+  const cards = [{ id: 'a', submissionId: 'batch-1' }, { id: 'b', submissionId: 'batch-2' }];
+  const submissions = [{ id: 'batch-1' }];
+  const flags = findOrphanSubmissionRefs(cards, submissions);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].id, 'b');
+});
+
+test('findOrphanSubmissionRefs does not flag a card with no submissionId, or one that matches a real submission', () => {
+  const cards = [{ id: 'a', submissionId: null }, { id: 'b', submissionId: 'batch-1' }];
+  const submissions = [{ id: 'batch-1' }];
+  assert.deepEqual(findOrphanSubmissionRefs(cards, submissions), []);
+});
+
+test('validateCards accepts a string submissionId or null, rejects other types', () => {
+  const clean = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', submissionId: 'batch-1' }]);
+  assert.deepEqual(clean.errors, []);
+  const nullOk = validateCards([{ id: 'b', cardName: 'Y', sport: 'hockey', submissionId: null }]);
+  assert.deepEqual(nullOk.errors, []);
+  const bad = validateCards([{ id: 'c', cardName: 'Z', sport: 'hockey', submissionId: 42 }]);
+  assert.ok(bad.errors.some(e => e.includes('submissionId')));
 });
 
 test('validateCards accepts real BGS subgrades in half-point steps, rejects out-of-range or off-step values', () => {

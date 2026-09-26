@@ -17,7 +17,7 @@ const {
   COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-  buildPortfolioValueTimeline
+  buildPortfolioValueTimeline, cardsForSubmission
 } = require('./grading-core.js');
 
 test('missing rawValue, expectedGradedValue, or estimatedGradingCost returns null, never a guessed verdict', () => {
@@ -339,4 +339,22 @@ test('buildPortfolioValueTimeline drops a card entirely from the date its soldDa
 test('the real cards.json never crashes buildPortfolioValueTimeline', () => {
   const data = require('./cards.json');
   assert.doesNotThrow(() => buildPortfolioValueTimeline(data.cards || []));
+});
+
+test('cardsForSubmission returns only cards whose submissionId matches, in no particular order guarantee', () => {
+  const cards = [
+    { id: 'a', submissionId: 'batch-1' },
+    { id: 'b', submissionId: 'batch-2' },
+    { id: 'c', submissionId: 'batch-1' },
+    { id: 'd', submissionId: null }
+  ];
+  assert.deepEqual(cardsForSubmission(cards, 'batch-1').map(c => c.id), ['a', 'c']);
+  assert.deepEqual(cardsForSubmission(cards, 'batch-2').map(c => c.id), ['b']);
+});
+
+test('cardsForSubmission returns an empty array for a submission with no cards yet, and for a null/missing id', () => {
+  const cards = [{ id: 'a', submissionId: 'batch-1' }];
+  assert.deepEqual(cardsForSubmission(cards, 'batch-99'), []);
+  assert.deepEqual(cardsForSubmission(cards, null), []);
+  assert.deepEqual(cardsForSubmission([], 'batch-1'), []);
 });

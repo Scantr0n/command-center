@@ -1336,7 +1336,7 @@ const {
   computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-  buildPortfolioValueTimeline: buildPortfolioValueTimelineCore
+  buildPortfolioValueTimeline: buildPortfolioValueTimelineCore, cardsForSubmission
 } = window.CGTGradingCore;
 
 const CANDIDATE_VERDICT_META = {
@@ -1707,6 +1707,22 @@ function openSubmissionModal(id) {
     body += `<div class="field-row"><a href="${escapeHtml(lookup.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(lookup.text)} &rarr;</a></div>`;
   }
   body += field('Notes', s.notes, !s.notes);
+
+  const linkedCards = cardsForSubmission(cards, s.id);
+  if (linkedCards.length) {
+    body += `<div class="field-row">
+      <div class="field-label">Cards from this submission</div>
+      <div class="field-value">${linkedCards.map(c =>
+        `<a href="?card=${encodeURIComponent(c.id)}" class="cert-link font-mono">${escapeHtml(c.cardName || c.id)}</a>`
+      ).join('<br>')}</div>
+    </div>`;
+  } else if (s.status === 'returned') {
+    body += `<div class="field-row">
+      <div class="field-label">Cards from this submission</div>
+      <div class="field-value empty">none logged yet</div>
+      <div class="field-note">This batch is marked returned, but no card in cards.json has this submission's id set as its "submissionId" yet.</div>
+    </div>`;
+  }
 
   document.getElementById('modalBody').innerHTML = body;
   wireSubmissionEditForm(s);
@@ -2122,6 +2138,7 @@ function renderAttentionBar() {
   const duplicateCandidateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateCandidateGroups(realCandidatesForDupes).length : 0;
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
   const listingPriceCount = window.CGTValidateCore ? CGTValidateCore.findListingPriceMismatches(realCards).length : 0;
+  const orphanSubmissionCount = window.CGTValidateCore ? CGTValidateCore.findOrphanSubmissionRefs(realCards, submissions).length : 0;
   // A candidate still being weighed (no decision logged yet) but missing
   // expectedGradedValue/estimatedGradingCost can't get a real verdict out of
   // computeGradingMath, so it sits stuck at "Needs more data" until that
@@ -2191,6 +2208,9 @@ function renderAttentionBar() {
   }
   if (listingPriceCount) {
     items.push({ n: listingPriceCount, tone: 'warn', target: 'listingPriceSection', label: listingPriceCount === 1 ? 'listing is 50%+ off its own researched estimate' : 'listings are 50%+ off their own researched estimate' });
+  }
+  if (orphanSubmissionCount) {
+    items.push({ n: orphanSubmissionCount, tone: 'warn', target: 'inventorySection', label: orphanSubmissionCount === 1 ? 'card references a submission id that doesn’t exist' : 'cards reference a submission id that doesn’t exist' });
   }
   if (overdueSubmissionsCount) {
     items.push({
@@ -3419,6 +3439,14 @@ function openModal(id) {
     </div>`;
   }
   body += field('Storage location', activeCard.storageLocation, !activeCard.storageLocation);
+  if (activeCard.submissionId) {
+    const linkedSubmission = submissions.find(s => s.id === activeCard.submissionId);
+    body += `<div class="field-row">
+      <div class="field-label">From submission</div>
+      <div class="field-value"><a href="?submission=${encodeURIComponent(activeCard.submissionId)}" class="cert-link font-mono">${escapeHtml(linkedSubmission ? (linkedSubmission.description || activeCard.submissionId) : activeCard.submissionId)} &rarr;</a></div>
+      ${!linkedSubmission ? '<div class="field-note">No submission with this id found in submissions.json, double-check for a typo.</div>' : ''}
+    </div>`;
+  }
   const bookValue = bookValueSearchLink(activeCard);
   if (bookValue) {
     body += `<div class="field-row">
@@ -4345,6 +4373,7 @@ function initQuickLogTool() {
     }, subgrades, {
       certNumber: document.getElementById('ncCertNumber').value.trim() || null,
       storageLocation: document.getElementById('ncStorageLocation').value.trim() || null,
+      submissionId: document.getElementById('ncSubmissionId').value.trim() || null,
       estimatedValue: estimatedValueRaw === '' ? null : Number(estimatedValueRaw),
       valuationBasis: document.getElementById('ncValuationBasis').value || null,
       compNote: document.getElementById('ncCompNote').value.trim() || null,
@@ -4386,6 +4415,11 @@ function initQuickLogTool() {
         const others = ownGroup.cards.filter(c => c !== candidate).map(c => c.id).join(', ');
         advisory.push('Same card name, year, grading company, and grade as an existing card (' + others +
           '). Could be a real second copy, or a duplicate entry, double check before pasting this in.');
+      }
+
+      if (candidate.submissionId && window.CGTValidateCore.findOrphanSubmissionRefs([candidate], submissions).length) {
+        advisory.push('"' + candidate.submissionId + '" does not match any real submission id in submissions.json. ' +
+          'Double check it against that submission\'s own "id" field before pasting this in.');
       }
     }
 

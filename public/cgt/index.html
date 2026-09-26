@@ -94,6 +94,7 @@
           <tr><th scope="row" class="wrap">subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
           <tr><th scope="row">certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
           <tr><th scope="row">storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
+          <tr><th scope="row">submissionId</th><td>Optional, the <code>id</code> of the real <code>submissions.json</code> batch this card was actually graded in, e.g. <code>"2026-08-psa-regular-batch-1"</code>. Leave <code>null</code> when not known, when the card wasn't graded through a batch logged here, or for a raw/ungraded card. When set, the card's detail view links to that submission and, once returned, that submission's own detail view lists every card that came back from it. <code>node public/cgt/data/validate.js</code> warns if it doesn't match any real submission id (a typo, or a submission never logged), never an error since it never breaks anything rendered.</td></tr>
           <tr><th scope="row">estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
           <tr><th scope="row">valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
           <tr><th scope="row">compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
@@ -125,6 +126,7 @@
   "subgradeSurface": null,
   "certNumber": null,
   "storageLocation": null,
+  "submissionId": null,
   "estimatedValue": null,
   "valuationBasis": null,
   "compNote": null,
@@ -201,6 +203,8 @@
           <input class="quick-log-input" type="text" id="ncCertNumber">
           <label class="quick-log-label" for="ncStorageLocation">Storage location (optional)</label>
           <input class="quick-log-input" type="text" id="ncStorageLocation" placeholder="e.g. Home safe">
+          <label class="quick-log-label" for="ncSubmissionId">From submission id (optional, must match a real id in submissions.json)</label>
+          <input class="quick-log-input" type="text" id="ncSubmissionId" placeholder="e.g. 2026-08-psa-regular-batch-1">
           <label class="quick-log-label" for="ncEstimatedValue">Estimated value, USD (optional)</label>
           <input class="quick-log-input" type="number" id="ncEstimatedValue" min="0" step="0.01">
           <label class="quick-log-label" for="ncValuationBasis">Valuation basis (required if a value is entered above)</label>
@@ -858,7 +862,7 @@
     <div class="data-quality-list" id="listingPriceList"></div>
   </section>
 
-  <section>
+  <section id="inventorySection">
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Inventory</h2>
       <button type="button" id="clearFiltersBtn" class="print-btn font-mono" hidden>Clear filters</button>

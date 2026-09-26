@@ -27,7 +27,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { validateCards, validateSubmissions, validateCandidates } = require('./validate-core.js');
+const { validateCards, validateSubmissions, validateCandidates, findOrphanSubmissionRefs } = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 
@@ -91,6 +91,18 @@ function main() {
   const cardsOk = checkFile('cards.json', cardsData.cards || [], validateCards);
   const submissionsOk = checkFile('submissions.json', submissionsData.submissions || [], validateSubmissions);
   const candidatesOk = checkFile('candidates.json', candidatesData.candidates || [], validateCandidates);
+
+  // Cross-file check: neither validateCards (only ever sees cards.json) nor
+  // validateSubmissions (only ever sees submissions.json) can tell a card's
+  // submissionId apart from a typo, since that takes both files loaded at
+  // once. Warning-level, same as every other possible-mistake flag above:
+  // it never breaks anything rendered, the card's detail view just quietly
+  // shows no linked submission.
+  const orphanRefs = findOrphanSubmissionRefs(cardsData.cards || [], submissionsData.submissions || []);
+  if (orphanRefs.length) {
+    console.warn('\n' + orphanRefs.length + ' card(s) in cards.json reference a submissionId not found in submissions.json:');
+    orphanRefs.forEach(c => console.warn('  - ' + (c.id || '(missing id)') + ': submissionId "' + c.submissionId + '"'));
+  }
 
   checkChangelogFreshness();
 
