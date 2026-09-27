@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-22T22:55:42.859Z",
-  "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json,acquisitions.json}, run node public/garage/data/changelog.js to refresh",
+  "generatedAt": "2026-09-27T23:02:19.300Z",
+  "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json,acquisitions.json,comps.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "5387aa7",
+      "fullHash": "5387aa76c4627c402dc8fa15c23637cd83d0f06a",
+      "date": "2026-09-27",
+      "author": "Claude",
+      "subject": "Garage: add a real sold-comps/pricing-research log",
+      "historyReset": false,
+      "files": [
+        "comps.json"
+      ]
+    },
     {
       "hash": "db32f08",
       "fullHash": "db32f082138608d832f942505975f2c038f0f4b4",
