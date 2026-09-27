@@ -928,6 +928,11 @@ async function loadData() {
     compsEmpty.setAttribute('role', 'alert');
     compsEmpty.textContent = "Couldn't load comps data: " + compsResult.reason.message;
   }
+  // renderOfferItemChips above already ran renderOfferGuide once, but before
+  // compsLog was set here, so its first paint could miss a real logged comp
+  // for the selected item. Re-run now that compsLog reflects what actually
+  // loaded, same fix any two out-of-order loadData sections would need.
+  renderOfferGuide();
 
   renderSellerStandardsProgress(sales, disputes);
   initTableScrollShadows();
@@ -2510,6 +2515,22 @@ function renderOfferItemChips(currentListings) {
   onOfferItemChange();
 }
 
+// Most recent comp actually logged against this listing in the sold-comps/
+// pricing-research log, if any: real grounding for the offer guide below
+// instead of the tier math alone, so "why won't you come down" has a real
+// recent sale to point back to, not just a percentage-of-asking rule.
+function mostRecentCompForListing(comps, listingId) {
+  if (!listingId) return null;
+  const matches = (comps || []).filter(c => c.listingId === listingId);
+  if (!matches.length) return null;
+  return [...matches].sort((a, b) => {
+    if (!a.soldDate && !b.soldDate) return 0;
+    if (!a.soldDate) return 1;
+    if (!b.soldDate) return -1;
+    return b.soldDate.localeCompare(a.soldDate);
+  })[0];
+}
+
 // A copy-paste reply matching the ladder verdict above, same "Copy" pattern
 // as the buyer message templates below: the guide already computes the
 // right counter number, this is the last step from "what to do" to an
@@ -2583,6 +2604,12 @@ function renderOfferGuide() {
   rows.push(`<div class="field-row"><div class="field-label font-mono">Tier</div><div class="field-value"><span class="badge ${badgeClass}">${escapeHtml(tierLabel)}</span></div></div>`);
   rows.push(fieldRow('Suggested action', escapeHtml(actionText)));
   if (counterAmount != null) rows.push(fieldRow('Suggested counter', formatUsd(counterAmount)));
+
+  const recentComp = l ? mostRecentCompForListing(compsLog, l.id) : null;
+  if (recentComp) {
+    rows.push(fieldRow('Recent comp', `${escapeHtml(PLATFORM_LABELS[recentComp.platform] || recentComp.platform)}: "${escapeHtml(recentComp.title)}" sold for ` +
+      `${formatUsd(recentComp.soldPrice)}${recentComp.soldDate ? ' on ' + escapeHtml(recentComp.soldDate) : ''}, logged in the sold comps/pricing research log above.`));
+  }
 
   const replyText = offerReplyText(tier, l && l.title, offer, counterAmount);
   rows.push(`
