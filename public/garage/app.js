@@ -4,6 +4,7 @@ let expensesLog = [];
 let disputesLog = [];
 let suppliesLog = [];
 let acquisitionsLog = [];
+let compsLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 // Set once from a real ?listing=<id> URL param and consumed once, right
@@ -24,6 +25,7 @@ let rawExpensesData = null;
 let rawDisputesData = null;
 let rawSuppliesData = null;
 let rawAcquisitionsData = null;
+let rawCompsData = null;
 let garageChangelogDriftStatus = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
@@ -744,7 +746,7 @@ function renderChangelog(data, driftStatus) {
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
   loadChangelog();
-  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
     fetchJson('/garage/data/activity.json'),
@@ -752,7 +754,8 @@ async function loadData() {
     fetchJson('/garage/data/expenses.json'),
     fetchJson('/garage/data/disputes.json'),
     fetchJson('/garage/data/supplies.json'),
-    fetchJson('/garage/data/acquisitions.json')
+    fetchJson('/garage/data/acquisitions.json'),
+    fetchJson('/garage/data/comps.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
@@ -762,6 +765,7 @@ async function loadData() {
   const disputesData = disputesResult.status === 'fulfilled' ? disputesResult.value.data : null;
   const suppliesData = suppliesResult.status === 'fulfilled' ? suppliesResult.value.data : null;
   const acquisitionsData = acquisitionsResult.status === 'fulfilled' ? acquisitionsResult.value.data : null;
+  const compsData = compsResult.status === 'fulfilled' ? compsResult.value.data : null;
   rawListingsData = listingsData;
   rawPipelineData = pipelineData;
   rawActivityData = activityData;
@@ -770,8 +774,9 @@ async function loadData() {
   rawDisputesData = disputesData;
   rawSuppliesData = suppliesData;
   rawAcquisitionsData = acquisitionsData;
+  rawCompsData = compsData;
   const backupBtn = document.getElementById('backupBtn');
-  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData);
+  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
@@ -779,8 +784,9 @@ async function loadData() {
   const disputes = (disputesData && disputesData.disputes) || [];
   const supplies = (suppliesData && suppliesData.supplies) || [];
   const acquisitions = (acquisitionsData && acquisitionsData.acquisitions) || [];
+  const comps = (compsData && compsData.comps) || [];
 
-  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult]
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult]
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value.lastModified));
 
@@ -909,6 +915,18 @@ async function loadData() {
     acquisitionsEmpty.setAttribute('role', 'alert');
     acquisitionsEmpty.textContent = "Couldn't load acquisitions data: " + acquisitionsResult.reason.message;
     document.getElementById('acquisitionsTotals').innerHTML = '';
+  }
+
+  if (compsData) {
+    compsLog = comps;
+    renderComps(comps, listings);
+  } else {
+    compsLog = [];
+    document.getElementById('compsTableBody').innerHTML = '';
+    const compsEmpty = document.getElementById('compsTableEmpty');
+    compsEmpty.hidden = false;
+    compsEmpty.setAttribute('role', 'alert');
+    compsEmpty.textContent = "Couldn't load comps data: " + compsResult.reason.message;
   }
 
   renderSellerStandardsProgress(sales, disputes);
@@ -3254,6 +3272,67 @@ function renderAcquisitions(acquisitions, currentListings, sales) {
     </p>`;
 }
 
+// Real comparable sold listings actually looked up before pricing an item or
+// answering a lowball offer in the offer response guide above, not an
+// estimate. Sorted most-recent-sold first (nulls last), same convention as
+// renderAcquisitions above. "Age" reuses daysSincePublished from
+// garage-core.js: that function is just a real "days since a given date"
+// calc, nothing eBay-listing-specific about it despite the name, so a
+// second identical day-math helper isn't needed just to rename it for this
+// table.
+function renderComps(comps, currentListings) {
+  const tbody = document.getElementById('compsTableBody');
+  const empty = document.getElementById('compsTableEmpty');
+
+  if (!comps.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No sold comps logged yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...comps].sort((a, b) => {
+    if (!a.soldDate && !b.soldDate) return 0;
+    if (!a.soldDate) return 1;
+    if (!b.soldDate) return -1;
+    return b.soldDate.localeCompare(a.soldDate);
+  });
+
+  tbody.innerHTML = sorted.map(c => {
+    const listing = c.listingId ? currentListings.find(l => l.id === c.listingId) : null;
+    const itemHtml = c.listingId
+      ? (listing
+          ? `<button type="button" class="badge badge-link badge-button" data-listing-id="${escapeHtml(c.listingId)}">${escapeHtml(listing.title)}</button>`
+          : `<span class="cell-muted">${escapeHtml(c.listingId)} (not itemized yet)</span>`)
+      : '<span class="cell-value empty">general research</span>';
+    const ageDays = daysSincePublished(c.soldDate);
+    const soldHtml = c.soldDate
+      ? escapeHtml(c.soldDate) + (ageDays != null ? `<div class="cell-muted">${ageDays === 0 ? 'today' : ageDays + 'd ago'}</div>` : '')
+      : '<span class="cell-value empty">not logged</span>';
+    const sourceHtml = c.url
+      ? `<a class="badge badge-link" href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer">View <span aria-hidden="true">&#8599;</span></a>`
+      : '<span class="cell-value empty">no link</span>';
+    return `
+    <tr>
+      <td>${itemHtml}</td>
+      <td><span class="badge badge-${escapeHtml(c.platform)}">${escapeHtml(PLATFORM_LABELS[c.platform] || c.platform)}</span></td>
+      <td class="cell-card-name">${escapeHtml(c.title)}</td>
+      <td class="cell-value">${formatUsd(c.soldPrice)}</td>
+      <td class="cell-muted">${soldHtml}</td>
+      <td>${sourceHtml}</td>
+      <td class="cell-muted">${c.notes ? escapeHtml(c.notes) : ''}</td>
+    </tr>
+  `;
+  }).join('');
+
+  tbody.querySelectorAll('[data-listing-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentListings.some(l => l.id === btn.dataset.listingId)) openModal(btn.dataset.listingId);
+    });
+  });
+}
+
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchTerm = e.target.value;
   applyFiltersAndRender();
@@ -4184,7 +4263,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // diffed against or restored from a known-good copy. Local download only,
 // nothing is sent anywhere. Same approach as CSM's own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData) return;
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData && !rawCompsData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center Garage (/garage), local download only',
@@ -4195,7 +4274,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
     expensesJson: rawExpensesData,
     disputesJson: rawDisputesData,
     suppliesJson: rawSuppliesData,
-    acquisitionsJson: rawAcquisitionsData
+    acquisitionsJson: rawAcquisitionsData,
+    compsJson: rawCompsData
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -4338,6 +4418,11 @@ const ACQUISITIONS_CSV_COLUMNS = [
   ['itemCount', 'Items'], ['perItemCost', 'Per-item cost'], ['listingIds', 'Linked listings'], ['notes', 'Notes']
 ];
 
+const COMPS_CSV_COLUMNS = [
+  ['listingId', 'Linked listing'], ['platform', 'Platform'], ['title', 'Comp'], ['soldPrice', 'Sold price'],
+  ['soldDate', 'Sold date'], ['url', 'Source URL'], ['notes', 'Notes']
+];
+
 // Exports every real logged acquisition, newest-first, same order as the
 // on-page table.
 document.getElementById('acquisitionsCsvBtn').addEventListener('click', () => {
@@ -4365,6 +4450,29 @@ document.getElementById('acquisitionsCsvBtn').addEventListener('click', () => {
   document.body.appendChild(a2);
   a2.click();
   document.body.removeChild(a2);
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('compsCsvBtn').addEventListener('click', () => {
+  const rows = [...compsLog]
+    .sort((a, b) => {
+      if (!a.soldDate && !b.soldDate) return 0;
+      if (!a.soldDate) return 1;
+      if (!b.soldDate) return -1;
+      return b.soldDate.localeCompare(a.soldDate);
+    })
+    .map(c => ({ ...c, platform: PLATFORM_LABELS[c.platform] || c.platform || '' }));
+  const header = COMPS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(c => COMPS_CSV_COLUMNS.map(([key]) => csvField(c[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a3 = document.createElement('a');
+  a3.href = url;
+  a3.download = 'garage-comps-' + todayDateStr() + '.csv';
+  document.body.appendChild(a3);
+  a3.click();
+  document.body.removeChild(a3);
   URL.revokeObjectURL(url);
 });
 
@@ -5237,6 +5345,85 @@ function wireQuickLogAcquisitionTool() {
   });
 }
 
+// Same quick-log convention as the tools above, for comps.json. soldDate in
+// the future is a blocker, not just an advisory (same as validate.js's own
+// isFutureDate check): a comp is a real past sale, a future one can only be
+// a typo'd year, never a real value worth pasting in as-is.
+function wireQuickLogCompTool() {
+  const form = document.getElementById('quickCompForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('ncpWarnings');
+  const output = document.getElementById('ncpOutput');
+  const copyBtn = document.getElementById('ncpCopyBtn');
+  const live = document.getElementById('quickLogCompLive');
+  const draftGuard = attachDraftGuard(form, 'garage-ncp-draft-v1', {
+    bannerId: 'ncpDraftBanner', timeId: 'ncpDraftBannerTime', discardId: 'ncpDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('ncpId').value.trim();
+    const listingId = document.getElementById('ncpListingId').value.trim() || null;
+    const platform = document.getElementById('ncpPlatform').value;
+    const title = document.getElementById('ncpTitle').value.trim();
+    const soldPrice = readOptionalNonNegativeInput(document.getElementById('ncpSoldPrice'));
+    const soldDate = document.getElementById('ncpSoldDate').value || null;
+    const url = document.getElementById('ncpUrl').value.trim() || null;
+    const notes = document.getElementById('ncpNotes').value.trim() || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (compsLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another comp, ids must be unique.');
+    }
+    if (!platform) blockers.push('Select a platform.');
+    if (!title) blockers.push('A comp title/description is required.');
+    if (soldPrice === null) blockers.push('Enter a real sold price of $0 or more.');
+    else if (soldPrice === undefined) blockers.push('Enter a valid sold price of $0 or more.');
+    if (soldDate) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (new Date(soldDate + 'T00:00:00') > tomorrow) {
+        blockers.push('Sold date is in the future, a comp is a real past sale, check for a typo\'d year.');
+      }
+    }
+    if (url && !/^https?:\/\//.test(url)) blockers.push('Source URL must be a real http(s) link, or left blank.');
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    if (listingId && !listings.some(l => l.id === listingId)) {
+      advisory.push('"' + listingId + '" does not match any listing in listings.json yet, fine if it\'s not itemized there yet.');
+    }
+
+    const comp = { id, listingId, platform, title, soldPrice, soldDate, url, notes };
+
+    advisory.push(...emDashAdvisory(comp, ['title', 'notes']));
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(comp, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Comp JSON copied to clipboard.';
+      draftGuard.clearDraft();
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 // AI photo-to-listing drafter. Two-stage flow: stage 1 (draft) sends real
 // item photos to /api/garage/draft-listing and shows every field with its
 // confidence and reasoning, purely informational, nothing saved. Stage 2
@@ -5546,6 +5733,7 @@ wireQuickLogExpenseTool();
 wireQuickLogDisputeTool();
 wireQuickLogSupplyTool();
 wireQuickLogAcquisitionTool();
+wireQuickLogCompTool();
 wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();

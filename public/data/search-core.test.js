@@ -14,9 +14,9 @@ const assert = require('node:assert/strict');
 const { RECORD_TYPE_PARAMS, recordHref } = require('./search-core.js');
 const { SEARCH_SOURCES } = require('../../data/search-sources-core.js');
 
-// Garage's five bulk-tracked entity types have no per-record modal or
+// Garage's six bulk-tracked entity types have no per-record modal or
 // highlight target on their own hub page yet, and (unlike every other real
-// type below) still have zero real rows logged in any of their five files,
+// type below) still have zero real rows logged in any of their six files,
 // so there is nothing real yet to jump to: a real, small, explicit allowlist
 // of intentional exceptions, not a silent skip. Requiring SEARCH_SOURCES
 // directly here (rather than a second hand-typed snapshot of "every type it
@@ -25,7 +25,7 @@ const { SEARCH_SOURCES } = require('../../data/search-sources-core.js');
 // genuinely new type added there is real input to the assertion below on
 // its very next test run, not something this file also has to be told
 // about by hand.
-const INTENTIONALLY_UNLINKED_TYPES = new Set(['sale', 'expense', 'dispute', 'supply', 'acquisition']);
+const INTENTIONALLY_UNLINKED_TYPES = new Set(['sale', 'expense', 'dispute', 'supply', 'acquisition', 'comp']);
 
 test('every real SEARCH_SOURCES type either has a param mapping or is a documented, intentional exception', () => {
   const realTypes = [...new Set(SEARCH_SOURCES.map(s => s.type))];

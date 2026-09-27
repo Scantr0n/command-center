@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
  * Validates listings.json, pipeline.json, activity.json, sales.json,
- * expenses.json, disputes.json, supplies.json, and acquisitions.json against
- * the field rules documented in public/garage/index.html.
+ * expenses.json, disputes.json, supplies.json, acquisitions.json, and
+ * comps.json against the field rules documented in public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -41,6 +41,11 @@
  * and "pricePaid" are the two real numbers the per-item cost math on the
  * page needs together, so one logged without the other is flagged the same
  * "can't compute yet" way the mileage/reorder gaps above already are.
+ * Every comps.json entry needs a real platform, a real title, and a
+ * non-negative "soldPrice"; "soldDate" can't be in the future (a comp is a
+ * real past sale, not a projection), and "listingId", if logged, is checked
+ * against listings.json the same "fine if not itemized yet" way sales/
+ * disputes/acquisitions already are.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -76,6 +81,18 @@ const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'
 const ITEM_SPECIFIC_KEYS = ['brand', 'size', 'color', 'condition'];
 const ACQUISITION_SOURCES = ['thrift-store', 'estate-sale', 'garage-sale', 'wholesale-lot', 'online-marketplace', 'personal-item', 'other'];
 
+// Mirrors sondrik/data/validate.js's and job-search/data/validate.js's own
+// isFutureDate: "tomorrow" rather than "now" as the cutoff so a real sale
+// logged today from a timezone ahead of the server's own clock isn't
+// wrongly flagged.
+function isFutureDate(v) {
+  if (!v || !DATE_RE.test(v)) return false;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return new Date(v + 'T00:00:00') > tomorrow;
+}
+
 function loadJson(name) {
   const file = path.join(DATA_DIR, name);
   const raw = fs.readFileSync(file, 'utf8');
@@ -98,7 +115,7 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData, acquisitionsData;
+  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData, acquisitionsData, compsData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
@@ -108,6 +125,7 @@ function main() {
     disputesData = loadJson('disputes.json');
     suppliesData = loadJson('supplies.json');
     acquisitionsData = loadJson('acquisitions.json');
+    compsData = loadJson('comps.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -614,6 +632,52 @@ function main() {
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
+  const comps = compsData.comps || [];
+  const seenCompIds = new Set();
+
+  comps.forEach((c, idx) => {
+    const where = 'comps[' + idx + ']' + (c && c.id ? ' (' + c.id + ')' : '');
+
+    if (!c.id) errors.push(where + ': missing "id"');
+    else if (seenCompIds.has(c.id)) errors.push(where + ': duplicate id "' + c.id + '"');
+    else seenCompIds.add(c.id);
+
+    if (!c.title) errors.push(where + ': missing "title"');
+
+    if (c.listingId !== null && c.listingId !== undefined && !listingById[c.listingId]) {
+      warnings.push(where + ': listingId "' + c.listingId + '" does not match any listing in listings.json (fine if not itemized there yet, or it has since fully sold through and was removed)');
+    }
+
+    if (!c.platform) {
+      errors.push(where + ': missing "platform"');
+    } else if (!PLATFORMS.includes(c.platform)) {
+      errors.push(where + ': platform "' + c.platform + '" is not one of ' + PLATFORMS.join(', '));
+    }
+
+    if (typeof c.soldPrice !== 'number' || c.soldPrice < 0) {
+      errors.push(where + ': "soldPrice" must be a non-negative number');
+    }
+
+    if (!isDateOrNull(c.soldDate)) {
+      errors.push(where + ': "soldDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.soldDate));
+    } else if (isFutureDate(c.soldDate)) {
+      errors.push(where + ': "soldDate" (' + c.soldDate + ') is in the future, a comp is a real past sale, check for a typo\'d year');
+    }
+
+    if (c.url !== null && c.url !== undefined) {
+      if (typeof c.url !== 'string' || !/^https?:\/\//.test(c.url)) {
+        errors.push(where + ': "url" must be a real http(s) URL string, or null');
+      }
+    }
+
+    if (c.notes !== null && c.notes !== undefined && typeof c.notes !== 'string') {
+      errors.push(where + ': "notes" must be a string or null');
+    }
+
+    emDashFields(c, ['title', 'notes']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
+  });
+
   // Every soldOn entry should have a matching sale logged, since a platform
   // only belongs in soldOn once something has actually sold there.
   listings.forEach(l => {
@@ -674,7 +738,7 @@ function main() {
   console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
     events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
     disputes.length + ' dispute(s), ' + supplies.length + ' suppl' + (supplies.length === 1 ? 'y' : 'ies') + ', ' +
-    acquisitions.length + ' acquisition(s)).');
+    acquisitions.length + ' acquisition(s), ' + comps.length + ' comp(s)).');
   process.exit(0);
 }
 
@@ -698,7 +762,7 @@ function checkChangelogFreshness(warnings) {
     if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: DATA_DIR, encoding: 'utf8' }).trim() === 'true') return;
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
-      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json'
+      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json', 'comps.json'
     ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
     const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     let changelogData = null;

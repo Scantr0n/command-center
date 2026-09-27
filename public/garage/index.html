@@ -1759,6 +1759,101 @@
     </details>
   </section>
 
+  <section id="compsSection">
+    <div class="board-toolbar">
+      <h2 class="section-title" style="margin:0">Sold comps / pricing research log</h2>
+      <button type="button" id="compsCsvBtn" class="print-btn font-mono">Export CSV</button>
+    </div>
+    <div class="callout">
+      Real comparable sold listings actually looked up before pricing an item or answering a lowball offer, one
+      row per comp. This grounds a price in a real recent sale on the same platform instead of a guess, and gives
+      the <a href="#offerGuideSection">offer response guide</a> above something concrete to point to when a buyer
+      pushes back. Nothing here is estimated or invented; an item with no comp logged yet is an honest gap, not a
+      placeholder.
+    </div>
+
+    <details class="schema-help" id="quickLogCompTool">
+      <summary>Quick log a comp (generates JSON to paste into comps.json, saves nothing)</summary>
+      <div class="schema-help-body">
+        <p>Runs the same checks <code>node public/garage/data/validate.js</code> does on <code>comps.json</code>
+          (a unique id, a real platform, a real title, a non-negative sold price, a sold date that isn't in the
+          future), then builds the JSON object to paste into the <code>comps</code> array yourself. This never
+          writes a file or sends anything, it only puts text on your clipboard.</p>
+        <table class="schema-table">
+          <tbody>
+            <tr><th>id</th><td>Unique slug, e.g. <code>"vinted-black-boots-comp-1"</code></td></tr>
+            <tr><th>listingId</th><td>Id from <code>listings.json</code> this comp was used to price, or leave
+              blank if it's general market research not tied to one listing yet</td></tr>
+            <tr><th>platform</th><td>One of: eBay, Vinted, Poshmark, Depop, where the comp actually sold</td></tr>
+            <tr><th>title</th><td>The comp's own real title/description, e.g. <code>"Doc Martens black leather
+              boots, size 8, good condition"</code></td></tr>
+            <tr><th>soldPrice</th><td>Real price it actually sold for, USD</td></tr>
+            <tr><th>soldDate</th><td>ISO date (<code>YYYY-MM-DD</code>) it actually sold, or <code>null</code></td></tr>
+            <tr><th>url</th><td>Real link to the sold listing, or <code>null</code></td></tr>
+            <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
+          </tbody>
+        </table>
+
+        <div id="ncpDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="ncpDraftBannerTime"></span>, this form is autosaved to
+            this browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="ncpDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
+
+        <div class="quick-log-grid">
+          <form class="quick-log-form" id="quickCompForm">
+            <h3 class="quick-log-title font-mono">New comp &rarr; comps.json</h3>
+            <label class="quick-log-label" for="ncpId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="ncpId" placeholder="e.g. vinted-black-boots-comp-1" required>
+            <label class="quick-log-label" for="ncpListingId">Linked listing id (optional)</label>
+            <input class="quick-log-input" type="text" id="ncpListingId" placeholder="e.g. black-boots">
+            <label class="quick-log-label" for="ncpPlatform">Platform it sold on</label>
+            <select class="quick-log-input" id="ncpPlatform" required>
+              <option value="" disabled selected>Select a platform</option>
+              <option value="ebay">eBay</option>
+              <option value="vinted">Vinted</option>
+              <option value="poshmark">Poshmark</option>
+              <option value="depop">Depop</option>
+            </select>
+            <label class="quick-log-label" for="ncpTitle">Comp title/description</label>
+            <input class="quick-log-input" type="text" id="ncpTitle" placeholder="The comp's own real title" required>
+            <label class="quick-log-label" for="ncpSoldPrice">Sold price, USD</label>
+            <input class="quick-log-input" type="number" id="ncpSoldPrice" min="0" step="0.01" required>
+            <label class="quick-log-label" for="ncpSoldDate">Sold date (optional)</label>
+            <input class="quick-log-input" type="date" id="ncpSoldDate">
+            <label class="quick-log-label" for="ncpUrl">Source URL (optional)</label>
+            <input class="quick-log-input" type="url" id="ncpUrl" placeholder="https://...">
+            <label class="quick-log-label" for="ncpNotes">Notes (optional)</label>
+            <input class="quick-log-input" type="text" id="ncpNotes">
+            <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+            <div class="quick-log-warnings" id="ncpWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="ncpOutput" readonly rows="10" hidden aria-label="Generated comp JSON, ready to paste into the comps array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="ncpCopyBtn" hidden>Copy JSON</button>
+            <p class="quick-log-hint" id="quickLogCompLive" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <div class="table-wrap">
+      <table class="card-table" id="compsTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Platform</th>
+            <th>Comp</th>
+            <th>Sold price</th>
+            <th>Sold</th>
+            <th>Source</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="compsTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="compsTableEmpty" hidden></div>
+    </div>
+  </section>
+
   <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Returns &amp; disputes log</h2>

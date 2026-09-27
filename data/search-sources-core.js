@@ -129,6 +129,11 @@
       fields: a => [a.sourceName, a.source]
     },
     {
+      hub: 'garage', clusterId: 'garage', file: 'comps.json', key: 'comps', type: 'comp',
+      label: c => c.title, detail: c => c.platform ? c.platform.toUpperCase() : '',
+      fields: c => [c.title]
+    },
+    {
       hub: 'sondrik', clusterId: 'sondrik', file: 'channels.json', key: 'channels', type: 'channel',
       label: c => c.name, detail: c => c.status || '',
       fields: c => [c.name]

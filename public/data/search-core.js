@@ -39,9 +39,9 @@
     release: 'release',
     goal: 'goal',
     application: 'application'
-    // sale/expense/dispute/supply/acquisition (garage) have no per-record
+    // sale/expense/dispute/supply/acquisition/comp (garage) have no per-record
     // modal or highlight target yet, and (unlike application above) still
-    // have zero real rows logged in any of the five files, so there's
+    // have zero real rows logged in any of the six files, so there's
     // nothing real yet to jump to: intentionally absent, not an oversight.
   };
 
