@@ -22,6 +22,7 @@ const {
   mostRecentConnectedAt,
   currentStateStartedAt,
   computeIncidents,
+  computeIncidentFreeStreak,
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
@@ -219,6 +220,47 @@ test('computeIncidents groups consecutive down runs and leaves a trailing one on
 test('computeIncidents is empty for an all-connected history, and for no history', () => {
   assert.deepEqual(computeIncidents([]), []);
   assert.deepEqual(computeIncidents([{ at: 'x', connected: true }]), []);
+});
+
+test('computeIncidentFreeStreak measures since the last incident ended, not since it started', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:20:00Z', connected: true },
+    { at: '2026-09-15T10:00:00Z', connected: true }
+  ];
+  const now = new Date('2026-09-15T10:00:00Z').getTime();
+  const streak = computeIncidentFreeStreak(history, now);
+  assert.equal(streak.active, true);
+  assert.equal(streak.everIncident, true);
+  assert.equal(streak.since, '2026-09-10T10:20:00Z');
+  assert.equal(streak.ms, now - new Date('2026-09-10T10:20:00Z').getTime());
+});
+
+test('computeIncidentFreeStreak falls back to the first recorded check when there has never been an incident', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-15T10:00:00Z', connected: true }
+  ];
+  const now = new Date('2026-09-15T10:00:00Z').getTime();
+  const streak = computeIncidentFreeStreak(history, now);
+  assert.equal(streak.active, true);
+  assert.equal(streak.everIncident, false);
+  assert.equal(streak.since, '2026-09-10T10:00:00Z');
+});
+
+test('computeIncidentFreeStreak reports inactive while the most recent incident is still ongoing', () => {
+  const history = [
+    { at: '2026-09-15T10:00:00Z', connected: true },
+    { at: '2026-09-15T10:05:00Z', connected: false }
+  ];
+  const streak = computeIncidentFreeStreak(history, Date.now());
+  assert.deepEqual(streak, { active: false, since: null, everIncident: true, ms: 0 });
+});
+
+test('computeIncidentFreeStreak is null with no recorded history', () => {
+  assert.equal(computeIncidentFreeStreak([], Date.now()), null);
+  assert.equal(computeIncidentFreeStreak(undefined, Date.now()), null);
 });
 
 test('computeKillSwitchEpisodes groups consecutive engaged runs and leaves a trailing one ongoing', () => {

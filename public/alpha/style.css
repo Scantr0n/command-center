@@ -721,6 +721,19 @@ header.page-head .sub {
   color: var(--dim);
   margin-bottom: 6px;
 }
+/* The "N days without an incident" trust signal, same real color convention
+   as .incident-ongoing above: accent green while the streak holds, the same
+   down-red as a real ongoing incident when the most recent one hasn't
+   resolved yet. */
+.incident-streak {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--accent);
+  font-weight: 600;
+}
+.incident-streak-down {
+  color: #E8A0A0;
+}
 .incident-list {
   list-style: none;
   margin: 0;
@@ -1703,6 +1716,11 @@ footer.page-foot {
      pink) and the current-regime label (#3DDC84 green). */
   .scope-banner strong { color: #111 !important; }
   .regime-history-current .regime-history-label-value { color: #111 !important; }
+  /* Same hardcoded-hex bug, same fix, for the incident-free streak badge
+     added alongside RECENT INCIDENTS: #3DDC84 green while it holds,
+     #E8A0A0 red while the most recent incident is still ongoing, neither
+     reachable by the :root reset above. */
+  .incident-streak { color: #111 !important; }
   /* The scope banner's own body text (#E8A0A0, distinct from its <strong>
      lead-in above) was still missed: on paper that renders this page's most
      important sentence, "never start, stop, configure, or otherwise

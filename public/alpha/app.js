@@ -56,6 +56,7 @@ const {
   mostRecentConnectedAt,
   currentStateStartedAt,
   computeIncidents,
+  computeIncidentFreeStreak,
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
@@ -1015,6 +1016,35 @@ function renderIncidents(data, clientHistory) {
   // glance-sized list rather than every incident this browser has ever seen.
   const recent = [...incidents].reverse().slice(0, INCIDENT_LIST_LIMIT);
   list.innerHTML = recent.map(incidentItem).join('');
+}
+
+// Statuspage-style "N days without an incident" badge next to the RECENT
+// INCIDENTS label above: the one trust signal real status-page UX research
+// consistently says belongs above the incident list itself, not just inside
+// it. Built from computeIncidentFreeStreak (dates-core.js), which already
+// derives the honest answer from the same real connection.history the list
+// just rendered; this only formats it, never recomputes it.
+function renderIncidentStreak(data, clientHistory) {
+  const el = document.getElementById('incidentStreak');
+  if (!el) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  const streak = computeIncidentFreeStreak(history);
+  if (!streak) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  if (!streak.active) {
+    el.textContent = 'Currently down';
+    el.classList.add('incident-streak-down');
+    return;
+  }
+  el.classList.remove('incident-streak-down');
+  const durationText = formatDuration(streak.ms) || 'under 1m';
+  el.textContent = streak.everIncident
+    ? durationText + ' without an incident'
+    : durationText + ' without an incident (since monitoring began)';
 }
 
 function killSwitchEpisodeItem(episode) {
@@ -2515,6 +2545,7 @@ async function loadStatus() {
     renderConnectionHistory(data, clientConnHistory);
     renderDailyUptime(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
+    renderIncidentStreak(data, clientConnHistory);
     renderKillSwitchHistory(data, clientConnHistory);
     renderRegimeHistory(clientRegimeHistory, lastKnown && lastKnown.asOf);
     // Kill switch engaged outranks plain connection freshness for the one
@@ -2586,6 +2617,7 @@ window.addEventListener('storage', (e) => {
   renderConnectionHistory(lastRawData, connHistory);
   renderDailyUptime(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
+  renderIncidentStreak(lastRawData, connHistory);
   renderKillSwitchHistory(lastRawData, connHistory);
   // Same last-known/frozen distinction loadStatus applies via `lastKnown`:
   // lastStatusIsLastKnown and lastStatusData are the same two values this

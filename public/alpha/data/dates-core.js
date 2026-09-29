@@ -358,6 +358,31 @@
     return computeStateRuns(history, 'connected', false);
   }
 
+  // Statuspage-style "N days without an incident" streak, the one-line trust
+  // signal real status pages lead with above their own incident list (see
+  // computeIncidents just above, whose output this reuses rather than
+  // re-walking history). Three honest outcomes, nothing guessed: no checks
+  // recorded yet -> null (nothing to show); the most recent incident is
+  // still ongoing -> { active: false } (currently down, no streak to claim);
+  // otherwise -> { active: true, since, everIncident, ms }, where `since` is
+  // the last incident's real end time, or (when there has never been one)
+  // the very first recorded check, and `everIncident` says which so a caller
+  // can word "since the last incident" versus "since monitoring began"
+  // correctly rather than always assuming the streak followed a real outage.
+  // `now` defaults to Date.now(), same testability convention as the rest of
+  // this file.
+  function computeIncidentFreeStreak(history, now) {
+    if (!Array.isArray(history) || !history.length) return null;
+    const incidents = computeIncidents(history);
+    const last = incidents[incidents.length - 1];
+    if (last && last.ongoing) return { active: false, since: null, everIncident: true, ms: 0 };
+    const since = last ? last.end : history[0].at;
+    const sinceMs = new Date(since).getTime();
+    if (Number.isNaN(sinceMs)) return null;
+    const nowMs = now == null ? Date.now() : now;
+    return { active: true, since, everIncident: !!last, ms: Math.max(0, nowMs - sinceMs) };
+  }
+
   // Kill-switch trigger history: real engaged windows (paused === true),
   // grouped the same start/end/ongoing way computeIncidents groups downtime,
   // built from the same connection.history entries. paused is null whenever
@@ -430,6 +455,7 @@
     mostRecentConnectedAt,
     currentStateStartedAt,
     computeIncidents,
+    computeIncidentFreeStreak,
     computeKillSwitchEpisodes,
     dayKeyLocal,
     computeDailyUptimeBuckets,
