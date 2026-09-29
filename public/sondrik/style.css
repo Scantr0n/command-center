@@ -753,6 +753,9 @@ section { margin-bottom: 52px; }
   color: #E0A030;
   font-weight: 500;
 }
+.freshness-badge a { color: inherit; text-decoration: underline; }
+.freshness-badge a:hover, .freshness-badge a:focus-visible { color: var(--ink); }
+.freshness-badge a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Same freshness-badge idea as above, but for a hand-verified static
    reference table (channel/lead norms) instead of a logged data check: it

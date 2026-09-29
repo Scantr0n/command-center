@@ -648,9 +648,22 @@
     const isAging = !isStale && ageDays > AGING_AFTER_DAYS;
     const ageLabel = ageDays <= 0 ? 'checked today' : ageDays === 1 ? 'checked 1 day ago' : 'checked ' + ageDays + ' days ago';
     const freshnessTier = isStale ? 'freshness-stale' : isAging ? 'freshness-aging' : 'freshness-fresh';
+    // The re-check prompt used to be plain text even once it was telling
+    // Jack exactly what to go do ("RE-CHECK GITHUB API"), so acting on it
+    // meant leaving the page to go find the real releases URL himself. When
+    // metric.checkUrl is filled in (honest empty state, null until Jack
+    // supplies the real one, see downloads.json) this turns the same prompt
+    // into a one-click link straight to it; toUpperCase runs only on the
+    // plain-text pieces so it never mangles the href.
+    const recheckText = isStale ? 'RE-CHECK GITHUB API' : isAging ? 'CHECK AGAIN SOON' : '';
+    const recheckHtml = !recheckText ? '' :
+      (metric.checkUrl
+        ? ', <a href="' + escapeHtml(metric.checkUrl) + '" target="_blank" rel="noopener noreferrer">' +
+          recheckText + ' <span aria-hidden="true">&#8599;</span></a>'
+        : ', ' + recheckText);
     const freshnessHtml = '<div class="freshness-badge ' + freshnessTier + ' font-mono">' +
       (isStale ? 'STALE, ' : isAging ? 'AGING, ' : '') + ageLabel.toUpperCase() +
-      (isStale ? ', RE-CHECK GITHUB API' : isAging ? ', CHECK AGAIN SOON' : '') +
+      recheckHtml +
       '</div>';
 
     // Which real, dated releases attached to which real check, the standard

@@ -105,6 +105,14 @@ function main() {
   const metric = downloadsData.metric || {};
   if (!metric.label) errors.push('metric.label is missing');
   if (!metric.source) warnings.push('metric.source is missing, a download count with no cited source reads as an estimate');
+  if (metric.checkUrl !== null && metric.checkUrl !== undefined && typeof metric.checkUrl !== 'string') {
+    errors.push('metric.checkUrl must be a string or null, got ' + JSON.stringify(metric.checkUrl));
+  }
+  if (!metric.checkUrl) {
+    warnings.push('metric.checkUrl is not set, the STALE/AGING re-check prompt on the Traction card and the ' +
+      '"pull a fresh count" next step have no real link to jump straight to the source, add the real GitHub ' +
+      'releases page URL once known');
+  }
   emDashFields(metric, ['label', 'source', 'scope']).forEach(f =>
     warnings.push('metric.' + f + ' contains an em dash, this product never uses one, check for a paste-in'));
   const checks = metric.checks || [];
