@@ -393,6 +393,12 @@ header.page-head .sub {
    .conn-dot.stale), applied to the Architecture section's hand-maintained
    lastVerifiedAt trust signal once it's gone past due for a recheck. */
 .section-title-meta.warn { color: #E0A030; }
+/* Same red used for the kill switch and other real emergencies elsewhere on
+   this page (.headline-status.critical), for the Components section's own
+   meta when at least one component is reporting a critical state (kill
+   switch engaged), which outranks the plain amber "N awaiting" reading the
+   same meta otherwise shows. */
+.section-title-meta.critical { color: #E05050; }
 
 /* Same "h2 + Export CSV" toolbar row as the other hubs' own .section-toolbar,
    for a section whose h2 needs an action button inline instead of standing
@@ -895,6 +901,67 @@ header.page-head .sub {
   font-size: 0.68rem;
   color: var(--sub);
   margin-top: 4px;
+}
+
+/* Components grid: one card per piece of Alpha's real architecture,
+   recomposed client-side from fields the sections below already render
+   (see renderComponentGrid in app.js and the Components row in "How the
+   live connection works"). Same color vocabulary as everywhere else on
+   this page (.headline-status.good/caution/critical/awaiting,
+   .conn-dot.live/stale/down), not a new one, so a reader who already knows
+   what green/amber/red/gray mean elsewhere on this page doesn't have to
+   learn a second scheme here. */
+.component-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.component-card {
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: border-color 0.15s ease;
+}
+.component-card:hover { border-color: var(--hairlineHover); }
+.component-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.component-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--dim);
+}
+.component-dot.good { background: #3DDC84; box-shadow: 0 0 0 3px rgba(61,220,132,0.18); }
+.component-dot.caution { background: #E0A030; box-shadow: 0 0 0 3px rgba(224,160,48,0.18); }
+.component-dot.critical { background: #E05050; box-shadow: 0 0 0 3px rgba(224,80,80,0.22); }
+.component-dot.lastknown { background: #7CA8E0; box-shadow: 0 0 0 3px rgba(124,168,224,0.18); }
+.component-dot.unknown { background: var(--dim); }
+.component-name {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.component-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  margin-top: 6px;
+}
+.component-status.good { color: #3DDC84; }
+.component-status.caution { color: #E0A030; }
+.component-status.critical { color: #E05050; }
+.component-status.lastknown { color: #7CA8E0; }
+.component-status.unknown { color: var(--dim); }
+.component-detail {
+  font-size: 0.72rem;
+  color: var(--sub);
+  margin-top: 3px;
 }
 
 /* Position sizing */
@@ -1617,10 +1684,12 @@ footer.page-foot {
   .callout strong, .offline-banner strong, .lastknown-banner strong { color: #111; }
 
   .conn-strip, .stat-tile, .ps-mode, .ps-meter, .arch-card, .lineage-card,
-  .event-item, .empty-panel, .pos-table-wrap, .changelog-item, .equity-curve-wrap {
+  .event-item, .empty-panel, .pos-table-wrap, .changelog-item, .equity-curve-wrap,
+  .component-card {
     background: none;
     border: 1px solid #ccc;
   }
+  .component-dot { background: #111 !important; box-shadow: none !important; }
   .pos-table-wrap::before, .pos-table-wrap::after { display: none !important; }
   .conn-latency-spark, .meter-spark, .history-tick.placeholder { display: none; }
   /* .regime-dist-segment/.regime-dist-swatch set their real per-regime color
@@ -1644,19 +1713,25 @@ footer.page-foot {
   .ps-mode-value, .ps-field-label, .ps-mode-sub, .meter-value,
   .arch-card-title, .arch-card-note, .lineage-label, .lineage-meta,
   .event-label, .event-detail, .empty-panel-title, .empty-panel-sub,
-  .pos-symbol, .pos-num, .conn-label, .conn-sub, .changelog-title {
+  .pos-symbol, .pos-num, .conn-label, .conn-sub, .changelog-title,
+  .component-name, .component-detail {
     color: #111 !important;
   }
   /* .pl-good/.pl-bad are real P&L figures (day change, unrealized gain/loss)
      nested inside a .stat-tile-value the rule above already targets, but
      each sets its own explicit color, which wins over an inherited value
-     regardless of the parent's !important. Neither was covered here before. */
-  .pl-good, .pl-bad { color: #111 !important; }
+     regardless of the parent's !important. Neither was covered here before.
+     .component-status is the same bypass on the Components grid: each
+     status word already says its own state in text (see the naming
+     convention comment above .component-status.good in this file), so the
+     color that would otherwise only survive on-screen is safe to force flat
+     here too. */
+  .pl-good, .pl-bad, .component-status { color: #111 !important; }
   /* .section-title-meta.warn sets its own explicit hex (see the definition
      above), same bypass-the-:root-reset bug already fixed elsewhere in this
      block, so it needs the same explicit print-safe override rather than
      relying on the --dim reset above it. */
-  .section-title-meta.warn { color: #111 !important; }
+  .section-title-meta.warn, .section-title-meta.critical { color: #111 !important; }
   .stat-tile-value.awaiting, .ps-mode-value.awaiting, .meter-value.awaiting,
   .conn-history-source, .regime-history-source, .lastknown-tag,
   .changelog-hash, .changelog-date, .changelog-author, .changelog-generated-note {

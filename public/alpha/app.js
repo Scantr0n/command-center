@@ -1156,6 +1156,99 @@ function statTile(value, label, sub, awaiting, subTitle) {
   `;
 }
 
+function componentCard(comp) {
+  return `
+    <div class="component-card">
+      <div class="component-card-head">
+        <span class="component-dot ${comp.status}" aria-hidden="true"></span>
+        <span class="component-name">${escapeHtml(comp.name)}</span>
+      </div>
+      <div class="component-status ${comp.status}">${escapeHtml(comp.label)}</div>
+      ${comp.detail ? `<div class="component-detail">${escapeHtml(comp.detail)}</div>` : ''}
+    </div>
+  `;
+}
+
+// A "Components" glance strip, real status-page convention for the same
+// reason those pages break "All systems operational" down into individual
+// services: a single connected/disconnected reading can't tell Jack which
+// specific piece of Alpha (kill switch, regime detection, the debate panel,
+// the genealogy feed) is the one not reporting, without him reading every
+// section below to find it. This is a pure client-side recomposition, not a
+// new field or a second fetch: every value here already renders somewhere
+// else on this page (see the Components row in "How the live connection
+// works"). `data` is the real, un-cached response (daemon connection and
+// the account/positions feed read it directly, same as the Connection and
+// Account sections, since those two never show a frozen reading);
+// `summaryData` is whatever the Summary/Position sizing/Genealogy sections
+// are themselves currently showing (last-known cache included when
+// disconnected), so this grid can never disagree with the section it
+// summarizes.
+function renderComponentGrid(data, summaryData, isLastKnown) {
+  const componentGridEl = document.getElementById('componentGrid');
+  const meta = document.getElementById('componentsMeta');
+  if (!componentGridEl) return;
+  const live = summaryData.live || {};
+  const comps = [];
+
+  if (data.connection && data.connection.connected) {
+    comps.push({ name: 'Daemon connection', status: 'good', label: 'Operational' });
+  } else if (isLastKnown) {
+    comps.push({ name: 'Daemon connection', status: 'lastknown', label: 'Last known', detail: 'Disconnected now, showing an earlier reading.' });
+  } else {
+    comps.push({ name: 'Daemon connection', status: 'unknown', label: 'Awaiting connection' });
+  }
+
+  const killEngaged = live.killSwitch && live.killSwitch.engaged;
+  comps.push(killEngaged == null
+    ? { name: 'Kill switch', status: 'unknown', label: 'Awaiting data' }
+    : { name: 'Kill switch', status: killEngaged ? 'critical' : 'good', label: killEngaged ? 'Engaged' : 'Clear' });
+
+  comps.push(live.regime
+    ? { name: 'Regime detection', status: 'good', label: 'Active', detail: live.regime }
+    : { name: 'Regime detection', status: 'unknown', label: 'Awaiting data' });
+
+  const activeMode = live.positionSizing && live.positionSizing.activeMode;
+  comps.push(activeMode
+    ? { name: 'Position sizing', status: 'good', label: 'Active', detail: activeMode }
+    : { name: 'Position sizing', status: 'unknown', label: 'Awaiting data' });
+
+  const stuckCount = live.anomalies && live.anomalies.stuckCount;
+  comps.push(stuckCount == null
+    ? { name: 'Anomaly detection', status: 'unknown', label: 'Awaiting data' }
+    : { name: 'Anomaly detection', status: stuckCount > 0 ? 'caution' : 'good', label: stuckCount > 0 ? `${stuckCount} stuck agent${stuckCount === 1 ? '' : 's'}` : 'Clear' });
+
+  const debate = live.debatePanel;
+  comps.push(debate && debate.active
+    ? { name: 'Debate panel', status: 'good', label: 'Active' }
+    : { name: 'Debate panel', status: 'caution', label: 'Pending', detail: debate && debate.blockedOn ? 'Blocked on: ' + debate.blockedOn : null });
+
+  const genealogy = live.genealogy;
+  const hasGenealogy = !!(genealogy && (genealogy.generation != null || (Array.isArray(genealogy.lineages) && genealogy.lineages.length)));
+  comps.push(hasGenealogy
+    ? { name: 'Genealogy wall', status: 'good', label: 'Data available', detail: genealogy.generation != null ? 'Generation ' + genealogy.generation : null }
+    : { name: 'Genealogy wall', status: 'unknown', label: 'Awaiting data' });
+
+  comps.push((data.live && data.live.account)
+    ? { name: 'Account & positions feed', status: 'good', label: 'Live' }
+    : { name: 'Account & positions feed', status: 'unknown', label: 'Awaiting data' });
+
+  componentGridEl.innerHTML = comps.map(componentCard).join('');
+
+  if (meta) {
+    // 'unknown' (not yet wired in) is the same honest, unremarkable empty
+    // state this whole page treats everywhere else, not a problem, so it
+    // never colors this meta on its own; only a genuine 'caution'/'critical'
+    // reading does, same "don't cry wolf over an empty state" rule
+    // renderArchitectureVerifiedMeta and renderEventLogMeta already follow.
+    const goodCount = comps.filter(c => c.status === 'good').length;
+    const hasCritical = comps.some(c => c.status === 'critical');
+    const hasCaution = comps.some(c => c.status === 'caution');
+    meta.textContent = `${goodCount} of ${comps.length} reporting`;
+    meta.className = 'section-title-meta' + (hasCritical ? ' critical' : (hasCaution ? ' warn' : ''));
+  }
+}
+
 function renderStats(data, clientDebateActivatedAt, clientDebateFirstPendingAt) {
   const sys = data.system;
   const live = data.live;
@@ -2434,6 +2527,7 @@ async function loadStatus() {
       ? 'critical'
       : (headline.level === 'caution' && connCls === 'live' ? 'anomaly' : connCls);
     updateGlanceIndicators(glanceCls);
+    renderComponentGrid(data, effectiveData, !!lastKnown);
     renderStats(effectiveData, clientDebateActivatedAt, clientDebateFirstPendingAt);
     renderAccount(data);
     renderPositions(data);
@@ -2505,6 +2599,7 @@ window.addEventListener('storage', (e) => {
   if (lastStatusData) {
     renderPositionSizing(lastStatusData, drawdownHistory, robustnessHistory);
     renderStats(lastStatusData, debateActivatedAt, debateFirstPendingAt);
+    renderComponentGrid(lastRawData, lastStatusData, lastStatusIsLastKnown);
   }
   renderSizingModeHistory(sizingModeHistory, regimeFrozenAsOf);
   renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length, sizingModeHistory.length, !!debateActivatedAt);
