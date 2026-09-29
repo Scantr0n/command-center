@@ -1386,6 +1386,31 @@ footer.page-foot {
   font-size: 1.2rem;
   margin: 0 0 2px;
 }
+/* Compare with backup modal needs more room than the 480px shortcuts/jump-nav
+   modal: it renders a scrolling list of diff rows, not a fixed shortcut list. */
+.modal-wide { max-width: 640px; }
+.compare-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.85rem;
+}
+.compare-row:first-of-type { border-top: none; }
+.compare-row strong { font-weight: 600; }
+.compare-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: #E0A030;
+  flex-shrink: 0;
+}
+/* Same amber as every other warn/attention state on this page (see
+   .callout-warn, .section-title-meta.warn), removed gets bold weight on top
+   rather than a separate red so the hub keeps its single-accent palette. */
+.compare-tag.compare-tag-removed { font-weight: 600; }
+.compare-list { display: flex; flex-direction: column; margin-top: 6px; }
+.compare-section-label { margin: 16px 0 0; font-size: 0.85rem; color: var(--sub); }
+.compare-section-label:first-of-type { margin-top: 12px; }
 .shortcuts-list { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
 .shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 0.85rem; }
 .shortcut-row .shortcut-label { color: var(--sub); }

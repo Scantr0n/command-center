@@ -23,6 +23,7 @@
   const lastUpdatedSub = document.getElementById('lastUpdatedSub');
   const printBtn = document.getElementById('printBtn');
   const backupBtn = document.getElementById('backupBtn');
+  const compareBackupBtn = document.getElementById('compareBackupBtn');
   const icsBtn = document.getElementById('icsBtn');
   const pageFavicon = document.getElementById('pageFavicon');
   const DEFAULT_FAVICON_HREF = pageFavicon ? pageFavicon.getAttribute('href') : null;
@@ -2462,6 +2463,48 @@
       backupBtn.disabled = true;
       backupBtn.title = "Can't back up, all data files failed to load";
     }
+
+    // Read-only diff against a file from the backup button just above:
+    // compareWithBackup (compare-core.js) does the actual field-by-field
+    // comparison; this just reads the file the user picks and renders the
+    // result. Nothing is uploaded anywhere and nothing is written back to
+    // releases.json/downloads.json/leads.json/channels.json/goals.json.
+    // Same approach as CSM's own Compare with backup.
+    if (releasesData || downloadsData || leadsData || channelsData || goalsData) {
+      compareBackupBtn.disabled = false;
+      compareBackupBtn.title = '';
+      const compareBackupInputEl = document.getElementById('compareBackupInput');
+      const compareBackupResultEl = document.getElementById('compareBackupResult');
+      compareBackupInputEl.addEventListener('change', () => {
+        const file = compareBackupInputEl.files && compareBackupInputEl.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          let parsed;
+          try {
+            parsed = JSON.parse(String(reader.result));
+          } catch (err) {
+            compareBackupResultEl.innerHTML = '<p class="section-note" role="alert">Could not read that file as JSON: ' +
+              escapeHtml(err.message) + '</p>';
+            return;
+          }
+          try {
+            renderCompareBackupResult(window.SondrikCompareCore.compareWithBackup(
+              { releasesData, downloadsData, leadsData, channelsData, goalsData }, parsed
+            ));
+          } catch (err) {
+            compareBackupResultEl.innerHTML = '<p class="section-note" role="alert">' + escapeHtml(err.message) + '</p>';
+          }
+        };
+        reader.onerror = () => {
+          compareBackupResultEl.innerHTML = '<p class="section-note" role="alert">Could not read that file.</p>';
+        };
+        reader.readAsText(file);
+      });
+    } else {
+      compareBackupBtn.disabled = true;
+      compareBackupBtn.title = "Can't compare, all data files failed to load";
+    }
   });
 
   // Surfaces this hub's own validate.js self-check (em-dash scan, duplicate-
@@ -2614,7 +2657,7 @@
   // while focus sits in a real text field (the quick-log forms all take
   // free text, including one with a literal "?" placeholder character).
   document.addEventListener('keydown', e => {
-    if (shortcutsOpen || jumpNavOpen) return;
+    if (shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -2728,6 +2771,107 @@
     if (e.key === 'Escape') { closeJumpNav(); return; }
     if (e.key === 'Tab') {
       const focusable = getJumpNavFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
+  // "Compare with backup..." modal chrome (open/close/focus trap). The
+  // actual diffing only runs once real data has loaded (wired inside the
+  // Promise.allSettled callback above, where releasesData/downloadsData/
+  // etc. are in scope), but the modal shell itself works unconditionally,
+  // same split as the shortcuts/jump-nav overlays above.
+  let compareBackupOpen = false;
+  let compareBackupLastFocusedEl = null;
+
+  function getCompareBackupFocusable() {
+    return Array.from(document.getElementById('compareBackupModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openCompareBackup() {
+    if (compareBackupOpen) return;
+    compareBackupOpen = true;
+    compareBackupLastFocusedEl = document.activeElement;
+    document.getElementById('compareBackupOverlay').hidden = false;
+    lockBodyScroll();
+    document.getElementById('compareBackupPickBtn').focus();
+  }
+
+  function closeCompareBackup() {
+    if (!compareBackupOpen) return;
+    compareBackupOpen = false;
+    document.getElementById('compareBackupOverlay').hidden = true;
+    unlockBodyScroll();
+    if (compareBackupLastFocusedEl && typeof compareBackupLastFocusedEl.focus === 'function') compareBackupLastFocusedEl.focus();
+    compareBackupLastFocusedEl = null;
+    document.getElementById('compareBackupResult').innerHTML = '';
+    document.getElementById('compareBackupInput').value = '';
+  }
+
+  function compareBackupTag(fields, removed) {
+    const text = removed ? 'NOT IN CURRENT DATA' : (fields ? fields.map(f => f.toUpperCase()).join(', ') + ' CHANGED' : 'NEW SINCE BACKUP');
+    return '<span class="compare-tag' + (removed ? ' compare-tag-removed' : '') + '">' + escapeHtml(text) + '</span>';
+  }
+
+  function compareBackupRow(label, sub, tagHtml) {
+    return '<div class="compare-row"><span><strong>' + escapeHtml(label) + '</strong>' +
+      (sub ? ' <span style="color:var(--sub)">' + escapeHtml(sub) + '</span>' : '') + '</span>' + tagHtml + '</div>';
+  }
+
+  // labelFn/subFn read straight off the real record fields (version, date,
+  // source, name, label, ...), never a guessed or reformatted value, so the
+  // row shown here always matches what's actually in the JSON file.
+  function renderCompareSection(title, diff, labelFn, subFn) {
+    const total = diff.added.length + diff.removed.length + diff.changed.length;
+    if (!total) return '';
+    return '<p class="compare-section-label">' + escapeHtml(title) + '</p><div class="compare-list">' +
+      diff.added.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, false))).join('') +
+      diff.changed.map(c => compareBackupRow(labelFn(c.current), subFn ? subFn(c.current) : null, compareBackupTag(c.fields, false))).join('') +
+      diff.removed.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, true))).join('') +
+      '</div>';
+  }
+
+  function renderCompareBackupResult(result) {
+    const exportedLabel = result.exportedAt
+      ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : 'unknown export date (an older backup, or a hand-edited file)';
+    const totalDiffs = ['releases', 'downloadChecks', 'leads', 'channels', 'goals']
+      .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
+    let html = '<p class="section-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
+    if (totalDiffs === 0) {
+      html += '<p class="section-note">No differences. The Sondrik data currently loaded matches this backup exactly.</p>';
+      document.getElementById('compareBackupResult').innerHTML = html;
+      return;
+    }
+    html += renderCompareSection('Releases (releases.json)', result.releases, r => 'v' + r.version, r => r.summary);
+    html += renderCompareSection('Download checks (downloads.json)', result.downloadChecks, c => c.date, c => (c.count != null ? c.count + ' downloads' : null));
+    html += renderCompareSection('Leads (leads.json)', result.leads, l => l.source || l.id, l => l.sourceDetail);
+    html += renderCompareSection('Channels (channels.json)', result.channels, c => c.name || c.id, null);
+    html += renderCompareSection('Goals (goals.json)', result.goals, g => g.label || g.id, null);
+    document.getElementById('compareBackupResult').innerHTML = html;
+  }
+
+  compareBackupBtn.addEventListener('click', openCompareBackup);
+  document.getElementById('compareBackupClose').addEventListener('click', closeCompareBackup);
+  document.getElementById('compareBackupOverlay').addEventListener('click', e => {
+    if (e.target.id === 'compareBackupOverlay') closeCompareBackup();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!compareBackupOpen) return;
+    if (e.key === 'Escape') { closeCompareBackup(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getCompareBackupFocusable();
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];

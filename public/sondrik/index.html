@@ -30,6 +30,7 @@
       <span id="publicPostCharCount" class="char-count-badge font-mono" hidden></span>
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="backupBtn" class="print-btn font-mono" disabled title="Loading Sondrik data...">Download backup (.json)</button>
+      <button type="button" id="compareBackupBtn" class="print-btn font-mono" disabled title="Loading Sondrik data...">Compare with backup&hellip;</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
       <button type="button" id="shortcutsBtn" class="print-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
       <a href="/" class="back-link">&larr; Command Center</a>
@@ -521,11 +522,26 @@
   </div>
 </div>
 
+<input type="file" id="compareBackupInput" accept="application/json,.json" hidden>
+<div class="modal-overlay" id="compareBackupOverlay" hidden>
+  <div class="modal modal-wide" id="compareBackupModal" role="dialog" aria-modal="true" aria-labelledby="compareBackupTitle">
+    <button class="modal-close" id="compareBackupClose" aria-label="Close">&times;</button>
+    <h3 id="compareBackupTitle" class="font-display">Compare with a backup</h3>
+    <p class="section-note" id="compareBackupHint">Pick a file downloaded earlier from this page&rsquo;s
+      <strong>Download backup (.json)</strong> button to see what&rsquo;s changed since then, field by field.
+      Read-only: this never writes anything back to releases.json/downloads.json/leads.json/channels.json/
+      goals.json, it only reads the file you pick, in your own browser. Nothing is uploaded anywhere.</p>
+    <button type="button" class="print-btn font-mono" id="compareBackupPickBtn">Choose backup file&hellip;</button>
+    <div id="compareBackupResult" aria-live="polite"></div>
+  </div>
+</div>
+
 <script src="/sondrik/data/validate-core.js"></script>
 <script src="/sondrik/data/goals-core.js"></script>
 <script src="/sondrik/data/release-core.js"></script>
 <script src="/sondrik/data/next-steps-core.js"></script>
 <script src="/sondrik/data/export-core.js"></script>
+<script src="/sondrik/data/compare-core.js"></script>
 <script src="/sondrik/data/html-core.js"></script>
 <script src="/sondrik/app.js"></script>
 <script src="/sidebar-core.js"></script>
