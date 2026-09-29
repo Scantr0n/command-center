@@ -4726,6 +4726,43 @@ document.getElementById('compsCsvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+const ENGAGEMENT_CSV_COLUMNS = [
+  ['listingId', 'Linked listing'], ['itemTitle', 'Item'], ['platform', 'Platform'], ['date', 'Date checked'],
+  ['views', 'Views'], ['saves', 'Watchers/likes'], ['notes', 'Notes']
+];
+
+// Same real logged data as the on-page table, newest-first, so this always
+// matches what's actually in engagement.json rather than a reformatted copy.
+document.getElementById('engagementCsvBtn').addEventListener('click', () => {
+  const rows = [...engagementLog]
+    .sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.localeCompare(a.date);
+    })
+    .map(s => {
+      const listing = listings.find(l => l.id === s.listingId);
+      return {
+        ...s,
+        itemTitle: listing ? listing.title : '',
+        platform: PLATFORM_LABELS[s.platform] || s.platform || ''
+      };
+    });
+  const header = ENGAGEMENT_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(s => ENGAGEMENT_CSV_COLUMNS.map(([key]) => csvField(s[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a4 = document.createElement('a');
+  a4.href = url;
+  a4.download = 'garage-engagement-' + todayDateStr() + '.csv';
+  document.body.appendChild(a4);
+  a4.click();
+  document.body.removeChild(a4);
+  URL.revokeObjectURL(url);
+});
+
 const disputesIcsBtn = document.getElementById('disputesIcsBtn');
 const DISPUTES_ICS_LABEL = disputesIcsBtn.textContent;
 disputesIcsBtn.addEventListener('click', () => {

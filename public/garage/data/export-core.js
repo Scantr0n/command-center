@@ -6,13 +6,13 @@
  * export-core.js in public/sondrik/data and public/alpha/data.
  *
  * csvField carries a real security guard (CSV/formula injection, OWASP):
- * all six CSV export buttons on this page (listings, sales, expenses,
- * disputes, supplies, acquisitions) run every field through it before it
- * ever touches a downloaded file, and it matters here specifically since
- * the sales/expenses CSVs get opened in a spreadsheet for real Schedule C
- * bookkeeping. Sondrik and Alpha already extracted the identical function
- * into their own tested core files; this closes the same gap for Garage,
- * which had it copied into app.js untested.
+ * every CSV export button on this page (listings, sales, expenses,
+ * disputes, supplies, acquisitions, comps, engagement) runs every field
+ * through it before it ever touches a downloaded file, and it matters here
+ * specifically since the sales/expenses CSVs get opened in a spreadsheet
+ * for real Schedule C bookkeeping. Sondrik and Alpha already extracted the
+ * identical function into their own tested core files; this closes the
+ * same gap for Garage, which had it copied into app.js untested.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
