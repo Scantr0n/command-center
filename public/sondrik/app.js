@@ -25,6 +25,8 @@
   const backupBtn = document.getElementById('backupBtn');
   const compareBackupBtn = document.getElementById('compareBackupBtn');
   const icsBtn = document.getElementById('icsBtn');
+  const notifyBtn = document.getElementById('notifyBtn');
+  const testAlertBtn = document.getElementById('testAlertBtn');
   const pageFavicon = document.getElementById('pageFavicon');
   const DEFAULT_FAVICON_HREF = pageFavicon ? pageFavicon.getAttribute('href') : null;
 
@@ -1131,6 +1133,139 @@
       pageFavicon.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(svg));
     }
   }
+
+  // Native OS-level alert, opt-in, for the one real gap the attention pill/
+  // favicon dot above can't cover: this is a static-data hub with no live
+  // backend polling it, so a real next step (the traction check crossing
+  // into STALE, a bugfix check-in going overdue, a goal's targetDate
+  // passing) can turn "urgent" at midnight while this tab sits open and
+  // unfocused in another window for hours, with nothing pulling Jack's eye
+  // back to it. Same real pattern Alpha's "Enable critical alerts" and CSM's
+  // "Enable nudge alerts" already ship (see their own app.js): the browser's
+  // own Notification API, built only from data already computed on this
+  // page by computeNextSteps, opt-in, one-shot per transition, never sent
+  // anywhere and never a path back to any real person.
+  const NOTIFY_PREF_KEY = 'sondrik:notifyEnabled';
+  const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+
+  function loadNotifyPref() {
+    try { return localStorage.getItem(NOTIFY_PREF_KEY) === 'true'; } catch (e) { return false; }
+  }
+  function saveNotifyPref(enabled) {
+    try { localStorage.setItem(NOTIFY_PREF_KEY, enabled ? 'true' : 'false'); } catch (e) { /* private browsing: works this load only */ }
+  }
+
+  function renderNotifyBtn() {
+    if (!notifyBtn) return;
+    if (!notifySupported) { notifyBtn.hidden = true; return; }
+    const permission = Notification.permission;
+    if (permission === 'denied') {
+      notifyBtn.hidden = false;
+      notifyBtn.disabled = true;
+      notifyBtn.classList.remove('notify-on');
+      notifyBtn.textContent = 'Next-step alerts blocked';
+      notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+      notifyBtn.removeAttribute('aria-pressed');
+      if (testAlertBtn) testAlertBtn.hidden = true;
+      return;
+    }
+    const enabled = permission === 'granted' && loadNotifyPref();
+    notifyBtn.hidden = false;
+    notifyBtn.disabled = false;
+    notifyBtn.classList.toggle('notify-on', enabled);
+    // Real toggle-button semantics (this button's own state persists across
+    // clicks, it isn't a one-shot action like Export CSV).
+    notifyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    notifyBtn.textContent = enabled ? 'Next-step alerts on' : 'Enable next-step alerts';
+    notifyBtn.title = enabled
+      ? 'A native notification fires when a real next step turns urgent while this tab is unfocused. Click to turn off.'
+      : 'Get a native notification when a real next step turns urgent while this tab is unfocused.';
+    // A granted browser permission doesn't guarantee the OS actually surfaces
+    // it (Do Not Disturb, a muted notification center entry for this
+    // browser), so once armed, offer a way to check that end-to-end instead
+    // of finding out only during a real urgent transition.
+    if (testAlertBtn) testAlertBtn.hidden = !enabled;
+  }
+
+  if (testAlertBtn) {
+    testAlertBtn.addEventListener('click', () => {
+      if (!notifySupported || Notification.permission !== 'granted') return;
+      const original = testAlertBtn.textContent;
+      try {
+        new Notification('Sondrik (test)', {
+          body: 'Test alert, no real next-step state change. A real urgent-next-step alert looks just like this.',
+          icon: '/icon-192.png',
+          tag: 'sondrik-next-step-test'
+        });
+        testAlertBtn.textContent = 'Test alert sent';
+      } catch (e) {
+        testAlertBtn.textContent = "Couldn't send";
+      }
+      setTimeout(() => { testAlertBtn.textContent = original; }, 1800);
+    });
+  }
+
+  if (notifyBtn && notifySupported) {
+    notifyBtn.addEventListener('click', async () => {
+      if (Notification.permission === 'denied') return;
+      if (Notification.permission === 'default') {
+        const result = await Notification.requestPermission();
+        if (result === 'granted') saveNotifyPref(true);
+        renderNotifyBtn();
+        return;
+      }
+      // Already granted: this button just toggles Jack's own preference,
+      // never re-prompts, since the browser permission itself already
+      // covers that question.
+      saveNotifyPref(!loadNotifyPref());
+      renderNotifyBtn();
+    });
+  }
+  renderNotifyBtn();
+
+  // One-shot per transition (never re-fires on the next poll while the
+  // urgent count just stays where it was), and only while this tab
+  // genuinely isn't the one Jack is looking at right now, same suppression
+  // Alpha's maybeFireCriticalNotification and CSM's checkNudgeAlerts already
+  // use, so enabling this can never double up with the on-page attention
+  // pill/favicon dot while the tab is actually visible. previousUrgentCount
+  // starts null so the very first check after page load only ever sets a
+  // baseline, it never fires (opening the page itself is not a real
+  // transition).
+  let previousUrgentCount = null;
+  function checkNextStepAlerts(steps) {
+    if (!notifySupported) return;
+    const urgent = steps.filter(s => s.urgent);
+    const isFirstCheck = previousUrgentCount === null;
+    const grewMoreUrgent = !isFirstCheck && urgent.length > previousUrgentCount;
+    previousUrgentCount = urgent.length;
+    if (isFirstCheck || !grewMoreUrgent) return;
+    if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
+    if (document.visibilityState === 'visible' && document.hasFocus()) return;
+    try {
+      const body = urgent.length === 1
+        ? (urgent[0].text || 'A next step') + ''
+        : urgent.length + ' next steps are now urgent.';
+      const notification = new Notification('Sondrik', { body, icon: '/icon-192.png', tag: 'sondrik-next-step' });
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+        const target = document.getElementById('nextStepsSection');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      };
+    } catch (e) {
+      // A granted permission can still throw post-revoke (e.g. a
+      // since-revoked OS-level permission); fail silently, the on-page
+      // attention pill/favicon dot already carries this state.
+    }
+  }
+
+  // Urgency only changes at a real date boundary (midnight) or after a real
+  // hand-edit reloads the page, never mid-day on its own, so a coarse poll
+  // is enough to catch the crossing without a real backend to push it
+  // instead. 10 minutes keeps the lag small while this tab might sit open
+  // and unfocused for hours, same cadence CSM's own nudge-alert poll uses.
+  const NEXT_STEP_ALERT_POLL_MS = 10 * 60 * 1000;
 
   // Grouping logic lives in SondrikValidateCore, shared with validate.js
   // (same reasoning as CGT's, CSM's and Garage's own validate-core.js) so the
@@ -2354,6 +2489,15 @@
       const steps = computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData, changelogStatusData);
       renderNextSteps(steps);
       renderAttentionPill(steps);
+      checkNextStepAlerts(steps);
+      // Recomputes from the same already-loaded data on a coarse poll purely
+      // to catch a real date boundary (STALE_AFTER_DAYS crossed, a bugfix
+      // check-in window passing, a goal's targetDate passing) while this tab
+      // sits open and unfocused; it never refetches the data files.
+      setInterval(() => {
+        const freshSteps = computeNextSteps(releasesData, downloadsData, leadsData, goalsData, channelsData, changelogStatusData);
+        checkNextStepAlerts(freshSteps);
+      }, NEXT_STEP_ALERT_POLL_MS);
     } else {
       nextStepsList.innerHTML = '<div class="empty-state" role="alert">Could not compute next steps, data failed to load.</div>';
     }

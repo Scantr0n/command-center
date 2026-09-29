@@ -128,6 +128,12 @@ header.page-head .sub {
 }
 .print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
+/* Same on/off toggle color CSM's/Alpha's own notify button already uses,
+   so "armed" reads consistently across every hub that offers native
+   browser notifications, not just Sondrik's own new color choice. */
+.print-btn.notify-on { border-color: rgba(61,220,132,0.4); color: #3DDC84; }
+.print-btn.notify-on:hover, .print-btn.notify-on:focus-visible { border-color: rgba(61,220,132,0.6); color: #3DDC84; }
+
 /* copyPublicBtn's real composed-post length used to be visible only as the
    button's hover title, which a touch device never shows and a mouse user
    only sees by hovering exactly that button first, the opposite of the "see
