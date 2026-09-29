@@ -4148,26 +4148,12 @@ function buildAllSubmissionsSorted() {
   });
 }
 
-// RFC 5545 (iCalendar) text escaping and 75-octet line folding, same
-// approach Garage's and Sondrik's own .ics exports already use.
-function icsEscapeText(s) {
-  return String(s == null ? '' : s)
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n');
-}
-
-function icsFoldLine(line) {
-  if (line.length <= 75) return line;
-  let out = line.slice(0, 75);
-  let rest = line.slice(75);
-  while (rest.length) {
-    out += '\r\n ' + rest.slice(0, 74);
-    rest = rest.slice(74);
-  }
-  return out;
-}
+// Shared, unit-tested RFC 5545 (iCalendar) text escaping and byte-aware
+// 75-octet line folding (export-core.js): see CgtExportCore.icsFoldLine's
+// own comment for why byte-awareness matters, same approach Sondrik's own
+// .ics export already uses.
+const icsEscapeText = CgtExportCore.icsEscapeText;
+const icsFoldLine = CgtExportCore.icsFoldLine;
 
 // One all-day VEVENT per active submission with a real computable estimate,
 // never anything invented for a submission with no submittedDate or no
