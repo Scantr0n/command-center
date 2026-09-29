@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { findDuplicateProspects, findCasingDrift, findDuplicateHooks } = require('./validate-core.js');
-const { emDashFields } = require('./csm-core.js');
+const { emDashFields, hasLegacySocialSnapshotField } = require('./csm-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -166,6 +166,17 @@ function main() {
           'nudgeSchedule.nudgePoint, or nudgeSchedule.doNotNudgeBefore. This prospect will not show up anywhere ' +
           'the board flags a follow-up as due, log a real plan even if it is just a rough one.');
       }
+    }
+
+    // schemaVersion 1's single "socialSnapshot" object was replaced by the
+    // plural "socialSnapshots" array in schemaVersion 2 (see prospects.json's
+    // own top-of-file note). Nothing in app.js reads the singular key
+    // anymore, so a leftover or hand-typed one is real research that never
+    // renders anywhere, an error rather than a warning since it is silently
+    // lost data, not just a style nit.
+    if (hasLegacySocialSnapshotField(p)) {
+      errors.push(where + ': has a legacy "socialSnapshot" (singular) field, this schema uses ' +
+        '"socialSnapshots" (plural array); move its contents there, this field is never read');
     }
 
     if (!Array.isArray(p.socialSnapshots || [])) {

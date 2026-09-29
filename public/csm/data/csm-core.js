@@ -603,6 +603,20 @@
     return hits;
   }
 
+  // schemaVersion 1 stored one social pull as a single "socialSnapshot"
+  // object; schemaVersion 2 (prospects.json's own top-of-file note explains
+  // why) moved to "socialSnapshots", an array, since a real China social
+  // media prospect is commonly active on more than one platform. Every
+  // reader in this app (the board, the modal, the CSV/brief/ics builders,
+  // socialSnapshotsStaleInfo below) only ever looks at the plural array, so
+  // a leftover or hand-typed singular "socialSnapshot" key is not a second,
+  // ignored copy of the data, it is real research that never renders
+  // anywhere and never gets caught by any array-shaped check above, since
+  // those only ever look at the field they expect.
+  function hasLegacySocialSnapshotField(p) {
+    return p != null && typeof p === 'object' && Object.prototype.hasOwnProperty.call(p, 'socialSnapshot');
+  }
+
   // Per-prospect data-quality check: every real gap the board can actually
   // detect from a prospect's own fields, not just the stall/cold-signal/
   // duplicate checks that already get their own panels. Reasons are plain
@@ -634,6 +648,9 @@
         if (p.nextNudgeDate && !isValidDateStr(p.nextNudgeDate)) reasons.push('NEXT NUDGE DATE IS NOT A VALID DATE, CHECK FORMATTING');
         const emDashHitFields = emDashHits(p);
         if (emDashHitFields.length) reasons.push('EM DASH IN ' + emDashHitFields.join(', ').toUpperCase() + ', CHECK FOR A PASTE-IN');
+        if (hasLegacySocialSnapshotField(p)) {
+          reasons.push('LEGACY "SOCIALSNAPSHOT" (SINGULAR) FIELD PRESENT, THIS SCHEMA USES "SOCIALSNAPSHOTS" (PLURAL ARRAY), NOTHING IN THAT FIELD IS SHOWN ANYWHERE ON THIS PAGE');
+        }
         return { p, reasons };
       })
       .filter(x => x.reasons.length > 0);
@@ -898,7 +915,7 @@
     outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
-    missingNextAction, hasStaleNudgePlanAfterReply,
+    missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
     emDashFields, emDashHits
   };
 });

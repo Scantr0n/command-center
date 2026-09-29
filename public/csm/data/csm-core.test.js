@@ -26,7 +26,7 @@ const {
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
-  missingNextAction, hasStaleNudgePlanAfterReply,
+  missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
   emDashFields, emDashHits
 } = require('./csm-core.js');
 
@@ -1328,4 +1328,25 @@ test('hasStaleNudgePlanAfterReply ignores an invalid nextNudgeDate rather than t
 test('computeDataQualityFlags filters out every prospect with nothing wrong', () => {
   const clean = { stage: 'client', name: 'clean', verifiedHook: 'x', contactChannel: { type: 'named-decision-maker', detail: 'x' } };
   assert.deepEqual(computeDataQualityFlags([], [clean]), []);
+});
+
+test('hasLegacySocialSnapshotField is false when only the current plural socialSnapshots array is present', () => {
+  assert.equal(hasLegacySocialSnapshotField({ socialSnapshots: [{ platform: 'Douyin' }] }), false);
+  assert.equal(hasLegacySocialSnapshotField({}), false);
+  assert.equal(hasLegacySocialSnapshotField({ socialSnapshot: null }), true);
+});
+
+test('hasLegacySocialSnapshotField fires on a leftover schemaVersion 1 singular "socialSnapshot" key', () => {
+  assert.equal(hasLegacySocialSnapshotField({
+    socialSnapshot: { platform: 'Xiaohongshu', followers: 50000, asOfDate: '2026-06-01' },
+    socialSnapshots: []
+  }), true);
+});
+
+test('computeDataQualityFlags flags a prospect with a leftover legacy socialSnapshot field', () => {
+  const clean = { stage: 'client', name: 'clean', verifiedHook: 'x', contactChannel: { type: 'named-decision-maker', detail: 'x' } };
+  const legacy = Object.assign({}, clean, { name: 'legacy', socialSnapshot: { platform: 'Weibo' } });
+  const flagged = computeDataQualityFlags([], [legacy]);
+  assert.equal(flagged.length, 1);
+  assert.ok(flagged[0].reasons.some(r => r.includes('LEGACY "SOCIALSNAPSHOT"')));
 });
