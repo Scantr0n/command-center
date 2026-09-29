@@ -81,7 +81,21 @@
     }
     .cc-sb-row:hover, .cc-sb-row:focus-visible { background: rgba(255,255,255,0.03); color: #F5F6F7; outline: none; }
     .cc-sb-row.active { color: #F5F6F7; border-left-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.03); }
-    .cc-sb-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
+    .cc-sb-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; }
+    /* Windows/browser forced-colors mode strips background-color to plain
+       Canvas, the only thing this dot varies between status: at rest it's
+       aria-hidden with the real status carried by the row's own title/
+       aria-label, but a sighted forced-colors user scanning the sidebar by
+       eye would see every status as an identical blank circle. border-style
+       survives forced-colors untouched (same fix already proven on Alpha's
+       history-tick/daily-uptime-bar), so it carries the distinction here. */
+    @media (forced-colors: active) {
+      .cc-sb-dot { border-style: solid; border-width: 2px; }
+      .cc-sb-dot-stalled { border-style: dashed; }
+      .cc-sb-dot-broken { border-style: double; border-width: 3px; }
+      .cc-sb-dot-unknown { border-style: dotted; }
+      .cc-sb-dot-done { border-style: ridge; border-width: 3px; }
+    }
     .cc-sb-label { overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity 0.1s ease; }
     #ccSidebar.expanded .cc-sb-label { opacity: 1; }
     #ccSidebar.expanded .cc-sb-row { padding-right: 34px; }
@@ -250,7 +264,7 @@
       return `
         <div class="cc-sb-row-wrap">
           <a class="cc-sb-row${active ? ' active' : ''}" href="${escapeHtml(c.link)}" title="${escapeHtml(c.name)}, status: ${escapeHtml(statusLabel)}" aria-label="${escapeHtml(c.name)}, status: ${escapeHtml(statusLabel)}" ${active ? 'aria-current="page"' : ''}>
-            <span class="cc-sb-dot" style="background:${color}" aria-hidden="true"></span>
+            <span class="cc-sb-dot cc-sb-dot-${escapeHtml(status)}" style="background:${color}" aria-hidden="true"></span>
             <span class="cc-sb-label">${escapeHtml(c.name)}</span>
           </a>
           <button type="button" class="cc-sb-pin${isPinned ? ' pinned' : ''}" data-pin-id="${escapeHtml(c.id)}" aria-label="${isPinned ? 'Unpin' : 'Pin'} ${escapeHtml(c.name)}" aria-pressed="${isPinned}" title="${isPinned ? 'Unpin' : 'Pin to top'}">
