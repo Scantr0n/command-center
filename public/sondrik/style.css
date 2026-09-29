@@ -303,6 +303,7 @@ header.page-head .sub {
 .snapshot-chip-leads { --chip-accent: #DB5C82; }
 .snapshot-chip-release { --chip-accent: #D9A441; }
 .snapshot-chip-goal { --chip-accent: #3DDC84; }
+.snapshot-chip-channels { --chip-accent: #9D7CE0; }
 .snapshot-chip-icon {
   width: 30px;
   height: 30px;

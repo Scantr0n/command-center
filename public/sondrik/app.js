@@ -377,9 +377,13 @@
     downloads: '<path d="M0,-8 L0,4 M-4.5,-0.5 L0,4 L4.5,-0.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M-7,6.5 L-7,8 Q-7,9 -6,9 L6,9 Q7,9 7,8 L7,6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
     leads: '<path d="M-8,-5 Q-8,-7 -6,-7 L6,-7 Q8,-7 8,-5 L8,1 Q8,3 6,3 L-1,3 L-4.5,6.5 L-4.5,3 L-6,3 Q-8,3 -8,1 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
     release: '<path d="M0,-8.5 C3.5,-6 5,-1.5 3.8,3 L2,6.5 L-2,6.5 L-3.8,3 C-5,-1.5 -3.5,-6 0,-8.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="0" cy="-2.5" r="1.6" fill="currentColor"/><path d="M-2,6.5 L-3.6,9 M2,6.5 L3.6,9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
-    goal: '<circle cx="0" cy="0" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="0" cy="0" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="0" cy="0" r="1.6" fill="currentColor"/>'
+    goal: '<circle cx="0" cy="0" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="0" cy="0" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="0" cy="0" r="1.6" fill="currentColor"/>',
+    // Broadcast/signal glyph: three concentric arcs fanning from a source
+    // point, standard "distribution channel" iconography, distinct from the
+    // download/lead/release/goal glyphs above.
+    channels: '<circle cx="-6.5" cy="6.5" r="1.6" fill="currentColor"/><path d="M-3,3 Q1,-1 5,-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M-1,5.5 A8,8 0 0,0 6,-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M-4,2 A12.5,12.5 0 0,0 7,-8.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>'
   };
-  const SNAPSHOT_TARGET = { downloads: 'tractionSection', leads: 'leadsSection', release: 'releaseSection', goal: 'goalsSection' };
+  const SNAPSHOT_TARGET = { downloads: 'tractionSection', leads: 'leadsSection', release: 'releaseSection', goal: 'goalsSection', channels: 'channelsSection' };
 
   // Real "clicked through" confirmation: a brief highlight on the section a
   // snapshot card actually jumps to, not just a silent scroll. Timeout
@@ -403,7 +407,7 @@
     }));
   }
 
-  function renderSnapshot(releasesData, downloadsData, leadsData, goalsData) {
+  function renderSnapshot(releasesData, downloadsData, leadsData, goalsData, channelsData) {
     const chips = [];
 
     const metric = (downloadsData && downloadsData.metric) || {};
@@ -479,6 +483,26 @@
       });
     } else {
       chips.push({ kind: 'goal', number: '-', label: 'no goal set yet', meta: 'add one once there is a real target' });
+    }
+
+    // Fifth card, new: how many of the real channels Jack actually watches
+    // have a real number behind them (tracked or manual-log) vs an honest
+    // gap (not-tracked). channels.json has held this real data since it was
+    // first added, but nothing surfaced the coverage total at a glance, a
+    // visitor had to scroll past Leads, the reference tables, and Goals to
+    // find the Channels section and count the gap pills themselves.
+    const channels = (channelsData && channelsData.channels) || [];
+    if (channels.length > 0) {
+      const covered = channels.filter(c => c.status === 'tracked' || c.status === 'manual-log').length;
+      const gaps = channels.length - covered;
+      chips.push({
+        kind: 'channels',
+        number: covered + '/' + channels.length,
+        label: 'channels with a real number',
+        meta: gaps > 0 ? gaps + (gaps === 1 ? ' honest gap' : ' honest gaps') : 'all covered'
+      });
+    } else {
+      chips.push({ kind: 'channels', number: '-', label: 'no channels logged yet', meta: 'add one once there is a real one to watch' });
     }
 
     snapshotStrip.innerHTML = chips.map(c =>
@@ -2229,8 +2253,8 @@
         failures.map(escapeHtml).join('; ') + '</div>';
     }
 
-    if (releasesData || downloadsData || leadsData) {
-      renderSnapshot(releasesData, downloadsData, leadsData, goalsData);
+    if (releasesData || downloadsData || leadsData || channelsData) {
+      renderSnapshot(releasesData, downloadsData, leadsData, goalsData, channelsData);
     } else {
       snapshotStrip.innerHTML = '<div class="empty-state" role="alert">Could not compute the snapshot, data failed to load.</div>';
     }
