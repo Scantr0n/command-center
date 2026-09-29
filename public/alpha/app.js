@@ -2470,6 +2470,9 @@ async function loadStatus() {
     const backupBtnEl = document.getElementById('backupBtn');
     backupBtnEl.disabled = false;
     backupBtnEl.title = '';
+    const compareBackupBtnEl = document.getElementById('compareBackupBtn');
+    compareBackupBtnEl.disabled = false;
+    compareBackupBtnEl.title = '';
     lastLoadedAt = new Date().toISOString();
     updateOfflineBanner();
 
@@ -2745,6 +2748,133 @@ backupBtn.addEventListener('click', () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// AlphaCompareCore.compareWithBackup (compare-core.js) does the actual
+// field-by-field comparison; everything here just reads the file the user
+// picks and renders the result. Nothing is uploaded anywhere and nothing is
+// written back to status.json. Same approach as CSM's/Sondrik's/CGT's/
+// Garage's own Compare with backup.
+let compareBackupOpen = false;
+let compareBackupLastFocusedEl = null;
+
+function getCompareBackupFocusable() {
+  return Array.from(document.getElementById('compareBackupModal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function openCompareBackup() {
+  if (compareBackupOpen) return;
+  compareBackupOpen = true;
+  compareBackupLastFocusedEl = document.activeElement;
+  document.getElementById('compareBackupOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('compareBackupPickBtn').focus();
+}
+
+function closeCompareBackup() {
+  if (!compareBackupOpen) return;
+  compareBackupOpen = false;
+  document.getElementById('compareBackupOverlay').hidden = true;
+  unlockBodyScroll();
+  if (compareBackupLastFocusedEl && typeof compareBackupLastFocusedEl.focus === 'function') compareBackupLastFocusedEl.focus();
+  compareBackupLastFocusedEl = null;
+  document.getElementById('compareBackupResult').innerHTML = '';
+  document.getElementById('compareBackupInput').value = '';
+}
+
+function compareBackupTag(fields, removed) {
+  const text = removed ? 'NOT IN CURRENT DATA' : (fields ? fields.map(f => f.toUpperCase()).join(', ') + ' CHANGED' : 'NEW SINCE BACKUP');
+  return '<span class="compare-tag' + (removed ? ' compare-tag-removed' : '') + '">' + escapeHtml(text) + '</span>';
+}
+
+function compareBackupRow(label, sub, tagHtml) {
+  return '<div class="compare-row"><span><strong>' + escapeHtml(label) + '</strong>' +
+    (sub ? ' <span style="color:var(--sub)">' + escapeHtml(sub) + '</span>' : '') + '</span>' + tagHtml + '</div>';
+}
+
+function renderCompareBackupResult(result) {
+  const exportedLabel = result.exportedAt ? formatAbsolute(result.exportedAt) : 'unknown export date (an older backup, or a hand-edited file)';
+  const totalDiffs = result.systemFields.length + result.features.added.length +
+    result.features.removed.length + result.features.changed.length;
+  let html = '<p class="section-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
+  if (totalDiffs === 0) {
+    html += '<p class="section-note">No differences. Alpha\'s real architecture facts currently loaded on this page match this backup exactly.</p>';
+    document.getElementById('compareBackupResult').innerHTML = html;
+    return;
+  }
+  if (result.systemFields.length) {
+    html += '<p class="compare-section-label">Architecture facts (system.*)</p><div class="compare-list">' +
+      result.systemFields.map(f => compareBackupRow(
+        f.field, 'now: ' + (f.current == null ? 'unset' : String(f.current)) + ', was: ' + (f.backup == null ? 'unset' : String(f.backup)),
+        compareBackupTag([f.field], false)
+      )).join('') + '</div>';
+  }
+  const feat = result.features;
+  if (feat.added.length + feat.removed.length + feat.changed.length) {
+    html += '<p class="compare-section-label">Features (system.features[])</p><div class="compare-list">' +
+      feat.added.map(f => compareBackupRow(f.label || f.id, null, compareBackupTag(null, false))).join('') +
+      feat.changed.map(c => compareBackupRow(c.current.label || c.key, null, compareBackupTag(c.fields, false))).join('') +
+      feat.removed.map(f => compareBackupRow(f.label || f.id, null, compareBackupTag(null, true))).join('') +
+      '</div>';
+  }
+  document.getElementById('compareBackupResult').innerHTML = html;
+}
+
+document.getElementById('compareBackupPickBtn').addEventListener('click', () => document.getElementById('compareBackupInput').click());
+
+document.getElementById('compareBackupInput').addEventListener('change', () => {
+  const input = document.getElementById('compareBackupInput');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = '<p class="section-note" role="alert">Could not read that file as JSON: ' +
+        escapeHtml(err.message) + '</p>';
+      return;
+    }
+    try {
+      renderCompareBackupResult(window.AlphaCompareCore.compareWithBackup(lastStatusData || {}, parsed));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = '<p class="section-note" role="alert">' + escapeHtml(err.message) + '</p>';
+    }
+  };
+  reader.onerror = () => {
+    document.getElementById('compareBackupResult').innerHTML = '<p class="section-note" role="alert">Could not read that file.</p>';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('compareBackupBtn').addEventListener('click', openCompareBackup);
+document.getElementById('compareBackupClose').addEventListener('click', closeCompareBackup);
+document.getElementById('compareBackupOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'compareBackupOverlay') closeCompareBackup();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!compareBackupOpen) return;
+  if (e.key === 'Escape') {
+    closeCompareBackup();
+    return;
+  }
+  if (e.key === 'Tab') {
+    const focusable = getCompareBackupFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 });
 
 // Extracted to data/export-core.js so its formula-injection guard has a
@@ -3080,7 +3210,7 @@ document.addEventListener('keydown', (e) => {
 // content, even though this page has no free-text input today, so a future
 // one doesn't silently start eating keystrokes.
 document.addEventListener('keydown', (e) => {
-  if (shortcutsOpen || jumpNavOpen) return;
+  if (shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
   const active = document.activeElement;
   const tag = active && active.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;

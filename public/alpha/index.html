@@ -34,6 +34,7 @@
       </div>
       <button type="button" id="copyStatusBtn" class="refresh-btn font-mono" aria-live="polite" disabled>Copy status</button>
       <button type="button" id="backupBtn" class="refresh-btn font-mono" disabled title="Loading status...">Download backup (.json)</button>
+      <button type="button" id="compareBackupBtn" class="refresh-btn font-mono" disabled title="Loading status...">Compare with backup&hellip;</button>
       <button type="button" id="printBtn" class="refresh-btn font-mono">Print / export PDF</button>
       <button type="button" id="notifyBtn" class="refresh-btn font-mono" hidden aria-live="polite" aria-pressed="false"></button>
       <button type="button" id="testAlertBtn" class="refresh-btn font-mono" hidden>Send test alert</button>
@@ -153,6 +154,15 @@
             read whatever the Summary/Position sizing/Genealogy sections are currently showing, last-known cache
             included, so this grid never disagrees with the section it summarizes. Nothing here is computed from a
             field the rest of the page doesn't already show.</td></tr>
+          <tr><th scope="row">Compare with backup</th><td>Not its own field: a client-side, field-by-field diff
+            between <code>system.*</code> (the real hand-maintained architecture facts) as currently loaded and a
+            file picked from disk, expected to be one produced earlier by this same page's own
+            <strong>Download backup (.json)</strong> button. Same pattern already proven at CSM's, Sondrik's,
+            CGT's, and Garage's own Compare with backup, adapted here to Alpha's one hand-edited record instead of
+            a list of them. Deliberately scoped to <code>system.*</code>: everything under <code>live</code>
+            changes on its own with no hand-edit behind it, so including it would just report "changed" on nearly
+            every field nearly every time, the exact noise this feature exists to avoid. Nothing is uploaded
+            anywhere, and nothing is ever written back to <code>status.json</code>.</td></tr>
           <tr><th scope="row">changelog.json</th><td>Generated, never hand-edit. Run
             <code>node public/alpha/data/changelog.js</code> after committing changes to <code>status.json</code>,
             it reads this repo's real git history and regenerates the whole file from actual commit hashes,
@@ -334,6 +344,25 @@
   </section>
   </main>
 
+  <input type="file" id="compareBackupInput" accept="application/json,.json" hidden>
+  <div class="modal-overlay" id="compareBackupOverlay" hidden>
+    <div class="modal modal-wide" id="compareBackupModal" role="dialog" aria-modal="true" aria-labelledby="compareBackupTitle">
+      <button class="modal-close" id="compareBackupClose" aria-label="Close">&times;</button>
+      <h3 id="compareBackupTitle" class="font-display">Compare with a backup</h3>
+      <p class="section-note" style="margin-top:-4px">Read-only. This never writes anything back to
+        <code>status.json</code>, it only shows what changed in the real, hand-maintained architecture facts
+        (agent count, feature list, and the rest of <code>system.*</code>) currently loaded on this page versus a
+        backup file taken earlier, so a bad hand-edit can be caught before it's trusted. Everything under
+        <code>live</code> (regime, drawdown, positions, account) is left out on purpose: it changes on its own
+        every 30 seconds with no hand-edit behind it, so diffing it here would just report "changed" on nearly
+        every field nearly every time.</p>
+      <p class="section-note" id="compareBackupHint">Pick a file downloaded earlier from this page&rsquo;s
+        <strong>Download backup (.json)</strong> button.</p>
+      <button type="button" class="refresh-btn font-mono" id="compareBackupPickBtn">Choose backup file&hellip;</button>
+      <div id="compareBackupResult" aria-live="polite"></div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="shortcutsOverlay" hidden>
     <div class="modal" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
       <button class="modal-close" id="shortcutsClose" aria-label="Close">&times;</button>
@@ -373,6 +402,7 @@
 <script src="/alpha/data/sparkline-core.js"></script>
 <script src="/alpha/data/export-core.js"></script>
 <script src="/alpha/data/html-core.js"></script>
+<script src="/alpha/data/compare-core.js"></script>
 <script src="/alpha/app.js"></script>
 <script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>
