@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   daysBetween, addDays, isValidDateStr, downloadsPerDayRate, recentDownloadsPerDayRate,
-  goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay, goalReminder
+  goalReachedDate, currentMetricValue, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay, goalReminder
 } = require('./goals-core.js');
 
 test('daysBetween counts whole days between two local dates', () => {
@@ -106,6 +106,50 @@ test('goalReachedDate for leads returns the Nth lead by real logged date once ev
     { loggedDate: '2026-09-12' }, { loggedDate: '2026-09-05' }, { loggedDate: '2026-09-20' }
   ] };
   assert.equal(goalReachedDate({ metric: 'leads', target: 2 }, null, leadsData), '2026-09-12');
+});
+
+test('currentMetricValue for downloads reads the latest check by date, not array order', () => {
+  const downloadsData = { metric: { checks: [
+    { date: '2026-09-20', count: 15 }, { date: '2026-09-04', count: 0 }, { date: '2026-09-07', count: 8 }
+  ] } };
+  assert.deepEqual(currentMetricValue('downloads', downloadsData, null), { count: 15, asOf: '2026-09-20' });
+});
+
+test('currentMetricValue for downloads returns null with no checks logged yet', () => {
+  assert.equal(currentMetricValue('downloads', { metric: { checks: [] } }, null), null);
+  assert.equal(currentMetricValue('downloads', null, null), null);
+});
+
+test('currentMetricValue for leads counts every logged lead, asOf is the most recent real loggedDate', () => {
+  const leadsData = { leads: [
+    { loggedDate: '2026-09-12' }, { loggedDate: '2026-09-05' }, { loggedDate: null }
+  ] };
+  assert.deepEqual(currentMetricValue('leads', null, leadsData), { count: 3, asOf: '2026-09-12' });
+});
+
+test('currentMetricValue for leads is honest-null asOf when none have a real loggedDate yet, never today\'s date', () => {
+  const leadsData = { leads: [{ loggedDate: null }] };
+  assert.deepEqual(currentMetricValue('leads', null, leadsData), { count: 1, asOf: null });
+});
+
+test('currentMetricValue for leads returns null with no leads logged yet', () => {
+  assert.equal(currentMetricValue('leads', null, { leads: [] }), null);
+  assert.equal(currentMetricValue('leads', null, null), null);
+});
+
+test('currentMetricValue returns null for any metric name other than downloads/leads, never guesses at zero', () => {
+  assert.equal(currentMetricValue('revenue', { metric: { checks: [{ date: '2026-09-07', count: 8 }] } }, null), null);
+  assert.equal(currentMetricValue(null, null, null), null);
+});
+
+test('the real goals.json on disk only ever sets a metric currentMetricValue actually supports', () => {
+  const goalsData = require('./goals.json');
+  const downloadsData = require('./downloads.json');
+  const leadsData = require('./leads.json');
+  (goalsData.goals || []).forEach(g => {
+    assert.notEqual(currentMetricValue(g.metric, downloadsData, leadsData), null,
+      '"' + g.label + '" sets metric "' + g.metric + '", which currentMetricValue has no real data for');
+  });
 });
 
 test('computeGoalProgressPct clamps and guards a zero/negative target instead of NaN', () => {

@@ -114,6 +114,36 @@
     return null;
   }
 
+  // Looks up the real current value behind a goal's target. Only "downloads"
+  // and "leads" have real numbers behind them so far (see VALID_GOAL_METRICS
+  // in validate.js); any other metric name would have nothing real to
+  // compare the target against, so this returns null rather than guessing
+  // at zero. Reads the exact same downloadsData/leadsData shapes
+  // goalReachedDate above already does, feeds the Goals card, the Next
+  // Steps goal-pace checks, the snapshot strip's goal chip, and the copied
+  // status update, all of which need to agree on the same real "how far
+  // along is this goal" number.
+  function currentMetricValue(metricName, downloadsData, leadsData) {
+    if (metricName === 'downloads') {
+      const metric = (downloadsData && downloadsData.metric) || {};
+      const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      if (checks.length === 0) return null;
+      const latest = checks[checks.length - 1];
+      return { count: latest.count, asOf: latest.date };
+    }
+    if (metricName === 'leads') {
+      // Total real leads logged so far, same count the Channels section
+      // already shows per-channel. asOf is the most recently logged lead's
+      // date, or null if none of them have a real loggedDate yet, rather
+      // than defaulting to today and implying a freshness that isn't real.
+      const leads = (leadsData && leadsData.leads) || [];
+      if (leads.length === 0) return null;
+      const dates = leads.map(l => l.loggedDate).filter(Boolean).sort();
+      return { count: leads.length, asOf: dates.length ? dates[dates.length - 1] : null };
+    }
+    return null;
+  }
+
   // A target of 0 (or a negative typo) would otherwise divide out to
   // NaN/Infinity, which Math.max/min don't clamp away, so guard it
   // explicitly rather than rendering "NaN%".
@@ -198,6 +228,7 @@
     downloadsPerDayRate,
     recentDownloadsPerDayRate,
     goalReachedDate,
+    currentMetricValue,
     computeGoalProgressPct,
     computeGoalPaceStatus,
     computeRequiredPerDay,

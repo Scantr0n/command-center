@@ -37,7 +37,8 @@
   // live in one place a test suite can actually exercise.
   const {
     daysBetween, addDays, isValidDateStr, recentDownloadsPerDayRate,
-    goalReachedDate, computeGoalProgressPct, computeGoalPaceStatus, computeRequiredPerDay, goalReminder
+    goalReachedDate, currentMetricValue, computeGoalProgressPct, computeGoalPaceStatus,
+    computeRequiredPerDay, goalReminder
   } = window.SondrikGoalsCore;
 
   // Shared, unit-tested bugfix-checkin date math (release-core.js), same
@@ -794,35 +795,10 @@
     update();
   }
 
-  // Looks up the real current value behind a goal's target. Only "downloads"
-  // and "leads" have real numbers behind them so far (see VALID_GOAL_METRICS
-  // in validate.js); any other metric name would have nothing real to
-  // compare the target against, so this returns null rather than guessing
-  // at zero.
-  function currentMetricValue(metricName, downloadsData, leadsData) {
-    if (metricName === 'downloads') {
-      const metric = (downloadsData && downloadsData.metric) || {};
-      const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-      if (checks.length === 0) return null;
-      const latest = checks[checks.length - 1];
-      return { count: latest.count, asOf: latest.date };
-    }
-    if (metricName === 'leads') {
-      // Total real leads logged so far, same count the Channels section
-      // already shows per-channel. asOf is the most recently logged lead's
-      // date, or null if none of them have a real loggedDate yet, rather
-      // than defaulting to today and implying a freshness that isn't real.
-      const leads = (leadsData && leadsData.leads) || [];
-      if (leads.length === 0) return null;
-      const dates = leads.map(l => l.loggedDate).filter(Boolean).sort();
-      return { count: leads.length, asOf: dates.length ? dates[dates.length - 1] : null };
-    }
-    return null;
-  }
-
-  // recentDownloadsPerDayRate and goalReachedDate now live in goals-core.js
-  // (destructured from SondrikGoalsCore near the top of this file), so the
-  // pace/projection math they feed can actually be unit-tested.
+  // recentDownloadsPerDayRate, goalReachedDate, and currentMetricValue now
+  // live in goals-core.js (destructured from SondrikGoalsCore near the top
+  // of this file), so the pace/projection math they feed can actually be
+  // unit-tested.
   // downloadsPerDayRate (the lifetime average) lives there too, kept for its
   // own tests even though nothing in this file calls it directly right now:
   // Traction's own "~X/day over that span" line computes its inline perDay
