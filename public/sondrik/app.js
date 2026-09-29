@@ -66,6 +66,13 @@
   // shared-core pattern as the four destructures above.
   const { escapeHtml } = window.SondrikHtmlCore;
 
+  // Shared, unit-tested shields.io "flat" badge builder (badge-core.js): the
+  // "Download README badge (SVG)" button's own text-width/layout math is
+  // real, hand-embeddable output (Sondrik's own README), same shared-core
+  // pattern as the destructures above, this closes the one gap where they
+  // were the last real on-page logic still living in app.js untested.
+  const { buildDownloadsBadgeSvg } = window.SondrikBadgeCore;
+
   printBtn.addEventListener('click', () => window.print());
 
   // A record-level deep link (?lead=<id>, ?channel=<id>, ?release=<version>,
@@ -1693,63 +1700,6 @@
     });
   }
 
-  // Minimal, self-contained shields.io "flat" badge renderer for two lines
-  // of static text (a fixed gray label side, a colored value side). Approx
-  // Verdana/DejaVu Sans glyph widths, close enough to render legibly without
-  // pulling in shields.io's own badge service (no live backend exists on
-  // this page to call it from) or a real font-metrics library for what is
-  // always exactly two short strings.
-  const BADGE_CHAR_WIDTH = 6.2;
-  function badgeTextWidth(text) {
-    return Math.round(text.length * BADGE_CHAR_WIDTH) + 10;
-  }
-  function renderFlatBadgeSvg(label, value, color) {
-    const labelWidth = badgeTextWidth(label);
-    const valueWidth = badgeTextWidth(value);
-    const totalWidth = labelWidth + valueWidth;
-    const height = 20;
-    const labelX = labelWidth / 2;
-    const valueX = labelWidth + valueWidth / 2;
-    const a11yLabel = escapeHtml(label + ': ' + value);
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + totalWidth + '" height="' + height +
-      '" role="img" aria-label="' + a11yLabel + '">' +
-      '<title>' + a11yLabel + '</title>' +
-      '<linearGradient id="s" x2="0" y2="100%">' +
-      '<stop offset="0" stop-color="#bbb" stop-opacity=".1"/>' +
-      '<stop offset="1" stop-opacity=".1"/>' +
-      '</linearGradient>' +
-      '<clipPath id="r"><rect width="' + totalWidth + '" height="' + height + '" rx="3" fill="#fff"/></clipPath>' +
-      '<g clip-path="url(#r)">' +
-      '<rect width="' + labelWidth + '" height="' + height + '" fill="#555"/>' +
-      '<rect x="' + labelWidth + '" width="' + valueWidth + '" height="' + height + '" fill="' + color + '"/>' +
-      '<rect width="' + totalWidth + '" height="' + height + '" fill="url(#s)"/>' +
-      '</g>' +
-      '<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">' +
-      '<text x="' + labelX + '" y="14">' + escapeHtml(label) + '</text>' +
-      '<text x="' + valueX + '" y="14">' + escapeHtml(value) + '</text>' +
-      '</g>' +
-      '</svg>';
-  }
-
-  // A real download-count badge to embed in Sondrik's own README, the same
-  // pattern any open-source project's shields.io downloads badge follows.
-  // Built once from whatever's on disk right now, not a live badge: shields.io
-  // has no way to read this repo's private data, and this page still has no
-  // live backend wired up anywhere (see the callout at the top). The real
-  // "as of" date is baked into the badge text itself, the same reason the
-  // Traction card's own freshness badge exists, so the badge tells anyone
-  // reading the README how current the number is instead of implying a live
-  // feed that quietly goes stale the moment a fresh check gets logged here.
-  function buildDownloadsBadgeSvg(downloadsData) {
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length === 0) return null;
-    const latest = checks[checks.length - 1];
-    const label = 'sondrik downloads';
-    const value = latest.count + ' (as of ' + fmtDate(latest.date) + ')';
-    return renderFlatBadgeSvg(label, value, '#3B82C4');
-  }
-
   // Exports the real, logged download-check history only, one row per actual
   // check that was run, never an interpolated or estimated in-between value.
   function exportDownloadsCsv(downloadsData) {
@@ -2408,7 +2358,7 @@
     if (downloadsData) {
       renderTraction(downloadsData, releasesData || {});
       csvBtn.addEventListener('click', () => exportDownloadsCsv(downloadsData));
-      const badgeSvg = buildDownloadsBadgeSvg(downloadsData);
+      const badgeSvg = buildDownloadsBadgeSvg(downloadsData, fmtDate, escapeHtml);
       if (badgeSvg) {
         downloadsBadgeBtn.addEventListener('click', () => {
           const blob = new Blob([badgeSvg], { type: 'image/svg+xml' });

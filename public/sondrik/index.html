@@ -502,7 +502,9 @@
     guards the CSV-formula-injection escape and the UTF-8-byte-aware ICS line folding. Run
     <code>node --test public/sondrik/data/next-steps-core.test.js</code> after changing the Next Steps
     checklist logic, it guards which real gaps and overdue check-ins surface as an action item there and on the
-    header's attention pill.
+    header's attention pill. Run
+    <code>node --test public/sondrik/data/badge-core.test.js</code> after changing the README badge builder, it
+    guards the text-width layout math and the escaping on the label/value baked into the exported SVG.
   </footer>
 </div>
 
@@ -545,6 +547,7 @@
 <script src="/sondrik/data/export-core.js"></script>
 <script src="/sondrik/data/compare-core.js"></script>
 <script src="/sondrik/data/html-core.js"></script>
+<script src="/sondrik/data/badge-core.js"></script>
 <script src="/sondrik/app.js"></script>
 <script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>
