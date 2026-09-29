@@ -22,7 +22,8 @@ const {
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
   ebayTrsProgress, depopTopSellerProgress,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
-  isSupplyLowStock
+  isSupplyLowStock,
+  sortEngagementSnapshots, annotateEngagementTrend
 } = require('./garage-core.js');
 
 test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
@@ -415,4 +416,57 @@ test('computeYtdNetProfit: an expense with no computable amount counts toward ex
   assert.equal(result.expensesCount, 1, 'only the real 2027-dated row counts toward the 2027 total');
   assert.equal(result.expensesUncountedCount, 1);
   assert.equal(result.businessExpenses, 0);
+});
+
+test('sortEngagementSnapshots: sorts ascending by date, undated entries first (empty string sorts before any real date)', () => {
+  const snapshots = [
+    { id: 'c', date: '2026-09-20' },
+    { id: 'a', date: '2026-09-01' },
+    { id: 'b', date: null }
+  ];
+  assert.deepEqual(sortEngagementSnapshots(snapshots).map(s => s.id), ['b', 'a', 'c']);
+});
+
+test('annotateEngagementTrend: a listing+platform pair\'s first-ever snapshot gets null deltas, not a misleading flat 0', () => {
+  const [first] = annotateEngagementTrend([
+    { id: 's1', listingId: 'black-boots', platform: 'ebay', date: '2026-09-01', views: 10, saves: 2 }
+  ]);
+  assert.equal(first.viewsDelta, null);
+  assert.equal(first.savesDelta, null);
+  assert.equal(first.previousDate, null);
+});
+
+test('annotateEngagementTrend: computes a real delta against the immediately prior snapshot for the same listing+platform pair', () => {
+  const result = annotateEngagementTrend([
+    { id: 's2', listingId: 'black-boots', platform: 'ebay', date: '2026-09-15', views: 47, saves: 6 },
+    { id: 's1', listingId: 'black-boots', platform: 'ebay', date: '2026-09-01', views: 10, saves: 2 }
+  ]);
+  const second = result.find(s => s.id === 's2');
+  assert.equal(second.viewsDelta, 37);
+  assert.equal(second.savesDelta, 4);
+  assert.equal(second.previousDate, '2026-09-01');
+});
+
+test('annotateEngagementTrend: never mixes up two different listings, or two different platforms of the same listing', () => {
+  const result = annotateEngagementTrend([
+    { id: 'boots-ebay-1', listingId: 'black-boots', platform: 'ebay', date: '2026-09-01', views: 10, saves: 1 },
+    { id: 'boots-vinted-1', listingId: 'black-boots', platform: 'vinted', date: '2026-09-05', views: 50, saves: 5 },
+    { id: 'white-boots-ebay-1', listingId: 'white-boots', platform: 'ebay', date: '2026-09-10', views: 20, saves: 2 }
+  ]);
+  // Each is the first-ever snapshot for its own real listingId+platform pair,
+  // even though "ebay" repeats and "black-boots" repeats separately.
+  result.forEach(s => {
+    assert.equal(s.viewsDelta, null);
+    assert.equal(s.savesDelta, null);
+  });
+});
+
+test('annotateEngagementTrend: a delta stays null when either side of the comparison never had that field logged', () => {
+  const result = annotateEngagementTrend([
+    { id: 's1', listingId: 'black-boots', platform: 'depop', date: '2026-09-01', views: null, saves: 3 },
+    { id: 's2', listingId: 'black-boots', platform: 'depop', date: '2026-09-10', views: 15, saves: null }
+  ]);
+  const second = result.find(s => s.id === 's2');
+  assert.equal(second.viewsDelta, null, 'the earlier snapshot never logged a real views count to compare against');
+  assert.equal(second.savesDelta, null, 'this snapshot itself never logged a real saves count');
 });

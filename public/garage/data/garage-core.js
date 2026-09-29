@@ -472,6 +472,45 @@
     return s.qtyOnHand != null && s.reorderThreshold != null && s.qtyOnHand <= s.reorderThreshold;
   }
 
+  // No live platform API exists to pull real view/watcher/like counts
+  // automatically (see engagement.json's own header comment), so this is a
+  // hand-logged snapshot log: date + views/saves for one listing on one
+  // platform, same "manual entry, no invention" shape as comps.json. The one
+  // thing worth computing over a plain log is the trend between two
+  // consecutive real snapshots of the *same* listing+platform pair, since
+  // "47 views" alone doesn't say whether that listing is picking up or
+  // going cold, but "47 views (+12 since the last log 6 days ago)" does.
+  // Sorts ascending by date first (a stable sort, so same-day entries keep
+  // their logged order) and walks forward per listingId+platform key, so a
+  // snapshot only ever compares against the real previous one for its own
+  // listing on its own platform, never a different item or a different
+  // platform's numbers.
+  function sortEngagementSnapshots(snapshots) {
+    return [...(snapshots || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  }
+
+  // Returns every snapshot with viewsDelta/savesDelta/previousDate added,
+  // each computed against the real prior snapshot for that same
+  // listingId+platform pair (null on all three for a pair's first-ever
+  // logged snapshot, honestly "no trend yet" rather than a misleading flat
+  // 0). A delta itself stays null whenever either side of the comparison
+  // never had that field logged, the same "unknown, not zero" rule
+  // daysSincePublished above already follows.
+  function annotateEngagementTrend(snapshots) {
+    const sorted = sortEngagementSnapshots(snapshots);
+    const lastByKey = new Map();
+    return sorted.map(s => {
+      const key = s.listingId + '|' + s.platform;
+      const prev = lastByKey.get(key) || null;
+      lastByKey.set(key, s);
+      return Object.assign({}, s, {
+        viewsDelta: (prev && s.views != null && prev.views != null) ? s.views - prev.views : null,
+        savesDelta: (prev && s.saves != null && prev.saves != null) ? s.saves - prev.saves : null,
+        previousDate: prev ? prev.date : null
+      });
+    });
+  }
+
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
     POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
@@ -488,6 +527,7 @@
     EBAY_TRS_WINDOW_DAYS, EBAY_TRS_TRANSACTIONS_TARGET, EBAY_TRS_GROSS_SALES_TARGET,
     DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
     ebayTrsProgress, depopTopSellerProgress,
-    isSupplyLowStock
+    isSupplyLowStock,
+    sortEngagementSnapshots, annotateEngagementTrend
   };
 });

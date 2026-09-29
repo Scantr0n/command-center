@@ -5,6 +5,7 @@ let disputesLog = [];
 let suppliesLog = [];
 let acquisitionsLog = [];
 let compsLog = [];
+let engagementLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 // Set once from a real ?listing=<id> URL param and consumed once, right
@@ -26,6 +27,7 @@ let rawDisputesData = null;
 let rawSuppliesData = null;
 let rawAcquisitionsData = null;
 let rawCompsData = null;
+let rawEngagementData = null;
 let garageChangelogDriftStatus = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
@@ -83,7 +85,7 @@ const {
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
-  isSupplyLowStock
+  isSupplyLowStock, annotateEngagementTrend
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -746,7 +748,7 @@ function renderChangelog(data, driftStatus) {
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
   loadChangelog();
-  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult, engagementResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
     fetchJson('/garage/data/activity.json'),
@@ -755,7 +757,8 @@ async function loadData() {
     fetchJson('/garage/data/disputes.json'),
     fetchJson('/garage/data/supplies.json'),
     fetchJson('/garage/data/acquisitions.json'),
-    fetchJson('/garage/data/comps.json')
+    fetchJson('/garage/data/comps.json'),
+    fetchJson('/garage/data/engagement.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
@@ -766,6 +769,7 @@ async function loadData() {
   const suppliesData = suppliesResult.status === 'fulfilled' ? suppliesResult.value.data : null;
   const acquisitionsData = acquisitionsResult.status === 'fulfilled' ? acquisitionsResult.value.data : null;
   const compsData = compsResult.status === 'fulfilled' ? compsResult.value.data : null;
+  const engagementData = engagementResult.status === 'fulfilled' ? engagementResult.value.data : null;
   rawListingsData = listingsData;
   rawPipelineData = pipelineData;
   rawActivityData = activityData;
@@ -775,8 +779,9 @@ async function loadData() {
   rawSuppliesData = suppliesData;
   rawAcquisitionsData = acquisitionsData;
   rawCompsData = compsData;
+  rawEngagementData = engagementData;
   const backupBtn = document.getElementById('backupBtn');
-  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData);
+  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
@@ -785,8 +790,9 @@ async function loadData() {
   const supplies = (suppliesData && suppliesData.supplies) || [];
   const acquisitions = (acquisitionsData && acquisitionsData.acquisitions) || [];
   const comps = (compsData && compsData.comps) || [];
+  const engagementSnapshots = (engagementData && engagementData.snapshots) || [];
 
-  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult]
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult, engagementResult]
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value.lastModified));
 
@@ -927,6 +933,18 @@ async function loadData() {
     compsEmpty.hidden = false;
     compsEmpty.setAttribute('role', 'alert');
     compsEmpty.textContent = "Couldn't load comps data: " + compsResult.reason.message;
+  }
+
+  if (engagementData) {
+    engagementLog = engagementSnapshots;
+    renderEngagement(engagementSnapshots, listings);
+  } else {
+    engagementLog = [];
+    document.getElementById('engagementTableBody').innerHTML = '';
+    const engagementEmpty = document.getElementById('engagementTableEmpty');
+    engagementEmpty.hidden = false;
+    engagementEmpty.setAttribute('role', 'alert');
+    engagementEmpty.textContent = "Couldn't load engagement data: " + engagementResult.reason.message;
   }
   // renderOfferItemChips above already ran renderOfferGuide once, but before
   // compsLog was set here, so its first paint could miss a real logged comp
@@ -3360,6 +3378,67 @@ function renderComps(comps, currentListings) {
   });
 }
 
+// Formats a real logged delta as a signed integer, or leaves it out
+// entirely when there's no prior snapshot of this same listing+platform to
+// compare against yet (annotateEngagementTrend already returns null for
+// that case, honestly "no trend yet" rather than a misleading "+0").
+function formatEngagementDelta(delta) {
+  if (delta == null) return '';
+  if (delta === 0) return ' (no change)';
+  return ' (' + (delta > 0 ? '+' : '') + delta + ')';
+}
+
+function renderEngagement(snapshots, currentListings) {
+  const tbody = document.getElementById('engagementTableBody');
+  const empty = document.getElementById('engagementTableEmpty');
+
+  if (!snapshots.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No engagement snapshots logged yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  // annotateEngagementTrend returns ascending by date (it needs that order
+  // to walk each listing+platform pair forward when computing deltas), the
+  // newest-first display every other log on this page uses is just a
+  // reverse of that already-computed order, never a second independent sort
+  // that could rank a row differently than the trend it was computed from.
+  const annotated = annotateEngagementTrend(snapshots).reverse();
+
+  tbody.innerHTML = annotated.map(s => {
+    const listing = currentListings.find(l => l.id === s.listingId);
+    const itemHtml = listing
+      ? `<button type="button" class="badge badge-link badge-button" data-listing-id="${escapeHtml(s.listingId)}">${escapeHtml(listing.title)}</button>`
+      : `<span class="cell-muted">${escapeHtml(s.listingId)} (not in listings.json anymore)</span>`;
+    const ageDays = daysSincePublished(s.date);
+    const dateHtml = escapeHtml(s.date) + (ageDays != null ? `<div class="cell-muted">${ageDays === 0 ? 'today' : ageDays + 'd ago'}</div>` : '');
+    const viewsHtml = s.views != null
+      ? escapeHtml(String(s.views)) + formatEngagementDelta(s.viewsDelta)
+      : '<span class="cell-value empty">not logged</span>';
+    const savesHtml = s.saves != null
+      ? escapeHtml(String(s.saves)) + formatEngagementDelta(s.savesDelta)
+      : '<span class="cell-value empty">not logged</span>';
+    return `
+    <tr>
+      <td>${itemHtml}</td>
+      <td><span class="badge badge-${escapeHtml(s.platform)}">${escapeHtml(PLATFORM_LABELS[s.platform] || s.platform)}</span></td>
+      <td class="cell-muted">${dateHtml}</td>
+      <td class="cell-value">${viewsHtml}</td>
+      <td class="cell-value">${savesHtml}</td>
+      <td class="cell-muted">${s.notes ? escapeHtml(s.notes) : ''}</td>
+    </tr>
+  `;
+  }).join('');
+
+  tbody.querySelectorAll('[data-listing-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentListings.some(l => l.id === btn.dataset.listingId)) openModal(btn.dataset.listingId);
+    });
+  });
+}
+
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchTerm = e.target.value;
   applyFiltersAndRender();
@@ -5451,6 +5530,93 @@ function wireQuickLogCompTool() {
   });
 }
 
+// Same quick-log convention as the tools above, for engagement.json. Unlike
+// a comp, listingId is required here (see validate.js's own comment on
+// this), so a blank one is a blocker, not just an advisory. date defaults
+// to today via the input's own value if left blank makes no sense here,
+// a real logged snapshot needs a real date, so it stays a blocker too.
+function wireQuickLogEngagementTool() {
+  const form = document.getElementById('quickEngagementForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('neWarnings');
+  const output = document.getElementById('neOutput');
+  const copyBtn = document.getElementById('neCopyBtn');
+  const live = document.getElementById('quickLogEngagementLive');
+  const draftGuard = attachDraftGuard(form, 'garage-ne-draft-v1', {
+    bannerId: 'neDraftBanner', timeId: 'neDraftBannerTime', discardId: 'neDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('neId').value.trim();
+    const listingId = document.getElementById('neListingId').value.trim();
+    const platform = document.getElementById('nePlatform').value;
+    const date = document.getElementById('neDate').value || null;
+    const views = readOptionalNonNegativeInput(document.getElementById('neViews'));
+    const saves = readOptionalNonNegativeInput(document.getElementById('neSaves'));
+    const notes = document.getElementById('neNotes').value.trim() || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (engagementLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another engagement snapshot, ids must be unique.');
+    }
+    if (!listingId) blockers.push('A linked listing id is required, an engagement snapshot must belong to a real listing.');
+    else if (!listings.some(l => l.id === listingId)) {
+      blockers.push('"' + listingId + '" does not match any listing in listings.json.');
+    }
+    if (!platform) blockers.push('Select a platform.');
+    else {
+      const listing = listings.find(l => l.id === listingId);
+      if (listing && !(listing.platforms || []).includes(platform)) {
+        advisory.push('"' + platform + '" is not one of "' + listingId + '"\'s own platforms, double check that\'s not a typo.');
+      }
+    }
+    if (!date) blockers.push('Enter the real date this snapshot was actually checked.');
+    else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (new Date(date + 'T00:00:00') > tomorrow) {
+        blockers.push('Date is in the future, this is a real logged snapshot, not a projection.');
+      }
+    }
+    if (views === undefined) blockers.push('Enter a valid non-negative views count, or leave it blank.');
+    if (saves === undefined) blockers.push('Enter a valid non-negative saves count, or leave it blank.');
+    if (views === null && saves === null) {
+      blockers.push('Log at least one of views/saves, a snapshot logging neither has nothing to show.');
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const snapshot = { id, listingId, platform, date, views, saves, notes };
+
+    advisory.push(...emDashAdvisory(snapshot, ['notes']));
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(snapshot, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Engagement snapshot JSON copied to clipboard.';
+      draftGuard.clearDraft();
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 // AI photo-to-listing drafter. Two-stage flow: stage 1 (draft) sends real
 // item photos to /api/garage/draft-listing and shows every field with its
 // confidence and reasoning, purely informational, nothing saved. Stage 2
@@ -5761,6 +5927,7 @@ wireQuickLogDisputeTool();
 wireQuickLogSupplyTool();
 wireQuickLogAcquisitionTool();
 wireQuickLogCompTool();
+wireQuickLogEngagementTool();
 wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();

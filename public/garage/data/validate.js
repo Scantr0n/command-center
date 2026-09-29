@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /*
  * Validates listings.json, pipeline.json, activity.json, sales.json,
- * expenses.json, disputes.json, supplies.json, acquisitions.json, and
- * comps.json against the field rules documented in public/garage/index.html.
+ * expenses.json, disputes.json, supplies.json, acquisitions.json,
+ * comps.json, and engagement.json against the field rules documented in
+ * public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -46,6 +47,14 @@
  * real past sale, not a projection), and "listingId", if logged, is checked
  * against listings.json the same "fine if not itemized yet" way sales/
  * disputes/acquisitions already are.
+ * Every engagement.json entry is a hand-logged views/watchers snapshot for
+ * one real listing on one real platform (no live platform API exists to
+ * pull this automatically), so unlike a comp it's never general research:
+ * "listingId" is required and must match a real listing in listings.json,
+ * "platform" is required and warned about if it isn't actually one of that
+ * listing's own platforms, "date" is required and can't be in the future,
+ * and at least one of "views"/"saves" must be a real non-negative number,
+ * a snapshot logging neither has nothing to show.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -115,7 +124,7 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData, acquisitionsData, compsData;
+  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData, acquisitionsData, compsData, engagementData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
@@ -126,6 +135,7 @@ function main() {
     suppliesData = loadJson('supplies.json');
     acquisitionsData = loadJson('acquisitions.json');
     compsData = loadJson('comps.json');
+    engagementData = loadJson('engagement.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -678,6 +688,53 @@ function main() {
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
+  const engagementSnapshots = engagementData.snapshots || [];
+  const seenEngagementIds = new Set();
+
+  engagementSnapshots.forEach((s, idx) => {
+    const where = 'engagement[' + idx + ']' + (s && s.id ? ' (' + s.id + ')' : '');
+
+    if (!s.id) errors.push(where + ': missing "id"');
+    else if (seenEngagementIds.has(s.id)) errors.push(where + ': duplicate id "' + s.id + '"');
+    else seenEngagementIds.add(s.id);
+
+    // Unlike a comp, an engagement snapshot with no real listing to attach
+    // to is meaningless, there's nothing else identifying which item it's
+    // even about, so this is required rather than the comps "fine if not
+    // itemized yet" allowance.
+    if (!s.listingId) {
+      errors.push(where + ': missing "listingId", an engagement snapshot must belong to a real listing');
+    } else if (!listingById[s.listingId]) {
+      errors.push(where + ': listingId "' + s.listingId + '" does not match any listing in listings.json');
+    }
+
+    if (!s.platform) {
+      errors.push(where + ': missing "platform"');
+    } else if (!PLATFORMS.includes(s.platform)) {
+      errors.push(where + ': platform "' + s.platform + '" is not one of ' + PLATFORMS.join(', '));
+    } else if (s.listingId && listingById[s.listingId] && !(listingById[s.listingId].platforms || []).includes(s.platform)) {
+      warnings.push(where + ': platform "' + s.platform + '" is not one of listing "' + s.listingId + '"\'s own platforms, check for a typo\'d platform');
+    }
+
+    if (!isDateOrNull(s.date) || !s.date) {
+      errors.push(where + ': "date" must be a real YYYY-MM-DD date: ' + JSON.stringify(s.date));
+    } else if (isFutureDate(s.date)) {
+      errors.push(where + ': "date" (' + s.date + ') is in the future, this is a real logged snapshot, not a projection');
+    }
+
+    ['views', 'saves'].forEach(field => {
+      if (s[field] !== null && s[field] !== undefined && (typeof s[field] !== 'number' || s[field] < 0)) {
+        errors.push(where + ': "' + field + '" must be a non-negative number or null');
+      }
+    });
+    if ((s.views === null || s.views === undefined) && (s.saves === null || s.saves === undefined)) {
+      errors.push(where + ': at least one of "views"/"saves" must be a real non-negative number, a snapshot logging neither has nothing to show');
+    }
+
+    emDashFields(s, ['notes']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
+  });
+
   // Every soldOn entry should have a matching sale logged, since a platform
   // only belongs in soldOn once something has actually sold there.
   listings.forEach(l => {
@@ -738,7 +795,7 @@ function main() {
   console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
     events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
     disputes.length + ' dispute(s), ' + supplies.length + ' suppl' + (supplies.length === 1 ? 'y' : 'ies') + ', ' +
-    acquisitions.length + ' acquisition(s), ' + comps.length + ' comp(s)).');
+    acquisitions.length + ' acquisition(s), ' + comps.length + ' comp(s), ' + engagementSnapshots.length + ' engagement snapshot(s)).');
   process.exit(0);
 }
 
@@ -762,7 +819,7 @@ function checkChangelogFreshness(warnings) {
     if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: DATA_DIR, encoding: 'utf8' }).trim() === 'true') return;
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
-      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json', 'comps.json'
+      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json', 'comps.json', 'engagement.json'
     ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
     const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     let changelogData = null;

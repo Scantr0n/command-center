@@ -1244,6 +1244,103 @@
     </div>
   </section>
 
+  <section id="engagementSection">
+    <h2 class="section-title" style="margin:0">Listing engagement log</h2>
+    <div class="callout">
+      Real views/watchers snapshots, hand-logged one row at a time. No cross-listing tool or platform API is
+      connected here to pull this automatically (eBay, Vinted, Poshmark, and Depop all show a live listing's own
+      view/watcher/like count in-app, just not to anything outside their own app), so this is only ever as
+      current as the last time someone actually opened each app and typed a real number in. The value isn't any
+      one snapshot alone, it's the trend between two real logged snapshots of the <em>same</em> listing on the
+      <em>same</em> platform: a listing with rising views is worth leaving alone, one that's gone flat for weeks
+      is a real signal to <a href="#relistSection">relist</a>, <a href="#markdownSection">drop the price</a>, or
+      check <a href="#compsSection">whether a comp moved</a>. "Saves" covers whichever term a platform actually
+      uses for it, eBay's watchers, Poshmark's and Depop's likes, Vinted's favorites, all the same real signal
+      under one field. Nothing here is estimated, an item with no snapshot logged yet is an honest gap, not a
+      placeholder.
+    </div>
+
+    <details class="schema-help" id="quickLogEngagementTool">
+      <summary>Quick log an engagement snapshot (generates JSON to paste into engagement.json, saves nothing)</summary>
+      <div class="schema-help-body">
+        <p>Runs the same checks <code>node public/garage/data/validate.js</code> does on <code>engagement.json</code>
+          (a unique id, a real listing id, a real platform, a real date that isn't in the future, at least one of
+          views/saves logged), then builds the JSON object to paste into the <code>snapshots</code> array
+          yourself. This never writes a file or sends anything, it only puts text on your clipboard.</p>
+        <table class="schema-table">
+          <tbody>
+            <tr><th>id</th><td>Unique slug, e.g. <code>"black-boots-ebay-2026-09-20"</code></td></tr>
+            <tr><th>listingId</th><td>Id from <code>listings.json</code> this snapshot is actually about, required,
+              an engagement snapshot with no real listing to attach to is meaningless</td></tr>
+            <tr><th>platform</th><td>One of: eBay, Vinted, Poshmark, Depop, the platform this was actually checked
+              on</td></tr>
+            <tr><th>date</th><td>ISO date (<code>YYYY-MM-DD</code>) this was actually checked, required</td></tr>
+            <tr><th>views</th><td>Real view count shown in-app right now, a non-negative number, or leave blank if
+              that platform doesn't surface one (Poshmark doesn't show a public view count)</td></tr>
+            <tr><th>saves</th><td>Real watcher/like/favorite count shown in-app right now (whichever term this
+              platform uses), a non-negative number, or leave blank if not logged. At least one of views/saves is
+              required</td></tr>
+            <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
+          </tbody>
+        </table>
+
+        <div id="neDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="neDraftBannerTime"></span>, this form is autosaved to
+            this browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="neDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
+
+        <div class="quick-log-grid">
+          <form class="quick-log-form" id="quickEngagementForm">
+            <h3 class="quick-log-title font-mono">New snapshot &rarr; engagement.json</h3>
+            <label class="quick-log-label" for="neId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="neId" placeholder="e.g. black-boots-ebay-2026-09-20" required>
+            <label class="quick-log-label" for="neListingId">Linked listing id</label>
+            <input class="quick-log-input" type="text" id="neListingId" placeholder="e.g. black-boots" required>
+            <label class="quick-log-label" for="nePlatform">Platform checked</label>
+            <select class="quick-log-input" id="nePlatform" required>
+              <option value="" disabled selected>Select a platform</option>
+              <option value="ebay">eBay</option>
+              <option value="vinted">Vinted</option>
+              <option value="poshmark">Poshmark</option>
+              <option value="depop">Depop</option>
+            </select>
+            <label class="quick-log-label" for="neDate">Date checked</label>
+            <input class="quick-log-input" type="date" id="neDate" required>
+            <label class="quick-log-label" for="neViews">Views (optional)</label>
+            <input class="quick-log-input" type="number" id="neViews" min="0" step="1">
+            <label class="quick-log-label" for="neSaves">Watchers/likes/favorites (optional)</label>
+            <input class="quick-log-input" type="number" id="neSaves" min="0" step="1">
+            <label class="quick-log-label" for="neNotes">Notes (optional)</label>
+            <input class="quick-log-input" type="text" id="neNotes">
+            <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+            <div class="quick-log-warnings" id="neWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="neOutput" readonly rows="10" hidden aria-label="Generated engagement snapshot JSON, ready to paste into the snapshots array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="neCopyBtn" hidden>Copy JSON</button>
+            <p class="quick-log-hint" id="quickLogEngagementLive" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <div class="table-wrap">
+      <table class="card-table" id="engagementTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Platform</th>
+            <th>Date checked</th>
+            <th>Views</th>
+            <th>Watchers/likes</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="engagementTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="engagementTableEmpty" hidden></div>
+    </div>
+  </section>
+
   <section>
     <h2 class="section-title">Est. net payout by platform
       <span class="reference-freshness" id="feeScheduleFreshness"></span>
