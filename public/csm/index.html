@@ -79,7 +79,9 @@
         <strong>Export CSV</strong>, which flattens each prospect to one row and drops <code>stageHistory</code>, the
         backup file keeps the full <code>prospects.json</code> and <code>stages.json</code> structure exactly as
         loaded, so a bad edit can be diffed against or restored from a known-good copy. This is a local download
-        only, nothing is uploaded anywhere.</p>
+        only, nothing is uploaded anywhere. After the edit, <strong>Compare with backup&hellip;</strong> in the
+        header reads that same file back and lists exactly what changed, field by field, so you do not have to
+        eyeball two JSON files by hand to check the edit did what you meant.</p>
       <div class="table-wrap">
       <table class="schema-table">
         <tbody>
