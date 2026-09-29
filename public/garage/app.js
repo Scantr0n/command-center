@@ -784,7 +784,7 @@ async function loadData() {
   backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const compareBackupBtn = document.getElementById('compareBackupBtn');
-  compareBackupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData);
+  compareBackupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData);
   compareBackupBtn.title = compareBackupBtn.disabled ? "Can't compare, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
@@ -4372,7 +4372,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // diffed against or restored from a known-good copy. Local download only,
 // nothing is sent anywhere. Same approach as CSM's own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData && !rawCompsData) return;
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData && !rawCompsData && !rawEngagementData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center Garage (/garage), local download only',
@@ -4384,7 +4384,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
     disputesJson: rawDisputesData,
     suppliesJson: rawSuppliesData,
     acquisitionsJson: rawAcquisitionsData,
-    compsJson: rawCompsData
+    compsJson: rawCompsData,
+    engagementJson: rawEngagementData
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -4402,8 +4403,9 @@ document.getElementById('backupBtn').addEventListener('click', () => {
 // field-by-field comparison; everything here just reads the file the user
 // picks and renders the result. Nothing is uploaded anywhere and nothing is
 // written back to listings.json/pipeline.json/activity.json/sales.json/
-// expenses.json/disputes.json/supplies.json/acquisitions.json/comps.json.
-// Same approach as CSM's, Sondrik's, and CGT's own Compare with backup.
+// expenses.json/disputes.json/supplies.json/acquisitions.json/comps.json/
+// engagement.json. Same approach as CSM's, Sondrik's, and CGT's own Compare
+// with backup.
 let compareBackupOpen = false;
 let compareBackupLastFocusedEl = null;
 
@@ -4460,7 +4462,7 @@ function renderCompareBackupResult(result) {
   const exportedLabel = result.exportedAt
     ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : 'unknown export date (an older backup, or a hand-edited file)';
-  const totalDiffs = ['listings', 'pipeline', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps']
+  const totalDiffs = ['listings', 'pipeline', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement']
     .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
   let html = '<p class="field-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
   if (totalDiffs === 0) {
@@ -4477,6 +4479,7 @@ function renderCompareBackupResult(result) {
   html += renderCompareSection('Supplies (supplies.json)', result.supplies, s => s.name || s.id, null);
   html += renderCompareSection('Acquisitions (acquisitions.json)', result.acquisitions, a => a.sourceName || a.id, a => a.source);
   html += renderCompareSection('Comps (comps.json)', result.comps, c => c.title || c.id, c => c.platform);
+  html += renderCompareSection('Engagement snapshots (engagement.json)', result.engagement, s => s.listingId || s.id, s => s.platform + (s.date ? ', ' + s.date : ''));
   document.getElementById('compareBackupResult').innerHTML = html;
 }
 
@@ -4498,7 +4501,7 @@ document.getElementById('compareBackupInput').addEventListener('change', () => {
     }
     try {
       renderCompareBackupResult(window.GarageCompareCore.compareWithBackup(
-        { rawListingsData, rawPipelineData, rawActivityData, rawSalesData, rawExpensesData, rawDisputesData, rawSuppliesData, rawAcquisitionsData, rawCompsData },
+        { rawListingsData, rawPipelineData, rawActivityData, rawSalesData, rawExpensesData, rawDisputesData, rawSuppliesData, rawAcquisitionsData, rawCompsData, rawEngagementData },
         parsed
       ));
     } catch (err) {
