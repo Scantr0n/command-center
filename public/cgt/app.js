@@ -280,15 +280,17 @@ const PRICE_STALE_AFTER_DAYS = 180;
 
 // The Grading service tiers reference table below is hand-researched prose,
 // not data-file driven, so nothing else in the app notices when it goes
-// stale -- the SGC $15->$50/card hike and the BGS-vs-SGC turnaround mixup
-// (see the 42b8f58/e0ab607 fixes) both shipped as silent inaccuracies until
-// someone happened to re-check by hand. This date is the "reviewed ... 2026-09-26"
-// claim already made in that section's callout prose; keep the two in sync by
+// stale -- the SGC $15->$50/card hike, the BGS-vs-SGC turnaround mixup
+// (see the 42b8f58/e0ab607 fixes), and CGC's Bulk/Economy/Standard/Express
+// turnaround windows all going stale by 2-4x once PSA-pause/SGC-hike volume
+// spilled onto CGC without matching staffing, all shipped as silent
+// inaccuracies until someone happened to re-check by hand. This date is the
+// "reviewed ... September 2026" claim already made in that section's callout prose; keep the two in sync by
 // hand whenever the table is re-verified. 30 days, not the 180 used for card
 // prices above: grading-company fee/tier changes have moved multiple times
 // within weeks of each other this year, so this table goes stale far faster
 // than a book value does.
-const GRADING_REFERENCE_REVIEWED_ON = '2026-09-26';
+const GRADING_REFERENCE_REVIEWED_ON = '2026-09-29';
 const GRADING_REFERENCE_STALE_AFTER_DAYS = 30;
 
 // Same freshness-badge pattern as GRADING_REFERENCE_REVIEWED_ON just above,
