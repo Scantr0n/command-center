@@ -1164,6 +1164,8 @@ test('emDashHits checks the top-level fields, contactChannel.detail, and every o
     ['contentIdeas[0].idea']
   );
   assert.deepEqual(emDashHits({ name: 'Jane Doe' }), []);
+  assert.deepEqual(emDashHits({ name: 'Jane Doe', replyStatus: 'Went quiet' + EM_DASH + 'no reply yet' }), ['replyStatus']);
+  assert.deepEqual(emDashHits({ name: 'Jane Doe', notes: 'Backfilled from an email thread' + EM_DASH + 'verify date' }), ['notes']);
 });
 
 test('computeDataQualityFlags flags a pasted-in em dash and names the field it is in', () => {

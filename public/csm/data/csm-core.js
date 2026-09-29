@@ -586,13 +586,18 @@
     return hits;
   }
 
-  // Same per-prospect field set validate.js already checks (top-level fields,
-  // contactChannel.detail, every outreachLog note, every contentIdeas idea),
-  // flattened into one list of human-readable field labels so a caller can
-  // report exactly which field(s) tripped it without re-deriving the field
-  // list itself.
+  // Same per-prospect field set validate.js already checks (top-level fields
+  // including replyStatus/notes, contactChannel.detail, every outreachLog
+  // note, every contentIdeas idea), flattened into one list of
+  // human-readable field labels so a caller can report exactly which
+  // field(s) tripped it without re-deriving the field list itself.
+  // replyStatus and notes were missed when this list was first split out of
+  // validate.js: both are free-text fields rendered in the modal and the
+  // copyable outreach brief same as verifiedHook/nextAction, so a pasted-in
+  // em dash there was going uncaught by both validate.js and this same
+  // live Data Quality panel that catches one in every other free-text field.
   function emDashHits(p) {
-    const hits = emDashFields(p, ['name', 'company', 'verifiedHook', 'nextAction']);
+    const hits = emDashFields(p, ['name', 'company', 'verifiedHook', 'nextAction', 'replyStatus', 'notes']);
     if (emDashFields(p.contactChannel, ['detail']).length) hits.push('contactChannel.detail');
     (p.outreachLog || []).forEach((entry, i) => {
       if (emDashFields(entry, ['note']).length) hits.push('outreachLog[' + i + '].note');

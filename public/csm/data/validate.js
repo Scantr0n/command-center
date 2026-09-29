@@ -376,7 +376,7 @@ function main() {
       }
     }
 
-    emDashFields(p, ['name', 'company', 'verifiedHook', 'nextAction']).forEach(f =>
+    emDashFields(p, ['name', 'company', 'verifiedHook', 'nextAction', 'replyStatus', 'notes']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this board never uses one, check for a paste-in'));
     emDashFields(p.contactChannel, ['detail']).forEach(f =>
       warnings.push(where + ': contactChannel.' + f + ' contains an em dash, this board never uses one, check for a paste-in'));
