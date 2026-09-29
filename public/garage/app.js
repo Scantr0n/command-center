@@ -783,6 +783,9 @@ async function loadData() {
   const backupBtn = document.getElementById('backupBtn');
   backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
+  const compareBackupBtn = document.getElementById('compareBackupBtn');
+  compareBackupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData);
+  compareBackupBtn.title = compareBackupBtn.disabled ? "Can't compare, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const sales = (salesData && salesData.sales) || [];
   const expenses = (expensesData && expensesData.expenses) || [];
@@ -3446,7 +3449,7 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 
 // Same "/" jumps to search shortcut as the main Command Center dashboard.
 document.addEventListener('keydown', (e) => {
-  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen || jumpNavOpen) return;
+  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
   if (e.key === '/' && document.activeElement.id !== 'searchInput') {
     e.preventDefault();
     document.getElementById('searchInput').focus();
@@ -3534,7 +3537,7 @@ document.addEventListener('keydown', (e) => {
 // calculators, and search box all take free text or numbers).
 document.addEventListener('keydown', (e) => {
   if (e.key !== '?') return;
-  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen || jumpNavOpen) return;
+  if (!document.getElementById('modalOverlay').hidden || shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
   const active = document.activeElement;
   const tag = active && active.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -4392,6 +4395,144 @@ document.getElementById('backupBtn').addEventListener('click', () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// Read-only diff against a file from the backup button just above:
+// GarageCompareCore.compareWithBackup (compare-core.js) does the actual
+// field-by-field comparison; everything here just reads the file the user
+// picks and renders the result. Nothing is uploaded anywhere and nothing is
+// written back to listings.json/pipeline.json/activity.json/sales.json/
+// expenses.json/disputes.json/supplies.json/acquisitions.json/comps.json.
+// Same approach as CSM's, Sondrik's, and CGT's own Compare with backup.
+let compareBackupOpen = false;
+let compareBackupLastFocusedEl = null;
+
+function getCompareBackupFocusable() {
+  return Array.from(document.getElementById('compareBackupModal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function openCompareBackup() {
+  if (compareBackupOpen) return;
+  compareBackupOpen = true;
+  compareBackupLastFocusedEl = document.activeElement;
+  document.getElementById('compareBackupOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('compareBackupPickBtn').focus();
+}
+
+function closeCompareBackup() {
+  if (!compareBackupOpen) return;
+  compareBackupOpen = false;
+  document.getElementById('compareBackupOverlay').hidden = true;
+  unlockBodyScroll();
+  if (compareBackupLastFocusedEl && typeof compareBackupLastFocusedEl.focus === 'function') compareBackupLastFocusedEl.focus();
+  compareBackupLastFocusedEl = null;
+  document.getElementById('compareBackupResult').innerHTML = '';
+  document.getElementById('compareBackupInput').value = '';
+}
+
+function compareBackupTag(fields, removed) {
+  const text = removed ? 'NOT IN CURRENT DATA' : (fields ? fields.map(f => f.toUpperCase()).join(', ') + ' CHANGED' : 'NEW SINCE BACKUP');
+  return '<span class="compare-tag' + (removed ? ' compare-tag-removed' : '') + '">' + escapeHtml(text) + '</span>';
+}
+
+function compareBackupRow(label, sub, tagHtml) {
+  return '<div class="compare-row"><span><strong>' + escapeHtml(label) + '</strong>' +
+    (sub ? ' <span style="color:var(--sub)">' + escapeHtml(sub) + '</span>' : '') + '</span>' + tagHtml + '</div>';
+}
+
+// labelFn/subFn read straight off the real record fields (title, description,
+// stage, ...), never a guessed or reformatted value, so the row shown here
+// always matches what's actually in the JSON file.
+function renderCompareSection(title, diff, labelFn, subFn) {
+  const total = diff.added.length + diff.removed.length + diff.changed.length;
+  if (!total) return '';
+  return '<p class="compare-section-label">' + escapeHtml(title) + '</p><div class="compare-list">' +
+    diff.added.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, false))).join('') +
+    diff.changed.map(c => compareBackupRow(labelFn(c.current), subFn ? subFn(c.current) : null, compareBackupTag(c.fields, false))).join('') +
+    diff.removed.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, true))).join('') +
+    '</div>';
+}
+
+function renderCompareBackupResult(result) {
+  const exportedLabel = result.exportedAt
+    ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : 'unknown export date (an older backup, or a hand-edited file)';
+  const totalDiffs = ['listings', 'pipeline', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps']
+    .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
+  let html = '<p class="field-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
+  if (totalDiffs === 0) {
+    html += '<p class="field-note">No differences. The Garage data currently loaded matches this backup exactly.</p>';
+    document.getElementById('compareBackupResult').innerHTML = html;
+    return;
+  }
+  html += renderCompareSection('Listings (listings.json)', result.listings, l => l.title || l.id, l => l.status);
+  html += renderCompareSection('Pipeline stages (pipeline.json)', result.pipeline, s => s.stage, s => s.count != null ? s.count + ' item(s)' : null);
+  html += renderCompareSection('Activity log (activity.json)', result.activity, e => e.title || e.id, e => e.type);
+  html += renderCompareSection('Sales (sales.json)', result.sales, s => s.title || s.id, s => s.platform);
+  html += renderCompareSection('Expenses (expenses.json)', result.expenses, e => e.description || e.id, e => e.category);
+  html += renderCompareSection('Disputes (disputes.json)', result.disputes, d => d.title || d.id, d => d.status);
+  html += renderCompareSection('Supplies (supplies.json)', result.supplies, s => s.name || s.id, null);
+  html += renderCompareSection('Acquisitions (acquisitions.json)', result.acquisitions, a => a.sourceName || a.id, a => a.source);
+  html += renderCompareSection('Comps (comps.json)', result.comps, c => c.title || c.id, c => c.platform);
+  document.getElementById('compareBackupResult').innerHTML = html;
+}
+
+document.getElementById('compareBackupPickBtn').addEventListener('click', () => document.getElementById('compareBackupInput').click());
+
+document.getElementById('compareBackupInput').addEventListener('change', () => {
+  const input = document.getElementById('compareBackupInput');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">Could not read that file as JSON: ' +
+        escapeHtml(err.message) + '</p>';
+      return;
+    }
+    try {
+      renderCompareBackupResult(window.GarageCompareCore.compareWithBackup(
+        { rawListingsData, rawPipelineData, rawActivityData, rawSalesData, rawExpensesData, rawDisputesData, rawSuppliesData, rawAcquisitionsData, rawCompsData },
+        parsed
+      ));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">' + escapeHtml(err.message) + '</p>';
+    }
+  };
+  reader.onerror = () => {
+    document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">Could not read that file.</p>';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('compareBackupBtn').addEventListener('click', openCompareBackup);
+document.getElementById('compareBackupClose').addEventListener('click', closeCompareBackup);
+document.getElementById('compareBackupOverlay').addEventListener('click', e => {
+  if (e.target.id === 'compareBackupOverlay') closeCompareBackup();
+});
+
+document.addEventListener('keydown', e => {
+  if (!compareBackupOpen) return;
+  if (e.key === 'Escape') { closeCompareBackup(); return; }
+  if (e.key === 'Tab') {
+    const focusable = getCompareBackupFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 });
 
 const SALES_CSV_COLUMNS = [
