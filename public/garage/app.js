@@ -5538,24 +5538,24 @@ function wireQuickLogCompTool() {
 function wireQuickLogEngagementTool() {
   const form = document.getElementById('quickEngagementForm');
   if (!form) return;
-  const warningsBox = document.getElementById('neWarnings');
-  const output = document.getElementById('neOutput');
-  const copyBtn = document.getElementById('neCopyBtn');
+  const warningsBox = document.getElementById('nesWarnings');
+  const output = document.getElementById('nesOutput');
+  const copyBtn = document.getElementById('nesCopyBtn');
   const live = document.getElementById('quickLogEngagementLive');
-  const draftGuard = attachDraftGuard(form, 'garage-ne-draft-v1', {
-    bannerId: 'neDraftBanner', timeId: 'neDraftBannerTime', discardId: 'neDiscardDraftBtn',
+  const draftGuard = attachDraftGuard(form, 'garage-nes-draft-v1', {
+    bannerId: 'nesDraftBanner', timeId: 'nesDraftBannerTime', discardId: 'nesDiscardDraftBtn',
     onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
   });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
-    const id = document.getElementById('neId').value.trim();
-    const listingId = document.getElementById('neListingId').value.trim();
-    const platform = document.getElementById('nePlatform').value;
-    const date = document.getElementById('neDate').value || null;
-    const views = readOptionalNonNegativeInput(document.getElementById('neViews'));
-    const saves = readOptionalNonNegativeInput(document.getElementById('neSaves'));
-    const notes = document.getElementById('neNotes').value.trim() || null;
+    const id = document.getElementById('nesId').value.trim();
+    const listingId = document.getElementById('nesListingId').value.trim();
+    const platform = document.getElementById('nesPlatform').value;
+    const date = document.getElementById('nesDate').value || null;
+    const views = readOptionalNonNegativeInput(document.getElementById('nesViews'));
+    const saves = readOptionalNonNegativeInput(document.getElementById('nesSaves'));
+    const notes = document.getElementById('nesNotes').value.trim() || null;
 
     const blockers = [];
     const advisory = [];

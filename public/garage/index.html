@@ -1284,39 +1284,39 @@
           </tbody>
         </table>
 
-        <div id="neDraftBanner" class="quick-log-draft-banner" hidden>
-          <span>Restored an unsaved draft from <span id="neDraftBannerTime"></span>, this form is autosaved to
+        <div id="nesDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="nesDraftBannerTime"></span>, this form is autosaved to
             this browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
-          <button type="button" id="neDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+          <button type="button" id="nesDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
         </div>
 
         <div class="quick-log-grid">
           <form class="quick-log-form" id="quickEngagementForm">
             <h3 class="quick-log-title font-mono">New snapshot &rarr; engagement.json</h3>
-            <label class="quick-log-label" for="neId">Id (unique slug)</label>
-            <input class="quick-log-input" type="text" id="neId" placeholder="e.g. black-boots-ebay-2026-09-20" required>
-            <label class="quick-log-label" for="neListingId">Linked listing id</label>
-            <input class="quick-log-input" type="text" id="neListingId" placeholder="e.g. black-boots" required>
-            <label class="quick-log-label" for="nePlatform">Platform checked</label>
-            <select class="quick-log-input" id="nePlatform" required>
+            <label class="quick-log-label" for="nesId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="nesId" placeholder="e.g. black-boots-ebay-2026-09-20" required>
+            <label class="quick-log-label" for="nesListingId">Linked listing id</label>
+            <input class="quick-log-input" type="text" id="nesListingId" placeholder="e.g. black-boots" required>
+            <label class="quick-log-label" for="nesPlatform">Platform checked</label>
+            <select class="quick-log-input" id="nesPlatform" required>
               <option value="" disabled selected>Select a platform</option>
               <option value="ebay">eBay</option>
               <option value="vinted">Vinted</option>
               <option value="poshmark">Poshmark</option>
               <option value="depop">Depop</option>
             </select>
-            <label class="quick-log-label" for="neDate">Date checked</label>
-            <input class="quick-log-input" type="date" id="neDate" required>
-            <label class="quick-log-label" for="neViews">Views (optional)</label>
-            <input class="quick-log-input" type="number" id="neViews" min="0" step="1">
-            <label class="quick-log-label" for="neSaves">Watchers/likes/favorites (optional)</label>
-            <input class="quick-log-input" type="number" id="neSaves" min="0" step="1">
-            <label class="quick-log-label" for="neNotes">Notes (optional)</label>
-            <input class="quick-log-input" type="text" id="neNotes">
+            <label class="quick-log-label" for="nesDate">Date checked</label>
+            <input class="quick-log-input" type="date" id="nesDate" required>
+            <label class="quick-log-label" for="nesViews">Views (optional)</label>
+            <input class="quick-log-input" type="number" id="nesViews" min="0" step="1">
+            <label class="quick-log-label" for="nesSaves">Watchers/likes/favorites (optional)</label>
+            <input class="quick-log-input" type="number" id="nesSaves" min="0" step="1">
+            <label class="quick-log-label" for="nesNotes">Notes (optional)</label>
+            <input class="quick-log-input" type="text" id="nesNotes">
             <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
-            <div class="quick-log-warnings" id="neWarnings" role="alert"></div>
-            <textarea class="quick-log-output" id="neOutput" readonly rows="10" hidden aria-label="Generated engagement snapshot JSON, ready to paste into the snapshots array"></textarea>
-            <button type="button" class="print-btn quick-log-copy" id="neCopyBtn" hidden>Copy JSON</button>
+            <div class="quick-log-warnings" id="nesWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="nesOutput" readonly rows="10" hidden aria-label="Generated engagement snapshot JSON, ready to paste into the snapshots array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="nesCopyBtn" hidden>Copy JSON</button>
             <p class="quick-log-hint" id="quickLogEngagementLive" aria-live="polite"></p>
           </form>
         </div>
