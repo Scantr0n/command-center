@@ -25,6 +25,7 @@
       <button type="button" id="copyLinkBtn" class="print-btn font-mono" aria-live="polite">Copy link to this view</button>
       <button type="button" id="csvBtn" class="print-btn font-mono">Export CSV</button>
       <button type="button" id="backupBtn" class="print-btn font-mono" disabled title="Loading inventory data...">Download backup (.json)</button>
+      <button type="button" id="compareBackupBtn" class="print-btn font-mono" disabled title="Loading inventory data...">Compare with backup&hellip;</button>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
       <button type="button" id="insurancePrintBtn" class="print-btn font-mono">Print insurance summary</button>
       <button type="button" id="shortcutsBtn" class="print-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
@@ -982,6 +983,22 @@
   </div>
 </div>
 
+<input type="file" id="compareBackupInput" accept="application/json,.json" hidden>
+<div class="modal-overlay" id="compareBackupOverlay" hidden>
+  <div class="modal modal-wide" id="compareBackupModal" role="dialog" aria-modal="true" aria-labelledby="compareBackupTitle">
+    <button class="modal-close" id="compareBackupClose" aria-label="Close">&times;</button>
+    <h3 id="compareBackupTitle" class="font-display">Compare with a backup</h3>
+    <p class="field-note" style="margin:-4px 0 16px">Read-only. This never writes anything back to
+      <code>cards.json</code>, <code>submissions.json</code>, or <code>candidates.json</code>, it only shows what
+      changed in the inventory data currently loaded on this page versus a backup file taken earlier, so a bad
+      hand-edit can be caught before it's trusted.</p>
+    <p class="field-note" id="compareBackupHint">Pick a file downloaded earlier from this page&rsquo;s
+      <strong>Download backup (.json)</strong> button.</p>
+    <button type="button" class="print-btn font-mono" id="compareBackupPickBtn">Choose backup file&hellip;</button>
+    <div id="compareBackupResult" aria-live="polite"></div>
+  </div>
+</div>
+
 <button type="button" id="jumpNavBtn" class="jump-nav-fab font-mono" aria-label="Sections, jump to a section on this page">Sections</button>
 
 <div class="modal-overlay" id="jumpNavOverlay" hidden>
@@ -996,6 +1013,7 @@
 <script src="/cgt/data/grading-core.js"></script>
 <script src="/cgt/data/turnaround-core.js"></script>
 <script src="/cgt/data/export-core.js"></script>
+<script src="/cgt/data/compare-core.js"></script>
 <script src="/cgt/data/html-core.js"></script>
 <script src="/cgt/app.js"></script>
 <script src="/sidebar-core.js"></script>

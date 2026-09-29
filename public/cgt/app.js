@@ -574,6 +574,9 @@ async function loadCards() {
     const backupBtn = document.getElementById('backupBtn');
     backupBtn.disabled = false;
     backupBtn.title = (rawSubmissionsData && rawCandidatesData) ? '' : 'Some data failed to load, backup will only include what actually loaded';
+    const compareBackupBtn = document.getElementById('compareBackupBtn');
+    compareBackupBtn.disabled = false;
+    compareBackupBtn.title = '';
     renderStats();
     renderCandidates();
     renderSubmissions();
@@ -616,6 +619,11 @@ async function loadCards() {
     backupBtn.title = backupBtn.disabled
       ? "Can't back up, no data loaded (see errors below)"
       : "Can't back up cards.json (see below), backup will only include submissions/candidates data";
+    const compareBackupBtn = document.getElementById('compareBackupBtn');
+    compareBackupBtn.disabled = backupBtn.disabled;
+    compareBackupBtn.title = compareBackupBtn.disabled
+      ? "Can't compare, no data loaded (see errors below)"
+      : "Can't compare cards.json (see below), only submissions/candidates data can be checked";
   }
 }
 
@@ -3745,7 +3753,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== '?') return;
   const modalOpen = !document.getElementById('modalOverlay').hidden;
-  if (modalOpen || shortcutsOpen || jumpNavOpen) return;
+  if (modalOpen || shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
   const active = document.activeElement;
   const tag = active && active.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -3760,7 +3768,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'n' && e.key !== 'N') return;
   const modalOpen = !document.getElementById('modalOverlay').hidden;
-  if (modalOpen || shortcutsOpen || jumpNavOpen) return;
+  if (modalOpen || shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
   const active = document.activeElement;
   const tag = active && active.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -4143,6 +4151,136 @@ document.getElementById('backupBtn').addEventListener('click', () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// Read-only diff against a file from the backup button just above:
+// CGTCompareCore.compareWithBackup (compare-core.js) does the actual
+// field-by-field comparison; everything here just reads the file the user
+// picks and renders the result. Nothing is uploaded anywhere and nothing is
+// written back to cards.json/submissions.json/candidates.json. Same approach
+// as CSM's and Sondrik's own Compare with backup.
+let compareBackupOpen = false;
+let compareBackupLastFocusedEl = null;
+
+function getCompareBackupFocusable() {
+  return Array.from(document.getElementById('compareBackupModal').querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+}
+
+function openCompareBackup() {
+  if (compareBackupOpen) return;
+  compareBackupOpen = true;
+  compareBackupLastFocusedEl = document.activeElement;
+  document.getElementById('compareBackupOverlay').hidden = false;
+  lockBodyScroll();
+  document.getElementById('compareBackupPickBtn').focus();
+}
+
+function closeCompareBackup() {
+  if (!compareBackupOpen) return;
+  compareBackupOpen = false;
+  document.getElementById('compareBackupOverlay').hidden = true;
+  unlockBodyScroll();
+  if (compareBackupLastFocusedEl && typeof compareBackupLastFocusedEl.focus === 'function') compareBackupLastFocusedEl.focus();
+  compareBackupLastFocusedEl = null;
+  document.getElementById('compareBackupResult').innerHTML = '';
+  document.getElementById('compareBackupInput').value = '';
+}
+
+function compareBackupTag(fields, removed) {
+  const text = removed ? 'NOT IN CURRENT DATA' : (fields ? fields.map(f => f.toUpperCase()).join(', ') + ' CHANGED' : 'NEW SINCE BACKUP');
+  return '<span class="compare-tag' + (removed ? ' compare-tag-removed' : '') + '">' + escapeHtml(text) + '</span>';
+}
+
+function compareBackupRow(label, sub, tagHtml) {
+  return '<div class="compare-row"><span><strong>' + escapeHtml(label) + '</strong>' +
+    (sub ? ' <span style="color:var(--sub)">' + escapeHtml(sub) + '</span>' : '') + '</span>' + tagHtml + '</div>';
+}
+
+// labelFn/subFn read straight off the real record fields (cardName,
+// gradingCompany, status, ...), never a guessed or reformatted value, so the
+// row shown here always matches what's actually in the JSON file.
+function renderCompareSection(title, diff, labelFn, subFn) {
+  const total = diff.added.length + diff.removed.length + diff.changed.length;
+  if (!total) return '';
+  return '<p class="compare-section-label">' + escapeHtml(title) + '</p><div class="compare-list">' +
+    diff.added.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, false))).join('') +
+    diff.changed.map(c => compareBackupRow(labelFn(c.current), subFn ? subFn(c.current) : null, compareBackupTag(c.fields, false))).join('') +
+    diff.removed.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, true))).join('') +
+    '</div>';
+}
+
+function renderCompareBackupResult(result) {
+  const exportedLabel = result.exportedAt
+    ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : 'unknown export date (an older backup, or a hand-edited file)';
+  const totalDiffs = ['cards', 'submissions', 'candidates']
+    .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
+  let html = '<p class="field-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
+  if (totalDiffs === 0) {
+    html += '<p class="field-note">No differences. The CGT inventory currently loaded matches this backup exactly.</p>';
+    document.getElementById('compareBackupResult').innerHTML = html;
+    return;
+  }
+  html += renderCompareSection('Cards (cards.json)', result.cards, c => c.cardName || c.id, c => [c.sport, c.gradingCompany, c.grade ? 'Grade ' + c.grade : null].filter(Boolean).join(' · '));
+  html += renderCompareSection('Submissions (submissions.json)', result.submissions, s => s.description || s.id, s => s.status);
+  html += renderCompareSection('Raw-card candidates (candidates.json)', result.candidates, c => c.cardName || c.id, c => c.decision);
+  document.getElementById('compareBackupResult').innerHTML = html;
+}
+
+document.getElementById('compareBackupPickBtn').addEventListener('click', () => document.getElementById('compareBackupInput').click());
+
+document.getElementById('compareBackupInput').addEventListener('change', () => {
+  const input = document.getElementById('compareBackupInput');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">Could not read that file as JSON: ' +
+        escapeHtml(err.message) + '</p>';
+      return;
+    }
+    try {
+      renderCompareBackupResult(window.CGTCompareCore.compareWithBackup(
+        { rawCardsData, rawSubmissionsData, rawCandidatesData }, parsed
+      ));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">' + escapeHtml(err.message) + '</p>';
+    }
+  };
+  reader.onerror = () => {
+    document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">Could not read that file.</p>';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('compareBackupBtn').addEventListener('click', openCompareBackup);
+document.getElementById('compareBackupClose').addEventListener('click', closeCompareBackup);
+document.getElementById('compareBackupOverlay').addEventListener('click', e => {
+  if (e.target.id === 'compareBackupOverlay') closeCompareBackup();
+});
+
+document.addEventListener('keydown', e => {
+  if (!compareBackupOpen) return;
+  if (e.key === 'Escape') { closeCompareBackup(); return; }
+  if (e.key === 'Tab') {
+    const focusable = getCompareBackupFocusable();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 });
 
 // Same per-section CSV export convention as Sondrik's channelsCsvBtn: the
