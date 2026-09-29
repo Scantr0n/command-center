@@ -145,6 +145,11 @@ header.page-head .sub {
   opacity: 0.45;
 }
 .print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
+/* Same universal "on" green every other hub's notify toggle uses
+   (Sondrik/CSM/Alpha), independent of this hub's own --accent, so an
+   enabled alert reads the same way across every hub. */
+.print-btn.notify-on { border-color: rgba(61,220,132,0.4); color: #3DDC84; }
+.print-btn.notify-on:hover, .print-btn.notify-on:focus-visible { border-color: rgba(61,220,132,0.6); color: #3DDC84; }
 
 .callout {
   border: 1px solid var(--hairline);
