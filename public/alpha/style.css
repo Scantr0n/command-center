@@ -619,6 +619,28 @@ header.page-head .sub {
   border-color: rgba(224,80,80,0.5);
 }
 
+/* Windows/browser forced-colors mode strips both background-color and
+   background-image down to the system Canvas color, the only thing every
+   rule above actually varies between up/degraded/down. Each tick/bar's real
+   aria-label already carries the state to screen readers, but a sighted
+   forced-colors user scanning the strip by eye would see identical blank
+   boxes for a fully-up day and a fully-down one. border-style survives
+   forced-colors untouched, so it carries the distinction here instead. */
+@media (forced-colors: active) {
+  .history-tick.up, .daily-uptime-bar.full {
+    border-style: solid;
+    border-width: 2px;
+  }
+  .daily-uptime-bar.degraded {
+    border-style: dotted;
+    border-width: 2px;
+  }
+  .history-tick.down, .daily-uptime-bar.down {
+    border-style: double;
+    border-width: 3px;
+  }
+}
+
 /* Both strips above are built as real <button> elements, not plain <span>s
    with a title attribute: a native title tooltip has no keyboard or touch
    equivalent at all, so every one of these per-check/per-day readings was
