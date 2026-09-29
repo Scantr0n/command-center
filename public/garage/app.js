@@ -372,7 +372,12 @@ function renderAuthenticationRulesFreshness() {
 // top of these rates from Oct 4, 2026 through Jan 17, 2027, added as its
 // own callout below rather than folded into this date, since it's a
 // separate, time-boxed change, not a revision to the July 12 baseline.
-const SHIPPING_COST_REVIEWED_ON = '2026-09-25';
+// Re-verified 2026-09-29 against USPS's own Sept 22, 2026 recommended
+// holiday mailing dates: added the actual ship-by deadlines (Dec 17/18/19
+// contiguous US, Dec 16/17/18/19 AK/HI/PR/territories) as a third callout,
+// the surcharge callout above only covered the price change, not the
+// separate deadline a late shipment would actually miss.
+const SHIPPING_COST_REVIEWED_ON = '2026-09-29';
 const SHIPPING_COST_STALE_AFTER_DAYS = 45;
 
 function renderShippingCostFreshness() {
