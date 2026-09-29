@@ -39,10 +39,11 @@
     release: 'release',
     goal: 'goal',
     application: 'application'
-    // sale/expense/dispute/supply/acquisition/comp (garage) have no per-record
-    // modal or highlight target yet, and (unlike application above) still
-    // have zero real rows logged in any of the six files, so there's
-    // nothing real yet to jump to: intentionally absent, not an oversight.
+    // sale/expense/dispute/supply/acquisition/comp/activity/engagement
+    // (garage) have no per-record modal or highlight target yet, and (unlike
+    // application above) most still have zero real rows logged; activity.json
+    // has two real rows already but still nothing on the page to jump to.
+    // Intentionally absent, not an oversight.
   };
 
   function recordHref(r) {

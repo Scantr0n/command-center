@@ -133,6 +133,20 @@
       label: c => c.title, detail: c => c.platform ? c.platform.toUpperCase() : '',
       fields: c => [c.title]
     },
+    // activity.json already has real logged rows (the Haggar corduroy
+    // photo-audit catch, the eBay return-policy fix) that were simply
+    // unsearchable, unlike the zero-row files above, since this source was
+    // never added alongside its siblings.
+    {
+      hub: 'garage', clusterId: 'garage', file: 'activity.json', key: 'events', type: 'activity',
+      label: e => e.title, detail: e => e.platform ? e.platform.toUpperCase() : '',
+      fields: e => [e.title, e.detail]
+    },
+    {
+      hub: 'garage', clusterId: 'garage', file: 'engagement.json', key: 'snapshots', type: 'engagement',
+      label: s => s.listingId || 'Engagement snapshot', detail: s => s.platform ? s.platform.toUpperCase() : '',
+      fields: s => [s.listingId, s.notes]
+    },
     {
       hub: 'sondrik', clusterId: 'sondrik', file: 'channels.json', key: 'channels', type: 'channel',
       label: c => c.name, detail: c => c.status || '',
