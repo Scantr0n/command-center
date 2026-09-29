@@ -22,6 +22,7 @@ const {
   mostRecentConnectedAt,
   currentStateStartedAt,
   computeIncidents,
+  computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
   dailyUptimeClass
@@ -218,6 +219,43 @@ test('computeIncidents groups consecutive down runs and leaves a trailing one on
 test('computeIncidents is empty for an all-connected history, and for no history', () => {
   assert.deepEqual(computeIncidents([]), []);
   assert.deepEqual(computeIncidents([{ at: 'x', connected: true }]), []);
+});
+
+test('computeKillSwitchEpisodes groups consecutive engaged runs and leaves a trailing one ongoing', () => {
+  const history = [
+    { at: '2026-09-15T10:00:00Z', connected: true, paused: false },
+    { at: '2026-09-15T10:05:00Z', connected: true, paused: true },
+    { at: '2026-09-15T10:10:00Z', connected: true, paused: true },
+    { at: '2026-09-15T10:15:00Z', connected: true, paused: false },
+    { at: '2026-09-15T10:20:00Z', connected: true, paused: true }
+  ];
+  const episodes = computeKillSwitchEpisodes(history);
+  assert.equal(episodes.length, 2);
+  assert.deepEqual(episodes[0], { start: '2026-09-15T10:05:00Z', end: '2026-09-15T10:15:00Z', ongoing: false });
+  assert.equal(episodes[1].start, '2026-09-15T10:20:00Z');
+  assert.equal(episodes[1].ongoing, true);
+  assert.equal(episodes[1].end, null);
+});
+
+test('computeKillSwitchEpisodes skips entries with no real paused reading rather than guessing across the gap', () => {
+  const history = [
+    { at: '2026-09-15T10:00:00Z', connected: true, paused: true },
+    { at: '2026-09-15T10:05:00Z', connected: false, paused: null },
+    { at: '2026-09-15T10:10:00Z', connected: false, paused: null },
+    { at: '2026-09-15T10:15:00Z', connected: true, paused: false }
+  ];
+  const episodes = computeKillSwitchEpisodes(history);
+  assert.equal(episodes.length, 1);
+  // The null-reading entries in between are removed before grouping, so the
+  // real engaged window is bounded by the two real readings on either side
+  // of the gap, not by the gap's own (nonexistent) timestamps.
+  assert.deepEqual(episodes[0], { start: '2026-09-15T10:00:00Z', end: '2026-09-15T10:15:00Z', ongoing: false });
+});
+
+test('computeKillSwitchEpisodes is empty when never engaged, for an all-null-paused history, and for no history', () => {
+  assert.deepEqual(computeKillSwitchEpisodes([]), []);
+  assert.deepEqual(computeKillSwitchEpisodes([{ at: 'x', connected: true, paused: false }]), []);
+  assert.deepEqual(computeKillSwitchEpisodes([{ at: 'x', connected: false, paused: null }]), []);
 });
 
 test('dayKeyLocal formats a zero-padded local calendar day, null for a bad timestamp', () => {

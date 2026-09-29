@@ -56,6 +56,7 @@ const {
   mostRecentConnectedAt,
   currentStateStartedAt,
   computeIncidents,
+  computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
   dailyUptimeClass
@@ -1014,6 +1015,68 @@ function renderIncidents(data, clientHistory) {
   // glance-sized list rather than every incident this browser has ever seen.
   const recent = [...incidents].reverse().slice(0, INCIDENT_LIST_LIMIT);
   list.innerHTML = recent.map(incidentItem).join('');
+}
+
+function killSwitchEpisodeItem(episode) {
+  const startAbs = formatAbsolute(episode.start);
+  const endMs = episode.ongoing ? Date.now() : new Date(episode.end).getTime();
+  const durationText = formatDuration(endMs - new Date(episode.start).getTime()) || 'under 1m';
+  const rangeText = episode.ongoing
+    ? 'Engaged ' + startAbs + ', still engaged'
+    : startAbs + ' to ' + formatAbsolute(episode.end);
+  return `
+    <li class="incident-item${episode.ongoing ? ' incident-ongoing' : ''}">
+      <span class="incident-duration font-mono">${episode.ongoing ? 'Still engaged' : 'Engaged for ' + escapeHtml(durationText)}</span>
+      <span class="incident-range">${escapeHtml(rangeText)}</span>
+    </li>
+  `;
+}
+
+// Same real-rows, glance-capped-list pattern as renderIncidents just above,
+// built from the same connection.history entries but grouping real paused
+// === true windows (see computeKillSwitchEpisodes in dates-core.js) instead
+// of real downtime. A real-money kill switch tripping is exactly the kind
+// of event Jack wants a "when and for how long" answer to at a glance,
+// without digging through the mixed-event-type Activity log below to find
+// each engaged/released pair by hand.
+let lastKillSwitchEpisodesSnapshot = [];
+
+function renderKillSwitchHistory(data, clientHistory) {
+  const list = document.getElementById('killSwitchHistoryList');
+  const csvBtn = document.getElementById('killSwitchHistoryCsvBtn');
+  if (!list) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  const hasReading = history.some(e => e && e.paused !== null && e.paused !== undefined);
+  if (!hasReading) {
+    lastKillSwitchEpisodesSnapshot = [];
+    if (csvBtn) {
+      csvBtn.disabled = true;
+      csvBtn.title = 'No kill-switch readings recorded yet.';
+    }
+    // Distinct from "no episodes": this browser has never actually seen a
+    // real paused reading at all (e.g. the client-only localStorage
+    // fallback, which only ever records connected/disconnected, not
+    // paused), so it would be dishonest to imply a clean record instead of
+    // an absent one.
+    list.innerHTML = `<li class="incident-empty font-mono">No kill-switch readings recorded yet.</li>`;
+    return;
+  }
+  const episodes = computeKillSwitchEpisodes(history);
+  lastKillSwitchEpisodesSnapshot = episodes;
+  if (!episodes.length) {
+    if (csvBtn) {
+      csvBtn.disabled = true;
+      csvBtn.title = 'No kill-switch engagements recorded in the covered history.';
+    }
+    list.innerHTML = `<li class="incident-empty font-mono">No kill-switch engagements recorded in the covered history.</li>`;
+    return;
+  }
+  if (csvBtn) {
+    csvBtn.disabled = false;
+    csvBtn.title = '';
+  }
+  const recent = [...episodes].reverse().slice(0, INCIDENT_LIST_LIMIT);
+  list.innerHTML = recent.map(killSwitchEpisodeItem).join('');
 }
 
 // Statuspage/UptimeRobot-style daily uptime bars: the tick strip above
@@ -2356,6 +2419,7 @@ async function loadStatus() {
     renderConnectionHistory(data, clientConnHistory);
     renderDailyUptime(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
+    renderKillSwitchHistory(data, clientConnHistory);
     renderRegimeHistory(clientRegimeHistory, lastKnown && lastKnown.asOf);
     // Kill switch engaged outranks plain connection freshness for the one
     // glance a background tab gives Jack, same priority it gets everywhere
@@ -2425,6 +2489,7 @@ window.addEventListener('storage', (e) => {
   renderConnectionHistory(lastRawData, connHistory);
   renderDailyUptime(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
+  renderKillSwitchHistory(lastRawData, connHistory);
   // Same last-known/frozen distinction loadStatus applies via `lastKnown`:
   // lastStatusIsLastKnown and lastStatusData are the same two values this
   // tab's own last loadStatus() call already computed, so a sibling tab's
@@ -2679,6 +2744,41 @@ document.getElementById('incidentsCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'alpha-incidents-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const KILL_SWITCH_HISTORY_CSV_COLUMNS = [
+  ['start', 'Start'], ['end', 'End'], ['status', 'Status'], ['durationMinutes', 'Duration (min)']
+];
+
+// Same real-rows-export pattern as Recent incidents above, for the Kill
+// switch history list: every real engaged window this browser's
+// connection history has recorded (see lastKillSwitchEpisodesSnapshot),
+// not just the INCIDENT_LIST_LIMIT-capped glance view the list itself
+// renders.
+document.getElementById('killSwitchHistoryCsvBtn').addEventListener('click', () => {
+  if (!lastKillSwitchEpisodesSnapshot.length) return;
+  const rows = [...lastKillSwitchEpisodesSnapshot].reverse().map(episode => {
+    const endMs = episode.ongoing ? Date.now() : new Date(episode.end).getTime();
+    const durationMinutes = Math.round((endMs - new Date(episode.start).getTime()) / 60000);
+    return {
+      start: formatAbsolute(episode.start),
+      end: episode.ongoing ? 'Still engaged' : formatAbsolute(episode.end),
+      status: episode.ongoing ? 'Still engaged' : 'Released',
+      durationMinutes
+    };
+  });
+  const header = KILL_SWITCH_HISTORY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(r => KILL_SWITCH_HISTORY_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alpha-kill-switch-history-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

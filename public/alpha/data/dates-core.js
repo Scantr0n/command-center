@@ -325,27 +325,55 @@
     return startedAt;
   }
 
-  function computeIncidents(history) {
+  // Shared by computeIncidents (runs where entry[field] === activeValue,
+  // e.g. connected === false) and computeKillSwitchEpisodes (runs where
+  // paused === true) below: both are the same "find contiguous runs of one
+  // boolean state in a real, ordered check history" question, just over a
+  // different field and a different active value, so the walk itself lives
+  // here once rather than twice.
+  function computeStateRuns(history, field, activeValue) {
     if (!Array.isArray(history) || !history.length) return [];
-    const incidents = [];
+    const runs = [];
     let open = null;
     for (const entry of history) {
       if (!entry) continue;
-      if (!entry.connected) {
+      if (entry[field] === activeValue) {
         if (!open) open = { start: entry.at, end: null, ongoing: true };
       } else if (open) {
         open.end = entry.at;
         open.ongoing = false;
-        incidents.push(open);
+        runs.push(open);
         open = null;
       }
     }
-    // A run still open when the loop ends means the most recent check in
-    // this history was still "not connected", i.e. a real outage still in
+    // A run still open when the loop ends means the most recent entry
+    // considered was still in the active state, i.e. a real state still in
     // progress as of the last recorded check, not one this page is guessing
     // has ended.
-    if (open) incidents.push(open);
-    return incidents;
+    if (open) runs.push(open);
+    return runs;
+  }
+
+  function computeIncidents(history) {
+    return computeStateRuns(history, 'connected', false);
+  }
+
+  // Kill-switch trigger history: real engaged windows (paused === true),
+  // grouped the same start/end/ongoing way computeIncidents groups downtime,
+  // built from the same connection.history entries. paused is null whenever
+  // connected is false (an unreachable daemon has no real kill-switch
+  // reading to attach, see connection.history[].paused in the schema
+  // table), so those entries are filtered out before walking rather than
+  // treated as "not paused", the same "never assume across a gap" rule
+  // live.killSwitch.lastTriggeredAt already follows server-side. A run that
+  // starts or ends right at the edge of a filtered-out gap is still exactly
+  // as real as one that doesn't, since every remaining entry is still a
+  // genuine, ordered kill-switch reading; only entries with no reading at
+  // all are removed, never re-interpreted.
+  function computeKillSwitchEpisodes(history) {
+    if (!Array.isArray(history) || !history.length) return [];
+    const withReading = history.filter(e => e && e.paused !== null && e.paused !== undefined);
+    return computeStateRuns(withReading, 'paused', true);
   }
 
   function dayKeyLocal(iso) {
@@ -402,6 +430,7 @@
     mostRecentConnectedAt,
     currentStateStartedAt,
     computeIncidents,
+    computeKillSwitchEpisodes,
     dayKeyLocal,
     computeDailyUptimeBuckets,
     dailyUptimeClass
