@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-27T23:02:19.300Z",
-  "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json,acquisitions.json,comps.json}, run node public/garage/data/changelog.js to refresh",
+  "generatedAt": "2026-09-29T02:55:02.061Z",
+  "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json,acquisitions.json,comps.json,engagement.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "b554aca",
+      "fullHash": "b554aca244cbe30c733c958262e37b3b65f7c8b1",
+      "date": "2026-09-29",
+      "author": "Claude",
+      "subject": "Garage: add a real listing engagement (views/watchers) snapshot log",
+      "historyReset": false,
+      "files": [
+        "engagement.json"
+      ]
+    },
     {
       "hash": "5387aa7",
       "fullHash": "5387aa76c4627c402dc8fa15c23637cd83d0f06a",
