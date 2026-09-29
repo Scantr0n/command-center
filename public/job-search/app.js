@@ -671,6 +671,18 @@
       backupBtn.disabled = true;
       backupBtn.title = "Can't back up, no data loaded (see errors below)";
     }
+    // Compare with backup only ever diffs applications.json (see
+    // compare-core.js), so it's gated on applicationsData alone, same as
+    // the CSV export just below.
+    const compareBackupBtn = document.getElementById('compareBackupBtn');
+    if (applicationsData) {
+      compareBackupBtn.disabled = false;
+      compareBackupBtn.title = '';
+    } else {
+      compareBackupBtn.disabled = true;
+      compareBackupBtn.title = "Can't compare, applications data failed to load";
+    }
+
     // CSV export only needs the applications table itself, unlike the
     // full-fidelity backup above which bundles whatever loaded across all
     // four files, so it's gated on applicationsData alone rather than any
@@ -819,7 +831,7 @@
   });
 
   document.addEventListener('keydown', e => {
-    if (shortcutsOpen || jumpNavOpen) return;
+    if (shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -835,7 +847,7 @@
   // never open a form with no real entry number/duplicate check behind it.
   document.addEventListener('keydown', e => {
     if (e.key !== 'n' && e.key !== 'N') return;
-    if (shortcutsOpen || jumpNavOpen) return;
+    if (shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -940,6 +952,142 @@
     if (e.key === 'Escape') { closeJumpNav(); return; }
     if (e.key === 'Tab') {
       const focusable = getJumpNavFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
+  // Read-only diff against a file from the backup button just above:
+  // JobSearchCompareCore.compareWithBackup (compare-core.js) does the
+  // actual field-by-field comparison, scoped to applications.json;
+  // everything here just reads the file the user picks and renders the
+  // result. Nothing is uploaded anywhere and nothing is written back to
+  // applications.json. Same approach as CSM's, Sondrik's, CGT's, Garage's,
+  // and Alpha's own Compare with backup.
+  let compareBackupOpen = false;
+  let compareBackupLastFocusedEl = null;
+
+  function getCompareBackupFocusable() {
+    return Array.from(document.getElementById('compareBackupModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openCompareBackup() {
+    if (compareBackupOpen) return;
+    compareBackupOpen = true;
+    compareBackupLastFocusedEl = document.activeElement;
+    document.getElementById('compareBackupOverlay').hidden = false;
+    lockBodyScroll();
+    document.getElementById('compareBackupPickBtn').focus();
+  }
+
+  function closeCompareBackup() {
+    if (!compareBackupOpen) return;
+    compareBackupOpen = false;
+    document.getElementById('compareBackupOverlay').hidden = true;
+    unlockBodyScroll();
+    if (compareBackupLastFocusedEl && typeof compareBackupLastFocusedEl.focus === 'function') compareBackupLastFocusedEl.focus();
+    compareBackupLastFocusedEl = null;
+    document.getElementById('compareBackupResult').innerHTML = '';
+    document.getElementById('compareBackupInput').value = '';
+  }
+
+  function compareBackupTag(fields, removed) {
+    const text = removed ? 'NOT IN CURRENT DATA' : (fields ? fields.map(f => f.toUpperCase()).join(', ') + ' CHANGED' : 'NEW SINCE BACKUP');
+    return '<span class="compare-tag' + (removed ? ' compare-tag-removed' : '') + '">' + escapeHtml(text) + '</span>';
+  }
+
+  function compareBackupRow(label, sub, tagHtml) {
+    return '<div class="compare-row"><span><strong>' + escapeHtml(label) + '</strong>' +
+      (sub ? ' <span style="color:var(--sub)">' + escapeHtml(sub) + '</span>' : '') + '</span>' + tagHtml + '</div>';
+  }
+
+  // labelFn/subFn read straight off the real record fields (role, company,
+  // reason, ...), never a guessed or reformatted value, so the row shown
+  // here always matches what's actually in applications.json.
+  function renderCompareSection(title, diff, labelFn, subFn) {
+    const total = diff.added.length + diff.removed.length + diff.changed.length;
+    if (!total) return '';
+    return '<p class="compare-section-label">' + escapeHtml(title) + '</p><div class="compare-list">' +
+      diff.added.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, false))).join('') +
+      diff.changed.map(c => compareBackupRow(labelFn(c.current), subFn ? subFn(c.current) : null, compareBackupTag(c.fields, false))).join('') +
+      diff.removed.map(item => compareBackupRow(labelFn(item), subFn ? subFn(item) : null, compareBackupTag(null, true))).join('') +
+      '</div>';
+  }
+
+  function renderCompareBackupResult(result) {
+    const exportedLabel = result.exportedAt
+      ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : 'unknown export date (an older backup, or a hand-edited file)';
+    const totalDiffs = result.applications.added.length + result.applications.removed.length + result.applications.changed.length +
+      result.dropped.added.length + result.dropped.removed.length + result.dropped.changed.length +
+      result.skipped.added.length + result.skipped.removed.length + result.skipped.changed.length +
+      result.savedCount.length;
+    let html = '<p class="field-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
+    if (totalDiffs === 0) {
+      html += '<p class="field-note">No differences. The applications data currently loaded matches this backup exactly.</p>';
+      document.getElementById('compareBackupResult').innerHTML = html;
+      return;
+    }
+    html += renderCompareSection('Applications (applications.json)', result.applications, a => a.role, a => a.company + ', #' + a.num);
+    html += renderCompareSection('Dropped (applications.json)', result.dropped, d => d.company, null);
+    html += renderCompareSection('Skipped (applications.json)', result.skipped, s => s.company, null);
+    if (result.savedCount.length) {
+      html += '<p class="compare-section-label">Saved count (applications.json)</p><div class="compare-list">' +
+        result.savedCount.map(f => compareBackupRow(f.field, null, compareBackupTag([f.field], false))).join('') +
+        '</div>';
+    }
+    document.getElementById('compareBackupResult').innerHTML = html;
+  }
+
+  document.getElementById('compareBackupPickBtn').addEventListener('click', () => document.getElementById('compareBackupInput').click());
+
+  document.getElementById('compareBackupInput').addEventListener('change', () => {
+    const input = document.getElementById('compareBackupInput');
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(String(reader.result));
+      } catch (err) {
+        document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">Could not read that file as JSON: ' +
+          escapeHtml(err.message) + '</p>';
+        return;
+      }
+      try {
+        renderCompareBackupResult(window.JobSearchCompareCore.compareWithBackup(rawApplicationsData, parsed));
+      } catch (err) {
+        document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">' + escapeHtml(err.message) + '</p>';
+      }
+    };
+    reader.onerror = () => {
+      document.getElementById('compareBackupResult').innerHTML = '<p class="field-note" role="alert">Could not read that file.</p>';
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById('compareBackupBtn').addEventListener('click', openCompareBackup);
+  document.getElementById('compareBackupClose').addEventListener('click', closeCompareBackup);
+  document.getElementById('compareBackupOverlay').addEventListener('click', e => {
+    if (e.target.id === 'compareBackupOverlay') closeCompareBackup();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!compareBackupOpen) return;
+    if (e.key === 'Escape') { closeCompareBackup(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getCompareBackupFocusable();
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
