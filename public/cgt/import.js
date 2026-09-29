@@ -78,7 +78,7 @@ const DATASETS = {
     idFields: ['description', 'gradingCompany', 'submittedDate'],
     idFallback: 'submission',
     validate: rows => window.CGTValidateCore.validateSubmissions(rows),
-    templateExample: { description: '12 cards, 2021 hockey rookies', gradingCompany: 'PSA', serviceLevel: 'Regular', cardCount: '12', submittedDate: '2026-08-08', status: 'submitted' },
+    templateExample: { description: '12 cards, 2021 hockey rookies', gradingCompany: 'PSA', serviceLevel: 'Priority', cardCount: '12', submittedDate: '2026-08-08', status: 'submitted' },
     fieldDefs: [
       { key: 'id', label: 'ID (optional, auto-generated if blank)', aliases: ['id', 'slug', 'uid'] },
       { key: 'description', label: 'Description', aliases: ['description', 'desc', 'batch', 'batchdescription'] },
@@ -102,7 +102,7 @@ const DATASETS = {
     idFallback: 'candidate',
     idSuffix: '-raw', // matches the documented convention (e.g. "2022-upper-deck-rookie-raw"), only for an auto-generated id, never applied to an explicit id column
     validate: rows => window.CGTValidateCore.validateCandidates(rows),
-    templateExample: { cardName: '2022 Upper Deck Rookie', year: '2022', sport: 'hockey', targetGradingCompany: 'PSA', targetServiceLevel: 'Regular' },
+    templateExample: { cardName: '2022 Upper Deck Rookie', year: '2022', sport: 'hockey', targetGradingCompany: 'PSA', targetServiceLevel: 'Priority' },
     fieldDefs: [
       { key: 'id', label: 'ID (optional, auto-generated if blank)', aliases: ['id', 'slug', 'uid'] },
       { key: 'cardName', label: 'Card name', aliases: ['cardname', 'card', 'name', 'description', 'title'] },

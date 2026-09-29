@@ -95,7 +95,7 @@
           <tr><th scope="row" class="wrap">subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
           <tr><th scope="row">certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
           <tr><th scope="row">storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
-          <tr><th scope="row">submissionId</th><td>Optional, the <code>id</code> of the real <code>submissions.json</code> batch this card was actually graded in, e.g. <code>"2026-08-psa-regular-batch-1"</code>. Leave <code>null</code> when not known, when the card wasn't graded through a batch logged here, or for a raw/ungraded card. When set, the card's detail view links to that submission and, once returned, that submission's own detail view lists every card that came back from it. <code>node public/cgt/data/validate.js</code> warns if it doesn't match any real submission id (a typo, or a submission never logged), never an error since it never breaks anything rendered.</td></tr>
+          <tr><th scope="row">submissionId</th><td>Optional, the <code>id</code> of the real <code>submissions.json</code> batch this card was actually graded in, e.g. <code>"2026-08-psa-priority-batch-1"</code>. Leave <code>null</code> when not known, when the card wasn't graded through a batch logged here, or for a raw/ungraded card. When set, the card's detail view links to that submission and, once returned, that submission's own detail view lists every card that came back from it. <code>node public/cgt/data/validate.js</code> warns if it doesn't match any real submission id (a typo, or a submission never logged), never an error since it never breaks anything rendered.</td></tr>
           <tr><th scope="row">estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
           <tr><th scope="row">valuationBasis</th><td><strong>Required whenever estimatedValue is set.</strong> <code>"recent-sale"</code> if a real comparable sale at this exact grade was found, <code>"comp-estimate"</code> if none exists and the number is inferred from other grades or similar cards.</td></tr>
           <tr><th scope="row">compNote</th><td><strong>Required when valuationBasis is comp-estimate.</strong> Plain-language note on what the estimate is based on, e.g. <code>"No PSA10 sales found, based on 3 PSA9 sales + typical grade premium"</code></td></tr>
@@ -205,7 +205,7 @@
           <label class="quick-log-label" for="ncStorageLocation">Storage location (optional)</label>
           <input class="quick-log-input" type="text" id="ncStorageLocation" placeholder="e.g. Home safe">
           <label class="quick-log-label" for="ncSubmissionId">From submission id (optional, must match a real id in submissions.json)</label>
-          <input class="quick-log-input" type="text" id="ncSubmissionId" placeholder="e.g. 2026-08-psa-regular-batch-1">
+          <input class="quick-log-input" type="text" id="ncSubmissionId" placeholder="e.g. 2026-08-psa-priority-batch-1">
           <label class="quick-log-label" for="ncEstimatedValue">Estimated value, USD (optional)</label>
           <input class="quick-log-input" type="number" id="ncEstimatedValue" min="0" step="0.01">
           <label class="quick-log-label" for="ncValuationBasis">Valuation basis (required if a value is entered above)</label>
@@ -261,10 +261,10 @@
       <div class="table-wrap">
       <table class="schema-table">
         <tbody>
-          <tr><th scope="row">id</th><td>Unique slug, e.g. <code>"2026-08-psa-regular-batch-1"</code></td></tr>
+          <tr><th scope="row">id</th><td>Unique slug, e.g. <code>"2026-08-psa-priority-batch-1"</code></td></tr>
           <tr><th scope="row">description</th><td>Plain text describing what's in the batch, e.g. <code>"12 cards, 2021 hockey rookies"</code></td></tr>
           <tr><th scope="row">gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
-          <tr><th scope="row">serviceLevel</th><td>Optional, the paid tier as billed, e.g. <code>"Regular"</code>, <code>"Express"</code>, <code>"Value Bulk"</code></td></tr>
+          <tr><th scope="row">serviceLevel</th><td>Optional, the paid tier as billed, e.g. <code>"Priority"</code>, <code>"Express"</code>, <code>"Value Bulk"</code>. PSA renamed Regular to Priority (and Walk-Through to Premier) on 2026-09-14, see "Grading service tiers reference" below; a batch billed before that date under the old name is fine to leave logged that way.</td></tr>
           <tr><th scope="row">cardCount</th><td>Optional whole number, how many cards are in this batch</td></tr>
           <tr><th scope="row">submittedDate</th><td>ISO date (<code>YYYY-MM-DD</code>) this batch was actually shipped out</td></tr>
           <tr><th scope="row">trackingNumber</th><td>Optional, the shipping tracking number for this batch</td></tr>
@@ -310,7 +310,7 @@
         <form class="quick-log-form" id="quickSubmissionForm">
           <h2 class="quick-log-title font-mono">New submission &rarr; submissions.json</h2>
           <label class="quick-log-label" for="nsId">Id (unique slug)</label>
-          <input class="quick-log-input" type="text" id="nsId" placeholder="e.g. 2026-08-psa-regular-batch-1" required>
+          <input class="quick-log-input" type="text" id="nsId" placeholder="e.g. 2026-08-psa-priority-batch-1" required>
           <label class="quick-log-label" for="nsDescription">Description</label>
           <input class="quick-log-input" type="text" id="nsDescription" placeholder="e.g. 12 cards, 2021 hockey rookies" required>
           <label class="quick-log-label" for="nsGradingCompany">Grading company</label>
@@ -324,7 +324,7 @@
             <option value="KSA">KSA</option>
           </select>
           <label class="quick-log-label" for="nsServiceLevel">Service level (optional, as billed)</label>
-          <input class="quick-log-input" type="text" id="nsServiceLevel" placeholder="e.g. Regular, Express, Value Bulk">
+          <input class="quick-log-input" type="text" id="nsServiceLevel" placeholder="e.g. Priority, Express, Value Bulk">
           <label class="quick-log-label" for="nsCardCount">Card count (optional)</label>
           <input class="quick-log-input" type="number" id="nsCardCount" min="1" step="1">
           <label class="quick-log-label" for="nsSubmittedDate">Submitted date (optional)</label>
@@ -395,7 +395,7 @@
           <tr><th scope="row">rawValueBasis</th><td><strong>Required whenever rawValue is set.</strong> <code>"recent-sale"</code> or <code>"comp-estimate"</code>, same rule as cards.json's <code>valuationBasis</code>.</td></tr>
           <tr><th scope="row">rawValueNote</th><td><strong>Required when rawValueBasis is comp-estimate.</strong> What the estimate is based on.</td></tr>
           <tr><th scope="row">targetGradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code>, whichever is being considered</td></tr>
-          <tr><th scope="row">targetServiceLevel</th><td>Optional, e.g. <code>"Regular"</code>, <code>"Express"</code></td></tr>
+          <tr><th scope="row">targetServiceLevel</th><td>Optional, e.g. <code>"Priority"</code>, <code>"Express"</code></td></tr>
           <tr><th scope="row">estimatedGradingCost</th><td>USD number, the grading company's real posted service fee for that tier. Leave <code>null</code> until checked against their real fee schedule.</td></tr>
           <tr><th scope="row">shippingCost</th><td>Optional USD number, round-trip shipping and insurance if known separately from the service fee</td></tr>
           <tr><th scope="row">expectedGrade</th><td>Plain text, the realistically expected grade or range, e.g. <code>"9"</code> or <code>"9-10"</code>, not an assumed perfect 10</td></tr>
@@ -485,7 +485,7 @@
             <option value="KSA">KSA</option>
           </select>
           <label class="quick-log-label" for="ncaTargetServiceLevel">Target service level (optional)</label>
-          <input class="quick-log-input" type="text" id="ncaTargetServiceLevel" placeholder="e.g. Regular, Express">
+          <input class="quick-log-input" type="text" id="ncaTargetServiceLevel" placeholder="e.g. Priority, Express">
           <label class="quick-log-label" for="ncaEstimatedGradingCost">Estimated grading cost, USD (optional, the real posted fee)</label>
           <input class="quick-log-input" type="number" id="ncaEstimatedGradingCost" min="0" step="0.01">
           <label class="quick-log-label" for="ncaShippingCost">Shipping cost, USD (optional)</label>
