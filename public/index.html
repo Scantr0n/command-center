@@ -435,10 +435,30 @@
 
   /* Graph <-> Grid crossfade (see setView's document.startViewTransition
      call). Same ease speed as the rest of the page's own 0.15-0.18s
-     transitions, not the browser's slower ~0.25s default. */
+     transitions, not the browser's slower ~0.25s default. Also the crossfade
+     the @view-transition rule below reuses for cross-document navigation:
+     both are the same root snapshot pair, one same-document, one across a
+     real page load, so one shared duration keeps them feeling identical. */
   ::view-transition-old(root), ::view-transition-new(root) {
     animation-duration: 0.18s;
     animation-timing-function: ease;
+  }
+
+  /* Cross-document view transition: sidebar links (see sidebar.js's own
+     cc-sb-row hrefs) and the palette's record results (recordHref in
+     search-core.js) navigate straight to a real /alpha/, /cgt/, etc. page
+     load, which used to hit as a hard flash to black between two dark-near-
+     identical pages, worse than no transition at all. This crossfades that
+     load instead. Requires the SAME rule on the destination page (every hub's
+     own style.css carries a matching copy, see its own header comment), one
+     side alone produces nothing. Chrome 126+/Safari 18.2+ only; unsupported
+     browsers just get today's plain navigation, no fallback needed. Gated on
+     prefers-reduced-motion here rather than a navigation: none override
+     below, since none is the property's own default when this never applies. */
+  @media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+      navigation: auto;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -1,3 +1,23 @@
+/* Cross-document view transition: crossfades a real page load to/from
+   the hub page or another hub (sidebar links, palette record results), same
+   pattern as every other hub's own style.css. Requires the matching rule on
+   BOTH the outgoing and incoming page (see public/index.html's own copy of
+   this comment); Sondrik's own reduced-motion block further down still
+   applies to every other transition on this page, this one is gated here
+   since navigation: none (skip the transition) is already the property's
+   default when prefers-reduced-motion never matches. Chrome 126+/Safari
+   18.2+ only, older browsers just get a plain navigation, no fallback code
+   needed. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+::view-transition-old(root), ::view-transition-new(root) {
+  animation-duration: 0.18s;
+  animation-timing-function: ease;
+}
+
 :root {
   color-scheme: dark;
   --void: #08090A;
