@@ -110,6 +110,8 @@ header.page-head .sub {
 .print-btn:focus-visible { outline: 1.5px solid var(--hairlineHover); outline-offset: 2px; }
 .print-btn:disabled { opacity: 0.45; cursor: default; }
 .print-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
+.print-btn.notify-on { border-color: rgba(61,220,132,0.4); color: #3DDC84; }
+.print-btn.notify-on:hover, .print-btn.notify-on:focus-visible { border-color: rgba(61,220,132,0.6); color: #3DDC84; }
 
 /* This device has no network path at all (navigator.onLine / online / offline,
    never inferred from a failed fetch), a different question from whether the

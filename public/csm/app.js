@@ -2000,6 +2000,134 @@
       .finally(() => { setTimeout(() => { snapshotBtn.textContent = original; }, 1800); });
   });
 
+  // Native OS-level alert, opt-in, for the one real gap the header badge/
+  // favicon dot above can't cover: this is a static-data planner with no
+  // live backend polling it, so a real nudge can cross from "not due yet"
+  // into due-or-overdue at midnight while this tab sits open and unfocused
+  // in another window for hours, with nothing pulling Jack's eye back to it.
+  // Same real pattern Alpha's own "Enable critical alerts" already ships
+  // (see its app.js): the browser's own Notification API, built only from
+  // data already rendered on this page, opt-in, one-shot per transition,
+  // never sent anywhere and never a path back to any prospect.
+  const NOTIFY_PREF_KEY = 'csm:notifyEnabled';
+  const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+
+  function loadNotifyPref() {
+    try { return localStorage.getItem(NOTIFY_PREF_KEY) === 'true'; } catch (e) { return false; }
+  }
+  function saveNotifyPref(enabled) {
+    try { localStorage.setItem(NOTIFY_PREF_KEY, enabled ? 'true' : 'false'); } catch (e) { /* private browsing: works this load only */ }
+  }
+
+  const notifyBtn = document.getElementById('notifyBtn');
+  const testAlertBtn = document.getElementById('testAlertBtn');
+
+  function renderNotifyBtn() {
+    if (!notifyBtn) return;
+    if (!notifySupported) { notifyBtn.hidden = true; return; }
+    const permission = Notification.permission;
+    if (permission === 'denied') {
+      notifyBtn.hidden = false;
+      notifyBtn.disabled = true;
+      notifyBtn.classList.remove('notify-on');
+      notifyBtn.textContent = 'Nudge alerts blocked';
+      notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+      notifyBtn.removeAttribute('aria-pressed');
+      if (testAlertBtn) testAlertBtn.hidden = true;
+      return;
+    }
+    const enabled = permission === 'granted' && loadNotifyPref();
+    notifyBtn.hidden = false;
+    notifyBtn.disabled = false;
+    notifyBtn.classList.toggle('notify-on', enabled);
+    // Real toggle-button semantics (this button's own state persists across
+    // clicks, it isn't a one-shot action like Export CSV), same as the
+    // channel/category filter chips already use.
+    notifyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    notifyBtn.textContent = enabled ? 'Nudge alerts on' : 'Enable nudge alerts';
+    notifyBtn.title = enabled
+      ? 'A native notification fires when a real nudge crosses into due or overdue while this tab is unfocused. Click to turn off.'
+      : 'Get a native notification when a real nudge crosses into due or overdue while this tab is unfocused.';
+    // A granted browser permission doesn't guarantee the OS actually surfaces
+    // it (Do Not Disturb, a muted notification center entry for this
+    // browser), so once armed, offer a way to check that end-to-end instead
+    // of finding out only during a real overdue nudge.
+    if (testAlertBtn) testAlertBtn.hidden = !enabled;
+  }
+
+  if (testAlertBtn) {
+    testAlertBtn.addEventListener('click', () => {
+      if (!notifySupported || Notification.permission !== 'granted') return;
+      const original = testAlertBtn.textContent;
+      try {
+        new Notification('CSM pipeline (test)', {
+          body: 'Test alert, no real nudge state change. A real overdue-nudge alert looks just like this.',
+          icon: '/icon-192.png',
+          tag: 'csm-nudge-test'
+        });
+        testAlertBtn.textContent = 'Test alert sent';
+      } catch (e) {
+        testAlertBtn.textContent = "Couldn't send";
+      }
+      setTimeout(() => { testAlertBtn.textContent = original; }, 1800);
+    });
+  }
+
+  if (notifyBtn && notifySupported) {
+    notifyBtn.addEventListener('click', async () => {
+      if (Notification.permission === 'denied') return;
+      if (Notification.permission === 'default') {
+        const result = await Notification.requestPermission();
+        if (result === 'granted') saveNotifyPref(true);
+        renderNotifyBtn();
+        return;
+      }
+      // Already granted: this button just toggles Jack's own preference,
+      // never re-prompts, since the browser permission itself already
+      // covers that question.
+      saveNotifyPref(!loadNotifyPref());
+      renderNotifyBtn();
+    });
+  }
+  renderNotifyBtn();
+
+  // One-shot per transition (never re-fires on the next poll while the
+  // overdue count just stays where it was), and only while this tab
+  // genuinely isn't the one Jack is looking at right now, same suppression
+  // Alpha's own maybeFireCriticalNotification already uses, so enabling this
+  // can never double up with the on-page header badge/favicon dot while the
+  // tab is actually visible. previousOverdueCount starts null so the very
+  // first check after page load only ever sets a baseline, it never fires
+  // (opening the page itself is not a real transition).
+  let previousOverdueCount = null;
+  function checkNudgeAlerts(prospects) {
+    if (!notifySupported) return;
+    const overdue = computeNudgeRows(prospects).filter(r => !r.badDate && r.days <= 0);
+    const isFirstCheck = previousOverdueCount === null;
+    const grewMoreOverdue = !isFirstCheck && overdue.length > previousOverdueCount;
+    previousOverdueCount = overdue.length;
+    if (isFirstCheck || !grewMoreOverdue) return;
+    if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
+    if (document.visibilityState === 'visible' && document.hasFocus()) return;
+    try {
+      const body = overdue.length === 1
+        ? overdue[0].p.name + (overdue[0].p.company ? ' (' + overdue[0].p.company + ')' : '') + ' is due or overdue for a nudge.'
+        : overdue.length + ' prospects are now due or overdue for a nudge.';
+      const notification = new Notification('CSM pipeline', { body, icon: '/icon-192.png', tag: 'csm-nudge' });
+      notification.onclick = () => { window.focus(); notification.close(); jumpToSection('nudgeQueue'); };
+    } catch (e) {
+      // A granted permission can still throw post-revoke (e.g. a
+      // since-revoked OS-level permission); fail silently, the on-page
+      // header badge/favicon dot already carries this state.
+    }
+  }
+
+  // Due-ness only changes at a real date boundary (midnight), never mid-day,
+  // so a coarse poll is enough to catch the crossing without a real backend
+  // to push it instead. 10 minutes keeps the lag small while this tab might
+  // sit open and unfocused for hours.
+  const NUDGE_ALERT_POLL_MS = 10 * 60 * 1000;
+
   // Full-fidelity backup: unlike the CSV export above, which flattens each
   // prospect to one row and drops stageHistory entirely, this keeps
   // prospects.json and stages.json exactly as loaded (including their
@@ -3946,6 +4074,8 @@
       renderSnapshot(allStages, allProspects, loadStatus);
       renderAttentionBar(allStages, allProspects, driftStatus);
       renderNudgeQueue(allProspects);
+      checkNudgeAlerts(allProspects);
+      setInterval(() => checkNudgeAlerts(allProspects), NUDGE_ALERT_POLL_MS);
       renderStats(allStages, allProspects);
       renderChannelFilterCounts(allProspects);
       renderCategoryFilter(allProspects);
