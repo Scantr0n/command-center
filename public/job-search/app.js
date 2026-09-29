@@ -239,6 +239,35 @@
     { key: 'applied', label: 'Applied' }
   ];
 
+  // Same scroll-edge fade convention already proven on CGT/Garage/CSM/
+  // Sondrik's own scrollable tables: the wrap has no fixed min-width, so it
+  // rarely overflows, but a long unbroken company/location string still can
+  // at in-between widths above the 640px card-layout breakpoint.
+  //
+  // Bound once on the durable #applicationsTableWrap container rather than
+  // the .data-table-wrap it renders: every render (including a plain column
+  // sort) replaces applicationsTableWrap's whole innerHTML, a fresh
+  // .data-table-wrap each time, so a listener closed over that specific
+  // child would leak one stale copy per sort click, forever. Capture still
+  // sees 'scroll' bubbling up through the capturing phase from the wrap
+  // inside it, and the update always re-reads whichever wrap is current.
+  let tableScrollShadowBound = false;
+  function updateTableScrollShadow() {
+    const wrap = applicationsTableWrap.querySelector('.data-table-wrap');
+    if (!wrap) return;
+    const maxScrollLeft = wrap.scrollWidth - wrap.clientWidth;
+    wrap.classList.toggle('can-scroll-left', wrap.scrollLeft > 1);
+    wrap.classList.toggle('can-scroll-right', wrap.scrollLeft < maxScrollLeft - 1);
+  }
+  function initTableScrollShadows() {
+    if (!tableScrollShadowBound) {
+      tableScrollShadowBound = true;
+      applicationsTableWrap.addEventListener('scroll', updateTableScrollShadow, { capture: true, passive: true });
+      window.addEventListener('resize', updateTableScrollShadow);
+    }
+    updateTableScrollShadow();
+  }
+
   function renderApplications(data) {
     const apps = data.applications || [];
     if (!apps.length) {
@@ -304,6 +333,7 @@
       );
     }
     applicationsAsides.innerHTML = asides.join('');
+    initTableScrollShadows();
   }
 
   // Real risk this catches: applications.json's only existing uniqueness

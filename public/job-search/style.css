@@ -336,7 +336,31 @@ header.page-head .sub {
 section { margin-bottom: 36px; }
 
 /* Applications table */
-.data-table-wrap { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 12px; }
+.data-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--hairline); border-radius: 12px; }
+/* Same scroll-edge fade convention already proven on CGT/Garage/CSM/
+   Sondrik's own scrollable tables: nothing signals there's more of a wide
+   row past the frame on a narrow screen without it. Fades whichever edge
+   still has content, toggled by initTableScrollShadows in app.js. */
+.data-table-wrap::before, .data-table-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.data-table-wrap::before {
+  left: 0;
+  background: linear-gradient(to right, var(--panel), transparent);
+}
+.data-table-wrap::after {
+  right: 0;
+  background: linear-gradient(to left, var(--panel), transparent);
+}
+.data-table-wrap.can-scroll-left::before { opacity: 1; }
+.data-table-wrap.can-scroll-right::after { opacity: 1; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: var(--panel); }
 .data-table th, .data-table td {
   text-align: left;
@@ -870,6 +894,7 @@ footer.page-foot code { overflow-wrap: anywhere; }
     border: 1px solid #ccc;
     break-inside: avoid;
   }
+  .data-table-wrap::before, .data-table-wrap::after { display: none !important; }
   .snapshot-chip-number, .lead-name { color: #111; }
   .snapshot-chip-label, .snapshot-chip-meta, .lead-meta-row, .lead-detail, .criteria-item, .dealbreaker-item, .sub-list-item, .section-note { color: #333; }
   .lead-caveat { color: #7a5000; }
