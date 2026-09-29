@@ -6,7 +6,7 @@
   // (the nudgeTodayNote line just after the DOM lookups, in particular).
   const {
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
-    socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
+    socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
@@ -241,6 +241,35 @@
     const followers = Number(snap.followers);
     if (!Number.isFinite(followers)) return null;
     return followers.toLocaleString() + ' followers';
+  }
+
+  // growth comes from CSMCore.computeSocialSnapshotGrowth: a diff between two
+  // real, manually logged snapshots for the same platform, never anything
+  // computed against today, so this stays an honest "since your last pull"
+  // readout rather than implying a live feed.
+  function formatSnapshotGrowth(growth) {
+    if (!growth) return null;
+    const parts = [];
+    if (growth.followersDelta != null) {
+      const sign = growth.followersDelta > 0 ? '+' : growth.followersDelta < 0 ? '' : '&plusmn;';
+      let text = sign + growth.followersDelta.toLocaleString() + ' followers';
+      if (growth.followersPercent != null) {
+        const pctSign = growth.followersPercent > 0 ? '+' : '';
+        text += ' (' + pctSign + growth.followersPercent.toFixed(1) + '%)';
+      }
+      parts.push(text);
+    }
+    if (growth.engagementDelta != null) {
+      const sign = growth.engagementDelta > 0 ? '+' : growth.engagementDelta < 0 ? '' : '&plusmn;';
+      parts.push(sign + growth.engagementDelta.toFixed(1) + 'pp engagement');
+    }
+    if (!parts.length) return null;
+    const isUp = (growth.followersDelta != null && growth.followersDelta > 0) ||
+      (growth.followersDelta == null && growth.engagementDelta != null && growth.engagementDelta > 0);
+    const isDown = (growth.followersDelta != null && growth.followersDelta < 0) ||
+      (growth.followersDelta == null && growth.engagementDelta != null && growth.engagementDelta < 0);
+    const cls = isUp ? 'snapshot-growth-up' : isDown ? 'snapshot-growth-down' : 'snapshot-growth-flat';
+    return { html: parts.join(', ') + ' since ' + fmtDate(growth.previousAsOfDate), cls };
   }
 
   function channelBadge(channel) {
@@ -1862,6 +1891,7 @@
 
     lines.push('SOCIAL SNAPSHOTS (one-time manual research, never live):');
     const snaps = (p.socialSnapshots || []).slice().sort((a, b) => (b.asOfDate || '').localeCompare(a.asOfDate || ''));
+    const snapGrowthBrief = computeSocialSnapshotGrowth(p.socialSnapshots || []);
     if (snaps.length) {
       snaps.forEach(snap => {
         const staleInfo = socialSnapshotStaleInfo(snap);
@@ -1872,7 +1902,19 @@
         const asOf = snap.asOfDate
           ? 'as of ' + fmtDate(snap.asOfDate) + (staleInfo ? ', ' + staleInfo.days + 'd old, DUE FOR REFRESH' : '')
           : 'no as-of date logged';
-        lines.push('  - ' + parts.join(', ') + ' (' + asOf + ')');
+        const growth = snapGrowthBrief.get(snap);
+        const growthParts = [];
+        if (growth) {
+          if (growth.followersDelta != null) {
+            growthParts.push((growth.followersDelta >= 0 ? '+' : '') + growth.followersDelta.toLocaleString() + ' followers' +
+              (growth.followersPercent != null ? ' (' + (growth.followersPercent >= 0 ? '+' : '') + growth.followersPercent.toFixed(1) + '%)' : ''));
+          }
+          if (growth.engagementDelta != null) {
+            growthParts.push((growth.engagementDelta >= 0 ? '+' : '') + growth.engagementDelta.toFixed(1) + 'pp engagement');
+          }
+        }
+        lines.push('  - ' + parts.join(', ') + ' (' + asOf + ')' +
+          (growthParts.length ? ', ' + growthParts.join(', ') + ' since ' + fmtDate(growth.previousAsOfDate) : ''));
       });
     } else {
       lines.push('  None logged yet.');
@@ -2632,17 +2674,21 @@
     rows.push(fieldRow('Nudge schedule', nudgeText, !(ns.doNotNudgeBefore || ns.nudgePoint)));
 
     const snaps = (p.socialSnapshots || []).slice().sort((a, b) => (b.asOfDate || '').localeCompare(a.asOfDate || ''));
+    const snapGrowth = computeSocialSnapshotGrowth(p.socialSnapshots || []);
     const snapsHtml = snaps.length
       ? '<ul class="ideas-list">' + snaps.map(snap => {
           const snapStale = socialSnapshotStaleInfo(snap);
           const followersLabel = formatFollowers(snap);
+          const growth = formatSnapshotGrowth(snapGrowth.get(snap));
           return '<li>' + escapeHtml(snap.platform || 'Platform not logged') +
             (followersLabel ? ', ' + followersLabel : '') +
             (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '') +
             '<span class="snapshot-tag' + (snapStale ? ' snapshot-tag-stale' : '') + '">' +
             (snap.asOfDate ? 'AS OF ' + fmtDate(snap.asOfDate).toUpperCase() + ', ONE-TIME MANUAL SNAPSHOT, NOT LIVE' : 'NO SNAPSHOT DATE LOGGED') +
             (snapStale ? ' &middot; ' + snapStale.days + 'D OLD, DUE FOR REFRESH' : '') +
-            '</span></li>';
+            '</span>' +
+            (growth ? '<span class="snapshot-tag ' + growth.cls + '">' + growth.html + '</span>' : '') +
+            '</li>';
         }).join('') + '</ul>'
       : 'Not logged yet';
     rows.push(fieldRow('Social snapshots', snapsHtml + socialSnapshotGeneratorHtml(), snaps.length === 0));

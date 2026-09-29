@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
-  socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
+  socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
@@ -138,6 +138,56 @@ test('socialSnapshotsStaleInfo surfaces the oldest stale platform across a multi
 test('socialSnapshotsStaleInfo is null when no platform is stale', () => {
   const p = { socialSnapshots: [{ platform: 'Weibo', followers: 100, asOfDate: todayIso() }] };
   assert.equal(socialSnapshotsStaleInfo(p), null);
+});
+
+test('computeSocialSnapshotGrowth is empty with zero or one snapshot per platform', () => {
+  assert.equal(computeSocialSnapshotGrowth([]).size, 0);
+  assert.equal(computeSocialSnapshotGrowth([{ platform: 'Douyin', followers: 1000, asOfDate: '2026-01-01' }]).size, 0);
+});
+
+test('computeSocialSnapshotGrowth diffs the two most recent real pulls for the same platform', () => {
+  const older = { platform: 'Douyin', followers: 1000, engagementRate: 3.0, asOfDate: '2026-01-01' };
+  const newer = { platform: 'Douyin', followers: 1200, engagementRate: 3.5, asOfDate: '2026-04-01' };
+  const growth = computeSocialSnapshotGrowth([older, newer]);
+  assert.equal(growth.size, 1);
+  const entry = growth.get(newer);
+  assert.equal(entry.followersDelta, 200);
+  assert.equal(Math.round(entry.followersPercent * 10) / 10, 20);
+  assert.equal(Math.round(entry.engagementDelta * 10) / 10, 0.5);
+  assert.equal(entry.previousAsOfDate, '2026-01-01');
+  assert.equal(entry.daysSincePrevious, 90);
+  assert.equal(growth.get(older), undefined);
+});
+
+test('computeSocialSnapshotGrowth handles a follower drop and keeps platforms independent', () => {
+  const douyinOld = { platform: 'Douyin', followers: 1000, asOfDate: '2026-01-01' };
+  const douyinNew = { platform: 'Douyin', followers: 800, asOfDate: '2026-02-01' };
+  const weiboOnly = { platform: 'Weibo', followers: 500, asOfDate: '2026-01-01' };
+  const growth = computeSocialSnapshotGrowth([douyinOld, douyinNew, weiboOnly]);
+  assert.equal(growth.get(douyinNew).followersDelta, -200);
+  assert.equal(growth.get(weiboOnly), undefined);
+});
+
+test('computeSocialSnapshotGrowth sorts out-of-input-order entries by real asOfDate, not array order', () => {
+  const newer = { platform: 'Douyin', followers: 2000, asOfDate: '2026-06-01' };
+  const older = { platform: 'Douyin', followers: 1000, asOfDate: '2026-01-01' };
+  const growth = computeSocialSnapshotGrowth([newer, older]);
+  assert.equal(growth.get(newer).followersDelta, 1000);
+});
+
+test('computeSocialSnapshotGrowth skips a snapshot with no platform, no asOfDate, or an unparseable asOfDate', () => {
+  const base = { platform: 'Douyin', followers: 1000, asOfDate: '2026-01-01' };
+  assert.equal(computeSocialSnapshotGrowth([base, { followers: 1200, asOfDate: '2026-02-01' }]).size, 0);
+  assert.equal(computeSocialSnapshotGrowth([base, { platform: 'Douyin', followers: 1200, asOfDate: null }]).size, 0);
+  assert.equal(computeSocialSnapshotGrowth([base, { platform: 'Douyin', followers: 1200, asOfDate: '2026-2-1' }]).size, 0);
+});
+
+test('computeSocialSnapshotGrowth leaves followersPercent null rather than dividing by zero when the prior pull had 0 followers', () => {
+  const zero = { platform: 'Douyin', followers: 0, asOfDate: '2026-01-01' };
+  const grew = { platform: 'Douyin', followers: 500, asOfDate: '2026-02-01' };
+  const entry = computeSocialSnapshotGrowth([zero, grew]).get(grew);
+  assert.equal(entry.followersDelta, 500);
+  assert.equal(entry.followersPercent, null);
 });
 
 test('nudgeUrgencyLevel tiers overdue/today/soon/later correctly', () => {

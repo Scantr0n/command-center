@@ -1554,6 +1554,9 @@ textarea.np-input { resize: vertical; }
   display: block;
 }
 .snapshot-tag-stale { color: #E5484D; }
+.snapshot-growth-up { color: #3DDC84; }
+.snapshot-growth-down { color: #E5484D; }
+.snapshot-growth-flat { color: var(--dim); }
 
 footer.page-foot {
   margin-top: 40px;
@@ -1785,6 +1788,12 @@ footer.page-foot {
      substitute as the nudge queue fix above, same real bug: #E5484D print
      text on white, 3.94:1, under WCAG AA. */
   .snapshot-tag-stale { color: #8B1F1F; }
+  /* Same real bug as .snapshot-tag-stale just above, same fix: dark-theme
+     #3DDC84/#E5484D plain text is 1.78:1/3.91:1 against white, both under
+     WCAG AA, confirmed via a real print render. #146C38 (6.5:1) and #8B1F1F
+     (the same substitute already used for stale, 9.08:1) both clear it. */
+  .snapshot-growth-up { color: #146C38; }
+  .snapshot-growth-down { color: #8B1F1F; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
   /* Same leak, same reuse of the changelog's #654600 amber substitute:

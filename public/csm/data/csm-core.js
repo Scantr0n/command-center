@@ -108,6 +108,45 @@
     return worst;
   }
 
+  // Real influencer-tracking practice (and this project's own schema docs:
+  // "add another dated entry for a refresh rather than overwriting the old
+  // one") expects a re-pulled snapshot to show growth since the last real
+  // pull, not just sit next to it as an unrelated second row. Still not live
+  // data: this only ever compares two manually logged, dated snapshots for
+  // the same platform, never anything computed against today. Returns a Map
+  // keyed by the newer snapshot object (reference identity, since snapshots
+  // carry no id of their own) so a caller can look up "does this entry have
+  // a prior one to compare against" without re-sorting per platform itself.
+  function computeSocialSnapshotGrowth(snapshots) {
+    const growthByRef = new Map();
+    const byPlatform = {};
+    (snapshots || []).forEach(snap => {
+      if (!snap || !snap.platform || !isValidDateStr(snap.asOfDate)) return;
+      (byPlatform[snap.platform] = byPlatform[snap.platform] || []).push(snap);
+    });
+    Object.values(byPlatform).forEach(arr => {
+      const sorted = arr.slice().sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const cur = sorted[i];
+        const entry = { previousAsOfDate: prev.asOfDate, daysSincePrevious: daysSince(prev.asOfDate) - daysSince(cur.asOfDate) };
+        const prevF = Number(prev.followers);
+        const curF = Number(cur.followers);
+        if (prev.followers != null && cur.followers != null && Number.isFinite(prevF) && Number.isFinite(curF)) {
+          entry.followersDelta = curF - prevF;
+          entry.followersPercent = prevF !== 0 ? (entry.followersDelta / prevF) * 100 : null;
+        }
+        const prevE = Number(prev.engagementRate);
+        const curE = Number(cur.engagementRate);
+        if (prev.engagementRate != null && cur.engagementRate != null && Number.isFinite(prevE) && Number.isFinite(curE)) {
+          entry.engagementDelta = curE - prevE;
+        }
+        growthByRef.set(cur, entry);
+      }
+    });
+    return growthByRef;
+  }
+
   function nudgeUrgencyLevel(days, unqueued, badDate) {
     if (badDate || unqueued || days < 0) return 'overdue';
     if (days === 0) return 'today';
@@ -978,7 +1017,7 @@
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
-    socialSnapshotStaleInfo, socialSnapshotsStaleInfo,
+    socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
