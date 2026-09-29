@@ -119,6 +119,7 @@
   function applicationSortValue(a, key) {
     if (key === 'num') return a.num;
     if (key === 'applied') return a.appliedDate || '';
+    if (key === 'status') return JobSearchFollowupCore.daysSinceApplied(a.appliedDate) ?? -Infinity;
     return a[key];
   }
 
@@ -236,8 +237,23 @@
     { key: 'company', label: 'Company' },
     { key: 'location', label: 'Location' },
     { key: 'pay', label: 'Pay' },
-    { key: 'applied', label: 'Applied' }
+    { key: 'applied', label: 'Applied' },
+    { key: 'status', label: 'Status' }
   ];
+
+  // applications.json only ever logs appliedDate, no status field, so this
+  // is the only real signal available: real elapsed time with nothing else
+  // on record. See followup-core.js's own header for where the 14/28-day
+  // thresholds come from.
+  function statusCellHtml(a) {
+    const days = JobSearchFollowupCore.daysSinceApplied(a.appliedDate);
+    const tier = JobSearchFollowupCore.awaitingResponseTier(a.appliedDate);
+    if (!tier) return '<span class="status-cell-quiet">-</span>';
+    const dayWord = days === 1 ? 'day' : 'days';
+    return tier === 'cold'
+      ? '<span class="status-badge status-badge-cold">No response, ' + days + ' ' + dayWord + '</span>'
+      : '<span class="status-badge status-badge-watch">Awaiting response, ' + days + ' ' + dayWord + '</span>';
+  }
 
   // Same scroll-edge fade convention already proven on CGT/Garage/CSM/
   // Sondrik's own scrollable tables: the wrap has no fixed min-width, so it
@@ -292,6 +308,7 @@
         '<td data-label="Location">' + escapeHtml(a.location) + '</td>' +
         '<td class="pay-col" data-label="Pay">' + escapeHtml(a.pay) + '</td>' +
         '<td data-label="Applied">' + escapeHtml(fmtDate(a.appliedDate) || 'undated') + '</td>' +
+        '<td data-label="Status">' + statusCellHtml(a) + '</td>' +
         '</tr>'
       ).join('') +
       '</tbody></table></div>';

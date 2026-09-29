@@ -417,6 +417,21 @@ section { margin-bottom: 36px; }
 .data-table tbody tr:hover { background: rgba(255,255,255,0.02); }
 .data-table td.num-col { color: var(--dim); font-family: 'JetBrains Mono', monospace; width: 1%; white-space: nowrap; }
 .data-table td.pay-col { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+.status-cell-quiet { color: var(--dim); }
+/* Same pill shape as .lead-badge above, two severity tints matching the
+   caution/critical colors already used app-wide (see Alpha/CSM/Garage's own
+   toast-caution #E0A030 / toast-critical #E05050), not a new color pair
+   invented just for this hub. */
+.status-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.status-badge-watch { color: #E0A030; border: 1px solid rgba(224,160,48,0.35); background: rgba(224,160,48,0.1); }
+.status-badge-cold { color: #F65156; border: 1px solid rgba(229,72,77,0.35); background: rgba(229,72,77,0.1); font-weight: 600; }
 
 @media (max-width: 640px) {
   .data-table, .data-table tbody, .data-table tr, .data-table th, .data-table td { display: block; width: auto; }
@@ -953,7 +968,7 @@ footer.page-foot code { overflow-wrap: anywhere; }
   .snapshot-chip-number, .lead-name { color: #111; }
   .snapshot-chip-label, .snapshot-chip-meta, .lead-meta-row, .lead-detail, .criteria-item, .dealbreaker-item, .sub-list-item, .section-note { color: #333; }
   .lead-caveat { color: #7a5000; }
-  .lead-badge { border-color: #999; background: none; color: #111; }
+  .lead-badge, .status-badge-watch, .status-badge-cold { border-color: #999; background: none; color: #111; }
   .data-table { background: none; }
   .data-table th, .data-table td { border-color: #ccc; color: #111; }
   .empty-state { border-color: #ccc; color: #555; }

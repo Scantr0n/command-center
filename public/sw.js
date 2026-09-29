@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v68';
+const CACHE_VERSION = 'v69';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -34,7 +34,7 @@ const SHELL_URLS = [
   '/sondrik/data/badge-core.js', '/sondrik/data/milestones-core.js',
   '/job-search/', '/job-search/index.html', '/job-search/app.js', '/job-search/style.css',
   '/job-search/data/validate-core.js', '/job-search/data/export-core.js', '/job-search/data/compare-core.js',
-  '/job-search/data/html-core.js'
+  '/job-search/data/html-core.js', '/job-search/data/followup-core.js'
 ];
 
 self.addEventListener('install', event => {
