@@ -27,6 +27,7 @@
       <button type="button" id="snapshotBtn" class="print-btn font-mono" disabled title="Loading pipeline data..." aria-live="polite">Copy pipeline snapshot</button>
       <button type="button" id="csvBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">Export CSV</button>
       <button type="button" id="backupBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">Download backup (.json)</button>
+      <button type="button" id="compareBackupBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">Compare with backup&hellip;</button>
       <button type="button" id="printBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">Print / export PDF</button>
       <button type="button" id="shortcutsBtn" class="print-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
       <a href="/" class="back-link">&larr; Command Center</a>
@@ -593,6 +594,22 @@
     <button class="modal-close" id="shortcutsClose" aria-label="Close">&times;</button>
     <h3 id="shortcutsTitle" class="font-display">Keyboard shortcuts</h3>
     <div class="shortcuts-list" id="shortcutsList"></div>
+  </div>
+</div>
+
+<input type="file" id="compareBackupInput" accept="application/json,.json" hidden>
+<div class="modal-overlay" id="compareBackupOverlay" hidden>
+  <div class="modal modal-wide" id="compareBackupModal" role="dialog" aria-modal="true" aria-labelledby="compareBackupTitle">
+    <button class="modal-close" id="compareBackupClose" aria-label="Close">&times;</button>
+    <h3 id="compareBackupTitle" class="font-display">Compare with a backup</h3>
+    <p class="np-disclaimer" style="margin:-4px 0 16px">Read-only. This never writes anything back to
+      <code>prospects.json</code> or <code>stages.json</code>, it only shows what changed in the pipeline data
+      currently loaded on this page versus a backup file taken earlier, so a bad hand-edit can be caught before
+      it's trusted.</p>
+    <p class="np-disclaimer" id="compareBackupHint">Pick a file downloaded earlier from this page&rsquo;s
+      <strong>Download backup (.json)</strong> button.</p>
+    <button type="button" class="print-btn font-mono" id="compareBackupPickBtn">Choose backup file&hellip;</button>
+    <div id="compareBackupResult" aria-live="polite"></div>
   </div>
 </div>
 

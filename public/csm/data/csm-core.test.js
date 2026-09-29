@@ -27,7 +27,7 @@ const {
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
-  emDashFields, emDashHits
+  emDashFields, emDashHits, compareWithBackup
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -1351,4 +1351,84 @@ test('computeDataQualityFlags flags a prospect with a leftover legacy socialSnap
   const flagged = computeDataQualityFlags([], [legacy]);
   assert.equal(flagged.length, 1);
   assert.ok(flagged[0].reasons.some(r => r.includes('LEGACY "SOCIALSNAPSHOT"')));
+});
+
+function backupFile(prospects, stages, exportedAt) {
+  return {
+    exportedAt: exportedAt || '2026-09-20T00:00:00.000Z',
+    prospectsJson: { prospects: prospects || [] },
+    stagesJson: { stages: stages || [] }
+  };
+}
+
+test('compareWithBackup rejects a file with no prospectsJson/stagesJson, not a real backup', () => {
+  assert.throws(() => compareWithBackup({ prospects: [] }, { stages: [] }, { oops: true }), /does not look like a CSM pipeline backup/);
+});
+
+test('compareWithBackup rejects null/non-object input the same way as a malformed file', () => {
+  assert.throws(() => compareWithBackup({ prospects: [] }, { stages: [] }, null), /does not look like a CSM pipeline backup/);
+});
+
+test('compareWithBackup reports a prospect only in the current data as added', () => {
+  const current = { prospects: [{ id: 'a', name: 'Ann' }] };
+  const result = compareWithBackup(current, { stages: [] }, backupFile([]));
+  assert.equal(result.prospects.added.length, 1);
+  assert.equal(result.prospects.added[0].id, 'a');
+  assert.deepEqual(result.prospects.removed, []);
+  assert.deepEqual(result.prospects.changed, []);
+});
+
+test('compareWithBackup reports a prospect only in the backup as removed, never silently dropped', () => {
+  const backup = backupFile([{ id: 'gone', name: 'Old Prospect' }]);
+  const result = compareWithBackup({ prospects: [] }, { stages: [] }, backup);
+  assert.equal(result.prospects.removed.length, 1);
+  assert.equal(result.prospects.removed[0].id, 'gone');
+  assert.deepEqual(result.prospects.added, []);
+});
+
+test('compareWithBackup flags exactly the top-level fields that actually changed', () => {
+  const current = { prospects: [{ id: 'a', name: 'Ann', stage: 'in-exploration', nextAction: 'Follow up', company: 'Acme' }] };
+  const backup = backupFile([{ id: 'a', name: 'Ann', stage: 'outreach-sent', nextAction: 'Follow up', company: 'Acme' }]);
+  const result = compareWithBackup(current, { stages: [] }, backup);
+  assert.equal(result.prospects.changed.length, 1);
+  assert.deepEqual(result.prospects.changed[0].fields, ['stage']);
+});
+
+test('compareWithBackup treats a missing key and an explicit null as equal, not a false change', () => {
+  const current = { prospects: [{ id: 'a', name: 'Ann', verifiedHook: null }] };
+  const backup = backupFile([{ id: 'a', name: 'Ann' }]);
+  const result = compareWithBackup(current, { stages: [] }, backup);
+  assert.deepEqual(result.prospects.changed, []);
+});
+
+test('compareWithBackup detects a nested contactChannel field change', () => {
+  const current = { prospects: [{ id: 'a', name: 'Ann', contactChannel: { type: 'named-decision-maker', detail: 'CEO' } }] };
+  const backup = backupFile([{ id: 'a', name: 'Ann', contactChannel: { type: 'generic-inbox', detail: null } }]);
+  const result = compareWithBackup(current, { stages: [] }, backup);
+  assert.deepEqual(result.prospects.changed[0].fields, ['contactChannel']);
+});
+
+test('compareWithBackup detects a new entry appended to an array field like stageHistory', () => {
+  const current = { prospects: [{ id: 'a', name: 'Ann', stageHistory: [{ date: '2026-01-01', stage: 'researched' }, { date: '2026-02-01', stage: 'outreach-sent' }] }] };
+  const backup = backupFile([{ id: 'a', name: 'Ann', stageHistory: [{ date: '2026-01-01', stage: 'researched' }] }]);
+  const result = compareWithBackup(current, { stages: [] }, backup);
+  assert.deepEqual(result.prospects.changed[0].fields, ['stageHistory']);
+});
+
+test('compareWithBackup finds no differences when current data exactly matches the backup', () => {
+  const prospects = [{ id: 'a', name: 'Ann', stage: 'client' }];
+  const result = compareWithBackup({ prospects }, { stages: [] }, backupFile(prospects));
+  assert.deepEqual(result.prospects, { added: [], removed: [], changed: [] });
+});
+
+test('compareWithBackup also diffs stages.json, e.g. a hand-edited stage color', () => {
+  const current = { stages: [{ id: 'client', label: 'Client', color: '#B084E0' }] };
+  const backup = backupFile([], [{ id: 'client', label: 'Client', color: '#FFFFFF' }]);
+  const result = compareWithBackup({ prospects: [] }, current, backup);
+  assert.deepEqual(result.stages.changed[0].fields, ['color']);
+});
+
+test('compareWithBackup passes through the backup file\'s own exportedAt timestamp', () => {
+  const result = compareWithBackup({ prospects: [] }, { stages: [] }, backupFile([], [], '2026-08-01T12:00:00.000Z'));
+  assert.equal(result.exportedAt, '2026-08-01T12:00:00.000Z');
 });

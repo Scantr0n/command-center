@@ -908,6 +908,73 @@
     };
   }
 
+  // Field-by-field diff between the pipeline data currently loaded in the
+  // browser and a previously downloaded "Download backup (.json)" file (see
+  // app.js's backupBtn handler for the exact shape that button writes:
+  // { exportedAt, prospectsJson: { prospects: [...] }, stagesJson: { stages: [...] } }).
+  // The schema-help text already promises a bad hand-edit "can be diffed
+  // against... a known-good copy", but nothing on the page actually did that
+  // diffing until this, it was left to eyeballing two JSON files by hand.
+  // Pure and read-only: this only ever reads the two objects it is given, it
+  // never writes anything back to prospects.json/stages.json itself.
+  const PROSPECT_DIFF_FIELDS = [
+    'name', 'company', 'category', 'stage', 'stageEnteredDate', 'verifiedHook',
+    'contactChannel', 'sendDate', 'nextNudgeDate', 'nextAction', 'nudgeSchedule',
+    'replyStatus', 'socialSnapshots', 'contentIdeas', 'stageHistory', 'outreachLog', 'notes'
+  ];
+
+  const STAGE_DIFF_FIELDS = ['label', 'shortLabel', 'description', 'color', 'staleAfterDays', 'entryCriteria'];
+
+  // undefined and null both mean "not logged" across this schema (see the
+  // null-vs-empty-string convention in prospects.json's own note), so they
+  // compare equal here rather than flagging a field as changed just because
+  // one side's key was omitted and the other's was explicitly null.
+  function fieldValuesDiffer(a, b) {
+    const na = a === undefined ? null : a;
+    const nb = b === undefined ? null : b;
+    return JSON.stringify(na) !== JSON.stringify(nb);
+  }
+
+  function diffById(currentList, backupList, fields) {
+    const currentById = new Map((currentList || []).filter(x => x && x.id).map(x => [x.id, x]));
+    const backupById = new Map((backupList || []).filter(x => x && x.id).map(x => [x.id, x]));
+    const added = [];
+    const removed = [];
+    const changed = [];
+    currentById.forEach((item, id) => {
+      if (!backupById.has(id)) { added.push(item); return; }
+      const prior = backupById.get(id);
+      const changedFields = fields.filter(f => fieldValuesDiffer(item[f], prior[f]));
+      if (changedFields.length) changed.push({ id, current: item, backup: prior, fields: changedFields });
+    });
+    backupById.forEach((item, id) => {
+      if (!currentById.has(id)) removed.push(item);
+    });
+    return { added, removed, changed };
+  }
+
+  // currentProspectsData/currentStagesData are the raw fetched objects app.js
+  // already keeps around as rawProspectsData/rawStagesData (i.e.
+  // { prospects: [...] } / { stages: [...] }); backupFile is a backup file's
+  // parsed JSON. Throws a plain Error, meant to be shown to the user as-is,
+  // if the file handed in was never produced by this page's own backup
+  // button (a random JSON file has no real "before" state to diff against).
+  function compareWithBackup(currentProspectsData, currentStagesData, backupFile) {
+    if (!backupFile || typeof backupFile !== 'object' || !backupFile.prospectsJson || !backupFile.stagesJson) {
+      throw new Error('That file does not look like a CSM pipeline backup (expected prospectsJson/stagesJson keys). ' +
+        'Use a file downloaded from this page’s "Download backup (.json)" button.');
+    }
+    const currentProspects = (currentProspectsData && currentProspectsData.prospects) || [];
+    const backupProspects = (backupFile.prospectsJson && backupFile.prospectsJson.prospects) || [];
+    const currentStages = (currentStagesData && currentStagesData.stages) || [];
+    const backupStages = (backupFile.stagesJson && backupFile.stagesJson.stages) || [];
+    return {
+      exportedAt: backupFile.exportedAt || null,
+      prospects: diffById(currentProspects, backupProspects, PROSPECT_DIFF_FIELDS),
+      stages: diffById(currentStages, backupStages, STAGE_DIFF_FIELDS)
+    };
+  }
+
   return {
     DATE_RE, SOCIAL_SNAPSHOT_STALE_DAYS, COLD_TOUCH_THRESHOLD, CHANNEL_EFF_MIN_N_FOR_RATE,
     isValidDateStr, daysUntil, daysSince, hasOutOfOrderDates, stallInfo,
@@ -921,6 +988,6 @@
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
-    emDashFields, emDashHits
+    emDashFields, emDashHits, compareWithBackup
   };
 });

@@ -16,7 +16,7 @@
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
-    missingNextAction, emDashHits
+    missingNextAction, emDashHits, compareWithBackup
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -40,6 +40,7 @@
   const printBtn = document.getElementById('printBtn');
   const csvBtn = document.getElementById('csvBtn');
   const backupBtn = document.getElementById('backupBtn');
+  const compareBackupBtn = document.getElementById('compareBackupBtn');
   const icsBtn = document.getElementById('icsBtn');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   const snapshotBtn = document.getElementById('snapshotBtn');
@@ -2016,6 +2017,169 @@
     downloadFile(JSON.stringify(backup, null, 2), 'csm-backup-' + todayIso() + '.json', 'application/json;charset=utf-8;');
   });
 
+  // Read-only diff against a file from the backup button just above: the
+  // schema-help text already promises a risky hand-edit "can be diffed
+  // against... a known-good copy", but until this, that meant eyeballing two
+  // JSON files side by side. compareWithBackup (csm-core.js) does the actual
+  // field-by-field comparison; everything here just reads the file the user
+  // picks and renders its result. Nothing is uploaded anywhere and nothing
+  // is written back to prospects.json/stages.json.
+  let compareBackupOpen = false;
+  let compareBackupLastFocusedEl = null;
+  const compareBackupOverlayEl = document.getElementById('compareBackupOverlay');
+  const compareBackupResultEl = document.getElementById('compareBackupResult');
+  const compareBackupInputEl = document.getElementById('compareBackupInput');
+
+  function getCompareBackupFocusable() {
+    return Array.from(document.getElementById('compareBackupModal').querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function openCompareBackup() {
+    if (compareBackupOpen) return;
+    compareBackupOpen = true;
+    compareBackupLastFocusedEl = document.activeElement;
+    compareBackupOverlayEl.hidden = false;
+    lockBodyScroll();
+    document.getElementById('compareBackupPickBtn').focus();
+  }
+
+  function closeCompareBackup() {
+    if (!compareBackupOpen) return;
+    compareBackupOpen = false;
+    compareBackupOverlayEl.hidden = true;
+    unlockBodyScroll();
+    if (compareBackupLastFocusedEl && typeof compareBackupLastFocusedEl.focus === 'function') compareBackupLastFocusedEl.focus();
+    compareBackupLastFocusedEl = null;
+    compareBackupResultEl.innerHTML = '';
+    compareBackupInputEl.value = '';
+  }
+
+  function compareBackupFieldTag(fields) {
+    return '<span class="dq-why">' + fields.map(f => escapeHtml(f.toUpperCase())).join(', ') + ' CHANGED</span>';
+  }
+
+  // Added/changed rows open the live prospect (wireRowsToModal below), a
+  // removed one has no live record left to open, so it renders as a plain,
+  // non-interactive row instead of a dead button.
+  function compareBackupRow(record, label, extraHtml, clickable) {
+    const tag = clickable ? 'button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(record.id) + '"'
+      : 'div class="data-quality-row" style="cursor:default"';
+    const closeTag = clickable ? 'button' : 'div';
+    return '<' + tag + '>' +
+      '<strong>' + escapeHtml(label || record.id) + '</strong>' +
+      (record.company ? '<span style="color:var(--sub)">' + escapeHtml(record.company) + '</span>' : '') +
+      extraHtml +
+      '</' + closeTag + '>';
+  }
+
+  function renderCompareBackupResult(result) {
+    const exportedLabel = result.exportedAt
+      ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : 'unknown export date (an older backup, or a hand-edited file)';
+    const totalDiffs = result.prospects.added.length + result.prospects.removed.length + result.prospects.changed.length +
+      result.stages.added.length + result.stages.removed.length + result.stages.changed.length;
+    let html = '<p class="np-disclaimer">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
+    if (totalDiffs === 0) {
+      html += '<p class="activity-empty" role="status">No differences. The pipeline data currently loaded matches ' +
+        'this backup exactly.</p>';
+      compareBackupResultEl.innerHTML = html;
+      return;
+    }
+    if (result.prospects.added.length) {
+      html += '<p class="np-disclaimer" style="margin-top:16px">' + result.prospects.added.length +
+        ' prospect(s) added since this backup:</p><div class="dq-sublist">' +
+        result.prospects.added.map(p => compareBackupRow(p, p.name, '<span class="dq-why">NEW SINCE BACKUP</span>', true)).join('') +
+        '</div>';
+    }
+    if (result.prospects.removed.length) {
+      html += '<p class="np-disclaimer" style="margin-top:16px;color:#E5484D">' + result.prospects.removed.length +
+        ' in the backup but not in the current data (removed, or a real id/company change, check before assuming ' +
+        'data loss):</p><div class="dq-sublist">' +
+        result.prospects.removed.map(p => compareBackupRow(p, p.name, '<span class="dq-why" style="color:#E5484D">NOT IN CURRENT DATA</span>', false)).join('') +
+        '</div>';
+    }
+    if (result.prospects.changed.length) {
+      html += '<p class="np-disclaimer" style="margin-top:16px">' + result.prospects.changed.length +
+        ' changed since this backup:</p><div class="dq-sublist">' +
+        result.prospects.changed.map(c => compareBackupRow(c.current, c.current.name, compareBackupFieldTag(c.fields), true)).join('') +
+        '</div>';
+    }
+    if (result.stages.added.length || result.stages.removed.length || result.stages.changed.length) {
+      html += '<p class="np-disclaimer" style="margin-top:16px">Stage definitions (data/stages.json) also differ:</p><div class="dq-sublist">' +
+        result.stages.changed.map(c => '<div class="data-quality-row" style="cursor:default"><strong>' +
+          escapeHtml(c.current.label || c.id) + '</strong>' + compareBackupFieldTag(c.fields) + '</div>').join('') +
+        result.stages.added.map(s => '<div class="data-quality-row" style="cursor:default"><strong>' +
+          escapeHtml(s.label || s.id) + '</strong><span class="dq-why">NEW SINCE BACKUP</span></div>').join('') +
+        result.stages.removed.map(s => '<div class="data-quality-row" style="cursor:default"><strong>' +
+          escapeHtml(s.label || s.id) + '</strong><span class="dq-why" style="color:#E5484D">NOT IN CURRENT DATA</span></div>').join('') +
+        '</div>';
+    }
+    compareBackupResultEl.innerHTML = html;
+    // Not wireRowsToModal: that opens the prospect detail modal on top of
+    // this one still open underneath it (two stacked overlays, two competing
+    // focus traps). Close this modal first so the detail view replaces it,
+    // same single-modal-at-a-time rule every other trigger on this page
+    // already follows.
+    compareBackupResultEl.querySelectorAll('[data-prospect-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.getAttribute('data-prospect-id');
+        closeCompareBackup();
+        openModal(id);
+      });
+    });
+  }
+
+  document.getElementById('compareBackupPickBtn').addEventListener('click', () => compareBackupInputEl.click());
+
+  compareBackupInputEl.addEventListener('change', () => {
+    const file = compareBackupInputEl.files && compareBackupInputEl.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(String(reader.result));
+      } catch (err) {
+        compareBackupResultEl.innerHTML = '<p class="activity-empty" role="alert">Could not read that file as JSON: ' +
+          escapeHtml(err.message) + '</p>';
+        return;
+      }
+      try {
+        renderCompareBackupResult(compareWithBackup(rawProspectsData, rawStagesData, parsed));
+      } catch (err) {
+        compareBackupResultEl.innerHTML = '<p class="activity-empty" role="alert">' + escapeHtml(err.message) + '</p>';
+      }
+    };
+    reader.onerror = () => {
+      compareBackupResultEl.innerHTML = '<p class="activity-empty" role="alert">Could not read that file.</p>';
+    };
+    reader.readAsText(file);
+  });
+
+  compareBackupBtn.addEventListener('click', openCompareBackup);
+  document.getElementById('compareBackupClose').addEventListener('click', closeCompareBackup);
+  compareBackupOverlayEl.addEventListener('click', e => { if (e.target === compareBackupOverlayEl) closeCompareBackup(); });
+
+  document.addEventListener('keydown', e => {
+    if (compareBackupOverlayEl.hidden) return;
+    if (e.key === 'Escape') { closeCompareBackup(); return; }
+    if (e.key === 'Tab') {
+      const focusable = getCompareBackupFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
   // icsEscapeText and icsFoldLine now live in csm-core.js, same
   // shared-core-with-tests pattern as the other pure math above (locks in
   // icsFoldLine's UTF-8-byte-not-UTF-16-unit fold-point math).
@@ -2773,7 +2937,7 @@
 
   // Same "/" jumps to search shortcut as the main Command Center dashboard.
   document.addEventListener('keydown', e => {
-    if (!modalOverlay.hidden || shortcutsOpen || e.key !== '/' || document.activeElement.id === 'searchInput') return;
+    if (!modalOverlay.hidden || shortcutsOpen || compareBackupOpen || e.key !== '/' || document.activeElement.id === 'searchInput') return;
     e.preventDefault();
     searchInput.focus();
   });
@@ -2857,7 +3021,7 @@
   // form, or a prospect's edit form all take free text).
   document.addEventListener('keydown', e => {
     if (e.key !== '?') return;
-    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen || jumpNavOpen) return;
+    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -2872,7 +3036,7 @@
   // can never open a form with nowhere real to save to.
   document.addEventListener('keydown', e => {
     if (e.key !== 'n' && e.key !== 'N') return;
-    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen || jumpNavOpen) return;
+    if (!modalOverlay.hidden || !npOverlay.hidden || shortcutsOpen || jumpNavOpen || compareBackupOpen) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable)) return;
@@ -3744,6 +3908,8 @@
     rawProspectsData = prospectsData;
     backupBtn.disabled = !stagesData && !prospectsData;
     backupBtn.title = backupBtn.disabled ? "Can't back up, pipeline data failed to load (see below)" : '';
+    compareBackupBtn.disabled = !stagesData && !prospectsData;
+    compareBackupBtn.title = compareBackupBtn.disabled ? "Can't compare, pipeline data failed to load (see below)" : '';
     snapshotBtn.disabled = !stagesData && !prospectsData;
     snapshotBtn.title = snapshotBtn.disabled ? "Can't build a snapshot, pipeline data failed to load (see below)" : '';
     // Both read from data that is empty until this load settles (lastFiltered
