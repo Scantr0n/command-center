@@ -958,6 +958,14 @@ async function loadData() {
   renderSellerStandardsProgress(sales, disputes);
   initTableScrollShadows();
   renderAttentionBar();
+  checkDisputeAlerts(disputesLog);
+  startDisputeAlertPoll();
+}
+let disputeAlertPollStarted = false;
+function startDisputeAlertPoll() {
+  if (disputeAlertPollStarted) return;
+  disputeAlertPollStarted = true;
+  setInterval(() => checkDisputeAlerts(disputesLog), DISPUTE_ALERT_POLL_MS);
 }
 
 // Purely a "you are here" pointer into the static seasonal reference table,
@@ -3715,6 +3723,140 @@ document.querySelectorAll('th.sortable').forEach(th => {
 });
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+// Native OS-level alert, opt-in, for the one real gap the attention bar
+// above can't cover: this is a static-data hub with no live backend polling
+// it, so a real dispute response deadline (see buildDisputeReminders above)
+// can cross from "not due yet" into due-or-overdue at midnight while this
+// tab sits open and unfocused in another window for hours, with nothing
+// pulling Jack's eye back to it, and a missed dispute deadline can mean the
+// case auto-resolves in the buyer's favor. Same real pattern Sondrik/CSM/
+// Alpha/Job Search's own notify toggles already ship (see their app.js):
+// the browser's own Notification API, built only from data already
+// computed on this page, opt-in, one-shot per transition, never sent
+// anywhere and never a path back to any real buyer or platform.
+const notifyBtn = document.getElementById('notifyBtn');
+const testAlertBtn = document.getElementById('testAlertBtn');
+const NOTIFY_PREF_KEY = 'garage:notifyEnabled';
+const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+
+function loadNotifyPref() {
+  try { return localStorage.getItem(NOTIFY_PREF_KEY) === 'true'; } catch (e) { return false; }
+}
+function saveNotifyPref(enabled) {
+  try { localStorage.setItem(NOTIFY_PREF_KEY, enabled ? 'true' : 'false'); } catch (e) { /* private browsing: works this load only */ }
+}
+
+function renderNotifyBtn() {
+  if (!notifyBtn) return;
+  if (!notifySupported) { notifyBtn.hidden = true; return; }
+  const permission = Notification.permission;
+  if (permission === 'denied') {
+    notifyBtn.hidden = false;
+    notifyBtn.disabled = true;
+    notifyBtn.classList.remove('notify-on');
+    notifyBtn.textContent = 'Dispute alerts blocked';
+    notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+    notifyBtn.removeAttribute('aria-pressed');
+    if (testAlertBtn) testAlertBtn.hidden = true;
+    return;
+  }
+  const enabled = permission === 'granted' && loadNotifyPref();
+  notifyBtn.hidden = false;
+  notifyBtn.disabled = false;
+  notifyBtn.classList.toggle('notify-on', enabled);
+  // Real toggle-button semantics (this button's own state persists across
+  // clicks, it isn't a one-shot action like Export CSV).
+  notifyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  notifyBtn.textContent = enabled ? 'Dispute alerts on' : 'Enable dispute alerts';
+  notifyBtn.title = enabled
+    ? 'A native notification fires when a dispute response turns due or overdue while this tab is unfocused. Click to turn off.'
+    : 'Get a native notification when a dispute response turns due or overdue while this tab is unfocused.';
+  // A granted browser permission doesn't guarantee the OS actually surfaces
+  // it (Do Not Disturb, a muted notification center entry for this
+  // browser), so once armed, offer a way to check that end-to-end instead
+  // of finding out only during a real due dispute.
+  if (testAlertBtn) testAlertBtn.hidden = !enabled;
+}
+
+if (testAlertBtn) {
+  testAlertBtn.addEventListener('click', () => {
+    if (!notifySupported || Notification.permission !== 'granted') return;
+    const original = testAlertBtn.textContent;
+    try {
+      new Notification('The Garage (test)', {
+        body: 'Test alert, no real dispute state change. A real due-dispute alert looks just like this.',
+        icon: '/icon-192.png',
+        tag: 'garage-dispute-test'
+      });
+      testAlertBtn.textContent = 'Test alert sent';
+    } catch (e) {
+      testAlertBtn.textContent = "Couldn't send";
+    }
+    setTimeout(() => { testAlertBtn.textContent = original; }, 1800);
+  });
+}
+
+if (notifyBtn && notifySupported) {
+  notifyBtn.addEventListener('click', async () => {
+    if (Notification.permission === 'denied') return;
+    if (Notification.permission === 'default') {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') saveNotifyPref(true);
+      renderNotifyBtn();
+      return;
+    }
+    // Already granted: this button just toggles Jack's own preference,
+    // never re-prompts, since the browser permission itself already
+    // covers that question.
+    saveNotifyPref(!loadNotifyPref());
+    renderNotifyBtn();
+  });
+}
+renderNotifyBtn();
+
+// One-shot per transition (never re-fires on the next poll while the due
+// count just stays where it was), and only while this tab genuinely isn't
+// the one Jack is looking at right now, same suppression Sondrik/CSM/
+// Alpha/Job Search's own notify checks already use, so enabling this can
+// never double up with the on-page attention bar while the tab is actually
+// visible. previousDueCount starts null so the very first check after page
+// load only ever sets a baseline, it never fires (opening the page itself
+// is not a real transition).
+let previousDisputeDueCount = null;
+function checkDisputeAlerts(disputesList) {
+  if (!notifySupported) return;
+  const today = todayDateStr();
+  const due = buildDisputeReminders(disputesList).filter(r => r.date <= today);
+  const isFirstCheck = previousDisputeDueCount === null;
+  const grewMoreDue = !isFirstCheck && due.length > previousDisputeDueCount;
+  previousDisputeDueCount = due.length;
+  if (isFirstCheck || !grewMoreDue) return;
+  if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
+  if (document.visibilityState === 'visible' && document.hasFocus()) return;
+  try {
+    const body = due.length === 1
+      ? due[0].summary + ' is now due or overdue.'
+      : due.length + ' dispute responses are now due or overdue.';
+    const notification = new Notification('The Garage', { body, icon: '/icon-192.png', tag: 'garage-dispute' });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+      const target = document.getElementById('disputeGuideSection');
+      if (target) target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    };
+  } catch (e) {
+    // A granted permission can still throw post-revoke (e.g. a
+    // since-revoked OS-level permission); fail silently, the on-page
+    // attention bar already carries this state.
+  }
+}
+
+// Due-ness only changes at a real date boundary (midnight), never mid-day,
+// so a coarse poll is enough to catch the crossing without a real backend
+// to push it instead. Same 10-minute cadence Sondrik/CSM's own alert polls
+// already use.
+const DISPUTE_ALERT_POLL_MS = 10 * 60 * 1000;
 
 // Platform-reference tables (best time to post, seasonal calendar,
 // search/discovery, listing upkeep, markdown guidance, packaging,
