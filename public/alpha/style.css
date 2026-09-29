@@ -1084,7 +1084,14 @@ header.page-head .sub {
 .pos-totals-row:hover { background: transparent; }
 .pos-symbol { font-weight: 600; }
 .pos-num { text-align: right; }
-.pos-plpct { display: block; font-size: 0.7rem; opacity: 0.75; }
+/* opacity was 0.75: real WCAG AA contrast fail once actually computed
+   against this table's real backdrop (there is no --panel behind it, the
+   table sits straight on body's --void). #E05050 (pl-bad) composited at
+   0.75 over --void lands at 3.30:1 and var(--dim) (pl-neutral) at 3.29:1,
+   both under the 4.5:1 normal text needs at this 0.7rem size. 0.95 clears
+   both (4.73:1, 4.66:1) while keeping this span visibly subordinate to the
+   primary $-amount next to it, same intent the lower opacity was going for. */
+.pos-plpct { display: block; font-size: 0.7rem; opacity: 0.95; }
 /* Real bug found while adding the concentration column below and confirmed
    against a mocked live feed (this table has never rendered against a real
    position, per account-core.js's own header comment, so nothing had ever
