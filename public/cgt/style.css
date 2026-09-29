@@ -918,11 +918,17 @@ table.card-table {
    badge here which just uses this page's own status-color palette. */
 .badge-black-label { background: #000; color: #D4AF37; border-color: #D4AF37; text-transform: uppercase; }
 .badge-sport { background: rgba(255,255,255,0.03); color: var(--sub); }
-.badge-stale { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
-/* Same red "real, avoidable problem" tone as badge-stale: flags a candidate
-   still heading toward a PSA Value-tier submission that PSA is not actually
+/* color is #E25C49, not the #E0503C used elsewhere for this same red: at
+   this badge's own rgba(224,80,60,0.1) fill over the real --panel backdrop
+   every use of it sits on (table rows, candidate cards, both modals), plain
+   #E0503C lands at 4.40:1, under the 4.5:1 AA floor for this 0.65rem text.
+   #E25C49 clears it at 4.74:1, same margin the Hub's OFF-badge fix used. */
+.badge-stale { background: rgba(224,80,60,0.1); color: #E25C49; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
+/* Same red "real, avoidable problem" tone as badge-stale (and the same
+   accessible #E25C49 override, same reason): flags a candidate still
+   heading toward a PSA Value-tier submission that PSA is not actually
    accepting right now (see isPsaPausedValueTier in app.js). */
-.badge-paused { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
+.badge-paused { background: rgba(224,80,60,0.1); color: #E25C49; border-color: rgba(224,80,60,0.35); text-transform: uppercase; }
 
 /* Grading submission status badges: neutral while sitting in the queue,
    amber while actively being graded (same "in progress" color as
@@ -946,7 +952,8 @@ table.card-table {
    input so no verdict can be computed at all. */
 .badge-worth { background: rgba(61,220,132,0.1); color: #3DDC84; border-color: rgba(61,220,132,0.3); }
 .badge-marginal { background: rgba(224,160,48,0.1); color: #E0A030; border-color: rgba(224,160,48,0.3); }
-.badge-notworth { background: rgba(224,80,60,0.1); color: #E0503C; border-color: rgba(224,80,60,0.35); }
+/* Same #E25C49 accessible-red override and reason as badge-stale/badge-paused above. */
+.badge-notworth { background: rgba(224,80,60,0.1); color: #E25C49; border-color: rgba(224,80,60,0.35); }
 .badge-needsdata { background: rgba(255,255,255,0.03); color: var(--sub); }
 .badge-decided { background: rgba(255,255,255,0.03); color: var(--sub); text-transform: capitalize; }
 
