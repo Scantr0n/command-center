@@ -211,6 +211,9 @@ header.page-head .sub {
 .snapshot-chip-saved { --chip-accent: #D9A441; }
 .snapshot-chip-digest { --chip-accent: #8B7FD9; }
 .snapshot-chip-verified { --chip-accent: #3DDC84; }
+/* Same red CSM's own .snapshot-chip-attention already uses for its "needs a
+   look" glance tile, not a new accent invented just for this hub. */
+.snapshot-chip-awaiting { --chip-accent: #E5484D; }
 .snapshot-chip-icon {
   width: 30px;
   height: 30px;

@@ -162,9 +162,10 @@
     applications: '<path d="M-6,-8 L4,-8 Q6,-8 6,-6 L6,7 Q6,9 4,9 L-6,9 Q-8,9 -8,7 L-8,-6 Q-8,-8 -6,-8 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M-4.5,0 L-1,3.5 L5,-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
     saved: '<path d="M-5,-8 L5,-8 Q6,-8 6,-7 L6,8 L0,4 L-6,8 L-6,-7 Q-6,-8 -5,-8 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
     digest: '<rect x="-7.5" y="-6.5" width="15" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="-7.5" y1="-2.5" x2="7.5" y2="-2.5" stroke="currentColor" stroke-width="1.4"/><line x1="-4" y1="-8.5" x2="-4" y2="-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="4" y1="-8.5" x2="4" y2="-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
-    verified: '<circle cx="0" cy="0" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M-4,0 L-1,3.5 L4.5,-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    verified: '<circle cx="0" cy="0" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M-4,0 L-1,3.5 L4.5,-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    awaiting: '<circle cx="0" cy="0" r="8" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="0" y1="0" x2="0" y2="-4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="0" y1="0" x2="3.5" y2="1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>'
   };
-  const SNAPSHOT_TARGET = { applications: 'applicationsSection', saved: 'applicationsSection', digest: 'digestSection', verified: 'digestSection' };
+  const SNAPSHOT_TARGET = { applications: 'applicationsSection', saved: 'applicationsSection', digest: 'digestSection', verified: 'digestSection', awaiting: 'applicationsSection' };
 
   // Real "clicked through" confirmation, identical pattern to Sondrik's
   // jumpToSection: a brief highlight on the section a card actually jumps
@@ -203,6 +204,24 @@
         ? 'Last stated ' + fmtDate(saved.asOfDate) + ', not reconfirmed since'
         : 'No dated confirmation on record'
     });
+
+    // Real signal from the Status column below (see followup-core.js): the
+    // tracker only ever logs appliedDate, no response/status field, so this
+    // is the only thing telling Jack an application needs a look without
+    // scrolling into the table first.
+    if (apps.length) {
+      const tiers = apps.map(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate));
+      const awaitingCount = tiers.filter(Boolean).length;
+      const coldCount = tiers.filter(t => t === 'cold').length;
+      chips.push({
+        kind: 'awaiting',
+        number: awaitingCount,
+        label: 'Awaiting response',
+        meta: awaitingCount
+          ? (coldCount ? coldCount + ' past 4 weeks, worth a follow-up' : 'Within the first follow-up window')
+          : 'None yet past the 2-week mark'
+      });
+    }
 
     if (digestData && digestData.runDate) {
       chips.push({ kind: 'digest', number: fmtDate(digestData.runDate), label: 'Most recent digest run', meta: 'Automated daily digest' });
