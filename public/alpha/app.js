@@ -1412,6 +1412,34 @@ function handlePositionsSortActivate(key) {
   if (lastRawData) renderPositions(lastRawData);
 }
 
+// Same scroll-edge fade convention already proven on CGT/Garage/CSM/
+// Sondrik's own scrollable tables (see their .table-wrap::before/::after +
+// scroll-shadow toggle), but bound once on the durable #positionsPanel
+// container rather than on the .pos-table-wrap it renders. Positions
+// re-renders on a 30s poll (REFRESH_INTERVAL_MS below), replacing the
+// panel's whole innerHTML, so a fresh .pos-table-wrap exists every cycle;
+// binding straight to it there would leak a stale scroll/resize listener
+// (closed over the just-detached wrap) every 30 seconds, forever. Capture
+// on the panel still sees 'scroll' from the wrap inside it (scroll doesn't
+// bubble, but it does propagate through the capturing phase), and always
+// re-reads whichever wrap is currently in the DOM.
+let positionsScrollShadowBound = false;
+function updatePositionsScrollShadow() {
+  const wrap = document.querySelector('#positionsPanel .pos-table-wrap');
+  if (!wrap) return;
+  const maxScrollLeft = wrap.scrollWidth - wrap.clientWidth;
+  wrap.classList.toggle('can-scroll-left', wrap.scrollLeft > 1);
+  wrap.classList.toggle('can-scroll-right', wrap.scrollLeft < maxScrollLeft - 1);
+}
+function initPositionsScrollShadow() {
+  if (!positionsScrollShadowBound) {
+    positionsScrollShadowBound = true;
+    document.getElementById('positionsPanel').addEventListener('scroll', updatePositionsScrollShadow, { capture: true, passive: true });
+    window.addEventListener('resize', updatePositionsScrollShadow);
+  }
+  updatePositionsScrollShadow();
+}
+
 function wirePositionsSortHeaders(panel) {
   panel.querySelectorAll('th.sortable').forEach(th => {
     const key = th.getAttribute('data-sort');
@@ -1571,6 +1599,7 @@ function renderPositions(data) {
     </div>
   `;
   wirePositionsSortHeaders(panel);
+  initPositionsScrollShadow();
 }
 
 // system.* has no daemon behind it to report its own freshness the way
