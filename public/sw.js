@@ -31,7 +31,7 @@ const SHELL_URLS = [
   '/sondrik/', '/sondrik/index.html', '/sondrik/app.js', '/sondrik/style.css', '/sondrik/data/validate-core.js',
   '/sondrik/data/goals-core.js', '/sondrik/data/release-core.js', '/sondrik/data/export-core.js',
   '/sondrik/data/next-steps-core.js', '/sondrik/data/compare-core.js', '/sondrik/data/html-core.js',
-  '/sondrik/data/badge-core.js',
+  '/sondrik/data/badge-core.js', '/sondrik/data/milestones-core.js',
   '/job-search/', '/job-search/index.html', '/job-search/app.js', '/job-search/style.css',
   '/job-search/data/validate-core.js', '/job-search/data/export-core.js', '/job-search/data/compare-core.js',
   '/job-search/data/html-core.js'

@@ -504,7 +504,10 @@
     checklist logic, it guards which real gaps and overdue check-ins surface as an action item there and on the
     header's attention pill. Run
     <code>node --test public/sondrik/data/badge-core.test.js</code> after changing the README badge builder, it
-    guards the text-width layout math and the escaping on the label/value baked into the exported SVG.
+    guards the text-width layout math and the escaping on the label/value baked into the exported SVG. Run
+    <code>node --test public/sondrik/data/milestones-core.test.js</code> after changing the download-milestone
+    or trend-confidence math, it guards which round numbers the Timeline/Traction cards flag as crossed and
+    when the "too early to call this a trend" caveat shows.
   </footer>
 </div>
 
@@ -548,6 +551,7 @@
 <script src="/sondrik/data/compare-core.js"></script>
 <script src="/sondrik/data/html-core.js"></script>
 <script src="/sondrik/data/badge-core.js"></script>
+<script src="/sondrik/data/milestones-core.js"></script>
 <script src="/sondrik/app.js"></script>
 <script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>
