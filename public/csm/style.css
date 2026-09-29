@@ -535,6 +535,27 @@ header.page-head .sub {
   height: 9px;
   border-radius: 50%;
   flex: 0 0 auto;
+  box-sizing: border-box;
+}
+/* Windows/browser forced-colors mode strips background-color (set inline
+   per stage, see renderFunnel/renderStageVelocity/renderBoard in app.js) to
+   plain Canvas, the only thing every one of these dots varies by: verified
+   live, every stage-dot/velocity-dot on this page renders as an identical
+   blank circle under forced-colors, with no other on-page cue which of the
+   5 real pipeline stages (stages.json) a column, funnel row, or velocity
+   row is. border-style survives forced-colors untouched (same fix already
+   proven on Alpha's history-tick/daily-uptime-bar and this app's own
+   sidebar nav dots), so it carries the distinction here instead. app.js
+   adds a stage-dot-<id>/velocity-dot-<id> class alongside the inline
+   background on every real usage (funnel, velocity, board column head,
+   board list view) so this one block covers all four. */
+@media (forced-colors: active) {
+  .stage-dot, .velocity-dot { border-width: 2px; }
+  .stage-dot-researched, .velocity-dot-researched { border-style: solid; }
+  .stage-dot-outreach-sent, .velocity-dot-outreach-sent { border-style: dashed; }
+  .stage-dot-silent-replied, .velocity-dot-silent-replied { border-style: dotted; }
+  .stage-dot-in-exploration, .velocity-dot-in-exploration { border-style: double; border-width: 3px; }
+  .stage-dot-client, .velocity-dot-client { border-style: groove; border-width: 3px; }
 }
 .velocity-label { flex: 1; font-weight: 500; }
 .velocity-value { color: var(--sub); font-size: 0.78rem; }
@@ -1003,7 +1024,7 @@ header.page-head .sub {
   margin-bottom: 4px;
 }
 .stage-dot {
-  width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0;
+  width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; box-sizing: border-box;
 }
 .column-head h2 {
   font-family: 'Manrope', sans-serif;

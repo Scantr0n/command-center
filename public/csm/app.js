@@ -903,7 +903,7 @@
         'previous one</span>';
       return '<div class="funnel-row">' +
         '<div class="funnel-row-head">' +
-        '<span class="stage-dot" style="background:' + escapeHtml(r.stage.color) + '"></span>' +
+        '<span class="stage-dot stage-dot-' + escapeHtml(r.stage.id) + '" style="background:' + escapeHtml(r.stage.color) + '"></span>' +
         '<span class="funnel-label">' + escapeHtml(r.stage.label) + '</span>' +
         '<span class="funnel-count font-mono">' + r.reached + ' of ' + total + '</span>' +
         '</div>' +
@@ -929,7 +929,7 @@
           ' completed move' + (r.n === 1 ? '' : 's') + '</span>'
         : '<span class="velocity-value velocity-value-empty font-mono">No completed moves logged yet</span>';
       return '<div class="velocity-row">' +
-        '<span class="velocity-dot" style="background:' + escapeHtml(r.stage.color) + '"></span>' +
+        '<span class="velocity-dot velocity-dot-' + escapeHtml(r.stage.id) + '" style="background:' + escapeHtml(r.stage.color) + '"></span>' +
         '<span class="velocity-label">' + escapeHtml(r.stage.label) + '</span>' +
         valueHtml +
         '</div>';
@@ -1092,7 +1092,7 @@
         : '';
       return '<div class="column' + (collapsed ? ' column-collapsed' : '') + '" data-stage-id="' + escapeHtml(stage.id) + '">' +
         '<div class="column-head">' +
-        '<span class="stage-dot" style="background:' + escapeHtml(stage.color) + '"></span>' +
+        '<span class="stage-dot stage-dot-' + escapeHtml(stage.id) + '" style="background:' + escapeHtml(stage.color) + '"></span>' +
         '<h2>' + escapeHtml(stage.label) + '</h2>' +
         toggleBtn +
         '<span class="column-count font-mono">' + inStage.length + '</span>' +
@@ -1260,7 +1260,7 @@
         '<td><div class="board-list-name">' + escapeHtml(p.name) + '</div><div class="board-list-company">' +
         escapeHtml(p.company || 'Company not logged') + '</div></td>' +
         '<td>' + (stage
-          ? '<span class="stage-dot" style="background:' + escapeHtml(stage.color) + '"></span> ' + escapeHtml(stage.label)
+          ? '<span class="stage-dot stage-dot-' + escapeHtml(stage.id) + '" style="background:' + escapeHtml(stage.color) + '"></span> ' + escapeHtml(stage.label)
           : '<span class="board-list-unlogged">Unknown stage</span>') + '</td>' +
         '<td>' + (p.category ? escapeHtml(p.category) : '<span class="board-list-unlogged">Not logged</span>') + '</td>' +
         '<td>' + channelBadge(p.contactChannel) + '</td>' +
