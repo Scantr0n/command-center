@@ -20,8 +20,9 @@ const {
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
-  ebayTrsProgress, depopTopSellerProgress,
+  ebayTrsProgress, depopTopSellerProgress, daysBetweenDates,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
+  DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
   isSupplyLowStock,
   sortEngagementSnapshots, annotateEngagementTrend
 } = require('./garage-core.js');
@@ -355,6 +356,60 @@ test('depopTopSellerProgress: sums real depop sales within the rolling 30 days o
   assert.equal(result.grossSales, 800);
   assert.equal(result.meetsCountTargets, false);
   assert.equal(depopTopSellerProgress([{ platform: 'depop', salePrice: 1000, saleDate: '2026-09-24' }], [], '2026-09-24').meetsCountTargets, true);
+});
+
+test('daysBetweenDates: whole-day gap between a real saleDate and a real shipDate', () => {
+  assert.equal(daysBetweenDates('2026-09-20', '2026-09-25'), 5);
+  assert.equal(daysBetweenDates('2026-09-20', '2026-09-20'), 0);
+});
+
+test('daysBetweenDates: null when either date is missing, invalid, or shipDate falls before saleDate', () => {
+  assert.equal(daysBetweenDates(null, '2026-09-25'), null);
+  assert.equal(daysBetweenDates('2026-09-20', null), null);
+  assert.equal(daysBetweenDates('2026-09-20', 'not-a-date'), null);
+  assert.equal(daysBetweenDates('2026-09-25', '2026-09-20'), null, 'shipping before selling is a logging mistake, not a negative duration');
+});
+
+test('depopTopSellerProgress: onTimeShipRate only counts sales with a real shipDate logged, null (not 0) with none', () => {
+  const noShipDates = [
+    { platform: 'depop', salePrice: 40, saleDate: '2026-09-20' },
+    { platform: 'depop', salePrice: 40, saleDate: '2026-09-21' }
+  ];
+  const result = depopTopSellerProgress(noShipDates, [], '2026-09-24');
+  assert.equal(result.onTimeShipRate, null);
+  assert.equal(result.onTimeShipSampleSize, 0);
+  assert.equal(result.shipWithinDaysTarget, DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS);
+  assert.equal(result.onTimeShipRateTarget, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET);
+});
+
+test('depopTopSellerProgress: onTimeShipRate is the real fraction shipped within the 5-day target, only among judged sales', () => {
+  const sales = [
+    { platform: 'depop', salePrice: 40, saleDate: '2026-09-01', shipDate: '2026-09-03' }, // 2 days, on time
+    { platform: 'depop', salePrice: 40, saleDate: '2026-09-05', shipDate: '2026-09-06' }, // 1 day, on time
+    { platform: 'depop', salePrice: 40, saleDate: '2026-09-10', shipDate: '2026-09-20' }, // 10 days, late
+    { platform: 'depop', salePrice: 40, saleDate: '2026-09-15' } // no shipDate, not judged
+  ];
+  const result = depopTopSellerProgress(sales, [], '2026-09-24');
+  assert.equal(result.onTimeShipSampleSize, 3, 'the undated sale is excluded from the sample entirely');
+  assert.ok(Math.abs(result.onTimeShipRate - (2 / 3)) < 1e-9);
+});
+
+test('ebayTrsProgress: avgDaysToShip is informational only, null with no real ship dates logged', () => {
+  const noShipDates = [{ platform: 'ebay', salePrice: 50, saleDate: '2026-09-01' }];
+  const result = ebayTrsProgress(noShipDates, [], '2026-09-24');
+  assert.equal(result.avgDaysToShip, null);
+  assert.equal(result.avgDaysToShipSampleSize, 0);
+});
+
+test('ebayTrsProgress: avgDaysToShip averages only the sales with a real shipDate logged', () => {
+  const sales = [
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-01', shipDate: '2026-09-02' }, // 1 day
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-05', shipDate: '2026-09-08' }, // 3 days
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-10' } // no shipDate
+  ];
+  const result = ebayTrsProgress(sales, [], '2026-09-24');
+  assert.equal(result.avgDaysToShipSampleSize, 2);
+  assert.equal(result.avgDaysToShip, 2);
 });
 
 test('isSupplyLowStock only fires once both qtyOnHand and reorderThreshold are real logged numbers', () => {

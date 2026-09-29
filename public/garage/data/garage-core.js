@@ -399,20 +399,67 @@
   // volume for eBay, a rolling-30-day dollar volume for Depop, both read
   // straight from real sales.json rows. Vinted and Poshmark's tiers key off
   // a star rating and review count this dashboard has no data source for, so
-  // they stay reference-only rather than guessing a number. Neither eBay's
-  // defect-rate/late-shipment-rate requirements nor Depop's on-time-shipping
-  // requirement are computed either, both need real per-order ship
-  // timestamps this dashboard doesn't log; the case-outcome rate below is
-  // the one real proxy actually buildable from what disputes.json tracks.
+  // they stay reference-only rather than guessing a number. Depop's real
+  // "90%+ shipped within 5 days" requirement is now computed below from each
+  // sale's own optional shipDate (added once sales.json actually started
+  // tracking per-order ship dates). eBay's late-shipment-rate requirement
+  // still isn't judged pass/fail: eBay's "late" is relative to each
+  // listing's own stated handling time, which this dashboard doesn't track,
+  // so only a plain average days-to-ship is surfaced for eBay, as an
+  // informational number rather than a false pass/fail against a threshold
+  // this app can't actually verify. The case-outcome rate below is the one
+  // real proxy shared by both platforms, buildable from what disputes.json
+  // tracks.
   const EBAY_TRS_WINDOW_DAYS = 365;
   const EBAY_TRS_TRANSACTIONS_TARGET = 100;
   const EBAY_TRS_GROSS_SALES_TARGET = 1000;
   const DEPOP_TOP_SELLER_WINDOW_DAYS = 30;
   const DEPOP_TOP_SELLER_GROSS_SALES_TARGET = 1000;
+  const DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS = 5;
+  const DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET = 0.9;
 
   function salesInWindow(sales, platform, todayStr, windowDays) {
     const start = addDaysToDateStr(todayStr, -windowDays);
     return (sales || []).filter(s => s.platform === platform && s.saleDate && s.saleDate >= start && s.saleDate <= todayStr);
+  }
+
+  // Whole-day gap between a sale and the day it actually shipped, or null if
+  // either date is missing, not a real calendar date, or shipDate falls
+  // before saleDate (a logging mistake validate.js also flags, never a real
+  // negative shipping time). Same UTC-midnight-anchored Date construction as
+  // addDaysToDateStr/daysSincePublished above, so this can't drift a day off
+  // from either of them around a timezone boundary.
+  function daysBetweenDates(fromStr, toStr) {
+    if (!fromStr || !toStr) return null;
+    const from = new Date(fromStr + 'T00:00:00');
+    const to = new Date(toStr + 'T00:00:00');
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+    const days = Math.round((to.getTime() - from.getTime()) / 86400000);
+    return days < 0 ? null : days;
+  }
+
+  // Real on-time-shipping rate among the sales in the window that actually
+  // have both a saleDate and a shipDate logged, e.g. Depop's own "90%+
+  // shipped within 5 days" Top Seller requirement. Returns null (not 0) when
+  // no sale in the window has both dates logged yet, the same "unknown, not
+  // a clean 0%" rule nonSellerResolvedRate above already follows, so a real
+  // shortfall never reads identically to "no data logged yet". sampleSize is
+  // returned alongside so callers can show a rate has run on the full window
+  // or on only a partial, still-growing sample.
+  function onTimeShipRate(windowSales, withinDays) {
+    const judged = windowSales.filter(s => daysBetweenDates(s.saleDate, s.shipDate) != null);
+    if (!judged.length) return { rate: null, sampleSize: 0 };
+    const onTime = judged.filter(s => daysBetweenDates(s.saleDate, s.shipDate) <= withinDays).length;
+    return { rate: onTime / judged.length, sampleSize: judged.length };
+  }
+
+  // Plain average days-to-ship over the same judged sample as onTimeShipRate
+  // above, informational only (see the comment above EBAY_TRS_WINDOW_DAYS),
+  // never compared against eBay's real late-shipment-rate target.
+  function avgDaysToShip(windowSales) {
+    const gaps = windowSales.map(s => daysBetweenDates(s.saleDate, s.shipDate)).filter(d => d != null);
+    if (!gaps.length) return { avgDays: null, sampleSize: 0 };
+    return { avgDays: gaps.reduce((sum, d) => sum + d, 0) / gaps.length, sampleSize: gaps.length };
   }
 
   function disputesInWindow(disputes, platform, todayStr, windowDays) {
@@ -441,11 +488,13 @@
     const windowDisputes = disputesInWindow(disputes, 'ebay', todayStr, EBAY_TRS_WINDOW_DAYS);
     const transactions = windowSales.length;
     const grossSales = windowSales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+    const shipStats = avgDaysToShip(windowSales);
     return {
       windowDays: EBAY_TRS_WINDOW_DAYS,
       transactions, transactionsTarget: EBAY_TRS_TRANSACTIONS_TARGET,
       grossSales, grossSalesTarget: EBAY_TRS_GROSS_SALES_TARGET,
       nonSellerResolvedRate: nonSellerResolvedRate(windowDisputes, windowSales),
+      avgDaysToShip: shipStats.avgDays, avgDaysToShipSampleSize: shipStats.sampleSize,
       meetsCountTargets: transactions >= EBAY_TRS_TRANSACTIONS_TARGET && grossSales >= EBAY_TRS_GROSS_SALES_TARGET
     };
   }
@@ -454,10 +503,13 @@
     const windowSales = salesInWindow(sales, 'depop', todayStr, DEPOP_TOP_SELLER_WINDOW_DAYS);
     const windowDisputes = disputesInWindow(disputes, 'depop', todayStr, DEPOP_TOP_SELLER_WINDOW_DAYS);
     const grossSales = windowSales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
+    const shipStats = onTimeShipRate(windowSales, DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS);
     return {
       windowDays: DEPOP_TOP_SELLER_WINDOW_DAYS,
       grossSales, grossSalesTarget: DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
       nonSellerResolvedRate: nonSellerResolvedRate(windowDisputes, windowSales),
+      onTimeShipRate: shipStats.rate, onTimeShipSampleSize: shipStats.sampleSize,
+      shipWithinDaysTarget: DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, onTimeShipRateTarget: DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
       meetsCountTargets: grossSales >= DEPOP_TOP_SELLER_GROSS_SALES_TARGET
     };
   }
@@ -526,6 +578,8 @@
     offerTier, offerCounterAmount,
     EBAY_TRS_WINDOW_DAYS, EBAY_TRS_TRANSACTIONS_TARGET, EBAY_TRS_GROSS_SALES_TARGET,
     DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
+    DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
+    daysBetweenDates, onTimeShipRate, avgDaysToShip,
     ebayTrsProgress, depopTopSellerProgress,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend

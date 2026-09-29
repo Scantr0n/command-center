@@ -19,7 +19,11 @@
  * in listings.json yet). It also cross-checks sales.json against every
  * listing's "soldOn" array in both directions, since a real sale should show
  * up in exactly one place: logged once as a sale, and marked once as sold on
- * that platform. Every expenses.json entry needs a real, computable dollar
+ * that platform. A sale's optional "shipDate" can't be in the future or fall
+ * before its own "saleDate" (an item can't ship before it sells), and a
+ * "shipDate" logged with no "saleDate" is flagged since the real on-time-
+ * shipping math on the Seller status & standards table needs both to
+ * judge that sale. Every expenses.json entry needs a real, computable dollar
  * amount: either a logged "amount", or (mileage entries only) real "miles"
  * on a real date the IRS has a published 2026 standard mileage rate for,
  * since a mileage deduction with no rate to apply it against isn't a real
@@ -393,6 +397,18 @@ function main() {
 
     if (!isDateOrNull(s.saleDate)) {
       errors.push(where + ': "saleDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.saleDate));
+    }
+
+    if (!isDateOrNull(s.shipDate)) {
+      errors.push(where + ': "shipDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.shipDate));
+    } else if (s.shipDate) {
+      if (isFutureDate(s.shipDate)) {
+        errors.push(where + ': "shipDate" (' + s.shipDate + ') is in the future, this is a real logged ship date, not a plan');
+      } else if (isDateOrNull(s.saleDate) && s.saleDate && s.shipDate < s.saleDate) {
+        errors.push(where + ': "shipDate" (' + s.shipDate + ') is before "saleDate" (' + s.saleDate + '), an item can\'t ship before it sells, check for a typo\'d date');
+      } else if (!s.saleDate) {
+        warnings.push(where + ': "shipDate" is logged but "saleDate" is not, the on-time-shipping math on the Seller status & standards table needs both to judge this sale');
+      }
     }
 
     if (s.listingId && listingById[s.listingId] && s.platform) {

@@ -85,7 +85,7 @@ const {
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
-  isSupplyLowStock, annotateEngagementTrend
+  isSupplyLowStock, annotateEngagementTrend, daysBetweenDates
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -2854,6 +2854,11 @@ function renderSales(sales) {
       <td class="cell-value${s.shippingCost == null ? ' empty' : ''}">${s.shippingCost != null ? formatUsd(s.shippingCost) : 'not logged'}</td>
       <td class="cell-value${profit == null ? ' empty' : (profit < 0 ? ' cell-value-loss' : '')}">${profit != null ? formatUsd(profit) : 'not logged'}</td>
       <td class="cell-muted">${s.saleDate ? escapeHtml(s.saleDate) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-muted">${(() => {
+        if (!s.shipDate) return '<span class="cell-value empty">not logged</span>';
+        const gap = daysBetweenDates(s.saleDate, s.shipDate);
+        return escapeHtml(s.shipDate) + (gap != null ? `<div class="cell-muted">${gap}d after sale</div>` : '');
+      })()}</td>
     </tr>
   `;
   }).join('');
@@ -2975,7 +2980,12 @@ function renderTaxTracker(sales) {
 // garage-core.js. Vinted and Poshmark's tiers key off a star rating and
 // review count this dashboard has no data source for, so those two rows stay
 // plain reference text (see the static markup in index.html) rather than
-// getting a fabricated number here.
+// getting a fabricated number here. Depop's on-time-shipping requirement is
+// now computed for real from each sale's optional shipDate; eBay's own
+// late-shipment-rate target still isn't judged pass/fail, only a plain
+// average days-to-ship is shown, since "late" there is relative to each
+// listing's own handling time, which isn't tracked (see the comment above
+// EBAY_TRS_WINDOW_DAYS in garage-core.js).
 function renderSellerStandardsProgress(sales, disputes) {
   const today = todayDateStr();
   const ebay = ebayTrsProgress(sales, disputes, today);
@@ -2988,20 +2998,32 @@ function renderSellerStandardsProgress(sales, disputes) {
   };
   const rateText = rate => rate == null ? 'no sales yet' : (rate * 100).toFixed(1) + '%';
 
+  const ebayShipText = ebay.avgDaysToShipSampleSize
+    ? `${ebay.avgDaysToShip.toFixed(1)} days (${ebay.avgDaysToShipSampleSize}/${ebay.transactions} sale(s) with a real ship date logged)`
+    : 'not enough data, no sale in this window has a real ship date logged yet';
+
   document.getElementById('ebayTrsProgressCell').innerHTML =
     `<div class="cell-value">${ebay.transactions} <span class="cell-muted">/ ${ebay.transactionsTarget} txns</span></div>` +
     progressBar(ebay.transactions, ebay.transactionsTarget) +
     `<div class="cell-value">${formatUsd(ebay.grossSales)} <span class="cell-muted">/ ${formatUsd(ebay.grossSalesTarget)}</span></div>` +
     progressBar(ebay.grossSales, ebay.grossSalesTarget) +
     `<div class="cell-muted">Cases resolved against seller: ${rateText(ebay.nonSellerResolvedRate)} (target &le;0.3%), ` +
-    `trailing ${ebay.windowDays} days. Defect rate and late-shipment rate aren't computed here, this dashboard ` +
-    `doesn't log per-order ship timestamps.</div>`;
+    `trailing ${ebay.windowDays} days. Avg. days sale-to-ship: ${ebayShipText}, informational only, not judged ` +
+    `against eBay's real late-shipment-rate target since that depends on each listing's own handling time, which ` +
+    `isn't tracked here. Defect rate isn't computed at all, no data source for it.</div>`;
+
+  const depopShipText = depop.onTimeShipSampleSize
+    ? `${(depop.onTimeShipRate * 100).toFixed(0)}% (${depop.onTimeShipSampleSize} sale(s) with a real ship date logged)`
+    : 'not enough data, no sale in this window has a real ship date logged yet';
+  const depopMeetsShip = depop.onTimeShipRate != null && depop.onTimeShipRate >= depop.onTimeShipRateTarget;
 
   document.getElementById('depopTopSellerProgressCell').innerHTML =
     `<div class="cell-value">${formatUsd(depop.grossSales)} <span class="cell-muted">/ ${formatUsd(depop.grossSalesTarget)}</span></div>` +
     progressBar(depop.grossSales, depop.grossSalesTarget) +
     `<div class="cell-muted">Refund rate: ${rateText(depop.nonSellerResolvedRate)} (target &lt;5%), rolling ` +
-    `${depop.windowDays} days. On-time-shipping rate isn't computed here, same reason as eBay's.</div>`;
+    `${depop.windowDays} days.</div>` +
+    `<div class="cell-muted${depop.onTimeShipSampleSize && !depopMeetsShip ? ' cell-value-loss' : ''}">Shipped within ` +
+    `${depop.shipWithinDaysTarget} days: ${depopShipText} (target &ge;${(depop.onTimeShipRateTarget * 100).toFixed(0)}%).</div>`;
 }
 
 // Expenses are sorted most-recent-first when a date is logged, undated
@@ -4541,7 +4563,7 @@ document.addEventListener('keydown', e => {
 const SALES_CSV_COLUMNS = [
   ['title', 'Item'], ['platform', 'Platform'], ['salePrice', 'Sale price'], ['askingPrice', 'Asking price'],
   ['netPayout', 'Est. net payout'], ['costBasis', 'Cost basis'], ['shippingCost', 'Shipping paid'],
-  ['profit', 'Profit'], ['saleDate', 'Sale date']
+  ['profit', 'Profit'], ['saleDate', 'Sale date'], ['shipDate', 'Ship date']
 ];
 
 // Exports every real logged sale, same computed net-payout/profit columns as
@@ -5222,6 +5244,7 @@ function wireQuickLogSaleTool() {
     const costBasis = readOptionalNonNegativeInput(document.getElementById('nsCostBasis'));
     const shippingCost = readOptionalNonNegativeInput(document.getElementById('nsShippingCost'));
     const saleDate = document.getElementById('nsSaleDate').value || null;
+    const shipDate = document.getElementById('nsShipDate').value || null;
 
     const blockers = [];
     const advisory = [];
@@ -5239,6 +5262,18 @@ function wireQuickLogSaleTool() {
     if (askingPrice === undefined) blockers.push('Enter a valid asking price of $0 or more, or leave it blank.');
     if (costBasis === undefined) blockers.push('Enter a valid cost basis of $0 or more, or leave it blank.');
     if (shippingCost === undefined) blockers.push('Enter a valid shipping cost of $0 or more, or leave it blank.');
+    if (shipDate) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (new Date(shipDate + 'T00:00:00') > tomorrow) {
+        blockers.push('Ship date is in the future, this is a real logged ship date, not a plan.');
+      } else if (saleDate && shipDate < saleDate) {
+        blockers.push('Ship date can\'t be before the sale date, an item can\'t ship before it sells.');
+      } else if (!saleDate) {
+        advisory.push('A ship date with no sale date logged can\'t feed the real on-time-shipping math on the Seller status & standards table, log a sale date too once known.');
+      }
+    }
 
     if (listingId && !(listings || []).some(l => l.id === listingId)) {
       advisory.push('"' + listingId + '" does not match any listing in listings.json. Fine if that listing has ' +
@@ -5268,7 +5303,8 @@ function wireQuickLogSaleTool() {
       askingPrice: askingPrice === undefined ? null : askingPrice,
       costBasis: costBasis === undefined ? null : costBasis,
       shippingCost: shippingCost === undefined ? null : shippingCost,
-      saleDate
+      saleDate,
+      shipDate
     };
 
     advisory.push(...emDashAdvisory(sale, ['title']));
