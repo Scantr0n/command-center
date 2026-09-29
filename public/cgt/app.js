@@ -1774,12 +1774,15 @@ function renderSubmissions() {
   }
 
   const active = buildActiveSubmissions();
-  const returnedCount = submissions.filter(s => s.status === 'returned' && !isExampleSubmission(s)).length;
+  const returned = submissions.filter(s => s.status === 'returned');
+  const returnedCount = returned.filter(s => !isExampleSubmission(s)).length;
+  const returnedHtml = renderReturnedSubmissionsHtml(returned);
 
   if (!active.length) {
     el.innerHTML = '<p class="submissions-empty" role="status">Nothing currently out for grading.' +
       (returnedCount ? ' ' + returnedCount + ' past submission' + (returnedCount === 1 ? '' : 's') + ' logged as returned.' : '') +
-      emptyStateCta('quickLogSubmissionTool', 'quickSubmissionForm', 'Log one now') + '</p>';
+      emptyStateCta('quickLogSubmissionTool', 'quickSubmissionForm', 'Log one now') + '</p>' + returnedHtml;
+    wireSubmissionRows(el);
     return;
   }
 
@@ -1834,9 +1837,14 @@ function renderSubmissions() {
     `;
   }).join('');
 
-  el.innerHTML = rows + (returnedCount
-    ? `<div class="submissions-returned-note">+ ${returnedCount} past submission${returnedCount === 1 ? '' : 's'} logged as returned</div>`
-    : '');
+  el.innerHTML = rows + returnedHtml;
+  wireSubmissionRows(el);
+}
+
+// Split out of renderSubmissions so the "row click opens its modal" wiring
+// works the same for the active rows above and the collapsed returned list
+// below, instead of two copies of the same click/keydown handler.
+function wireSubmissionRows(el) {
   el.querySelectorAll('.submission-row-main[data-id]').forEach(row => {
     row.addEventListener('click', () => openSubmissionModal(row.dataset.id));
     row.addEventListener('keydown', (e) => {
@@ -1846,6 +1854,48 @@ function renderSubmissions() {
       }
     });
   });
+}
+
+// Used to be a plain "+N past submissions logged as returned" line with no
+// way to actually reach any of them: a returned submission with no card
+// pointing back at it via submissionId (see findReturnedSubmissionsMissingCards)
+// had no card detail view to link from either, so once a batch's cards.json
+// backfill got missed, that submission's own notes/tracking number/cost
+// became unreachable in the UI entirely, only visible by hand-typing its id
+// into the ?submission= URL param. Collapsed behind a details/summary (same
+// pattern as the schema-help boxes elsewhere on this page) so it doesn't
+// compete with the active submissions above for attention, but every row is
+// real and clickable now, same as an active one.
+function renderReturnedSubmissionsHtml(returned) {
+  if (!returned.length) return '';
+  const missingCardIds = window.CGTValidateCore
+    ? new Set(CGTValidateCore.findReturnedSubmissionsMissingCards(returned, cards).map(s => s.id))
+    : new Set();
+  const rows = returned.map(s => {
+    const metaParts = [
+      s.gradingCompany,
+      s.serviceLevel,
+      s.cardCount != null ? s.cardCount + ' card' + (s.cardCount === 1 ? '' : 's') : null,
+      s.returnedDate ? 'returned ' + s.returnedDate : null,
+      s.cost != null ? formatUsd(s.cost) + ' fee' : null
+    ].filter(Boolean);
+    return `
+      <div class="submission-row">
+        <div class="candidate-row submission-row-main" tabindex="0" role="button" data-id="${escapeHtml(s.id)}">
+          <span class="badge badge-status-returned">Returned</span>
+          <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
+          <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
+          ${missingCardIds.has(s.id) ? '<span class="badge badge-late" title="This batch is marked returned, but no card in cards.json has this submission’s id set as its submissionId yet.">no cards logged yet</span>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <details class="schema-help">
+      <summary>+ ${returned.length} past submission${returned.length === 1 ? '' : 's'} logged as returned</summary>
+      <div class="schema-help-body">${rows}</div>
+    </details>
+  `;
 }
 
 // Batches aren't a fixed vocabulary like sport/basis/grader, they're one per
@@ -2144,6 +2194,9 @@ function renderAttentionBar() {
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
   const listingPriceCount = window.CGTValidateCore ? CGTValidateCore.findListingPriceMismatches(realCards).length : 0;
   const orphanSubmissionCount = window.CGTValidateCore ? CGTValidateCore.findOrphanSubmissionRefs(realCards, submissions).length : 0;
+  const returnedMissingCardsCount = window.CGTValidateCore
+    ? CGTValidateCore.findReturnedSubmissionsMissingCards(realSubmissions(), realCards).length
+    : 0;
   // A candidate still being weighed (no decision logged yet) but missing
   // expectedGradedValue/estimatedGradingCost can't get a real verdict out of
   // computeGradingMath, so it sits stuck at "Needs more data" until that
@@ -2217,6 +2270,16 @@ function renderAttentionBar() {
   }
   if (orphanSubmissionCount) {
     items.push({ n: orphanSubmissionCount, tone: 'warn', target: 'inventorySection', label: orphanSubmissionCount === 1 ? 'card references a submission id that doesn’t exist' : 'cards reference a submission id that doesn’t exist' });
+  }
+  if (returnedMissingCardsCount) {
+    items.push({
+      n: returnedMissingCardsCount,
+      tone: 'warn',
+      target: 'submissionsSection',
+      label: returnedMissingCardsCount === 1
+        ? 'returned submission has no cards logged from it yet'
+        : 'returned submissions have no cards logged from them yet'
+    });
   }
   if (overdueSubmissionsCount) {
     items.push({

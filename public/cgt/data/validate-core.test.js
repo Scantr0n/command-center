@@ -17,7 +17,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   isDateOrNull, findDuplicateGroups, findDuplicateCertGroups, findDuplicateCandidateGroups, findGradeLadderInversions,
-  findListingPriceMismatches, findOrphanSubmissionRefs, validateCards, validateSubmissions, validateCandidates
+  findListingPriceMismatches, findOrphanSubmissionRefs, findReturnedSubmissionsMissingCards, validateCards,
+  validateSubmissions, validateCandidates
 } = require('./validate-core.js');
 
 test('isDateOrNull accepts null and real calendar dates, rejects impossible ones', () => {
@@ -288,6 +289,25 @@ test('findOrphanSubmissionRefs does not flag a card with no submissionId, or one
   const cards = [{ id: 'a', submissionId: null }, { id: 'b', submissionId: 'batch-1' }];
   const submissions = [{ id: 'batch-1' }];
   assert.deepEqual(findOrphanSubmissionRefs(cards, submissions), []);
+});
+
+test('findReturnedSubmissionsMissingCards flags a returned submission with no card pointing back at it', () => {
+  const submissions = [
+    { id: 'batch-1', status: 'returned' },
+    { id: 'batch-2', status: 'returned' },
+    { id: 'batch-3', status: 'grading' }
+  ];
+  const cards = [{ id: 'a', submissionId: 'batch-1' }];
+  const flags = findReturnedSubmissionsMissingCards(submissions, cards);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].id, 'batch-2');
+});
+
+test('findReturnedSubmissionsMissingCards does not flag a returned submission once any card links to it, and ignores non-returned submissions with no cards', () => {
+  const submissions = [{ id: 'batch-1', status: 'returned' }, { id: 'batch-2', status: 'in-queue' }];
+  const cards = [{ id: 'a', submissionId: 'batch-1' }];
+  assert.deepEqual(findReturnedSubmissionsMissingCards(submissions, cards), []);
+  assert.deepEqual(findReturnedSubmissionsMissingCards(submissions, []).map(s => s.id), ['batch-1']);
 });
 
 test('validateCards accepts a string submissionId or null, rejects other types', () => {

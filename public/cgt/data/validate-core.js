@@ -528,6 +528,19 @@
     return flags;
   }
 
+  // The inverse of findOrphanSubmissionRefs above: a submission marked
+  // "returned" (the grading company actually shipped it back) with no card
+  // in cards.json pointing back at it via submissionId means the graded
+  // cards from that real batch never got logged, not that the batch came
+  // back with zero cards (submissions.json's own cardCount would say that,
+  // and a batch is never submitted with zero cards). Worth a warning, not
+  // an error, same reasoning as findOrphanSubmissionRefs: it never breaks
+  // anything rendered, it just means a real batch is sitting un-backfilled.
+  function findReturnedSubmissionsMissingCards(submissions, cards) {
+    const linkedIds = new Set((cards || []).filter(c => c.submissionId != null).map(c => c.submissionId));
+    return (submissions || []).filter(s => s.status === 'returned' && !linkedIds.has(s.id));
+  }
+
   // Validates the separate "cards sent off and not back yet" log
   // (public/cgt/data/submissions.json). This is a distinct real-world thing
   // from a graded card row: a submission is a batch shipped to a grading
@@ -710,6 +723,7 @@
   return {
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findDuplicateCertGroups,
     findDuplicateCandidateGroups, findGradeLadderInversions, findListingPriceMismatches, findOrphanSubmissionRefs,
+    findReturnedSubmissionsMissingCards,
     isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
     SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };

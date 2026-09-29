@@ -27,7 +27,9 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { validateCards, validateSubmissions, validateCandidates, findOrphanSubmissionRefs } = require('./validate-core.js');
+const {
+  validateCards, validateSubmissions, validateCandidates, findOrphanSubmissionRefs, findReturnedSubmissionsMissingCards
+} = require('./validate-core.js');
 
 const DATA_DIR = __dirname;
 
@@ -102,6 +104,15 @@ function main() {
   if (orphanRefs.length) {
     console.warn('\n' + orphanRefs.length + ' card(s) in cards.json reference a submissionId not found in submissions.json:');
     orphanRefs.forEach(c => console.warn('  - ' + (c.id || '(missing id)') + ': submissionId "' + c.submissionId + '"'));
+  }
+
+  // Same cross-file reasoning as orphanRefs just above, the other direction:
+  // a submission marked returned that no card in cards.json links back to
+  // means that real batch's graded cards never got entered.
+  const returnedMissingCards = findReturnedSubmissionsMissingCards(submissionsData.submissions || [], cardsData.cards || []);
+  if (returnedMissingCards.length) {
+    console.warn('\n' + returnedMissingCards.length + ' submission(s) in submissions.json are marked "returned" but no card in cards.json links back to them:');
+    returnedMissingCards.forEach(s => console.warn('  - ' + (s.id || '(missing id)') + ': ' + (s.description || 'untitled')));
   }
 
   checkChangelogFreshness();
