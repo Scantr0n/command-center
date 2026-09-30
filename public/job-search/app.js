@@ -138,7 +138,7 @@
   function checkFollowupAlerts(applicationsData) {
     if (!notifySupported) return;
     const apps = (applicationsData && applicationsData.applications) || [];
-    const awaiting = apps.filter(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status));
+    const awaiting = apps.filter(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, todayIso(), a.status));
     const awaitingNums = awaiting.map(a => a.num);
     const isFirstCheck = previousAwaitingNums === null;
     const grewMoreAwaiting = JobSearchFollowupCore.hasNewDueId(awaitingNums, previousAwaitingNums);
@@ -221,7 +221,7 @@
     const lines = apps.map(a => {
       const status = JobSearchFollowupCore.isTerminalStatus(a.status)
         ? JobSearchFollowupCore.STATUS_LABELS[a.status]
-        : (JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status) || '');
+        : (JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, todayIso(), a.status) || '');
       return [a.num, a.role, a.company, a.location, a.pay, fmtDate(a.appliedDate) || 'undated', status].map(csvField).join(',');
     });
     const csv = [header, ...lines].join('\n');
@@ -258,7 +258,7 @@
   function applicationSortValue(a, key) {
     if (key === 'num') return a.num;
     if (key === 'applied') return a.appliedDate || '';
-    if (key === 'status') return JobSearchFollowupCore.daysSinceApplied(a.appliedDate) ?? -Infinity;
+    if (key === 'status') return JobSearchFollowupCore.daysSinceApplied(a.appliedDate, todayIso()) ?? -Infinity;
     return a[key];
   }
 
@@ -349,7 +349,7 @@
     // is the only thing telling Jack an application needs a look without
     // scrolling into the table first.
     if (apps.length) {
-      const tiers = apps.map(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status));
+      const tiers = apps.map(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, todayIso(), a.status));
       const awaitingCount = tiers.filter(Boolean).length;
       const coldCount = tiers.filter(t => t === 'cold').length;
       chips.push({
@@ -408,8 +408,8 @@
       return '<span class="status-badge status-badge-' + escapeHtml(a.status) + '">' +
         escapeHtml(JobSearchFollowupCore.STATUS_LABELS[a.status]) + '</span>';
     }
-    const days = JobSearchFollowupCore.daysSinceApplied(a.appliedDate);
-    const tier = JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status);
+    const days = JobSearchFollowupCore.daysSinceApplied(a.appliedDate, todayIso());
+    const tier = JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, todayIso(), a.status);
     if (!tier) return '<span class="status-cell-quiet">-</span>';
     const dayWord = days === 1 ? 'day' : 'days';
     return tier === 'cold'
