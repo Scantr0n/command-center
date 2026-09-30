@@ -965,12 +965,20 @@ async function loadData() {
   renderAttentionBar();
   checkDisputeAlerts(disputesLog);
   startDisputeAlertPoll();
+  checkRelistAlerts(listings);
+  startRelistAlertPoll();
 }
 let disputeAlertPollStarted = false;
 function startDisputeAlertPoll() {
   if (disputeAlertPollStarted) return;
   disputeAlertPollStarted = true;
   setInterval(() => checkDisputeAlerts(disputesLog), DISPUTE_ALERT_POLL_MS);
+}
+let relistAlertPollStarted = false;
+function startRelistAlertPoll() {
+  if (relistAlertPollStarted) return;
+  relistAlertPollStarted = true;
+  setInterval(() => checkRelistAlerts(listings), RELIST_ALERT_POLL_MS);
 }
 
 // Purely a "you are here" pointer into the static seasonal reference table,
@@ -3862,6 +3870,114 @@ function checkDisputeAlerts(disputesList) {
 // to push it instead. Same 10-minute cadence Sondrik/CSM's own alert polls
 // already use.
 const DISPUTE_ALERT_POLL_MS = 10 * 60 * 1000;
+
+// Same opt-in native-notification pattern as the dispute alert above, kept
+// as its own independent toggle/preference rather than folded into that
+// one, since relist-due and dispute-due are different real deadlines
+// (money-at-risk vs. search-ranking staleness) that Jack may want to
+// enable separately. Reuses the same buildRelistReminders(...).date <=
+// today reminders the relist table and the attention bar already compute,
+// so there's nothing new to keep in sync. Stays honestly inert (nothing to
+// fire) until a real datePublished is logged per item, same as the relist
+// table and .ics export above.
+const relistNotifyBtn = document.getElementById('relistNotifyBtn');
+const relistTestAlertBtn = document.getElementById('relistTestAlertBtn');
+const RELIST_NOTIFY_PREF_KEY = 'garage:relistNotifyEnabled';
+
+function loadRelistNotifyPref() {
+  try { return localStorage.getItem(RELIST_NOTIFY_PREF_KEY) === 'true'; } catch (e) { return false; }
+}
+function saveRelistNotifyPref(enabled) {
+  try { localStorage.setItem(RELIST_NOTIFY_PREF_KEY, enabled ? 'true' : 'false'); } catch (e) { /* private browsing: works this load only */ }
+}
+
+function renderRelistNotifyBtn() {
+  if (!relistNotifyBtn) return;
+  if (!notifySupported) { relistNotifyBtn.hidden = true; return; }
+  const permission = Notification.permission;
+  if (permission === 'denied') {
+    relistNotifyBtn.hidden = false;
+    relistNotifyBtn.disabled = true;
+    relistNotifyBtn.classList.remove('notify-on');
+    relistNotifyBtn.textContent = 'Relist alerts blocked';
+    relistNotifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+    relistNotifyBtn.removeAttribute('aria-pressed');
+    if (relistTestAlertBtn) relistTestAlertBtn.hidden = true;
+    return;
+  }
+  const enabled = permission === 'granted' && loadRelistNotifyPref();
+  relistNotifyBtn.hidden = false;
+  relistNotifyBtn.disabled = false;
+  relistNotifyBtn.classList.toggle('notify-on', enabled);
+  relistNotifyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  relistNotifyBtn.textContent = enabled ? 'Relist alerts on' : 'Enable relist alerts';
+  relistNotifyBtn.title = enabled
+    ? 'A native notification fires when a relist/renew reminder or Poshmark relist-eligible date turns due while this tab is unfocused. Click to turn off.'
+    : 'Get a native notification when a relist/renew reminder or Poshmark relist-eligible date turns due while this tab is unfocused.';
+  if (relistTestAlertBtn) relistTestAlertBtn.hidden = !enabled;
+}
+
+if (relistTestAlertBtn) {
+  relistTestAlertBtn.addEventListener('click', () => {
+    if (!notifySupported || Notification.permission !== 'granted') return;
+    const original = relistTestAlertBtn.textContent;
+    try {
+      new Notification('The Garage (test)', {
+        body: 'Test alert, no real relist state change. A real due-relist alert looks just like this.',
+        icon: '/icon-192.png',
+        tag: 'garage-relist-test'
+      });
+      relistTestAlertBtn.textContent = 'Test alert sent';
+    } catch (e) {
+      relistTestAlertBtn.textContent = "Couldn't send";
+    }
+    setTimeout(() => { relistTestAlertBtn.textContent = original; }, 1800);
+  });
+}
+
+if (relistNotifyBtn && notifySupported) {
+  relistNotifyBtn.addEventListener('click', async () => {
+    if (Notification.permission === 'denied') return;
+    if (Notification.permission === 'default') {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') saveRelistNotifyPref(true);
+      renderRelistNotifyBtn();
+      return;
+    }
+    saveRelistNotifyPref(!loadRelistNotifyPref());
+    renderRelistNotifyBtn();
+  });
+}
+renderRelistNotifyBtn();
+
+let previousRelistDueCount = null;
+function checkRelistAlerts(currentListings) {
+  if (!notifySupported) return;
+  const today = todayDateStr();
+  const due = buildRelistReminders(currentListings).filter(r => r.date <= today);
+  const isFirstCheck = previousRelistDueCount === null;
+  const grewMoreDue = !isFirstCheck && due.length > previousRelistDueCount;
+  previousRelistDueCount = due.length;
+  if (isFirstCheck || !grewMoreDue) return;
+  if (Notification.permission !== 'granted' || !loadRelistNotifyPref()) return;
+  if (document.visibilityState === 'visible' && document.hasFocus()) return;
+  try {
+    const body = due.length === 1
+      ? due[0].summary + ' is now due.'
+      : due.length + ' relist reminders are now due.';
+    const notification = new Notification('The Garage', { body, icon: '/icon-192.png', tag: 'garage-relist' });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+      const target = document.getElementById('relistSection');
+      if (target) target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    };
+  } catch (e) {
+    // Same post-revoke-permission guard as checkDisputeAlerts above.
+  }
+}
+
+const RELIST_ALERT_POLL_MS = 10 * 60 * 1000;
 
 // Platform-reference tables (best time to post, seasonal calendar,
 // search/discovery, listing upkeep, markdown guidance, packaging,
