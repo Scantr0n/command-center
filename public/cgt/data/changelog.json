@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-26T17:49:49.496Z",
+  "generatedAt": "2026-09-30T09:33:39.303Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "6dce740",
+      "fullHash": "6dce7407c4b75fade9b9b1ec13ee779373a87229",
+      "date": "2026-09-29",
+      "author": "Claude",
+      "subject": "CGT: replace stale \"Regular\" PSA tier examples with current \"Priority\" name",
+      "historyReset": false,
+      "files": [
+        "submissions.json"
+      ]
+    },
     {
       "hash": "f9e8d33",
       "fullHash": "f9e8d337a56892eb6a7a8731f285097e06d20f28",
