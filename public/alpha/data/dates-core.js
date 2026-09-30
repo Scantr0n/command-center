@@ -437,6 +437,36 @@
     return 'down';
   }
 
+  // Statuspage/UptimeRobot-style fixed-window uptime headline (a real public
+  // status page's own top-line "99.98% uptime, last 90 days" stat), distinct
+  // from computeDailyUptimeBuckets' per-day bars just above: this looks back
+  // a fixed number of real elapsed days from `now`, not however many
+  // calendar days happen to have data, so early on, before this server has
+  // actually been observing for a full 30 or 90 days yet, the wider windows
+  // honestly report `pct: null` (checks: 0) instead of a misleadingly
+  // "complete" percentage computed over a handful of real checks. Every
+  // entry counted is real, already-recorded connection.history, same as
+  // every other stat on this page; nothing here is estimated or backfilled
+  // to fill a window that hasn't actually elapsed yet. `now` defaults to
+  // Date.now(), same testability convention as the rest of this file.
+  function computeUptimeWindows(history, now) {
+    const nowMs = now == null ? Date.now() : now;
+    const list = Array.isArray(history) ? history : [];
+    return [7, 30, 90].map(days => {
+      const cutoffMs = nowMs - days * 86400000;
+      let up = 0;
+      let total = 0;
+      for (const entry of list) {
+        if (!entry || !entry.at) continue;
+        const at = new Date(entry.at).getTime();
+        if (Number.isNaN(at) || at < cutoffMs || at > nowMs) continue;
+        total += 1;
+        if (entry.connected) up += 1;
+      }
+      return { days, checks: total, pct: total ? (up / total) * 100 : null };
+    });
+  }
+
   return {
     MARKET_HOLIDAYS_2026,
     MARKET_EARLY_CLOSES_2026,
@@ -459,6 +489,7 @@
     computeKillSwitchEpisodes,
     dayKeyLocal,
     computeDailyUptimeBuckets,
-    dailyUptimeClass
+    dailyUptimeClass,
+    computeUptimeWindows
   };
 });

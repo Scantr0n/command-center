@@ -607,6 +607,34 @@ header.page-head .sub {
   margin-top: 6px;
 }
 
+/* Fixed 7d/30d/90d uptime badges, the headline stat real status pages
+   (Statuspage, UptimeRobot) lead with above their own per-day history; see
+   computeUptimeWindows in dates-core.js and renderUptimeWindows in app.js.
+   Colored the same good/caution/critical/unknown palette as
+   .component-status below, text-first so the state still reads correctly
+   with color removed (forced-colors, print). */
+.uptime-windows-wrap {
+  margin: 10px 0 16px;
+}
+.uptime-windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.uptime-window-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--hairline);
+  background: var(--panel-2, rgba(255,255,255,0.03));
+}
+.uptime-window-badge.full { color: #3DDC84; border-color: rgba(61,220,132,0.35); }
+.uptime-window-badge.degraded { color: #E0A030; border-color: rgba(224,160,48,0.35); }
+.uptime-window-badge.down { color: #E05050; border-color: rgba(224,80,80,0.35); }
+.uptime-window-badge.unknown { color: var(--dim); }
+.uptime-window-badge.unknown em { font-style: normal; }
+
 /* Daily uptime bars: one bar per real calendar day of connection.history,
    the same Statuspage/UptimeRobot-style long-range companion to the
    per-check tick strip above (see computeDailyUptimeBuckets in app.js).
@@ -1792,7 +1820,7 @@ footer.page-foot {
      convention comment above .component-status.good in this file), so the
      color that would otherwise only survive on-screen is safe to force flat
      here too. */
-  .pl-good, .pl-bad, .component-status { color: #111 !important; }
+  .pl-good, .pl-bad, .component-status, .uptime-window-badge { color: #111 !important; }
   /* .section-title-meta.warn sets its own explicit hex (see the definition
      above), same bypass-the-:root-reset bug already fixed elsewhere in this
      block, so it needs the same explicit print-safe override rather than

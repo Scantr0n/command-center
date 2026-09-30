@@ -60,7 +60,8 @@ const {
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
-  dailyUptimeClass
+  dailyUptimeClass,
+  computeUptimeWindows
 } = AlphaDatesCore;
 const {
   regimeColor,
@@ -1174,6 +1175,37 @@ function renderDailyUptime(data, clientHistory) {
       ? `Covers ${fmtDay(buckets[0].dateKey)} to ${fmtDay(buckets[buckets.length - 1].dateKey)}`
       : `Single day of data, ${fmtDay(buckets[0].dateKey)}`;
   }
+}
+
+// The fixed 7d/30d/90d uptime badges a real public status page leads with
+// (Statuspage, UptimeRobot), a headline number distinct from the per-day bar
+// strip above it: that strip's own summary blends over "however many days
+// happen to have data", so a page seen for the first time today would call
+// itself "100% up (last 1 day with data)", technically honest but easy to
+// misread as a long-run track record. These three badges instead look back
+// a fixed real elapsed window from now, computeUptimeWindows in
+// dates-core.js, so a young history honestly shows "not enough data yet"
+// for 30d/90d instead of quietly reusing the 7-day figure for a window that
+// hasn't actually elapsed. Built only from the same real connection.history
+// entries every other connectivity stat on this page already uses.
+function uptimeWindowBadge(win) {
+  if (win.pct == null) {
+    return `<span class="uptime-window-badge unknown" title="No connectivity checks recorded in the last ${win.days} days yet.">${win.days}d <em>not enough data yet</em></span>`;
+  }
+  const pctText = Number.isInteger(win.pct) ? String(win.pct) : win.pct.toFixed(1);
+  const title = `${pctText}% up over the last ${win.days} days (${win.checks} check${win.checks === 1 ? '' : 's'} recorded)`;
+  return `<span class="uptime-window-badge ${dailyUptimeClass(win.pct)}" title="${escapeHtml(title)}"><strong>${win.days}d</strong> ${pctText}%</span>`;
+}
+
+function renderUptimeWindows(data, clientHistory) {
+  const row = document.getElementById('uptimeWindows');
+  if (!row) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  if (!history.length) {
+    row.innerHTML = '';
+    return;
+  }
+  row.innerHTML = computeUptimeWindows(history).map(uptimeWindowBadge).join('');
 }
 
 function statTile(value, label, sub, awaiting, subTitle) {
@@ -2543,6 +2575,7 @@ async function loadStatus() {
     updateLastKnownTags(lastKnown);
     const connCls = renderConnection(data, clientConnHistory, clientLatencyHistory);
     renderConnectionHistory(data, clientConnHistory);
+    renderUptimeWindows(data, clientConnHistory);
     renderDailyUptime(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
     renderIncidentStreak(data, clientConnHistory);
@@ -2615,6 +2648,7 @@ window.addEventListener('storage', (e) => {
   const debateFirstPendingAt = loadClientDebateFirstPendingAt();
   renderConnection(lastRawData, connHistory, latencyHistory);
   renderConnectionHistory(lastRawData, connHistory);
+  renderUptimeWindows(lastRawData, connHistory);
   renderDailyUptime(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
   renderIncidentStreak(lastRawData, connHistory);

@@ -26,7 +26,8 @@ const {
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
-  dailyUptimeClass
+  dailyUptimeClass,
+  computeUptimeWindows
 } = require('./dates-core.js');
 
 // A time built from real ET wall-clock hour/minute on a real date, expressed
@@ -338,6 +339,60 @@ test('dailyUptimeClass tiers full/degraded/down', () => {
   assert.equal(dailyUptimeClass(50), 'degraded');
   assert.equal(dailyUptimeClass(0.1), 'degraded');
   assert.equal(dailyUptimeClass(0), 'down');
+});
+
+test('computeUptimeWindows computes a real fixed-window percentage per window, excluding checks outside it', () => {
+  const now = new Date('2026-09-30T12:00:00Z').getTime();
+  const history = [
+    { at: new Date(now - 40 * 86400000).toISOString(), connected: false }, // outside 30d, inside 90d
+    { at: new Date(now - 5 * 86400000).toISOString(), connected: true },   // inside all three windows
+    { at: new Date(now - 5 * 86400000 + 1000).toISOString(), connected: false }, // inside all three windows
+    { at: new Date(now - 1 * 86400000).toISOString(), connected: true }    // inside all three windows
+  ];
+  const windows = computeUptimeWindows(history, now);
+  assert.deepEqual(windows.map(w => w.days), [7, 30, 90]);
+
+  const win7 = windows[0];
+  assert.equal(win7.checks, 3, 'the 40-day-old check falls outside the 7-day window');
+  assert.equal(win7.pct, (2 / 3) * 100);
+
+  const win30 = windows[1];
+  assert.equal(win30.checks, 3, 'the 40-day-old check falls outside the 30-day window too');
+  assert.equal(win30.pct, (2 / 3) * 100);
+
+  const win90 = windows[2];
+  assert.equal(win90.checks, 4, 'the 90-day window is the only one wide enough to include the 40-day-old check');
+  assert.equal(win90.pct, (2 / 4) * 100);
+});
+
+test('computeUptimeWindows reports pct: null with zero checks for a window that has none yet, not a fabricated 0 or 100', () => {
+  const now = new Date('2026-09-30T12:00:00Z').getTime();
+  const windows = computeUptimeWindows([], now);
+  for (const w of windows) {
+    assert.equal(w.checks, 0);
+    assert.equal(w.pct, null);
+  }
+  // Only the 7-day window has any real data; 30d/90d honestly stay null
+  // rather than reusing the 7-day figure as if it applied to the wider range.
+  const partial = computeUptimeWindows([
+    { at: new Date(now - 2 * 86400000).toISOString(), connected: true }
+  ], now);
+  assert.equal(partial[0].pct, 100);
+  assert.equal(partial[1].pct, 100, '2 days ago is still inside the 30-day window');
+  assert.equal(partial[2].pct, 100, '2 days ago is still inside the 90-day window');
+});
+
+test('computeUptimeWindows ignores a malformed timestamp and a future one, defaults now to Date.now()', () => {
+  const windows = computeUptimeWindows([
+    { at: 'not-a-date', connected: true },
+    { at: null, connected: true },
+    { connected: true },
+    { at: new Date(Date.now() + 86400000).toISOString(), connected: false }
+  ]);
+  for (const w of windows) {
+    assert.equal(w.checks, 0);
+    assert.equal(w.pct, null);
+  }
 });
 
 // computeHeadline is the single most prominent text on the whole page, so
