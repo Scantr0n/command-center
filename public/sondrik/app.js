@@ -2207,9 +2207,18 @@
       }
 
       const obj = { id, label, metric, target, targetDate, setDate, note: null };
-      qgWarnings.textContent = SondrikValidateCore.emDashFields(obj, ['label', 'note'])
-        .map(f => '"' + f + '" contains an em dash, this product never uses one, check for a paste-in.')
-        .join(' ');
+      const advisory = [];
+      // Mirrors validate.js's own targetDate-before-setDate check: both
+      // fields can individually be well-formed dates and still be
+      // nonsensical together (a deadline already in the past on the day the
+      // goal was supposedly set), the CLI's own biggest catch for exactly
+      // this same typo.
+      if (targetDate && targetDate < setDate) {
+        advisory.push('Target date (' + targetDate + ') is before the set date (' + setDate + '), a goal cannot have a deadline before it was even set, check for a typo.');
+      }
+      advisory.push(...SondrikValidateCore.emDashFields(obj, ['label', 'note'])
+        .map(f => '"' + f + '" contains an em dash, this product never uses one, check for a paste-in.'));
+      qgWarnings.textContent = advisory.join(' ');
       qgOutput.value = JSON.stringify(obj, null, 2) + ',';
       qgOutput.hidden = false;
       qgCopyBtn.hidden = false;

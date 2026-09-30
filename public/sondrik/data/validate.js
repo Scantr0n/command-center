@@ -278,6 +278,18 @@ function main() {
     if (!isDateOrNull(g.setDate)) errors.push(where + ': "setDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(g.setDate));
     else if (isFutureDate(g.setDate)) warnings.push(where + ': "setDate" (' + g.setDate + ') is in the future, a goal should be set as of the day Jack actually set it, check for a typo');
     if (!g.setDate) warnings.push(where + ': no setDate logged, cannot tell when this target was actually set');
+    // Neither isDateOrNull check above catches this: both dates can be
+    // individually well-formed and still be nonsensical together. A
+    // targetDate earlier than the setDate means the deadline was already in
+    // the past on the day the goal was supposedly set, the one hand-edit
+    // slip most likely to produce that: typing last year's date into
+    // targetDate (see isFutureDate's own comment on the same failure mode).
+    // Both sides have to individually pass isDateOrNull first, so this never
+    // compares a malformed string.
+    if (g.targetDate && g.setDate && isDateOrNull(g.targetDate) && isDateOrNull(g.setDate) && g.targetDate < g.setDate) {
+      warnings.push(where + ': "targetDate" (' + g.targetDate + ') is before "setDate" (' + g.setDate +
+        '), a goal cannot have a deadline before it was even set, check for a typo');
+    }
     emDashFields(g, ['label', 'note']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this product never uses one, check for a paste-in'));
   });
