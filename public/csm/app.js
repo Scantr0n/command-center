@@ -1428,9 +1428,12 @@
 
   // Reuses the exact same compute functions renderAttentionBar already
   // calls (computeNudgeRows, computeStalled, computeColdSignal,
-  // computeDataQualityFlags, CSMValidateCore.findDuplicateProspects), so
-  // this card's numbers can never drift from what the attention bar itself
-  // shows for the same real data.
+  // computeDataQualityFlags, CSMValidateCore.findDuplicateProspects,
+  // findCasingDrift x2, findDuplicateHooks), so this card's numbers can
+  // never drift from what the attention bar itself shows for the same real
+  // data. Keep this list in sync by hand: findCasingDrift/findDuplicateHooks
+  // were added to renderAttentionBar after this function existed and were
+  // missed here for a while, undercounting the chip against the bar below it.
   // loadStatus (prospectsFailed / stagesFailed) reflects which source file,
   // if any, actually failed to load this pass (set by the Promise.allSettled
   // handler below). On a failed load, `stages`/`prospects` here are already
@@ -1444,9 +1447,12 @@
     const failedFile = loadStatus.prospectsFailed ? 'prospects.json' : (loadStatus.stagesFailed ? 'stages.json' : null);
     const nudgeRows = computeNudgeRows(prospects);
     const overdueCount = nudgeRows.filter(r => r.days <= 0).length;
+    const casingDriftCount = CSMValidateCore.findCasingDrift(prospects, p => [p.category]).length +
+      CSMValidateCore.findCasingDrift(prospects, p => (p.socialSnapshots || []).map(s => s && s.platform)).length;
     const attentionCount = overdueCount + computeStalled(stages, prospects).length +
       computeColdSignal(prospects).active.length + computeDataQualityFlags(stages, prospects).length +
-      CSMValidateCore.findDuplicateProspects(prospects).length;
+      CSMValidateCore.findDuplicateProspects(prospects).length + casingDriftCount +
+      CSMValidateCore.findDuplicateHooks(prospects).length;
 
     // Skipped on a failed load rather than called with the empty-array
     // overdueCount of 0: that would quietly replace a real "nudges due"
@@ -1479,7 +1485,7 @@
         label: dataIncomplete ? 'attention count unknown'
           : (attentionCount === 1 ? 'item needs attention' : 'items need attention'),
         meta: dataIncomplete ? failedFile + ' failed to load'
-          : (attentionCount ? 'stalled, cold, backfill, or duplicate flags' : 'nothing flagged right now')
+          : (attentionCount ? 'stalled, cold, backfill, duplicate, or spelling flags' : 'nothing flagged right now')
       }
     ];
 
