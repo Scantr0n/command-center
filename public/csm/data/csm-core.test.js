@@ -19,7 +19,8 @@ const {
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
-  CHINA_HOLIDAYS_2026, chinaHolidayOnDate, rollPastChinaHolidays,
+  CHINA_HOLIDAYS_2026, CHINA_HOLIDAYS_COVERED_YEAR, chinaHolidayOnDate, chinaHolidayCalendarCoversDate,
+  rollPastChinaHolidays,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
@@ -334,6 +335,19 @@ test('rollPastChinaHolidays chains a second roll when the day right after a holi
   // after (Sunday 01-04) is a real weekend too, so this needs the loop, not
   // a single fixed jump, to land on the real next working day, Monday 01-05.
   assert.equal(rollPastChinaHolidays('2026-01-01'), '2026-01-05');
+});
+
+test('chinaHolidayCalendarCoversDate is true for a real 2026 date and false once the year rolls over', () => {
+  assert.equal(CHINA_HOLIDAYS_COVERED_YEAR, 2026);
+  assert.equal(chinaHolidayCalendarCoversDate('2026-09-30'), true);
+  assert.equal(chinaHolidayCalendarCoversDate('2027-01-01'), false);
+  assert.equal(chinaHolidayCalendarCoversDate('2025-12-31'), false);
+});
+
+test('chinaHolidayCalendarCoversDate rejects a missing/malformed date rather than throwing', () => {
+  assert.equal(chinaHolidayCalendarCoversDate(null), false);
+  assert.equal(chinaHolidayCalendarCoversDate(undefined), false);
+  assert.equal(chinaHolidayCalendarCoversDate(''), false);
 });
 
 test('rollPastChinaHolidays handles a holiday date landing mid-week after the initial weekday roll', () => {

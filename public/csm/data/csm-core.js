@@ -233,8 +233,23 @@
     { name: 'National Day (Golden Week)', start: '2026-10-01', end: '2026-10-07' }
   ];
 
+  // The year CHINA_HOLIDAYS_2026 actually covers, exposed separately from
+  // the array itself so a caller can tell "not a holiday" (chinaHolidayOnDate
+  // returned null because it genuinely is not one) apart from "this date's
+  // year was never loaded" (it returned null because nobody has entered next
+  // year's real notice yet). Without that distinction, the moment 2027
+  // starts every holiday check on this page silently goes back to
+  // weekend-only with no visible sign anything changed, same failure mode
+  // PLATFORM_REFERENCE_STALE_AFTER_DAYS in app.js exists to avoid for the
+  // platform-marketplace table.
+  const CHINA_HOLIDAYS_COVERED_YEAR = 2026;
+
   function chinaHolidayOnDate(iso) {
     return CHINA_HOLIDAYS_2026.find(h => iso >= h.start && iso <= h.end) || null;
+  }
+
+  function chinaHolidayCalendarCoversDate(iso) {
+    return typeof iso === 'string' && iso.slice(0, 4) === String(CHINA_HOLIDAYS_COVERED_YEAR);
   }
 
   // Rolls a proposed date past both weekends and the real holiday calendar
@@ -1060,7 +1075,8 @@
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
-    CHINA_HOLIDAYS_2026, chinaHolidayOnDate, rollPastChinaHolidays,
+    CHINA_HOLIDAYS_2026, CHINA_HOLIDAYS_COVERED_YEAR, chinaHolidayOnDate, chinaHolidayCalendarCoversDate,
+    rollPastChinaHolidays,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,

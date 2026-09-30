@@ -9,7 +9,7 @@
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
-    chinaHolidayOnDate, rollPastChinaHolidays,
+    chinaHolidayOnDate, chinaHolidayCalendarCoversDate, CHINA_HOLIDAYS_COVERED_YEAR, rollPastChinaHolidays,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
@@ -146,7 +146,10 @@
     else if (b.isBusinessHours) verdict = 'Inside typical business hours, outside that Tue-Thu-morning window.';
     else if (b.isWeekday) verdict = 'Outside typical business hours; a message sent now likely sits unread until morning there.';
     else verdict = 'A weekend in China; a message sent now likely sits unread until Monday there.';
-    beijingTimeNoteEl.textContent = 'Beijing time right now: ' + clock + ', ' + b.weekdayName + '. ' + verdict;
+    const coverageNote = chinaHolidayCalendarCoversDate(b.dateIso)
+      ? ''
+      : ' (Holiday calendar only covers ' + CHINA_HOLIDAYS_COVERED_YEAR + ', only weekends are checked here.)';
+    beijingTimeNoteEl.textContent = 'Beijing time right now: ' + clock + ', ' + b.weekdayName + '. ' + verdict + coverageNote;
   }
 
   // Reference/analytics widgets below the attention bar (platform reference,
