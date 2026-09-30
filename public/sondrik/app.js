@@ -1386,208 +1386,37 @@
     ).join('') + '</ul>';
   }
 
-  // Builds a plain-text snapshot from the same real data files already on
-  // the page, for Jack to paste into a build log or status update himself.
-  // Purely a clipboard copy, nothing here ever transmits anywhere on its own.
+  // Shared, unit-tested copy-generation logic (posts-core.js): the header's
+  // "Copy status update"/"Copy build-in-public post" buttons and each
+  // Channels card's own "Copy draft post" button all read from here now,
+  // same shared-core pattern as the destructures above. This is real,
+  // human-facing text (some of it meant to be pasted into an actual public
+  // post), and until now none of it had a regression test. fmtDate,
+  // currentMetricValue, and today's real date are injected via POST_OPTS
+  // since posts-core.js has no script-load-order dependency on this file
+  // or on goals-core.js, a test can supply its own.
+  const {
+    buildStatusUpdate: buildStatusUpdateCore, buildPublicPost: buildPublicPostCore,
+    buildChannelDraftPost: buildChannelDraftPostCore
+  } = window.SondrikPostsCore;
+
+  function postOpts() {
+    return { fmtDate, currentMetricValue, todayIsoStr: todayIso() };
+  }
+
   function buildStatusUpdate(releasesData, downloadsData, leadsData, goalsData, channelsData) {
-    const lines = ['Sondrik status snapshot, generated ' + fmtDate(todayIso())];
-
-    const releases = ((releasesData && releasesData.releases) || []).slice()
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    if (releases.length > 0) {
-      const r = releases[0];
-      const rel = relativeDaysLabel(r.date);
-      lines.push('');
-      lines.push('Latest release: v' + r.version + (r.date ? ' (' + fmtDate(r.date) + (rel ? ', ' + rel : '') + ')' : '') +
-        (r.summary ? ', ' + r.summary : ''));
-    }
-
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length > 0) {
-      const latest = checks[checks.length - 1];
-      let line = latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date);
-      if (checks.length > 1) {
-        const first = checks[0];
-        const delta = latest.count - first.count;
-        line += ' (' + (delta >= 0 ? '+' : '') + delta + ' vs ' + fmtDate(first.date) + ' check)';
-      }
-      if (metric.source) line += '. Source: ' + metric.source;
-      lines.push('');
-      lines.push(line);
-    }
-
-    const leads = (leadsData && leadsData.leads) || [];
-    if (leads.length > 0) {
-      lines.push('');
-      leads.forEach(l => {
-        const o = l.outreach || {};
-        const status = o.sent ? 'sent'
-          : (o.approvalStatus === 'awaiting-approval' ? 'drafted, awaiting approval' : (o.draftStatus || 'no draft yet'));
-        lines.push('Lead: ' + (l.sourceDetail || l.source || 'Unknown source') +
-          (l.summary ? ', ' + l.summary : '') + ' [' + status + ']');
-      });
-    }
-
-    const goals = (goalsData && goalsData.goals) || [];
-    if (goals.length > 0) {
-      lines.push('');
-      goals.forEach(g => {
-        const current = currentMetricValue(g.metric, downloadsData, leadsData);
-        const currentCount = current ? current.count : 0;
-        lines.push('Goal: ' + g.label + ', ' + currentCount + ' / ' + g.target +
-          (g.targetDate ? ' by ' + fmtDate(g.targetDate) : ''));
-      });
-    }
-
-    // Not-tracked channels don't have a real number to add to the snapshot
-    // above, but leaving them out silently would let a reader assume the
-    // downloads/leads figures already cover every channel Jack is watching.
-    // Tracked and manual-log channels are skipped here, their real numbers
-    // are already the downloads/lead lines above, repeating them would just
-    // be the same fact twice.
-    const gaps = ((channelsData && channelsData.channels) || []).filter(c => c.status === 'not-tracked');
-    if (gaps.length > 0) {
-      lines.push('');
-      lines.push('Not tracked yet: ' + gaps.map(c => c.name || 'Unnamed channel').join(', ') + '.');
-    }
-
-    return lines.join('\n');
+    return buildStatusUpdateCore(releasesData, downloadsData, leadsData, goalsData, channelsData, postOpts());
   }
 
-  // Indie/solo founder dashboards commonly expose a one-tap "copy a
-  // build-in-public post" alongside an internal status log, since sharing real
-  // traction on X/Reddit is a normal part of that workflow. This is a
-  // separate, shorter composition from buildStatusUpdate above, not a
-  // trimmed copy of it: it drops internal-only detail (next steps, the
-  // approval-gated lead's draft/approval status) and instead writes the same
-  // real facts as a plain sentence or two meant to be posted publicly. It
-  // still only ever states what is already real and logged elsewhere on the
-  // page, and it is still just a clipboard copy, nothing here posts on its
-  // own behalf.
   function buildPublicPost(releasesData, downloadsData, leadsData) {
-    const parts = [];
-
-    const releases = ((releasesData && releasesData.releases) || []).slice()
-      .filter(r => r.date)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    if (releases.length > 0) {
-      const r = releases[0];
-      parts.push('Sondrik v' + r.version + ' shipped ' + fmtDate(r.date) +
-        (r.summary ? ' (' + r.summary.replace(/\.$/, '') + ')' : '') + '.');
-    }
-
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length > 0) {
-      const latest = checks[checks.length - 1];
-      let line = latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date);
-      if (checks.length > 1) {
-        const first = checks[0];
-        line += ', up from ' + first.count + ' on ' + fmtDate(first.date);
-      }
-      parts.push(line + '.');
-    }
-
-    const leads = (leadsData && leadsData.leads) || [];
-    const testerOffers = leads.filter(l => l.type === 'beta-tester-offer');
-    if (testerOffers.length > 0) {
-      parts.push((testerOffers.length === 1 ? 'One' : String(testerOffers.length)) +
-        ' real reader offered to test it in exchange for lifetime access.');
-    }
-
-    if (parts.length === 0) return '';
-    return parts.join(' ');
+    return buildPublicPostCore(releasesData, downloadsData, leadsData, postOpts());
   }
-
-  // Turns the channel norms already researched in the "Distribution channel
-  // norms reference" table into an actual copy-paste starting point, one per
-  // not-tracked channel with no post made yet. Same discipline as
-  // buildPublicPost above: every sentence is built from a real logged fact
-  // (version, ship date, summary, download count, source), never an invented
-  // pitch or story. Where a real one-line pitch or narrative is genuinely
-  // needed and nothing logged here has it (Show HN and Product Hunt both
-  // require a short pitch line; r/SideProject and Indie Hackers Milestones
-  // both explicitly reward a real "why/what I learned" story per the norms
-  // table), this leaves an obvious bracketed placeholder rather than
-  // fabricating marketing copy, the same "leave it null/blank, don't guess"
-  // rule the schema-help section already applies to hand-edited JSON.
-  function realFactsLine(releasesData, downloadsData) {
-    const parts = [];
-    const releases = ((releasesData && releasesData.releases) || []).slice()
-      .filter(r => r.date)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    if (releases.length > 0) {
-      const r = releases[0];
-      parts.push('v' + r.version + ' shipped ' + fmtDate(r.date) + (r.summary ? ': ' + r.summary.replace(/\.$/, '') + '.' : '.'));
-    }
-    const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    if (checks.length > 0) {
-      const latest = checks[checks.length - 1];
-      parts.push(latest.count + ' ' + (metric.label || 'downloads') + ' as of ' + fmtDate(latest.date) +
-        (metric.source ? ' (' + metric.source + ')' : '') + '.');
-    }
-    return parts.join(' ');
-  }
-
-  const CHANNEL_POST_BUILDERS = {
-    'hacker-news': (releasesData, downloadsData) => {
-      const facts = realFactsLine(releasesData, downloadsData);
-      if (!facts) return null;
-      return {
-        title: 'Show HN: Sondrik - [one-line pitch, fill in before posting]',
-        body: 'I built Sondrik, a CRM tool. ' + facts +
-          '\n\n[Add why you built it, then post yourself once ready. HN\'s own guidelines ban generated/AI-edited replies in the comment thread, so any reply once this is live needs to actually be typed by you.]'
-      };
-    },
-    'product-hunt': (releasesData, downloadsData) => {
-      const facts = realFactsLine(releasesData, downloadsData);
-      if (!facts) return null;
-      return {
-        title: 'Tagline: Sondrik - [one-line pitch, fill in before posting]',
-        body: facts + '\n\n[Add a real screenshot or short clip before submitting, then plan to answer comments yourself the day it launches.]'
-      };
-    },
-    'r-sideproject': (releasesData, downloadsData) => {
-      const facts = realFactsLine(releasesData, downloadsData);
-      if (!facts) return null;
-      const releases = ((releasesData && releasesData.releases) || []);
-      const latest = releases.length ? releases[releases.length - 1] : null;
-      return {
-        title: 'Sondrik' + (latest ? ' v' + latest.version : '') + ' - [one-line pitch, fill in before posting]',
-        body: 'I\'ve been building Sondrik, a CRM tool. ' + facts +
-          '\n\n[Add the real story: why you built it, what you learned. r/SideProject removes low-effort link drops with no real description.]'
-      };
-    },
-    'indie-hackers-milestones': (releasesData, downloadsData) => {
-      const metric = (downloadsData && downloadsData.metric) || {};
-      const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-      if (checks.length === 0) return null;
-      const latest = checks[checks.length - 1];
-      const facts = realFactsLine(releasesData, downloadsData);
-      return {
-        title: latest.count + ' ' + (metric.label || 'downloads') + ' for Sondrik',
-        body: facts + '\n\n[Add what you actually learned getting here. Milestone posts with a real story get far more engagement than a bare announcement, per Indie Hackers\' own posting guidance.]'
-      };
-    },
-    // Reuses the exact same real-facts composition the header's own "Copy
-    // build-in-public post" button already builds for X, rather than a
-    // second, possibly-drifting copy of the same logic. No separate title
-    // line, X has no title field.
-    'x-twitter': (releasesData, downloadsData, leadsData) => {
-      const text = buildPublicPost(releasesData || {}, downloadsData || {}, leadsData || {});
-      return text ? { title: null, body: text } : null;
-    }
-  };
 
   function buildChannelDraftPost(channelId, releasesData, downloadsData, leadsData) {
-    const builder = CHANNEL_POST_BUILDERS[channelId];
-    if (!builder) return null;
-    const draft = builder(releasesData, downloadsData, leadsData);
-    if (!draft) return null;
-    return draft.title ? draft.title + '\n\n' + draft.body : draft.body;
+    return buildChannelDraftPostCore(channelId, releasesData, downloadsData, leadsData, postOpts());
   }
+
+  const CHANNEL_POST_BUILDERS = window.SondrikPostsCore.CHANNEL_POST_BUILDERS;
 
   // The real filter/date math now lives in release-core.js alongside
   // BUGFIX_CHECKPOINTS/bugfixCheckinStatus, same reason those were split
