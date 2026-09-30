@@ -345,6 +345,35 @@ test('validateSubmissions requires returnedDate once status is returned', () => 
   assert.ok(warnings.some(w => w.includes('returnedDate')));
 });
 
+test('validateSubmissions warns when cost/cardCount works out to an implausible per-card price', () => {
+  const tooLow = validateSubmissions([
+    { id: 'a', description: 'test batch', gradingCompany: 'PSA', status: 'in-queue', cardCount: 10, cost: 50 }
+  ]);
+  assert.ok(tooLow.warnings.some(w => w.includes('$5.00/card')));
+
+  const tooHigh = validateSubmissions([
+    { id: 'b', description: 'test batch', gradingCompany: 'PSA', status: 'in-queue', cardCount: 1, cost: 5000 }
+  ]);
+  assert.ok(tooHigh.warnings.some(w => w.includes('$5000.00/card')));
+
+  const realistic = validateSubmissions([
+    { id: 'c', description: 'test batch', gradingCompany: 'BGS', status: 'in-queue', cardCount: 12, cost: 959.4 }
+  ]);
+  assert.ok(!realistic.warnings.some(w => w.includes('/card')));
+});
+
+test('validateSubmissions skips the per-card price sanity check for declared-value tiers (SGC Expedited, CGC WalkThrough)', () => {
+  const sgc = validateSubmissions([
+    { id: 'a', description: 'test batch', gradingCompany: 'SGC', serviceLevel: 'Expedited', status: 'in-queue', cardCount: 1, cost: 3750 }
+  ]);
+  assert.ok(!sgc.warnings.some(w => w.includes('/card')));
+
+  const cgc = validateSubmissions([
+    { id: 'b', description: 'test batch', gradingCompany: 'CGC', serviceLevel: 'WalkThrough', status: 'in-queue', cardCount: 1, cost: 2 }
+  ]);
+  assert.ok(!cgc.warnings.some(w => w.includes('/card')));
+});
+
 test('validateCandidates requires a labeled basis on rawValue and expectedGradedValue independently', () => {
   const rawOnly = validateCandidates([
     { id: 'a', cardName: 'X', sport: 'hockey', rawValue: 5, rawValueBasis: null }

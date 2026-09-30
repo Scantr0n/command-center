@@ -588,6 +588,35 @@
         }
       }
 
+      // Below every flat per-card fee this tracker's own "Grading service
+      // tiers reference" knows about (BGS Base, $14.95/card, the real floor)
+      // or above the highest (PSA Premier, $599/card) almost always means
+      // "cost" or "cardCount" was typed wrong, not a real price -- the most
+      // common real way this drifts is entering a batch's total invoice as
+      // if it were already the per-card figure, or the reverse. Skips SGC
+      // Expedited and CGC WalkThrough, the two tiers that price by the
+      // card's own declared value rather than a flat per-card fee, since a
+      // genuinely valuable card can fall well outside a flat range there.
+      // These bounds are drawn from the reference table reviewed 2026-09-29;
+      // widen them if a company's own published fee ever moves past either
+      // edge for real.
+      if (typeof s.cost === 'number' && !Number.isNaN(s.cost) && s.cost >= 0 &&
+        Number.isInteger(s.cardCount) && s.cardCount > 0 &&
+        !(s.gradingCompany === 'SGC' && s.serviceLevel === 'Expedited') &&
+        !(s.gradingCompany === 'CGC' && s.serviceLevel === 'WalkThrough')) {
+        const perCard = s.cost / s.cardCount;
+        if (perCard < 10) {
+          warnings.push(where + ': cost works out to $' + perCard.toFixed(2) + '/card across ' + s.cardCount +
+            ' card(s), below every real flat per-card grading fee this tracker knows about. Common cause: "cost" ' +
+            'got typed as a per-card price instead of the real total for the whole batch.');
+        } else if (perCard > 700) {
+          warnings.push(where + ': cost works out to $' + perCard.toFixed(2) + '/card across ' + s.cardCount +
+            ' card(s), above every real flat per-card grading fee this tracker knows about (PSA Premier, the ' +
+            'priciest flat tier, tops out at $599/card). Common cause: "cardCount" is missing a card, or "cost" ' +
+            'is really the per-card price already multiplied in.');
+        }
+      }
+
       if (!isDateOrNull(s.submittedDate)) {
         errors.push(where + ': "submittedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.submittedDate));
       }
