@@ -18,7 +18,8 @@ const assert = require('node:assert/strict');
 const {
   isDateOrNull, findDuplicateGroups, findDuplicateCertGroups, findDuplicateCandidateGroups, findGradeLadderInversions,
   findListingPriceMismatches, findOrphanSubmissionRefs, findReturnedSubmissionsMissingCards, validateCards,
-  validateSubmissions, validateCandidates
+  validateSubmissions, validateCandidates,
+  LISTING_PRICE_MISMATCH_RATIO_HIGH, LISTING_PRICE_MISMATCH_RATIO_LOW, listingPriceMismatchPct
 } = require('./validate-core.js');
 
 test('isDateOrNull accepts null and real calendar dates, rejects impossible ones', () => {
@@ -275,6 +276,22 @@ test('findListingPriceMismatches does not flag a listing that is only modestly a
     { id: 'b', cardName: 'Y', estimatedValue: 100, listedPrice: 300, listedDate: '2026-08-08', soldDate: '2026-08-09', soldPrice: 290 }
   ];
   assert.deepEqual(findListingPriceMismatches(cards), []);
+});
+
+test('listingPriceMismatchPct and the exported thresholds match what findListingPriceMismatches itself flags', () => {
+  // The card detail modal (app.js) shows this exact "listed X% above/below
+  // estimate" note on its own Listed price field, imported from here rather
+  // than re-hardcoding its own copy of the 1.5/0.5 thresholds and the
+  // rounding formula, so the two can never silently drift apart.
+  assert.equal(LISTING_PRICE_MISMATCH_RATIO_HIGH, 1.5);
+  assert.equal(LISTING_PRICE_MISMATCH_RATIO_LOW, 0.5);
+  assert.equal(listingPriceMismatchPct(2), 100, 'listed at 2x estimate is 100% above');
+  assert.equal(listingPriceMismatchPct(0.5), 50, 'listed at 0.5x estimate is 50% below');
+  assert.equal(listingPriceMismatchPct(1.5), 50);
+
+  const cards = [{ id: 'a', cardName: 'X', estimatedValue: 50, listedPrice: 100, listedDate: '2026-08-08' }];
+  const [flag] = findListingPriceMismatches(cards);
+  assert.equal(listingPriceMismatchPct(flag.ratio), 100, 'matches the real ratio findListingPriceMismatches itself computed');
 });
 
 test('findOrphanSubmissionRefs flags a card whose submissionId does not match any real submission', () => {

@@ -3655,11 +3655,15 @@ function openModal(id) {
         : activeCard.listedDate;
       body += field('Listed date', listedDateDisplay, false);
       let listedPriceDisplay = activeCard.listedPrice != null ? formatUsd(activeCard.listedPrice) : null;
+      // Same thresholds/rounding CGTValidateCore.findListingPriceMismatches
+      // uses for the Data Quality warning on this same field, imported
+      // rather than re-hardcoded, so this note can never silently drift out
+      // of sync with what Data Quality actually flags for this card.
       if (activeCard.listedPrice != null && activeCard.estimatedValue > 0) {
         const ratio = activeCard.listedPrice / activeCard.estimatedValue;
-        if (ratio >= 1.5 || ratio <= 0.5) {
-          const pct = Math.round(Math.abs(ratio - 1) * 100);
-          listedPriceDisplay += ' (' + pct + '% ' + (ratio >= 1.5 ? 'above' : 'below') + ' the researched estimate, worth a look)';
+        if (ratio >= CGTValidateCore.LISTING_PRICE_MISMATCH_RATIO_HIGH || ratio <= CGTValidateCore.LISTING_PRICE_MISMATCH_RATIO_LOW) {
+          const pct = CGTValidateCore.listingPriceMismatchPct(ratio);
+          listedPriceDisplay += ' (' + pct + '% ' + (ratio >= CGTValidateCore.LISTING_PRICE_MISMATCH_RATIO_HIGH ? 'above' : 'below') + ' the researched estimate, worth a look)';
         }
       }
       body += field('Listed price', listedPriceDisplay, activeCard.listedPrice == null);

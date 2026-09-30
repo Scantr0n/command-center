@@ -428,7 +428,7 @@
     });
 
     findListingPriceMismatches(cards).forEach(({ card, ratio, direction }) => {
-      const pct = Math.round(Math.abs(ratio - 1) * 100);
+      const pct = listingPriceMismatchPct(ratio);
       warnings.push('listed price looks ' + direction + ' the researched estimate: "' + (card.cardName || card.id) +
         '" (' + (card.id || '(missing id)') + ') is listed at $' + card.listedPrice + ', ' + pct + '% ' + direction +
         ' its own researched estimate of $' + card.estimatedValue + '. Could be intentional, but worth double-' +
@@ -495,14 +495,31 @@
   // 1.5x or 0.5x gap is far more often a forgotten re-list or a stale
   // estimate than a deliberate pricing choice. A warning, not an error: a
   // real collector sometimes does list well above or below book on purpose.
+  // The exact 1.5x/0.5x thresholds above, as named constants: the card
+  // detail modal (app.js) shows this same "listed X% above/below estimate"
+  // note on its own Listed price field, and used to re-derive both the
+  // thresholds and the rounding below as its own hardcoded copy rather than
+  // importing these, a real drift risk (tune the threshold here and the
+  // modal's copy silently stops matching what Data Quality actually flags
+  // for the same card) even though nothing has drifted yet.
+  const LISTING_PRICE_MISMATCH_RATIO_HIGH = 1.5;
+  const LISTING_PRICE_MISMATCH_RATIO_LOW = 0.5;
+
+  // The exact "how far off" percentage both findListingPriceMismatches'
+  // own warning text above and the card detail modal display, extracted so
+  // neither has its own copy of Math.round(Math.abs(ratio - 1) * 100).
+  function listingPriceMismatchPct(ratio) {
+    return Math.round(Math.abs(ratio - 1) * 100);
+  }
+
   function findListingPriceMismatches(cards) {
     const flags = [];
     (cards || []).forEach(c => {
       if (c.listedPrice == null || c.estimatedValue == null || c.estimatedValue <= 0) return;
       if (c.soldPrice != null && c.soldDate != null) return;
       const ratio = c.listedPrice / c.estimatedValue;
-      if (ratio >= 1.5) flags.push({ card: c, ratio, direction: 'above' });
-      else if (ratio <= 0.5) flags.push({ card: c, ratio, direction: 'below' });
+      if (ratio >= LISTING_PRICE_MISMATCH_RATIO_HIGH) flags.push({ card: c, ratio, direction: 'above' });
+      else if (ratio <= LISTING_PRICE_MISMATCH_RATIO_LOW) flags.push({ card: c, ratio, direction: 'below' });
     });
     return flags;
   }
@@ -753,6 +770,7 @@
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findDuplicateCertGroups,
     findDuplicateCandidateGroups, findGradeLadderInversions, findListingPriceMismatches, findOrphanSubmissionRefs,
     findReturnedSubmissionsMissingCards,
+    LISTING_PRICE_MISMATCH_RATIO_HIGH, LISTING_PRICE_MISMATCH_RATIO_LOW, listingPriceMismatchPct,
     isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
     SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };
