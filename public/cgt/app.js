@@ -595,6 +595,8 @@ async function loadCards() {
     renderGradeLadderFlags();
     renderListingPriceFlags();
     renderAttentionBar();
+    checkSubmissionAlerts();
+    startSubmissionAlertPoll();
     renderBatchFilter();
     renderInsuranceSummary();
     renderCoverageCheck();
@@ -4822,5 +4824,148 @@ updateOfflineBanner();
 renderGradingReferenceFreshness();
 renderGradingStandardsFreshness();
 renderTaxTrackerFreshness();
+
+// Native OS-level alert, opt-in, for the one real gap the attention bar
+// above can't cover: this is a static-data hub with no live backend polling
+// it, so a submission can cross from "on track" into past-that-grader's-own
+// average turnaround (see the overdueSubmissionsCount flag in
+// renderAttentionBar above) while this tab sits open and unfocused in
+// another window, with nothing pulling Jack's eye back to it. Same real
+// pattern Sondrik/CSM/Alpha/Job Search/Garage's own notify toggles already
+// ship (see their app.js): the browser's own Notification API, built only
+// from data already computed on this page, opt-in, one-shot per transition,
+// never sent anywhere and never a path back to any real grader or platform.
+const notifyBtn = document.getElementById('notifyBtn');
+const testAlertBtn = document.getElementById('testAlertBtn');
+const NOTIFY_PREF_KEY = 'cgt:notifyEnabled';
+const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+
+function loadNotifyPref() {
+  try { return localStorage.getItem(NOTIFY_PREF_KEY) === 'true'; } catch (e) { return false; }
+}
+function saveNotifyPref(enabled) {
+  try { localStorage.setItem(NOTIFY_PREF_KEY, enabled ? 'true' : 'false'); } catch (e) { /* private browsing: works this load only */ }
+}
+
+function renderNotifyBtn() {
+  if (!notifyBtn) return;
+  if (!notifySupported) { notifyBtn.hidden = true; return; }
+  const permission = Notification.permission;
+  if (permission === 'denied') {
+    notifyBtn.hidden = false;
+    notifyBtn.disabled = true;
+    notifyBtn.classList.remove('notify-on');
+    notifyBtn.textContent = 'Turnaround alerts blocked';
+    notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+    notifyBtn.removeAttribute('aria-pressed');
+    if (testAlertBtn) testAlertBtn.hidden = true;
+    return;
+  }
+  const enabled = permission === 'granted' && loadNotifyPref();
+  notifyBtn.hidden = false;
+  notifyBtn.disabled = false;
+  notifyBtn.classList.toggle('notify-on', enabled);
+  // Real toggle-button semantics (this button's own state persists across
+  // clicks, it isn't a one-shot action like Export CSV).
+  notifyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  notifyBtn.textContent = enabled ? 'Turnaround alerts on' : 'Enable turnaround alerts';
+  notifyBtn.title = enabled
+    ? 'A native notification fires when a submission crosses past its grader’s own average turnaround while this tab is unfocused. Click to turn off.'
+    : 'Get a native notification when a submission crosses past its grader’s own average turnaround while this tab is unfocused.';
+  // A granted browser permission doesn't guarantee the OS actually surfaces
+  // it (Do Not Disturb, a muted notification center entry for this
+  // browser), so once armed, offer a way to check that end-to-end instead
+  // of finding out only during a real overdue submission.
+  if (testAlertBtn) testAlertBtn.hidden = !enabled;
+}
+
+if (testAlertBtn) {
+  testAlertBtn.addEventListener('click', () => {
+    if (!notifySupported || Notification.permission !== 'granted') return;
+    const original = testAlertBtn.textContent;
+    try {
+      new Notification('Card Grading Tracker (test)', {
+        body: 'Test alert, no real submission state change. A real overdue-submission alert looks just like this.',
+        icon: '/icon-192.png',
+        tag: 'cgt-submission-test'
+      });
+      testAlertBtn.textContent = 'Test alert sent';
+    } catch (e) {
+      testAlertBtn.textContent = "Couldn't send";
+    }
+    setTimeout(() => { testAlertBtn.textContent = original; }, 1800);
+  });
+}
+
+if (notifyBtn && notifySupported) {
+  notifyBtn.addEventListener('click', async () => {
+    if (Notification.permission === 'denied') return;
+    if (Notification.permission === 'default') {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') saveNotifyPref(true);
+      renderNotifyBtn();
+      return;
+    }
+    // Already granted: this button just toggles Jack's own preference,
+    // never re-prompts, since the browser permission itself already
+    // covers that question.
+    saveNotifyPref(!loadNotifyPref());
+    renderNotifyBtn();
+  });
+}
+renderNotifyBtn();
+
+// Same overdueSubmissionsCount rule as renderAttentionBar's own flag above:
+// a returned-eligible submission that's crossed past its grader's real
+// average turnaround (or the published estimate, once at least 2 real
+// returns exist to average from).
+function countOverdueSubmissions() {
+  const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
+  return buildActiveSubmissions()
+    .filter(s => !isExampleSubmission(s) && estimatedReturnFor(s, turnaroundByGrader).runningLong).length;
+}
+
+// One-shot per transition (never re-fires on the next poll while the
+// overdue count just stays where it was), and only while this tab genuinely
+// isn't the one Jack is looking at right now, same suppression Sondrik/CSM/
+// Alpha/Job Search/Garage's own notify checks already use, so enabling this
+// can never double up with the on-page attention bar while the tab is
+// actually visible. previousOverdueCount starts null so the very first
+// check after page load only ever sets a baseline, it never fires (opening
+// the page itself is not a real transition).
+let previousOverdueCount = null;
+function checkSubmissionAlerts() {
+  if (!notifySupported) return;
+  const overdue = countOverdueSubmissions();
+  const isFirstCheck = previousOverdueCount === null;
+  const grewMoreOverdue = !isFirstCheck && overdue > previousOverdueCount;
+  previousOverdueCount = overdue;
+  if (isFirstCheck || !grewMoreOverdue) return;
+  if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
+  if (document.visibilityState === 'visible' && document.hasFocus()) return;
+  try {
+    const body = overdue === 1
+      ? 'A submission is now past its grader’s own average turnaround.'
+      : overdue + ' submissions are now past their grader’s own average turnaround.';
+    const notification = new Notification('Card Grading Tracker', { body, icon: '/icon-192.png', tag: 'cgt-submission' });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+      const target = document.getElementById('submissionsSection');
+      if (target) target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    };
+  } catch (e) {
+    // A granted permission can still throw post-revoke (e.g. a
+    // since-revoked OS-level permission); fail silently, the on-page
+    // attention bar already carries this state.
+  }
+}
+const SUBMISSION_ALERT_POLL_MS = 10 * 60 * 1000;
+let submissionAlertPollStarted = false;
+function startSubmissionAlertPoll() {
+  if (submissionAlertPollStarted) return;
+  submissionAlertPollStarted = true;
+  setInterval(checkSubmissionAlerts, SUBMISSION_ALERT_POLL_MS);
+}
 
 loadCards();
