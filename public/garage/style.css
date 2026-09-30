@@ -1572,6 +1572,19 @@ textarea.np-input { resize: vertical; }
   }
 }
 
+/* Windows/browser forced-colors mode strips background-color to the system
+   Canvas color. .tax-progress-track keeps its own hairline border so the
+   track itself stays visible, but .tax-progress-fill has no border of its
+   own, so a real $200-of-$600 progress and a real $0 progress render as the
+   identical empty outlined box. Same real gap already fixed on Sondrik's
+   goal/launch-window/compare-bar fills and on CGT's breakdown/tax bars:
+   mark the fill's own leading edge with a CanvasText border instead. */
+@media (forced-colors: active) {
+  .tax-progress-fill {
+    border-right: 2px solid CanvasText;
+  }
+}
+
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
   /* Real bug already found and fixed on Command Center's main dashboard,

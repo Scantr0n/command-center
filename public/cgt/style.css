@@ -1560,6 +1560,24 @@ textarea.np-input { resize: vertical; }
   }
 }
 
+/* Windows/browser forced-colors mode strips background-color to the system
+   Canvas color, the only thing distinguishing the value-breakdown bars and
+   the 1099-K progress bar from the track they sit inside, and neither track
+   has a border either (unlike this page's print stylesheet below, which
+   already patches one in), so the whole bar disappears rather than just
+   losing its fill. Same real gap already fixed on Sondrik's goal/
+   launch-window/compare-bar fills: an explicit CanvasText border on the
+   track so it stays visible at all, plus a border on the fill's own leading
+   edge so a 10% bar and a 90% bar don't render identically. */
+@media (forced-colors: active) {
+  .breakdown-bar-track, .tax-progress-track {
+    border: 1px solid CanvasText;
+  }
+  .breakdown-bar-fill, .tax-progress-fill {
+    border-right: 2px solid CanvasText;
+  }
+}
+
 /* Print / export to PDF: a plain, light, single-column handout. */
 @media print {
   /* The rest of this block resets body's own color, plus hand-patches a
