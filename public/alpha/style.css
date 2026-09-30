@@ -693,6 +693,18 @@ header.page-head .sub {
     border-style: double;
     border-width: 3px;
   }
+  /* Same real gap, one more component: .meter-fill (drawdown/position-
+     sizing risk gauges) has no border of its own, so its background-color
+     collapsing to Canvas leaves an empty track where a real 10% and a real
+     90% reading look identical. Same CanvasText edge already used on CGT/
+     Garage/Sondrik's own progress fills. (.regime-dist-segment gets the
+     equivalent fix further down, near its own unconditional border-right
+     rule, since a same-specificity rule declared later in the file there
+     would otherwise win the cascade over this block regardless of the
+     media query.) */
+  .meter-fill {
+    border-right: 2px solid CanvasText;
+  }
 }
 
 /* Both strips above are built as real <button> elements, not plain <span>s
@@ -849,6 +861,20 @@ header.page-head .sub {
   min-width: 2px;
 }
 .regime-dist-segment:last-child { border-right: none; }
+/* Own rule rather than living in the shared forced-colors block above:
+   needs to come after the unconditional border-right: 1px rule right above
+   (same 0,0,1,0 specificity, so source order decides the tie regardless of
+   the media query) to actually win. Real bug this segment shares with
+   .meter-fill above: the existing border-right is a near-invisible
+   rgba(0,0,0,0.35) hairline, not a real system color, so adjacent regime
+   segments collapse into one indistinguishable block once background-color
+   is stripped to Canvas. :last-child's own border-right: none is left
+   alone, it never needed a divider even outside forced-colors. */
+@media (forced-colors: active) {
+  .regime-dist-segment {
+    border-right: 2px solid CanvasText;
+  }
+}
 .regime-dist-segment:focus-visible {
   outline: 1.5px solid var(--hairlineHover);
   outline-offset: -2px;
