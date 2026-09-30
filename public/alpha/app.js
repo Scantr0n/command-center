@@ -1190,11 +1190,17 @@ function renderDailyUptime(data, clientHistory) {
 // entries every other connectivity stat on this page already uses.
 function uptimeWindowBadge(win) {
   if (win.pct == null) {
-    return `<span class="uptime-window-badge unknown" title="No connectivity checks recorded in the last ${win.days} days yet.">${win.days}d <em>not enough data yet</em></span>`;
+    // Same info in the visible text and in aria-label/title: a badge like
+    // this is never wrapped in a button (nothing to click), so a
+    // screen-reader user gets nothing beyond the accessible name, unlike the
+    // tick strips above whose own aria-label/data-tick-detail combo at least
+    // sits on a real, focusable <button>.
+    const label = `${win.days} days: no connectivity checks recorded in that window yet`;
+    return `<span class="uptime-window-badge unknown" title="No connectivity checks recorded in the last ${win.days} days yet." aria-label="${escapeHtml(label)}">${win.days}d <em>not enough data yet</em></span>`;
   }
   const pctText = Number.isInteger(win.pct) ? String(win.pct) : win.pct.toFixed(1);
-  const title = `${pctText}% up over the last ${win.days} days (${win.checks} check${win.checks === 1 ? '' : 's'} recorded)`;
-  return `<span class="uptime-window-badge ${dailyUptimeClass(win.pct)}" title="${escapeHtml(title)}"><strong>${win.days}d</strong> ${pctText}%</span>`;
+  const detail = `${pctText}% up over the last ${win.days} days (${win.checks} check${win.checks === 1 ? '' : 's'} recorded)`;
+  return `<span class="uptime-window-badge ${dailyUptimeClass(win.pct)}" title="${escapeHtml(detail)}" aria-label="${escapeHtml(detail)}"><strong>${win.days}d</strong> ${pctText}%</span>`;
 }
 
 function renderUptimeWindows(data, clientHistory) {
