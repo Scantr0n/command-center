@@ -762,6 +762,17 @@ header.page-head .sub {
 .incident-streak-down {
   color: #E8A0A0;
 }
+/* Mean-time-to-recovery, paired next to the streak badge above: neutral dim
+   text rather than the streak's accent green, since a recovery-time average
+   isn't itself a "things are good" signal the way an incident-free streak
+   is, just a real measured number. */
+.incident-mttr {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--dim);
+  font-weight: 500;
+  margin-left: 10px;
+}
 .incident-list {
   list-style: none;
   margin: 0;

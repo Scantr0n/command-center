@@ -358,6 +358,25 @@
     return computeStateRuns(history, 'connected', false);
   }
 
+  // Statuspage/incident.io-style "mean time to recovery": the average real
+  // duration of a completed incident, the other headline stat these tools
+  // pair with an uptime percentage (uptime says how often it broke, MTTR
+  // says how long it took to come back each time). Built from the same
+  // computeIncidents output the incident list and streak badge already use,
+  // so it can never disagree with what's on screen. Deliberately averages
+  // only completed incidents (ongoing: false): a still-open incident has no
+  // real recovery time yet, and folding its still-growing elapsed duration
+  // in would silently drag the average toward whatever moment happened to
+  // call this, not a real completed recovery. Returns null (nothing shown)
+  // when there are no completed incidents to average, same honest-empty-
+  // state rule as computeIncidentFreeStreak above.
+  function computeMTTR(history) {
+    const completed = computeIncidents(history).filter(i => !i.ongoing);
+    if (!completed.length) return null;
+    const totalMs = completed.reduce((sum, i) => sum + (new Date(i.end).getTime() - new Date(i.start).getTime()), 0);
+    return { ms: totalMs / completed.length, count: completed.length };
+  }
+
   // Statuspage-style "N days without an incident" streak, the one-line trust
   // signal real status pages lead with above their own incident list (see
   // computeIncidents just above, whose output this reuses rather than
@@ -486,6 +505,7 @@
     currentStateStartedAt,
     computeIncidents,
     computeIncidentFreeStreak,
+    computeMTTR,
     computeKillSwitchEpisodes,
     dayKeyLocal,
     computeDailyUptimeBuckets,

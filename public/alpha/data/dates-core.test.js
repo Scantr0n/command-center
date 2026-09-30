@@ -23,6 +23,7 @@ const {
   currentStateStartedAt,
   computeIncidents,
   computeIncidentFreeStreak,
+  computeMTTR,
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
@@ -257,6 +258,39 @@ test('computeIncidentFreeStreak reports inactive while the most recent incident 
   ];
   const streak = computeIncidentFreeStreak(history, Date.now());
   assert.deepEqual(streak, { active: false, since: null, everIncident: true, ms: 0 });
+});
+
+test('computeMTTR averages only completed incidents, in ms, over their real count', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:15:00Z', connected: true }, // incident 1: 10m
+    { at: '2026-09-12T10:00:00Z', connected: false },
+    { at: '2026-09-12T10:30:00Z', connected: true } // incident 2: 30m
+  ];
+  const mttr = computeMTTR(history);
+  assert.deepEqual(mttr, { ms: 20 * 60000, count: 2 });
+});
+
+test('computeMTTR excludes a still-ongoing incident from the average', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:15:00Z', connected: true }, // incident 1: 10m, completed
+    { at: '2026-09-12T10:00:00Z', connected: false } // incident 2: still ongoing
+  ];
+  const mttr = computeMTTR(history);
+  assert.deepEqual(mttr, { ms: 10 * 60000, count: 1 });
+});
+
+test('computeMTTR is null with no completed incidents, or no history', () => {
+  assert.equal(computeMTTR([]), null);
+  assert.equal(computeMTTR(undefined), null);
+  assert.equal(computeMTTR([{ at: 'x', connected: true }]), null);
+  assert.equal(computeMTTR([
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false }
+  ]), null);
 });
 
 test('computeIncidentFreeStreak is null with no recorded history', () => {

@@ -57,6 +57,7 @@ const {
   currentStateStartedAt,
   computeIncidents,
   computeIncidentFreeStreak,
+  computeMTTR,
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
@@ -1046,6 +1047,29 @@ function renderIncidentStreak(data, clientHistory) {
   el.textContent = streak.everIncident
     ? durationText + ' without an incident'
     : durationText + ' without an incident (since monitoring began)';
+}
+
+// Statuspage/incident.io-style mean-time-to-recovery, the pairing stat next
+// to the incident-free streak badge: the streak says how long it's been
+// since the last one, this says how long a real one has taken to resolve on
+// average. Built from computeMTTR (dates-core.js), which already averages
+// only completed incidents from this same real connection.history; this
+// only formats it, never recomputes it. Hidden until there is at least one
+// completed incident to average, same honest-empty-state rule as the streak
+// badge beside it.
+function renderIncidentMttr(data, clientHistory) {
+  const el = document.getElementById('incidentMttr');
+  if (!el) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  const mttr = computeMTTR(history);
+  if (!mttr) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  const durationText = formatDuration(mttr.ms) || 'under 1m';
+  el.textContent = 'avg recovery ' + durationText + ' (' + mttr.count + ' incident' + (mttr.count === 1 ? '' : 's') + ')';
 }
 
 function killSwitchEpisodeItem(episode) {
@@ -2625,6 +2649,7 @@ async function loadStatus() {
     renderDailyUptime(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
     renderIncidentStreak(data, clientConnHistory);
+    renderIncidentMttr(data, clientConnHistory);
     renderKillSwitchHistory(data, clientConnHistory);
     renderRegimeHistory(clientRegimeHistory, lastKnown && lastKnown.asOf);
     // Kill switch engaged outranks plain connection freshness for the one
@@ -2698,6 +2723,7 @@ window.addEventListener('storage', (e) => {
   renderDailyUptime(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
   renderIncidentStreak(lastRawData, connHistory);
+  renderIncidentMttr(lastRawData, connHistory);
   renderKillSwitchHistory(lastRawData, connHistory);
   // Same last-known/frozen distinction loadStatus applies via `lastKnown`:
   // lastStatusIsLastKnown and lastStatusData are the same two values this

@@ -154,6 +154,14 @@
             for it rather than quietly reusing the shorter window's percentage as if it covered the longer one.
             Real public status pages (Statuspage, UptimeRobot) lead with exactly this fixed-window trio above
             their own per-day history.</td></tr>
+          <tr><th scope="row">Avg recovery (MTTR badge)</th><td>Not its own field: a client-side average of real
+            incident durations, computed the same way the incident-free streak badge next to it is, from the same
+            <code>connection.history[]</code>-derived incident list the RECENT INCIDENTS list below already shows.
+            Only averages completed incidents; a still-ongoing one has no real recovery time yet and is left out of
+            the average rather than counted as however long it happens to have run so far. Hidden until at least
+            one incident has actually completed, same honest-empty-state rule as the streak badge beside it. The
+            other headline pairing real status pages (Statuspage, incident.io) lead with alongside an uptime
+            percentage: uptime says how often it broke, this says how long it took to come back each time.</td></tr>
           <tr><th scope="row">Components (section)</th><td>Not its own field, a client-side recomposition of eight
             fields that already appear in the sections below (daemon connection, kill switch, regime detection,
             position sizing, anomaly detection, debate panel, genealogy wall, account/positions feed), each reduced
@@ -244,7 +252,7 @@
     </div>
     <div class="incident-list-wrap">
       <div class="section-toolbar">
-        <div class="incident-list-label font-mono">RECENT INCIDENTS <span class="incident-streak font-mono" id="incidentStreak" hidden></span></div>
+        <div class="incident-list-label font-mono">RECENT INCIDENTS <span class="incident-streak font-mono" id="incidentStreak" hidden></span><span class="incident-mttr font-mono" id="incidentMttr" hidden></span></div>
         <button type="button" id="incidentsCsvBtn" class="refresh-btn font-mono" disabled title="No incidents recorded yet.">Export CSV</button>
       </div>
       <ol class="incident-list" id="incidentList"></ol>
