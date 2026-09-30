@@ -1628,6 +1628,16 @@ body.has-sticky-critical { padding-top: 40px; }
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
+  /* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a pointer target needs at
+     least 24x24 CSS px. This was ~10x16 (the bare "x" glyph's own box, no
+     padding at all), the same class of gap chip-info-btn/modal-close
+     elsewhere on this codebase already fixed. The "x" glyph itself stays
+     the same font-size, only the clickable box grows. */
+  width: 24px;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .toast-close:hover, .toast-close:focus-visible { color: var(--ink); }
 .toast-close:focus-visible { outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
