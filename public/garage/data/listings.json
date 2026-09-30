@@ -14,6 +14,7 @@
       "notes": null,
       "location": null,
       "ebayReturnPolicy": "No Return Accepted",
+      "handlingTimeDays": null,
       "itemSpecifics": { "brand": null, "size": null, "color": "Black", "condition": null }
     },
     {
@@ -30,6 +31,7 @@
       "notes": null,
       "location": null,
       "ebayReturnPolicy": "No Return Accepted",
+      "handlingTimeDays": null,
       "itemSpecifics": { "brand": null, "size": null, "color": "White", "condition": null }
     },
     {
@@ -46,6 +48,7 @@
       "notes": null,
       "location": null,
       "ebayReturnPolicy": "No Return Accepted",
+      "handlingTimeDays": null,
       "itemSpecifics": { "brand": null, "size": null, "color": null, "condition": null }
     }
   ]

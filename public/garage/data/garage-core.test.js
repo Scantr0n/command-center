@@ -21,6 +21,7 @@ const {
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
   ebayTrsProgress, depopTopSellerProgress, daysBetweenDates,
+  shipDeadline, isLateShipment, ebayLateShipmentRate,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
   DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
   isSupplyLowStock,
@@ -410,6 +411,77 @@ test('ebayTrsProgress: avgDaysToShip averages only the sales with a real shipDat
   const result = ebayTrsProgress(sales, [], '2026-09-24');
   assert.equal(result.avgDaysToShipSampleSize, 2);
   assert.equal(result.avgDaysToShip, 2);
+});
+
+test('shipDeadline: a real handlingTimeDays gives a business-day-only deadline, same helper as the eBay dispute clock', () => {
+  // Friday + 3 business days skips the weekend, same as the
+  // addBusinessDays('2026-09-18', 3) case already covered above.
+  assert.equal(shipDeadline('2026-09-18', 3), '2026-09-23');
+});
+
+test('shipDeadline: null with no real saleDate or handlingTimeDays to compute from, never a guess', () => {
+  assert.equal(shipDeadline(null, 3), null);
+  assert.equal(shipDeadline('2026-09-18', null), null);
+  assert.equal(shipDeadline('2026-09-18', undefined), null);
+});
+
+test('isLateShipment: true once the real shipDate falls after the listing\'s own handling-time deadline', () => {
+  const sale = { saleDate: '2026-09-18', shipDate: '2026-09-24' }; // deadline is 2026-09-23
+  assert.equal(isLateShipment(sale, { handlingTimeDays: 3 }), true);
+});
+
+test('isLateShipment: false when shipped by the deadline, including exactly on it', () => {
+  const onTime = { saleDate: '2026-09-18', shipDate: '2026-09-22' };
+  const exactlyOnDeadline = { saleDate: '2026-09-18', shipDate: '2026-09-23' };
+  assert.equal(isLateShipment(onTime, { handlingTimeDays: 3 }), false);
+  assert.equal(isLateShipment(exactlyOnDeadline, { handlingTimeDays: 3 }), false);
+});
+
+test('isLateShipment: null (not false) with no real shipDate or no matched listing handlingTimeDays, never a false pass', () => {
+  assert.equal(isLateShipment({ saleDate: '2026-09-18' }, { handlingTimeDays: 3 }), null, 'never shipped yet');
+  assert.equal(isLateShipment({ saleDate: '2026-09-18', shipDate: '2026-09-24' }, { handlingTimeDays: null }), null, 'no handling time logged on the listing');
+  assert.equal(isLateShipment({ saleDate: '2026-09-18', shipDate: '2026-09-24' }, null), null, 'no matched listing at all');
+});
+
+test('ebayLateShipmentRate: joins sales to listings by listingId, only judges sales with both a real handlingTimeDays and shipDate', () => {
+  const listings = [
+    { id: 'black-boots', handlingTimeDays: 2 },
+    { id: 'white-boots', handlingTimeDays: null } // logged listing, but no handling time yet
+  ];
+  const sales = [
+    { listingId: 'black-boots', saleDate: '2026-09-01', shipDate: '2026-09-02' }, // on time (1 <= 2 business days)
+    { listingId: 'black-boots', saleDate: '2026-09-14', shipDate: '2026-09-18' }, // late (deadline was 09-16, a Wed)
+    { listingId: 'white-boots', saleDate: '2026-09-01', shipDate: '2026-09-02' }, // no handlingTimeDays, excluded
+    { listingId: 'unknown-item', saleDate: '2026-09-01', shipDate: '2026-09-02' }, // no matching listing, excluded
+    { listingId: 'black-boots', saleDate: '2026-09-05' } // no shipDate yet, excluded
+  ];
+  const result = ebayLateShipmentRate(sales, listings);
+  assert.equal(result.sampleSize, 2);
+  assert.equal(result.rate, 0.5);
+});
+
+test('ebayLateShipmentRate: null rate (not 0) with nothing real to judge yet', () => {
+  assert.deepEqual(ebayLateShipmentRate([], []), { rate: null, sampleSize: 0 });
+  assert.deepEqual(ebayLateShipmentRate([{ listingId: 'black-boots', saleDate: '2026-09-01', shipDate: '2026-09-02' }], []), { rate: null, sampleSize: 0 });
+});
+
+test('ebayTrsProgress: lateShipmentRate stays null when no listings are passed, same as every caller before this existed', () => {
+  const sales = [{ platform: 'ebay', salePrice: 50, saleDate: '2026-09-01', shipDate: '2026-09-05', listingId: 'black-boots' }];
+  const result = ebayTrsProgress(sales, [], '2026-09-24');
+  assert.equal(result.lateShipmentRate, null);
+  assert.equal(result.lateShipmentSampleSize, 0);
+  assert.equal(result.lateShipmentRateTarget, 0.03);
+});
+
+test('ebayTrsProgress: lateShipmentRate is computed for real once listings with handlingTimeDays are passed, scoped to the trailing window', () => {
+  const listings = [{ id: 'black-boots', handlingTimeDays: 1 }];
+  const sales = [
+    { platform: 'ebay', salePrice: 50, saleDate: '2026-09-01', shipDate: '2026-09-02', listingId: 'black-boots' }, // on time
+    { platform: 'vinted', salePrice: 50, saleDate: '2026-09-01', shipDate: '2026-09-10', listingId: 'black-boots' } // wrong platform, excluded
+  ];
+  const result = ebayTrsProgress(sales, [], '2026-09-24', listings);
+  assert.equal(result.lateShipmentSampleSize, 1);
+  assert.equal(result.lateShipmentRate, 0);
 });
 
 test('isSupplyLowStock only fires once both qtyOnHand and reorderThreshold are real logged numbers', () => {

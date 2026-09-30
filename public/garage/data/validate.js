@@ -39,7 +39,11 @@
  * search filters (eBay's Cassini is just the platform with the clearest
  * public documentation of it), and a listing missing the field drops out
  * of a buyer's filtered results entirely on that platform, not just ranks
- * lower.
+ * lower. A live eBay listing with no "handlingTimeDays" logged (a whole
+ * number of business days from 1 to 30, eBay's own real range for that
+ * setting) is also warned about, since the real late-shipment-rate math on
+ * the Seller status & standards table can't judge any sale of that item
+ * pass/fail without it.
  * Every acquisitions.json entry needs a real source and, if logged,
  * "listingIds" must each match a real id in listings.json (a lot that's
  * only partly itemized so far is fine, that's just a warning); "itemCount"
@@ -240,6 +244,17 @@ function main() {
       errors.push(where + ': "ebayReturnPolicy" must be a string (the real policy name set on the eBay listing) or null');
     }
 
+    // eBay's own real handling-time setting only accepts a whole number of
+    // business days from 1 to 30 (same unit garage-core.js's shipDeadline
+    // now computes eBay's real late-shipment rate against, see the comment
+    // above EBAY_TRS_WINDOW_DAYS there), so a value outside that range could
+    // never actually be what's set on the real listing.
+    if (l.handlingTimeDays !== null && l.handlingTimeDays !== undefined) {
+      if (!Number.isInteger(l.handlingTimeDays) || l.handlingTimeDays < 1 || l.handlingTimeDays > 30) {
+        errors.push(where + ': "handlingTimeDays" must be a whole number of business days from 1 to 30 (eBay\'s own real range), or null');
+      }
+    }
+
     if (l.itemSpecifics !== undefined && l.itemSpecifics !== null) {
       if (typeof l.itemSpecifics !== 'object' || Array.isArray(l.itemSpecifics)) {
         errors.push(where + ': "itemSpecifics" must be an object keyed by brand/size/color/condition, or omitted');
@@ -261,6 +276,11 @@ function main() {
         warnings.push(where + ': "ebayReturnPolicy" is "' + l.ebayReturnPolicy + '", which mentions parts/' +
           'accessories/auto, the same wrong-template pattern as the real bug already caught once. Confirm this ' +
           'listing\'s actual eBay return policy and fix it if it really did inherit that template again.');
+      }
+      if (l.handlingTimeDays == null) {
+        warnings.push(where + ': live on eBay with no "handlingTimeDays" logged, the real Seller status & ' +
+          'standards table on the page can\'t judge eBay\'s late-shipment-rate requirement pass/fail for any ' +
+          'sale of this item until the real handling time set on the listing is logged here');
       }
     }
     // Not eBay-only: Poshmark, Vinted, and Depop all expose brand/size/

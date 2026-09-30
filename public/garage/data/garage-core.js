@@ -400,19 +400,29 @@
   // straight from real sales.json rows. Vinted and Poshmark's tiers key off
   // a star rating and review count this dashboard has no data source for, so
   // they stay reference-only rather than guessing a number. Depop's real
-  // "90%+ shipped within 5 days" requirement is now computed below from each
+  // "90%+ shipped within 5 days" requirement is computed below from each
   // sale's own optional shipDate (added once sales.json actually started
-  // tracking per-order ship dates). eBay's late-shipment-rate requirement
-  // still isn't judged pass/fail: eBay's "late" is relative to each
-  // listing's own stated handling time, which this dashboard doesn't track,
-  // so only a plain average days-to-ship is surfaced for eBay, as an
-  // informational number rather than a false pass/fail against a threshold
-  // this app can't actually verify. The case-outcome rate below is the one
-  // real proxy shared by both platforms, buildable from what disputes.json
-  // tracks.
+  // tracking per-order ship dates). eBay's late-shipment-rate requirement is
+  // now judged pass/fail too, once a sale's listingId resolves to a real
+  // listing with its own handlingTimeDays logged (added once listings.json
+  // actually started tracking each listing's committed eBay handling time):
+  // "late" there is relative to that listing's own stated handling time, not
+  // a fixed number of days the way Depop's requirement is, so it needs that
+  // per-listing join sales.json alone can't provide. The deadline itself is
+  // computed with addBusinessDays below, the same weekends-only business-day
+  // helper disputeResponseDeadline already uses for eBay's 3-business-day
+  // case-response clock; it has no US federal holiday calendar to check
+  // against either, same known gap, see the comment above addBusinessDays.
+  // A sale whose listing has no handlingTimeDays logged yet, or that has no
+  // real shipDate itself, is left out of the rate entirely rather than
+  // silently counted as on-time, same "unknown, not a clean pass" rule
+  // onTimeShipRate below already follows for Depop. The case-outcome rate
+  // below is the one real proxy shared by both platforms, buildable from
+  // what disputes.json tracks.
   const EBAY_TRS_WINDOW_DAYS = 365;
   const EBAY_TRS_TRANSACTIONS_TARGET = 100;
   const EBAY_TRS_GROSS_SALES_TARGET = 1000;
+  const EBAY_LATE_SHIPMENT_RATE_TARGET = 0.03;
   const DEPOP_TOP_SELLER_WINDOW_DAYS = 30;
   const DEPOP_TOP_SELLER_GROSS_SALES_TARGET = 1000;
   const DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS = 5;
@@ -462,6 +472,50 @@
     return { avgDays: gaps.reduce((sum, d) => sum + d, 0) / gaps.length, sampleSize: gaps.length };
   }
 
+  // The real calendar date a sale's shipment is due by, given the listing's
+  // own committed eBay handling time (a whole number of *business* days,
+  // same unit eBay's own handling-time setting uses). Reuses addBusinessDays
+  // above rather than a second copy of the weekend-skipping loop, so the two
+  // dates can never drift apart the way two independently hand-maintained
+  // implementations already have once in this file (see EBAY_CATEGORY_RATES'
+  // own history). Returns null with no real saleDate or handlingTimeDays to
+  // compute from, same "unknown, not a guess" rule as disputeResponseDeadline.
+  function shipDeadline(saleDate, handlingTimeDays) {
+    if (!saleDate || handlingTimeDays == null) return null;
+    return addBusinessDays(saleDate, handlingTimeDays);
+  }
+
+  // A sale is only ever judged late once it has a real deadline to compare
+  // against (the matched listing's own handlingTimeDays) and a real shipDate
+  // to compare it with; either missing returns null, not false, so a
+  // never-shipped or never-timed sale can't silently read as "on time".
+  // String comparison is safe here since both sides are the same YYYY-MM-DD
+  // shape shipDeadline/addBusinessDays always produce.
+  function isLateShipment(sale, listing) {
+    const deadline = shipDeadline(sale.saleDate, listing && listing.handlingTimeDays);
+    if (!deadline || !sale.shipDate) return null;
+    return sale.shipDate > deadline;
+  }
+
+  // eBay's own late-shipment-rate requirement, judged for real: for each
+  // sale in the window, looks up its matching listing by the sale's own
+  // optional listingId (added once sales.json started tracking that join)
+  // and only counts the sale toward the rate once that listing has a real
+  // handlingTimeDays logged and the sale itself has a real shipDate, the
+  // same "leave the unknown ones out rather than guess" rule onTimeShipRate
+  // above already follows for Depop. sampleSize is the count actually judged,
+  // out of windowSales.length, so a partial sample never reads as a full one.
+  function ebayLateShipmentRate(windowSales, listings) {
+    const byId = new Map((listings || []).filter(l => l && l.id).map(l => [l.id, l]));
+    const judged = windowSales.filter(s => {
+      const listing = s.listingId && byId.get(s.listingId);
+      return !!(listing && listing.handlingTimeDays != null && s.shipDate);
+    });
+    if (!judged.length) return { rate: null, sampleSize: 0 };
+    const late = judged.filter(s => isLateShipment(s, byId.get(s.listingId))).length;
+    return { rate: late / judged.length, sampleSize: judged.length };
+  }
+
   function disputesInWindow(disputes, platform, todayStr, windowDays) {
     const start = addDaysToDateStr(todayStr, -windowDays);
     return (disputes || []).filter(d => d.platform === platform && d.openedDate && d.openedDate >= start && d.openedDate <= todayStr);
@@ -483,18 +537,26 @@
     return sales.length > 0 ? disputes.filter(isNonSellerResolved).length / sales.length : null;
   }
 
-  function ebayTrsProgress(sales, disputes, todayStr) {
+  // listings is optional (defaults to none, via the `|| []` inside
+  // ebayLateShipmentRate/the byId lookup) so every existing caller and test
+  // that only ever passed (sales, disputes, todayStr) keeps working exactly
+  // as before, just with lateShipmentRate staying null, same as before this
+  // was ever computable at all.
+  function ebayTrsProgress(sales, disputes, todayStr, listings) {
     const windowSales = salesInWindow(sales, 'ebay', todayStr, EBAY_TRS_WINDOW_DAYS);
     const windowDisputes = disputesInWindow(disputes, 'ebay', todayStr, EBAY_TRS_WINDOW_DAYS);
     const transactions = windowSales.length;
     const grossSales = windowSales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
     const shipStats = avgDaysToShip(windowSales);
+    const lateShipStats = ebayLateShipmentRate(windowSales, listings);
     return {
       windowDays: EBAY_TRS_WINDOW_DAYS,
       transactions, transactionsTarget: EBAY_TRS_TRANSACTIONS_TARGET,
       grossSales, grossSalesTarget: EBAY_TRS_GROSS_SALES_TARGET,
       nonSellerResolvedRate: nonSellerResolvedRate(windowDisputes, windowSales),
       avgDaysToShip: shipStats.avgDays, avgDaysToShipSampleSize: shipStats.sampleSize,
+      lateShipmentRate: lateShipStats.rate, lateShipmentSampleSize: lateShipStats.sampleSize,
+      lateShipmentRateTarget: EBAY_LATE_SHIPMENT_RATE_TARGET,
       meetsCountTargets: transactions >= EBAY_TRS_TRANSACTIONS_TARGET && grossSales >= EBAY_TRS_GROSS_SALES_TARGET
     };
   }
@@ -593,9 +655,11 @@
     OFFER_TIER_ACCEPT_PCT, OFFER_TIER_COUNTER_PCT, OFFER_TIER_BORDERLINE_PCT,
     offerTier, offerCounterAmount,
     EBAY_TRS_WINDOW_DAYS, EBAY_TRS_TRANSACTIONS_TARGET, EBAY_TRS_GROSS_SALES_TARGET,
+    EBAY_LATE_SHIPMENT_RATE_TARGET,
     DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
     DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
     daysBetweenDates, onTimeShipRate, avgDaysToShip,
+    shipDeadline, isLateShipment, ebayLateShipmentRate,
     ebayTrsProgress, depopTopSellerProgress,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend,

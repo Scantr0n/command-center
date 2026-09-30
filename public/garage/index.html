@@ -70,6 +70,7 @@
           <tr><th>notes</th><td>Free text, or <code>null</code></td></tr>
           <tr><th>location</th><td>Real physical storage spot for this item right now, e.g. <code>"Bin 3"</code> or <code>"Closet shelf B"</code>, a string or <code>null</code> until logged. Standard reseller inventory practice: pairs a bin/shelf label with each item so it can actually be found and shipped fast once it sells, rather than searched for. Purely descriptive, doesn't drive any calculation on this page.</td></tr>
           <tr><th>ebayReturnPolicy</th><td>The real return policy name set on the actual eBay listing, e.g. <code>"No Return Accepted"</code>, or <code>null</code> until confirmed. Only meaningful when <code>ebay</code> is in <code>platforms</code>. Exists because of a real bug: three eBay listings silently inherited a "30-Day Seller-Paid Returns (Parts &amp; Accessories)" policy meant for auto parts, which blocked publish (see the Activity log below). A live eBay listing with this left <code>null</code>, or set to anything mentioning parts/accessories/auto, gets flagged in "Needs backfill" below so that exact bug can't repeat unnoticed.</td></tr>
+          <tr><th>handlingTimeDays</th><td>The real handling time set on the actual eBay listing, a whole number of business days from 1 to 30 (eBay's own real range for that setting), or <code>null</code> until confirmed. Only meaningful when <code>ebay</code> is in <code>platforms</code>. Feeds the real eBay late-shipment-rate calc on the Seller status &amp; standards table below: a sale is judged late once its own <code>shipDate</code> falls after this many business days from its <code>saleDate</code>. A live eBay listing with this left <code>null</code> gets flagged in "Needs backfill" below, since no sale of that item can be judged pass/fail without it.</td></tr>
           <tr><th>itemSpecifics</th><td>Object with <code>brand</code>, <code>size</code>, <code>color</code>, <code>condition</code>, each a real string or <code>null</code> until logged. Not eBay-only: eBay's Cassini search excludes a listing entirely from a buyer's filtered results once that filter (brand, size, condition, etc.) is applied and the field is missing, it doesn't just rank it lower, but Poshmark, Vinted, and Depop all expose the same fields as buyer search filters, so a listing missing one drops out of a filtered search there too. <code>brand</code> and <code>condition</code> are checked on every live listing regardless of platform; <code>size</code> and <code>color</code> only on the <code>"shoes"</code> category, since they don't meaningfully apply to something like the swing analyzer. Missing required fields show up in "Needs backfill" below for whichever platforms the listing is actually live on.</td></tr>
           <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>.</td></tr>
           <tr><th>activity.json</th><td>One object per logged event in the <code>events</code> array: real bug fixes, photo audits, and other quality checks. Requires <code>id</code>, <code>title</code>, and <code>type</code> (<code>bug-fix</code>, <code>photo-audit</code>, or <code>other</code>).</td></tr>
@@ -83,7 +84,7 @@
           <tr><th>costBasis</th><td>USD cost of acquiring the sold item, a non-negative number or <code>null</code>. Usually copied over from the matching listing's own <code>costBasis</code> at the time it sold; drives the real profit column in the sales log, stays <code>null</code> until known.</td></tr>
           <tr><th>shippingCost</th><td>USD actually spent shipping this sale out (postage, box, mailer), a non-negative number or <code>null</code>. Only real on a platform where the seller pays for shipping rather than the buyer covering it separately (see the shipping note on the price calculator above); leave <code>null</code> until the real receipt is known, it also feeds the profit column in the sales log.</td></tr>
           <tr><th>saleDate</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
-          <tr><th>shipDate</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet. The real day this sale actually shipped; feeds the on-time-shipping math on the Seller status &amp; standards table below (Depop's real "90%+ within 5 days" Top Seller requirement, and an informational avg. days-to-ship for eBay). Can't be in the future or fall before <code>saleDate</code>, an item can't ship before it sells.</td></tr>
+          <tr><th>shipDate</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet. The real day this sale actually shipped; feeds the on-time-shipping math on the Seller status &amp; standards table below (Depop's real "90%+ within 5 days" Top Seller requirement, an informational avg. days-to-ship for eBay, and, once the sold listing's own <code>handlingTimeDays</code> is logged too, eBay's real late-shipment-rate requirement). Can't be in the future or fall before <code>saleDate</code>, an item can't ship before it sells.</td></tr>
           <tr><th>expenses.json</th><td>One object per real business expense in the <code>expenses</code> array, for Schedule C record-keeping.</td></tr>
           <tr><th>id</th><td>Unique slug for the expense, e.g. <code>"2026-03-thrift-run-mileage"</code></td></tr>
           <tr><th>date</th><td>ISO date (<code>YYYY-MM-DD</code>) or <code>null</code> if not tracked yet</td></tr>
@@ -107,6 +108,7 @@
   "notes": null,
   "location": null,
   "ebayReturnPolicy": null,
+  "handlingTimeDays": null,
   "itemSpecifics": { "brand": null, "size": null, "color": null, "condition": null }
 }</pre>
     </div>
@@ -164,6 +166,8 @@
           <input class="quick-log-input" type="text" id="nlLocation" placeholder="e.g. Bin 3">
           <label class="quick-log-label" for="nlEbayReturnPolicy">eBay return policy (optional, only if listed on eBay)</label>
           <input class="quick-log-input" type="text" id="nlEbayReturnPolicy" placeholder="e.g. No Return Accepted">
+          <label class="quick-log-label" for="nlHandlingTimeDays">eBay handling time, business days (optional, 1-30, only if listed on eBay)</label>
+          <input class="quick-log-input" type="number" id="nlHandlingTimeDays" min="1" max="30" step="1">
           <label class="quick-log-label" for="nlBrand">Brand (optional, eBay search filter)</label>
           <input class="quick-log-input" type="text" id="nlBrand">
           <label class="quick-log-label" for="nlCondition">Condition (optional, eBay search filter)</label>
@@ -717,11 +721,13 @@
       rate proxy, and Depop's real "90%+ shipped within 5 days" on-time-shipping requirement are computed live
       in the "Real progress" column below from actual <code>sales.json</code> and <code>disputes.json</code>
       rows, since that's just arithmetic over data already tracked elsewhere on this page, once a sale's real
-      <code>shipDate</code> is logged. eBay's own late-shipment-rate target still isn't judged pass/fail, only
-      a plain average days-to-ship is shown, since "late" there is relative to each listing's own handling
-      time, which isn't tracked here. Vinted's and Poshmark's tiers key off a star rating and review count this
-      dashboard has no data source for, and no platform's defect rate is computed either since it isn't logged
-      here, so those cells stay reference-only, there's no live account connection to read a real standing from.
+      <code>shipDate</code> is logged. eBay's own late-shipment-rate target is judged pass/fail too, once a
+      sale's own <code>listingId</code> resolves to a listing with a real <code>handlingTimeDays</code> logged,
+      since "late" there is relative to that specific listing's own stated handling time, not a fixed number of
+      days: business days only, no US federal holiday calendar. Vinted's and Poshmark's tiers key off a star
+      rating and review count this dashboard has no data source for, and no platform's defect rate is computed
+      either since it isn't logged here, so those cells stay reference-only, there's no live account connection
+      to read a real standing from.
     </div>
     <div class="table-wrap">
       <table class="card-table">

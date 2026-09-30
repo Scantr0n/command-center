@@ -64,7 +64,7 @@
 
   const LISTING_FIELDS = [
     'title', 'price', 'costBasis', 'category', 'platforms', 'soldOn', 'listingUrls',
-    'status', 'datePublished', 'notes', 'location', 'ebayReturnPolicy', 'itemSpecifics'
+    'status', 'datePublished', 'notes', 'location', 'ebayReturnPolicy', 'handlingTimeDays', 'itemSpecifics'
   ];
   const PIPELINE_STAGE_FIELDS = ['count', 'note'];
   const ACTIVITY_FIELDS = ['date', 'type', 'platform', 'title', 'detail', 'itemsReviewed', 'issuesFound'];

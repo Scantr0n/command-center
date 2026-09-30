@@ -997,7 +997,7 @@ async function loadData() {
   // loaded, same fix any two out-of-order loadData sections would need.
   renderOfferGuide();
 
-  renderSellerStandardsProgress(sales, disputes);
+  renderSellerStandardsProgress(sales, disputes, listings);
   initTableScrollShadows();
   renderAttentionBar();
   checkDisputeAlerts(disputesLog);
@@ -1411,6 +1411,9 @@ function buildDataQualityFlags(listings, acquisitions) {
           reasons.push('NO EBAY RETURN POLICY LOGGED (COULD BE A SILENTLY INHERITED WRONG POLICY)');
         } else if (GarageValidateCore.isSuspiciousEbayReturnPolicy(l.ebayReturnPolicy)) {
           reasons.push('EBAY RETURN POLICY "' + l.ebayReturnPolicy.toUpperCase() + '" LOOKS INHERITED FROM AN UNRELATED TEMPLATE, CONFIRM IT');
+        }
+        if (l.handlingTimeDays == null) {
+          reasons.push('NO HANDLING TIME LOGGED (BLOCKS THE REAL EBAY LATE-SHIPMENT-RATE CALC ON SELLER STATUS & STANDARDS)');
         }
       }
       // Not eBay-only: Poshmark, Vinted, and Depop all expose the same
@@ -2051,6 +2054,18 @@ function readOptionalNonNegativeInput(el) {
   if (raw === '') return null;
   const n = Number(raw);
   return Number.isNaN(n) || n < 0 ? undefined : n;
+}
+
+// Same blank-is-null, invalid-is-undefined convention as
+// readOptionalNonNegativeInput above, for a field that must be a whole
+// number in a real closed range instead of any non-negative amount, e.g.
+// eBay's own handling-time setting (1-30 business days, see validate.js's
+// matching "handlingTimeDays" rule).
+function readOptionalIntInRange(el, min, max) {
+  const raw = el.value.trim();
+  if (raw === '') return null;
+  const n = Number(raw);
+  return !Number.isInteger(n) || n < min || n > max ? undefined : n;
 }
 
 // Same real-time em-dash catch CSM's own prospect-entry form just got: a
@@ -3034,19 +3049,20 @@ function renderTaxTracker(sales) {
 
 // Turns the eBay and Depop rows of the "Seller status & standards" reference
 // table from static text into a real progress readout, computed from actual
-// sales.json/disputes.json rows via ebayTrsProgress/depopTopSellerProgress in
-// garage-core.js. Vinted and Poshmark's tiers key off a star rating and
-// review count this dashboard has no data source for, so those two rows stay
-// plain reference text (see the static markup in index.html) rather than
-// getting a fabricated number here. Depop's on-time-shipping requirement is
-// now computed for real from each sale's optional shipDate; eBay's own
-// late-shipment-rate target still isn't judged pass/fail, only a plain
-// average days-to-ship is shown, since "late" there is relative to each
-// listing's own handling time, which isn't tracked (see the comment above
-// EBAY_TRS_WINDOW_DAYS in garage-core.js).
-function renderSellerStandardsProgress(sales, disputes) {
+// sales.json/disputes.json/listings.json rows via ebayTrsProgress/
+// depopTopSellerProgress in garage-core.js. Vinted and Poshmark's tiers key
+// off a star rating and review count this dashboard has no data source for,
+// so those two rows stay plain reference text (see the static markup in
+// index.html) rather than getting a fabricated number here. Depop's
+// on-time-shipping requirement is computed for real from each sale's
+// optional shipDate; eBay's own late-shipment-rate target is now judged
+// pass/fail too, for whichever sales have a listingId that resolves to a
+// real listing with its own handlingTimeDays logged (see the comment above
+// EBAY_TRS_WINDOW_DAYS in garage-core.js for the real business-day math and
+// its one known gap, no US federal holiday calendar).
+function renderSellerStandardsProgress(sales, disputes, listings) {
   const today = todayDateStr();
-  const ebay = ebayTrsProgress(sales, disputes, today);
+  const ebay = ebayTrsProgress(sales, disputes, today, listings);
   const depop = depopTopSellerProgress(sales, disputes, today);
 
   const progressBar = (value, target) => {
@@ -3060,15 +3076,22 @@ function renderSellerStandardsProgress(sales, disputes) {
     ? `${ebay.avgDaysToShip.toFixed(1)} days (${ebay.avgDaysToShipSampleSize}/${ebay.transactions} sale(s) with a real ship date logged)`
     : 'not enough data, no sale in this window has a real ship date logged yet';
 
+  const ebayLateShipText = ebay.lateShipmentSampleSize
+    ? `${(ebay.lateShipmentRate * 100).toFixed(1)}% (${ebay.lateShipmentSampleSize} sale(s) with both a real ship date and the listing's own handling time logged)`
+    : 'not enough data, no sale in this window has both a real ship date and the sold listing\'s own handlingTimeDays logged yet';
+  const ebayMeetsLateShip = ebay.lateShipmentRate != null && ebay.lateShipmentRate <= ebay.lateShipmentRateTarget;
+
   document.getElementById('ebayTrsProgressCell').innerHTML =
     `<div class="cell-value">${ebay.transactions} <span class="cell-muted">/ ${ebay.transactionsTarget} txns</span></div>` +
     progressBar(ebay.transactions, ebay.transactionsTarget) +
     `<div class="cell-value">${formatUsd(ebay.grossSales)} <span class="cell-muted">/ ${formatUsd(ebay.grossSalesTarget)}</span></div>` +
     progressBar(ebay.grossSales, ebay.grossSalesTarget) +
     `<div class="cell-muted">Cases resolved against seller: ${rateText(ebay.nonSellerResolvedRate)} (target &le;0.3%), ` +
-    `trailing ${ebay.windowDays} days. Avg. days sale-to-ship: ${ebayShipText}, informational only, not judged ` +
-    `against eBay's real late-shipment-rate target since that depends on each listing's own handling time, which ` +
-    `isn't tracked here. Defect rate isn't computed at all, no data source for it.</div>`;
+    `trailing ${ebay.windowDays} days. Avg. days sale-to-ship: ${ebayShipText}, informational only.</div>` +
+    `<div class="cell-muted${ebay.lateShipmentSampleSize && !ebayMeetsLateShip ? ' cell-value-loss' : ''}">Late shipment rate: ` +
+    `${ebayLateShipText} (target &le;${(ebay.lateShipmentRateTarget * 100).toFixed(0)}%), judged against each sold listing's ` +
+    `own eBay handling time, business days only (no US federal holiday calendar). Defect rate isn't computed at all, ` +
+    `no data source for it.</div>`;
 
   const depopShipText = depop.onTimeShipSampleSize
     ? `${(depop.onTimeShipRate * 100).toFixed(0)}% (${depop.onTimeShipSampleSize} sale(s) with a real ship date logged)`
@@ -4177,6 +4200,9 @@ function listingEditFormHtml(l) {
     leFieldRow('leDatePublished', 'Date published', l.datePublished, 'date') +
     leFieldRow('leLocation', 'Storage location', l.location) +
     leFieldRow('leEbayReturnPolicy', 'eBay return policy (the real policy set on the eBay listing, if any)', l.ebayReturnPolicy) +
+    '<div class="form-row"><label for="leHandlingTimeDays">eBay handling time, business days (the real value set on the eBay listing, 1-30, if any)</label>' +
+    '<input type="number" id="leHandlingTimeDays" class="np-input" min="1" max="30" step="1" value="' +
+    (l.handlingTimeDays == null ? '' : escapeHtml(String(l.handlingTimeDays))) + '"></div>' +
     '<div class="form-row-split">' +
     leInputInner('leBrand', 'Brand (eBay/Poshmark/Vinted/Depop search filter)', l.itemSpecifics && l.itemSpecifics.brand) +
     leInputInner('leCondition', 'Condition (eBay/Poshmark/Vinted/Depop search filter)', l.itemSpecifics && l.itemSpecifics.condition) +
@@ -4224,6 +4250,7 @@ function wireListingEditForm(l) {
     const datePublished = leVal('leDatePublished');
     const location = leVal('leLocation');
     const ebayReturnPolicy = leVal('leEbayReturnPolicy');
+    const handlingTimeDays = readOptionalIntInRange(document.getElementById('leHandlingTimeDays'), 1, 30);
     const notes = leVal('leNotes');
     const itemSpecifics = {
       brand: leVal('leBrand'),
@@ -4239,6 +4266,7 @@ function wireListingEditForm(l) {
     if (!platforms.length) blockers.push('Select at least one platform.');
     if (price === undefined) blockers.push('Enter a valid asking price of $0 or more, or leave it blank.');
     if (costBasis === undefined) blockers.push('Enter a valid cost basis of $0 or more, or leave it blank.');
+    if (handlingTimeDays === undefined) blockers.push('Enter a valid eBay handling time of 1-30 whole business days, or leave it blank.');
 
     // soldOn/listingUrls each reference a specific platform; validate.js
     // errors if either holds a platform no longer in this listing's own
@@ -4267,6 +4295,11 @@ function wireListingEditForm(l) {
     if (platforms.includes('ebay') && ebayReturnPolicy && GarageValidateCore.isSuspiciousEbayReturnPolicy(ebayReturnPolicy)) {
       advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
         'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing.');
+    }
+    if (platforms.includes('ebay') && handlingTimeDays == null) {
+      advisory.push('No eBay handling time logged, the real Seller status & standards table can\'t judge eBay\'s ' +
+        'late-shipment-rate requirement pass/fail for any sale of this item until the real handling time set on ' +
+        'the listing is logged here.');
     }
     if (platforms.length) {
       const missingSpecifics = GarageValidateCore.missingItemSpecifics(Object.assign({}, l, { platforms, itemSpecifics }));
@@ -4314,6 +4347,7 @@ function wireListingEditForm(l) {
       datePublished,
       location,
       ebayReturnPolicy,
+      handlingTimeDays,
       notes,
       itemSpecifics
     });
@@ -5428,6 +5462,7 @@ function wireQuickLogTool() {
     const datePublished = document.getElementById('nlDatePublished').value || null;
     const location = document.getElementById('nlLocation').value.trim() || null;
     const ebayReturnPolicy = document.getElementById('nlEbayReturnPolicy').value.trim() || null;
+    const handlingTimeDays = readOptionalIntInRange(document.getElementById('nlHandlingTimeDays'), 1, 30);
     const notes = document.getElementById('nlNotes').value.trim() || null;
     const itemSpecifics = {
       brand: document.getElementById('nlBrand').value.trim() || null,
@@ -5450,6 +5485,7 @@ function wireQuickLogTool() {
     // above already makes with this same helper.
     if (price === undefined) blockers.push('Enter a valid asking price of $0 or more, or leave it blank.');
     if (costBasis === undefined) blockers.push('Enter a valid cost basis of $0 or more, or leave it blank.');
+    if (handlingTimeDays === undefined) blockers.push('Enter a valid eBay handling time of 1-30 whole business days, or leave it blank.');
 
     if (title && platforms.length) {
       platforms.forEach(p => {
@@ -5463,6 +5499,11 @@ function wireQuickLogTool() {
     if (platforms.includes('ebay') && ebayReturnPolicy && GarageValidateCore.isSuspiciousEbayReturnPolicy(ebayReturnPolicy)) {
       advisory.push('"' + ebayReturnPolicy + '" mentions parts/accessories/auto, the same wrong-inherited-template ' +
         'pattern as the real eBay return-policy bug already caught once. Double check the real eBay listing before publishing.');
+    }
+    if (platforms.includes('ebay') && handlingTimeDays == null) {
+      advisory.push('No eBay handling time logged, the real Seller status & standards table can\'t judge eBay\'s ' +
+        'late-shipment-rate requirement pass/fail for any sale of this item until the real handling time set on ' +
+        'the listing is logged here.');
     }
     if (platforms.length) {
       const missingSpecifics = GarageValidateCore.missingItemSpecifics({ category, itemSpecifics });
@@ -5494,6 +5535,7 @@ function wireQuickLogTool() {
       notes,
       location,
       ebayReturnPolicy,
+      handlingTimeDays,
       itemSpecifics
     };
 
