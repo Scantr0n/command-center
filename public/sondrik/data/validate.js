@@ -216,6 +216,14 @@ function main() {
       errors.push(where + ': outreach.sentDate (' + JSON.stringify(o.sentDate) + ') is not a YYYY-MM-DD date.');
     } else if (o.sent === true && isFutureDate(o.sentDate)) {
       errors.push(where + ': outreach.sentDate (' + o.sentDate + ') is in the future, check for a typo.');
+    } else if (o.sent === true && l.loggedDate && DATE_RE.test(l.loggedDate) && o.sentDate < l.loggedDate) {
+      // Same "two individually well-formed dates, nonsensical together"
+      // failure mode as the goals targetDate/setDate check above: this
+      // branch only runs once sentDate has already passed the date-shape
+      // and not-future checks, so the string comparison is always between
+      // two real YYYY-MM-DD dates.
+      errors.push(where + ': outreach.sentDate (' + o.sentDate + ') is before "loggedDate" (' + l.loggedDate +
+        '), outreach cannot have been sent before the lead was even logged, check for a typo.');
     }
     if (o.sent !== true && o.sentDate) {
       errors.push(where + ': outreach.sentDate is set but sent is not true, remove it until the message is ' +
