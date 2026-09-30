@@ -1500,6 +1500,29 @@ footer.page-foot {
   }
 }
 
+/* Windows/browser forced-colors mode strips background-color to the system
+   Canvas color, the only thing that distinguishes a progress fill from the
+   empty track it sits inside on this page (verified live: .goal-progress-fill,
+   .launch-window-fill, and .compare-bar-fill all compute to the exact same
+   Canvas background as their track/bar container under forced-colors, while
+   the track's own 1px border still renders, so a real goal at 10% and one at
+   90% become an identical empty outlined box, no visual progress signal at
+   all). Unlike the discrete on/off states this same bug takes elsewhere in
+   this codebase (Alpha's history-tick/daily-uptime-bar, CSM's stage-dot/
+   velocity-dot), a continuous 0-100% fill has no fixed set of border-styles
+   to switch between, so this marks the fill's own edge with a border instead,
+   the one boundary that actually carries the real value. CanvasText is the
+   forced-colors system color for on-page text/borders, so this reads as a
+   solid line in any forced-colors theme, not a guessed color. */
+@media (forced-colors: active) {
+  .goal-progress-fill, .launch-window-fill {
+    border-right: 2px solid CanvasText;
+  }
+  .compare-bar-fill {
+    border-top: 2px solid CanvasText;
+  }
+}
+
 /* Print / export to PDF: a plain, light, single-column handout.
    Interactive-only controls (print button, back link, schema help) are
    dropped since they do nothing on paper. */
