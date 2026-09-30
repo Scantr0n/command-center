@@ -4294,8 +4294,23 @@ document.addEventListener('keydown', e => {
 // the full-fidelity JSON backup below. Ranked in the same order the feed
 // itself renders, unfiltered (buildRankedCandidates covers every real
 // candidate, decided or not, same as the on-screen feed).
+// The three research-link columns below reuse the exact same URL builders
+// already wired into openCandidateModal's per-candidate research links (see
+// rawCompSearchLink/compSearchLink/bookValueSearchLink above), just surfaced
+// as flat CSV columns instead of buttons behind a modal. The real bottleneck
+// this closes: every one of the 86 real candidates is still missing
+// expectedGrade/expectedGradedValue (the "needs more data" verdict, see
+// CANDIDATE_VERDICT_META), which only gets filled by opening each one's real
+// comp search one at a time in the app. A flat export with the search URL
+// already built lets that research happen from a spreadsheet instead,
+// working through many rows without round-tripping back into the app per
+// card. No new data, same real card name/year/target company/expected grade
+// already on each row, just the URL that would already build from them.
 const CANDIDATES_CSV_COLUMNS = [
   [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'],
+  [c => rawCompSearchLink(c)?.url ?? null, 'Raw comp search (eBay sold)'],
+  [c => bookValueSearchLink(c)?.url ?? null, 'Book value search (SportsCardsPro)'],
+  [c => compSearchLink({ cardName: c.cardName, year: c.year, gradingCompany: c.targetGradingCompany, grade: c.expectedGrade })?.url ?? null, 'Graded comp search (eBay sold)'],
   [c => c.targetGradingCompany, 'Target grading company'], [c => c.targetServiceLevel, 'Target service level'],
   [c => c.rawValue, 'Raw value'], [c => c.rawValueBasis, 'Raw value basis'], [c => c.rawValueNote, 'Raw value note'],
   [c => c.estimatedGradingCost, 'Estimated grading cost'], [c => c.shippingCost, 'Shipping cost'],
