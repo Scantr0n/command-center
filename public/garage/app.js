@@ -116,7 +116,7 @@ const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
   estimateNetPayout, minListingPriceForNet,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
-  addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
+  addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
@@ -841,7 +841,7 @@ async function loadData() {
 
   if (listingsData) {
     listings = listingsData.listings || [];
-    renderStats(listings, stages, sales, expenses, supplies, acquisitions);
+    renderStats(listings, stages, sales, expenses, supplies, acquisitions, disputes);
     renderDelistList(listings);
     renderDataQuality(listings, acquisitions);
     renderDuplicates(listings);
@@ -1043,11 +1043,12 @@ function bestCaseTotalPayout(live) {
   }, 0);
 }
 
-function renderStats(listings, stages, sales, expenses, supplies, acquisitions) {
+function renderStats(listings, stages, sales, expenses, supplies, acquisitions, disputes) {
   sales = sales || [];
   expenses = expenses || [];
   supplies = supplies || [];
   acquisitions = acquisitions || [];
+  disputes = disputes || [];
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
   const platformCounts = {};
@@ -1078,6 +1079,8 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions) 
   const suppliesCounted = supplies.filter(s => s.qtyOnHand != null && s.reorderThreshold != null);
   const lowStockCount = suppliesCounted.filter(isSupplyLowStock).length;
   const totalSourcingSpend = acquisitions.reduce((s, a) => s + (a.pricePaid || 0), 0);
+  const openDisputeCount = disputes.filter(d => d.status === 'open').length;
+  const dueDisputeCount = openDisputesDueForResponse(disputes, todayDateStr()).length;
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -1089,6 +1092,7 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions) 
     { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 },
     { value: coverageGapCount, label: 'Items with cross-post gaps', sub: coverageGapCount ? 'Not yet on all 4 platforms' : 'Fully cross-listed' },
     { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 },
+    { value: dueDisputeCount, label: 'Disputes needing a response', sub: openDisputeCount ? `${dueDisputeCount}/${openDisputeCount} open case(s) at or past their response window` : 'No open disputes logged', warn: dueDisputeCount > 0 },
     { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
     { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },
     { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have at least one logged` : 'No sale has a cost basis or shipping cost logged yet' },

@@ -271,6 +271,24 @@
     return null;
   }
 
+  // Open disputes whose response deadline has already arrived (or passed),
+  // the same "isDueForRelist" cut the Summary row already applies to
+  // relists, just not previously surfaced anywhere outside the opt-in
+  // browser notification and the .ics export (both easy to miss:
+  // notifications are opt-in per device, and nobody opens a calendar file
+  // to notice something is already overdue). A dispute past its window can
+  // auto-resolve in the buyer's favor, real money, so this belongs next to
+  // "Due for a relist" in the stat row. Skips a dispute
+  // disputeResponseDeadline can't compute one for (not open, or missing
+  // openedDate/an unrecognized platform), same as every other caller of
+  // that function.
+  function openDisputesDueForResponse(disputes, todayStr) {
+    return (disputes || []).filter(d => {
+      const deadline = disputeResponseDeadline(d);
+      return deadline != null && deadline <= todayStr;
+    });
+  }
+
   // Poshmark's prepaid USPS Ground Advantage label is a flat $6.49 buyer-paid
   // rate only up to a 5 lb boxed weight (current 2026 rate); past that the
   // label steps up to $11.49 (5.1-10 lb) or $16.49 (10.1-15 lb) and the
@@ -648,7 +666,7 @@
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
     MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
     computeYtdNetProfit,
-    addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
+    addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
     remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
     poshmarkWeightTier, bundleNetComparison,
     computePoshmarkShareStreak,

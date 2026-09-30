@@ -16,6 +16,7 @@ const assert = require('node:assert/strict');
 const {
   estimateNetPayout, ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet,
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
+  openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
@@ -124,6 +125,28 @@ test('disputeResponseDeadline returns null for a resolved case, a missing opened
   assert.equal(disputeResponseDeadline({ status: 'open', platform: 'ebay', openedDate: null }), null);
   assert.equal(disputeResponseDeadline({ status: 'open', platform: 'vinted', openedDate: '2026-09-18' }), null);
   assert.equal(disputeResponseDeadline({ status: 'open', platform: 'depop', openedDate: '2026-09-18' }), null);
+});
+
+test('openDisputesDueForResponse includes a dispute due today or already overdue, and only those', () => {
+  const disputes = [
+    // eBay: opened Mon 2026-09-14, 3 business days -> due Thu 2026-09-17, before "today" -> overdue, included.
+    { id: 'a', status: 'open', platform: 'ebay', openedDate: '2026-09-14' },
+    // Poshmark: opened yesterday -> due today -> included.
+    { id: 'b', status: 'open', platform: 'poshmark', openedDate: '2026-09-19' },
+    // eBay: opened today -> due in 3 business days, in the future -> not yet due, excluded.
+    { id: 'c', status: 'open', platform: 'ebay', openedDate: '2026-09-20' },
+    // Resolved case has no computable deadline at all -> excluded.
+    { id: 'd', status: 'resolved-seller', platform: 'ebay', openedDate: '2026-09-10' },
+    // Vinted has no fixed response clock -> disputeResponseDeadline returns null -> excluded.
+    { id: 'e', status: 'open', platform: 'vinted', openedDate: '2026-09-10' }
+  ];
+  const due = openDisputesDueForResponse(disputes, '2026-09-20');
+  assert.deepEqual(due.map(d => d.id), ['a', 'b']);
+});
+
+test('openDisputesDueForResponse returns an empty array for no disputes, not null or an error', () => {
+  assert.deepEqual(openDisputesDueForResponse([], '2026-09-20'), []);
+  assert.deepEqual(openDisputesDueForResponse(undefined, '2026-09-20'), []);
 });
 
 test('remainingPlatforms drops platforms already recorded as sold elsewhere', () => {
