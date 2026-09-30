@@ -60,7 +60,7 @@
   // above: the Next Steps section and the header's attention pill are both
   // real, user-facing signals Jack checks every visit, and until now neither
   // had a regression test.
-  const { computeNextSteps: computeNextStepsCore } = window.SondrikNextStepsCore;
+  const { computeNextSteps: computeNextStepsCore, hasNewDueId } = window.SondrikNextStepsCore;
 
   // Shared, unit-tested XSS guard (html-core.js): escapeHtml now has a real
   // regression test instead of only ever running live in a browser, same
@@ -1183,22 +1183,26 @@
   }
   renderNotifyBtn();
 
-  // One-shot per transition (never re-fires on the next poll while the
-  // urgent count just stays where it was), and only while this tab
-  // genuinely isn't the one Jack is looking at right now, same suppression
-  // Alpha's maybeFireCriticalNotification and CSM's checkNudgeAlerts already
-  // use, so enabling this can never double up with the on-page attention
-  // pill/favicon dot while the tab is actually visible. previousUrgentCount
-  // starts null so the very first check after page load only ever sets a
-  // baseline, it never fires (opening the page itself is not a real
-  // transition).
-  let previousUrgentCount = null;
+  // One-shot per real transition (never re-fires on the next poll while the
+  // same urgent steps just stay urgent), and only while this tab genuinely
+  // isn't the one Jack is looking at right now, same suppression Alpha's
+  // maybeFireCriticalNotification and CSM's checkNudgeAlerts already use, so
+  // enabling this can never double up with the on-page attention pill/
+  // favicon dot while the tab is actually visible. Tracks the actual set of
+  // urgent step texts rather than just a count: a count-only compare misses
+  // a real transition when one urgent step resolves the same poll window a
+  // different one newly turns urgent (flat or falling count, but genuinely
+  // new attention needed). previousUrgentKeys starts null so the very first
+  // check after page load only ever sets a baseline, it never fires
+  // (opening the page itself is not a real transition).
+  let previousUrgentKeys = null;
   function checkNextStepAlerts(steps) {
     if (!notifySupported) return;
     const urgent = steps.filter(s => s.urgent);
-    const isFirstCheck = previousUrgentCount === null;
-    const grewMoreUrgent = !isFirstCheck && urgent.length > previousUrgentCount;
-    previousUrgentCount = urgent.length;
+    const urgentKeys = urgent.map(s => s.text);
+    const isFirstCheck = previousUrgentKeys === null;
+    const grewMoreUrgent = hasNewDueId(urgentKeys, previousUrgentKeys);
+    previousUrgentKeys = urgentKeys;
     if (isFirstCheck || !grewMoreUrgent) return;
     if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
     if (document.visibilityState === 'visible' && document.hasFocus()) return;

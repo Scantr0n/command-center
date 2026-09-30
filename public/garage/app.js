@@ -85,7 +85,7 @@ const {
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
-  isSupplyLowStock, annotateEngagementTrend, daysBetweenDates
+  isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -3836,14 +3836,15 @@ renderNotifyBtn();
 // visible. previousDueCount starts null so the very first check after page
 // load only ever sets a baseline, it never fires (opening the page itself
 // is not a real transition).
-let previousDisputeDueCount = null;
+let previousDisputeDueIds = null;
 function checkDisputeAlerts(disputesList) {
   if (!notifySupported) return;
   const today = todayDateStr();
   const due = buildDisputeReminders(disputesList).filter(r => r.date <= today);
-  const isFirstCheck = previousDisputeDueCount === null;
-  const grewMoreDue = !isFirstCheck && due.length > previousDisputeDueCount;
-  previousDisputeDueCount = due.length;
+  const dueIds = due.map(r => r.id);
+  const isFirstCheck = previousDisputeDueIds === null;
+  const grewMoreDue = hasNewDueId(dueIds, previousDisputeDueIds);
+  previousDisputeDueIds = dueIds;
   if (isFirstCheck || !grewMoreDue) return;
   if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
   if (document.visibilityState === 'visible' && document.hasFocus()) return;
@@ -3950,14 +3951,15 @@ if (relistNotifyBtn && notifySupported) {
 }
 renderRelistNotifyBtn();
 
-let previousRelistDueCount = null;
+let previousRelistDueIds = null;
 function checkRelistAlerts(currentListings) {
   if (!notifySupported) return;
   const today = todayDateStr();
   const due = buildRelistReminders(currentListings).filter(r => r.date <= today);
-  const isFirstCheck = previousRelistDueCount === null;
-  const grewMoreDue = !isFirstCheck && due.length > previousRelistDueCount;
-  previousRelistDueCount = due.length;
+  const dueIds = due.map(r => r.id);
+  const isFirstCheck = previousRelistDueIds === null;
+  const grewMoreDue = hasNewDueId(dueIds, previousRelistDueIds);
+  previousRelistDueIds = dueIds;
   if (isFirstCheck || !grewMoreDue) return;
   if (Notification.permission !== 'granted' || !loadRelistNotifyPref()) return;
   if (document.visibilityState === 'visible' && document.hasFocus()) return;

@@ -27,7 +27,7 @@ const {
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
-  emDashFields, emDashHits, compareWithBackup
+  emDashFields, emDashHits, compareWithBackup, hasNewDueId
 } = require('./csm-core.js');
 
 test('isValidDateStr accepts a real, correctly zero-padded date', () => {
@@ -1481,4 +1481,22 @@ test('compareWithBackup also diffs stages.json, e.g. a hand-edited stage color',
 test('compareWithBackup passes through the backup file\'s own exportedAt timestamp', () => {
   const result = compareWithBackup({ prospects: [] }, { stages: [] }, backupFile([], [], '2026-08-01T12:00:00.000Z'));
   assert.equal(result.exportedAt, '2026-08-01T12:00:00.000Z');
+});
+
+test('hasNewDueId returns false on the first check, previousIds null', () => {
+  assert.equal(hasNewDueId(['p1', 'p2'], null), false);
+});
+
+test('hasNewDueId returns false when the same prospects just stay overdue', () => {
+  assert.equal(hasNewDueId(['p1', 'p2'], ['p1', 'p2']), false);
+});
+
+test('hasNewDueId returns true when a new prospect falls overdue even if the count also fell', () => {
+  // p2 got nudged the same poll window p3 newly fell overdue: count stays
+  // 2, but p3 is a real, new transition the old count-only check would miss.
+  assert.equal(hasNewDueId(['p1', 'p3'], ['p1', 'p2']), true);
+});
+
+test('hasNewDueId returns false when a prospect drops out and nothing new falls overdue', () => {
+  assert.equal(hasNewDueId(['p1'], ['p1', 'p2']), false);
 });

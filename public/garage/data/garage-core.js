@@ -563,6 +563,22 @@
     });
   }
 
+  // The on-page dispute/relist notify checks used to fire only when the due
+  // count went up (currentCount > previousCount), which misses a real
+  // transition: one due item resolving in the same poll window a different
+  // one newly becomes due leaves the count flat (or lower), so the
+  // count-only check never fires even though something genuinely new is
+  // now due. Comparing the actual set of reminder ids catches that:
+  // previousIds null means this is the first check ever (no real
+  // transition to report yet, same as the count-only version's
+  // isFirstCheck guard). Shared by both checkDisputeAlerts and
+  // checkRelistAlerts, each with its own previousIds tracker.
+  function hasNewDueId(currentIds, previousIds) {
+    if (!previousIds) return false;
+    const prev = new Set(previousIds);
+    return currentIds.some(id => !prev.has(id));
+  }
+
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
     POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
@@ -582,6 +598,7 @@
     daysBetweenDates, onTimeShipRate, avgDaysToShip,
     ebayTrsProgress, depopTopSellerProgress,
     isSupplyLowStock,
-    sortEngagementSnapshots, annotateEngagementTrend
+    sortEngagementSnapshots, annotateEngagementTrend,
+    hasNewDueId
   };
 });

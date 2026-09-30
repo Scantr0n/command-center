@@ -120,22 +120,29 @@
   }
   renderNotifyBtn();
 
-  // One-shot per transition (never re-fires on the next poll while the
-  // awaiting count just stays where it was), and only while this tab
-  // genuinely isn't the one Jack is looking at right now, same suppression
-  // Sondrik/CSM/Alpha's own notify checks already use, so enabling this can
-  // never double up with the on-page "Awaiting response" snapshot chip while
-  // the tab is actually visible. previousAwaitingCount starts null so the
-  // very first check after page load only ever sets a baseline, it never
-  // fires (opening the page itself is not a real transition).
-  let previousAwaitingCount = null;
+  // One-shot per real transition (never re-fires on the next poll while the
+  // same applications just stay awaiting), and only while this tab genuinely
+  // isn't the one Jack is looking at right now, same suppression Sondrik/
+  // CSM/Alpha's own notify checks already use, so enabling this can never
+  // double up with the on-page "Awaiting response" snapshot chip while the
+  // tab is actually visible. Tracks the actual set of application "num"s
+  // (applications.json's own validated unique key, same one compare-core.js
+  // diffs by) rather than just a count: a count-only compare misses a real
+  // transition when one application gets a real response the same poll
+  // window a different one newly crosses into "worth a follow-up" (flat or
+  // falling count, but genuinely new attention needed). previousAwaitingNums
+  // starts null so the very first check after page load only ever sets a
+  // baseline, it never fires (opening the page itself is not a real
+  // transition).
+  let previousAwaitingNums = null;
   function checkFollowupAlerts(applicationsData) {
     if (!notifySupported) return;
     const apps = (applicationsData && applicationsData.applications) || [];
     const awaiting = apps.filter(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate));
-    const isFirstCheck = previousAwaitingCount === null;
-    const grewMoreAwaiting = !isFirstCheck && awaiting.length > previousAwaitingCount;
-    previousAwaitingCount = awaiting.length;
+    const awaitingNums = awaiting.map(a => a.num);
+    const isFirstCheck = previousAwaitingNums === null;
+    const grewMoreAwaiting = JobSearchFollowupCore.hasNewDueId(awaitingNums, previousAwaitingNums);
+    previousAwaitingNums = awaitingNums;
     if (isFirstCheck || !grewMoreAwaiting) return;
     if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
     if (document.visibilityState === 'visible' && document.hasFocus()) return;

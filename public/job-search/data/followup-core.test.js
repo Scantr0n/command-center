@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { WATCH_AFTER_DAYS, COLD_AFTER_DAYS, daysSinceApplied, awaitingResponseTier } = require('./followup-core.js');
+const { WATCH_AFTER_DAYS, COLD_AFTER_DAYS, daysSinceApplied, awaitingResponseTier, hasNewDueId } = require('./followup-core.js');
 
 test('daysSinceApplied returns null for a missing or invalid appliedDate', () => {
   assert.equal(daysSinceApplied(null, '2026-09-29'), null);
@@ -39,4 +39,23 @@ test('awaitingResponseTier ignores a future appliedDate typo rather than flaggin
 test('WATCH_AFTER_DAYS/COLD_AFTER_DAYS are the real documented thresholds, not silently drifted', () => {
   assert.equal(WATCH_AFTER_DAYS, 14);
   assert.equal(COLD_AFTER_DAYS, 28);
+});
+
+test('hasNewDueId returns false on the first check, previousKeys null', () => {
+  assert.equal(hasNewDueId([1, 2], null), false);
+});
+
+test('hasNewDueId returns false when the same applications just stay awaiting', () => {
+  assert.equal(hasNewDueId([1, 2], [1, 2]), false);
+});
+
+test('hasNewDueId returns true when a new application starts awaiting even if the count also fell', () => {
+  // Application #2 got a real response the same poll window #3 newly
+  // crossed into awaiting: count stays 2, but #3 is a real, new transition
+  // the old count-only check would miss.
+  assert.equal(hasNewDueId([1, 3], [1, 2]), true);
+});
+
+test('hasNewDueId returns false when an application drops out and nothing new starts awaiting', () => {
+  assert.equal(hasNewDueId([1], [1, 2]), false);
 });

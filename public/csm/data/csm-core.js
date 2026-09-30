@@ -1027,6 +1027,21 @@
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
-    emDashFields, emDashHits, compareWithBackup
+    emDashFields, emDashHits, compareWithBackup, hasNewDueId
   };
+
+  // The on-page nudge-overdue notify check used to fire only when the
+  // overdue count went up (currentCount > previousCount), which misses a
+  // real transition: one overdue prospect getting nudged in the same poll
+  // window a different one newly falls overdue leaves the count flat (or
+  // lower), so the count-only check never fires even though something
+  // genuinely new needs a nudge. Comparing the actual set of prospect ids
+  // catches that: previousIds null means this is the first check ever (no
+  // real transition to report yet, same as the count-only version's
+  // isFirstCheck guard).
+  function hasNewDueId(currentIds, previousIds) {
+    if (!previousIds) return false;
+    const prev = new Set(previousIds);
+    return currentIds.some(id => !prev.has(id));
+  }
 });

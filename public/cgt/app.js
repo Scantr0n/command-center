@@ -269,7 +269,7 @@ function shippingCarrierLinks(trackingNumber) {
 // working unchanged.
 const {
   isPsaPausedValueTier, isBgsPausedTier, isPausedTier, addDaysIso, daysSince,
-  computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor
+  computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor, hasNewDueId
 } = window.CGTTurnaroundCore;
 
 // Card market prices drift over months, not days, so this is a much longer
@@ -4934,31 +4934,37 @@ renderNotifyBtn();
 // a returned-eligible submission that's crossed past its grader's real
 // average turnaround (or the published estimate, once at least 2 real
 // returns exist to average from).
-function countOverdueSubmissions() {
+function overdueSubmissionIds() {
   const turnaroundByGrader = new Map(buildTurnaroundByGrader(realSubmissions()).map(g => [g.label, g]));
   return buildActiveSubmissions()
-    .filter(s => !isExampleSubmission(s) && estimatedReturnFor(s, turnaroundByGrader).runningLong).length;
+    .filter(s => !isExampleSubmission(s) && estimatedReturnFor(s, turnaroundByGrader).runningLong)
+    .map(s => s.id);
 }
 
-// One-shot per transition (never re-fires on the next poll while the
-// overdue count just stays where it was), and only while this tab genuinely
+// One-shot per real transition (never re-fires on the next poll while the
+// same submissions just stay overdue), and only while this tab genuinely
 // isn't the one Jack is looking at right now, same suppression Sondrik/CSM/
 // Alpha/Job Search/Garage's own notify checks already use, so enabling this
 // can never double up with the on-page attention bar while the tab is
-// actually visible. previousOverdueCount starts null so the very first
-// check after page load only ever sets a baseline, it never fires (opening
-// the page itself is not a real transition).
-let previousOverdueCount = null;
+// actually visible. Tracks the actual set of overdue submission ids rather
+// than just a count: a count-only compare misses a real transition when one
+// overdue submission gets returned the same poll window a different one
+// newly crosses into running-long (flat or falling count, but genuinely new
+// attention needed). previousOverdueIds starts null so the very first check
+// after page load only ever sets a baseline, it never fires (opening the
+// page itself is not a real transition).
+let previousOverdueIds = null;
 function checkSubmissionAlerts() {
   if (!notifySupported) return;
-  const overdue = countOverdueSubmissions();
-  const isFirstCheck = previousOverdueCount === null;
-  const grewMoreOverdue = !isFirstCheck && overdue > previousOverdueCount;
-  previousOverdueCount = overdue;
+  const overdueIds = overdueSubmissionIds();
+  const isFirstCheck = previousOverdueIds === null;
+  const grewMoreOverdue = hasNewDueId(overdueIds, previousOverdueIds);
+  previousOverdueIds = overdueIds;
   if (isFirstCheck || !grewMoreOverdue) return;
   if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
   if (document.visibilityState === 'visible' && document.hasFocus()) return;
   try {
+    const overdue = overdueIds.length;
     const body = overdue === 1
       ? 'A submission is now past its grader’s own average turnaround.'
       : overdue + ' submissions are now past their grader’s own average turnaround.';

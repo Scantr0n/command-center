@@ -16,7 +16,7 @@
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
-    missingNextAction, emDashHits, compareWithBackup
+    missingNextAction, emDashHits, compareWithBackup, hasNewDueId
   } = CSMCore;
 
   const boardEl = document.getElementById('board');
@@ -2133,21 +2133,26 @@
   }
   renderNotifyBtn();
 
-  // One-shot per transition (never re-fires on the next poll while the
-  // overdue count just stays where it was), and only while this tab
-  // genuinely isn't the one Jack is looking at right now, same suppression
-  // Alpha's own maybeFireCriticalNotification already uses, so enabling this
-  // can never double up with the on-page header badge/favicon dot while the
-  // tab is actually visible. previousOverdueCount starts null so the very
-  // first check after page load only ever sets a baseline, it never fires
-  // (opening the page itself is not a real transition).
-  let previousOverdueCount = null;
+  // One-shot per real transition (never re-fires on the next poll while the
+  // same prospects just stay overdue), and only while this tab genuinely
+  // isn't the one Jack is looking at right now, same suppression Alpha's own
+  // maybeFireCriticalNotification already uses, so enabling this can never
+  // double up with the on-page header badge/favicon dot while the tab is
+  // actually visible. Tracks the actual set of overdue prospect ids rather
+  // than just a count: a count-only compare misses a real transition when
+  // one overdue prospect gets nudged the same poll window a different one
+  // newly falls overdue (flat or falling count, but genuinely new attention
+  // needed). previousOverdueIds starts null so the very first check after
+  // page load only ever sets a baseline, it never fires (opening the page
+  // itself is not a real transition).
+  let previousOverdueIds = null;
   function checkNudgeAlerts(prospects) {
     if (!notifySupported) return;
     const overdue = computeNudgeRows(prospects).filter(r => !r.badDate && r.days <= 0);
-    const isFirstCheck = previousOverdueCount === null;
-    const grewMoreOverdue = !isFirstCheck && overdue.length > previousOverdueCount;
-    previousOverdueCount = overdue.length;
+    const overdueIds = overdue.map(r => r.p.id);
+    const isFirstCheck = previousOverdueIds === null;
+    const grewMoreOverdue = hasNewDueId(overdueIds, previousOverdueIds);
+    previousOverdueIds = overdueIds;
     if (isFirstCheck || !grewMoreOverdue) return;
     if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
     if (document.visibilityState === 'visible' && document.hasFocus()) return;

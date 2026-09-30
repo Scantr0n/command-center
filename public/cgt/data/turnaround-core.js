@@ -228,10 +228,26 @@
     return { days, graderStats, hasRealHistory, runningLong, publishedDays, estReturnDate, estReturnIsPublished };
   }
 
+  // The on-page notify check used to fire only when the overdue count went
+  // up (currentCount > previousCount), which misses a real transition: one
+  // overdue submission getting returned in the same poll window a different
+  // one newly crosses into running-long leaves the count flat (or lower),
+  // so the count-only check never fires even though something genuinely
+  // new is now overdue. Comparing the actual set of submission ids catches
+  // that: previousIds null means this is the first check ever (no real
+  // transition to report yet, same as the count-only version's
+  // isFirstCheck guard).
+  function hasNewDueId(currentIds, previousIds) {
+    if (!previousIds) return false;
+    const prev = new Set(previousIds);
+    return currentIds.some(id => !prev.has(id));
+  }
+
   return {
     PUBLISHED_TURNAROUND_DAYS, PSA_VALUE_TIERS_PAUSED, PSA_PAUSED_VALUE_TIER_NAMES,
     isPsaPausedValueTier, BGS_BASE_STANDARD_PAUSED, BGS_PAUSED_TIER_NAMES,
     isBgsPausedTier, isPausedTier, publishedTurnaroundDays, businessDaysToCalendarDays,
-    addDaysIso, daysSince, computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor
+    addDaysIso, daysSince, computeTurnaroundDays, buildTurnaroundByGrader, estimatedReturnFor,
+    hasNewDueId
   };
 });

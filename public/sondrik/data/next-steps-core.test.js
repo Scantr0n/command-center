@@ -13,7 +13,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { computeNextSteps } = require('./next-steps-core.js');
+const { computeNextSteps, hasNewDueId } = require('./next-steps-core.js');
 const { bugfixCheckinStatus } = require('./release-core.js');
 const {
   isValidDateStr, daysBetween, computeGoalProgressPct, computeGoalPaceStatus,
@@ -386,4 +386,23 @@ test('sorts every urgent step before every non-urgent step regardless of inserti
   assert.ok(urgentCount > 0 && urgentCount < steps.length);
   assert.ok(steps.slice(0, urgentCount).every(s => s.urgent));
   assert.ok(steps.slice(urgentCount).every(s => !s.urgent));
+});
+
+test('hasNewDueId returns false on the first check, previousKeys null', () => {
+  assert.equal(hasNewDueId(['a', 'b'], null), false);
+});
+
+test('hasNewDueId returns false when the same keys just stay urgent (no growth, no new key)', () => {
+  assert.equal(hasNewDueId(['a', 'b'], ['a', 'b']), false);
+});
+
+test('hasNewDueId returns true when a new key appears even if the count also fell', () => {
+  // One urgent step resolved (b) the same poll window a different one (c)
+  // newly turned urgent: count goes from 2 to 2 (flat) or could even drop,
+  // but c is a real, new transition the old count-only check would miss.
+  assert.equal(hasNewDueId(['a', 'c'], ['a', 'b']), true);
+});
+
+test('hasNewDueId returns false when a key drops out and nothing new appears', () => {
+  assert.equal(hasNewDueId(['a'], ['a', 'b']), false);
 });

@@ -24,7 +24,7 @@ const {
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
   DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
   isSupplyLowStock,
-  sortEngagementSnapshots, annotateEngagementTrend
+  sortEngagementSnapshots, annotateEngagementTrend, hasNewDueId
 } = require('./garage-core.js');
 
 test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
@@ -524,4 +524,23 @@ test('annotateEngagementTrend: a delta stays null when either side of the compar
   const second = result.find(s => s.id === 's2');
   assert.equal(second.viewsDelta, null, 'the earlier snapshot never logged a real views count to compare against');
   assert.equal(second.savesDelta, null, 'this snapshot itself never logged a real saves count');
+});
+
+test('hasNewDueId returns false on the first check, previousIds null', () => {
+  assert.equal(hasNewDueId(['a-dispute-respond'], null), false);
+});
+
+test('hasNewDueId returns false when the same reminders just stay due', () => {
+  assert.equal(hasNewDueId(['a-dispute-respond', 'b-dispute-respond'], ['a-dispute-respond', 'b-dispute-respond']), false);
+});
+
+test('hasNewDueId returns true when a new reminder becomes due even if the count also fell', () => {
+  // b's dispute got resolved the same poll window c's newly became due:
+  // count stays 2, but c is a real, new transition the old count-only check
+  // would miss.
+  assert.equal(hasNewDueId(['a-dispute-respond', 'c-dispute-respond'], ['a-dispute-respond', 'b-dispute-respond']), true);
+});
+
+test('hasNewDueId returns false when a reminder drops out and nothing new becomes due', () => {
+  assert.equal(hasNewDueId(['a-dispute-respond'], ['a-dispute-respond', 'b-dispute-respond']), false);
 });

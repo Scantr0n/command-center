@@ -276,5 +276,19 @@
     return steps;
   }
 
-  return { computeNextSteps };
+  // The on-page notify check used to fire only when the urgent count went
+  // up (currentCount > previousCount), which misses a real transition: one
+  // urgent step resolving in the same poll window a different one newly
+  // turns urgent leaves the count flat (or lower), so the count-only check
+  // never fires even though something genuinely new needs Jack's
+  // attention. Comparing the actual set of keys catches that: previousKeys
+  // null means this is the first check ever (no real transition to report
+  // yet, same as the count-only version's isFirstCheck guard).
+  function hasNewDueId(currentKeys, previousKeys) {
+    if (!previousKeys) return false;
+    const prev = new Set(previousKeys);
+    return currentKeys.some(k => !prev.has(k));
+  }
+
+  return { computeNextSteps, hasNewDueId };
 });

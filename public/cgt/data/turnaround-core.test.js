@@ -16,7 +16,7 @@ const {
   isPsaPausedValueTier, isBgsPausedTier, isPausedTier, publishedTurnaroundDays,
   businessDaysToCalendarDays, addDaysIso, daysSince, computeTurnaroundDays,
   buildTurnaroundByGrader, estimatedReturnFor, PSA_VALUE_TIERS_PAUSED,
-  BGS_BASE_STANDARD_PAUSED
+  BGS_BASE_STANDARD_PAUSED, hasNewDueId
 } = require('./turnaround-core.js');
 
 test('publishedTurnaroundDays matches an exact tier name before falling back to substring matching', () => {
@@ -180,4 +180,22 @@ test('the real submissions.json never crashes computeTurnaroundDays/buildTurnaro
   const byGrader = buildTurnaroundByGrader(submissions);
   const map = new Map(byGrader.map(g => [g.label, g]));
   assert.doesNotThrow(() => submissions.forEach(s => estimatedReturnFor(s, map)));
+});
+
+test('hasNewDueId returns false on the first check, previousIds null', () => {
+  assert.equal(hasNewDueId(['s1', 's2'], null), false);
+});
+
+test('hasNewDueId returns false when the same submissions just stay overdue', () => {
+  assert.equal(hasNewDueId(['s1', 's2'], ['s1', 's2']), false);
+});
+
+test('hasNewDueId returns true when a new submission crosses overdue even if the count also fell', () => {
+  // s2 got returned the same poll window s3 newly ran long: count stays 2,
+  // but s3 is a real, new transition the old count-only check would miss.
+  assert.equal(hasNewDueId(['s1', 's3'], ['s1', 's2']), true);
+});
+
+test('hasNewDueId returns false when a submission drops out and nothing new crosses overdue', () => {
+  assert.equal(hasNewDueId(['s1'], ['s1', 's2']), false);
 });

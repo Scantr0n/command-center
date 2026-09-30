@@ -42,5 +42,20 @@
     return days < COLD_AFTER_DAYS ? 'watch' : 'cold';
   }
 
-  return { WATCH_AFTER_DAYS, COLD_AFTER_DAYS, daysSinceApplied, awaitingResponseTier };
+  // The on-page follow-up notify check used to fire only when the awaiting
+  // count went up (currentCount > previousCount), which misses a real
+  // transition: one application getting a real response in the same poll
+  // window a different one newly crosses into "worth a follow-up" leaves
+  // the count flat (or lower), so the count-only check never fires even
+  // though something genuinely new is now worth following up on. Comparing
+  // the actual set of application keys catches that: previousKeys null
+  // means this is the first check ever (no real transition to report yet,
+  // same as the count-only version's isFirstCheck guard).
+  function hasNewDueId(currentKeys, previousKeys) {
+    if (!previousKeys) return false;
+    const prev = new Set(previousKeys);
+    return currentKeys.some(k => !prev.has(k));
+  }
+
+  return { WATCH_AFTER_DAYS, COLD_AFTER_DAYS, daysSinceApplied, awaitingResponseTier, hasNewDueId };
 });
