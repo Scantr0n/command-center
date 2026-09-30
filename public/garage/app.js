@@ -114,7 +114,7 @@ function syncUrl() {
 // relist) now live in one place a test suite can actually exercise.
 const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
-  estimateNetPayout, minListingPriceForNet,
+  estimateNetPayout, computeSaleProfit, minListingPriceForNet,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
@@ -1062,11 +1062,18 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions, 
   const knownAgeCount = live.filter(l => l.datePublished).length;
   const dueForRelistCount = live.filter(l => isDueForRelist(l, daysSincePublished(l.datePublished))).length;
   const realizedRevenue = sales.reduce((s, sale) => s + (sale.salePrice || 0), 0);
-  const salesWithCost = sales.filter(sale => sale.costBasis != null || sale.shippingCost != null);
-  const realizedProfit = salesWithCost.reduce((s, sale) => {
+  // Same computeSaleProfit used by renderSales' own table and the sales CSV
+  // export below, so this stat tile can never again disagree with what
+  // those two actually show for the same sale (a sale with cost logged but
+  // no salePrice yet used to count here as a real loss, the full logged
+  // cost with $0 substituted for the missing price, while the table and CSV
+  // both correctly showed no profit figure for that same row at all).
+  const saleProfits = sales.map(sale => {
     const net = estimateNetPayout(sale.platform, sale.salePrice, categoryForListingId(sale.listingId));
-    return s + ((net != null ? net : (sale.salePrice || 0)) - (sale.costBasis || 0) - (sale.shippingCost || 0));
-  }, 0);
+    return computeSaleProfit(net, sale);
+  });
+  const salesWithCost = sales.filter((sale, i) => saleProfits[i] != null);
+  const realizedProfit = saleProfits.reduce((s, p) => s + (p || 0), 0);
   const computedExpenses = expenses.map(e => computeExpenseAmount(e)).filter(a => a != null);
   const totalExpenses = computedExpenses.reduce((s, a) => s + a, 0);
   const uncomputedExpenseCount = expenses.length - computedExpenses.length;
@@ -1095,7 +1102,7 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions, 
     { value: dueDisputeCount, label: 'Disputes needing a response', sub: openDisputeCount ? `${dueDisputeCount}/${openDisputeCount} open case(s) at or past their response window` : 'No open disputes logged', warn: dueDisputeCount > 0 },
     { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
     { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },
-    { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have at least one logged` : 'No sale has a cost basis or shipping cost logged yet' },
+    { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have a price plus at least one cost logged` : 'No sale has both a sale price and a cost basis or shipping cost logged yet' },
     { value: expenses.length, label: 'Business expenses logged', sub: expenses.length ? null : 'None yet' },
     { value: formatUsd(totalExpenses), label: 'Real business expenses', sub: uncomputedExpenseCount ? `${uncomputedExpenseCount} of ${expenses.length} not counted yet, missing amount or a usable mileage rate` : (expenses.length ? 'For Schedule C, not tax advice' : 'No expenses logged yet') },
     { value: netIncomeTracked ? formatUsd(netIncome) : 'not tracked yet', label: 'Net business income', sub: netIncomeTracked ? (expenses.length ? 'Realized profit minus real logged expenses' : 'Realized profit minus $0, no expenses logged yet') : 'Needs at least one sale with cost basis or shipping logged', warn: netIncomeTracked && netIncome < 0 },
@@ -2907,8 +2914,7 @@ function renderSales(sales) {
 
   tbody.innerHTML = sorted.map(s => {
     const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
-    const hasEither = s.costBasis != null || s.shippingCost != null;
-    const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
+    const profit = computeSaleProfit(net, s);
     const askingPct = computeAskingPct(s);
 
     const platformKey = s.platform || 'unknown';
@@ -4915,8 +4921,7 @@ const SALES_CSV_COLUMNS = [
 document.getElementById('salesCsvBtn').addEventListener('click', () => {
   const rows = salesLog.map(s => {
     const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
-    const hasEither = s.costBasis != null || s.shippingCost != null;
-    const profit = net != null && hasEither ? net - (s.costBasis || 0) - (s.shippingCost || 0) : null;
+    const profit = computeSaleProfit(net, s);
     return {
       ...s,
       platform: PLATFORM_LABELS[s.platform] || s.platform || '',

@@ -14,7 +14,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  estimateNetPayout, ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet,
+  estimateNetPayout, computeSaleProfit, ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet,
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
@@ -64,6 +64,35 @@ test('estimateNetPayout: Vinted has no seller fee, Poshmark and Depop use their 
 test('estimateNetPayout: null price or unknown platform never guesses a payout', () => {
   assert.equal(estimateNetPayout('ebay', null), null);
   assert.equal(estimateNetPayout('mercari', 50), null);
+});
+
+test('computeSaleProfit: a sale with cost logged but no salePrice yet returns null, never a phantom loss', () => {
+  // Real bug: renderStats in app.js used to substitute $0 for the missing
+  // salePrice here, folding the sale's full logged cost in as a real
+  // negative number on the "Realized profit" stat tile, while the sales
+  // table and CSV export (both already correct) showed no profit figure at
+  // all for that same row. net is null whenever salePrice is null
+  // (estimateNetPayout's own contract), so this must match.
+  const sale = { platform: 'ebay', salePrice: null, costBasis: 12, shippingCost: 4 };
+  const net = estimateNetPayout(sale.platform, sale.salePrice);
+  assert.equal(net, null);
+  assert.equal(computeSaleProfit(net, sale), null);
+});
+
+test('computeSaleProfit: neither cost basis nor shipping logged returns null even with a real net payout', () => {
+  const sale = { platform: 'vinted', salePrice: 40, costBasis: null, shippingCost: null };
+  const net = estimateNetPayout(sale.platform, sale.salePrice);
+  assert.equal(computeSaleProfit(net, sale), null);
+});
+
+test('computeSaleProfit: real net payout minus cost basis and shipping, missing field treated as $0', () => {
+  const sale = { platform: 'vinted', salePrice: 40, costBasis: 10, shippingCost: null };
+  const net = estimateNetPayout(sale.platform, sale.salePrice);
+  assert.equal(computeSaleProfit(net, sale), 30);
+
+  const sale2 = { platform: 'vinted', salePrice: 40, costBasis: null, shippingCost: 5 };
+  const net2 = estimateNetPayout(sale2.platform, sale2.salePrice);
+  assert.equal(computeSaleProfit(net2, sale2), 35);
 });
 
 test('minListingPriceForNet inverts estimateNetPayout for every platform', () => {

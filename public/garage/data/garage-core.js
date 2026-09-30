@@ -83,6 +83,24 @@
     }
   }
 
+  // One real sale's profit: net payout minus cost basis and shipping, the
+  // exact math renderSales/the sales CSV export already used inline. Real
+  // gap this closes: renderStats in app.js had its own third copy of this
+  // same math that, unlike the other two, substituted a real $0 for a sale
+  // with costBasis/shippingCost logged but no salePrice yet (a state the
+  // sales table explicitly supports, rendering that row's price as "not
+  // set"), silently folding that sale's full logged cost in as a loss on
+  // the "Realized profit" stat tile while the same sale showed no profit
+  // figure at all in the table or CSV. Returns null, never a guessed
+  // number, whenever net payout can't be computed (no salePrice) or neither
+  // cost field is logged, so every caller treats "can't compute this sale's
+  // profit yet" the same way instead of three different ways.
+  function computeSaleProfit(net, sale) {
+    const hasEither = sale.costBasis != null || sale.shippingCost != null;
+    if (net == null || !hasEither) return null;
+    return net - (sale.costBasis || 0) - (sale.shippingCost || 0);
+  }
+
   function ebayMinPriceForNet(targetNet, category) {
     const rate = ebayFinalValueRate(category);
     const lowStep = (targetNet + 0.30) / (1 - rate);
@@ -662,7 +680,7 @@
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
     POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
-    estimateNetPayout, ebayFinalValueRate,
+    estimateNetPayout, computeSaleProfit, ebayFinalValueRate,
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
     MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
     computeYtdNetProfit,
