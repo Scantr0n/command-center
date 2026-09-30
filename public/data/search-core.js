@@ -38,12 +38,14 @@
     channel: 'channel',
     release: 'release',
     goal: 'goal',
-    application: 'application'
-    // sale/expense/dispute/supply/acquisition/comp/activity/engagement
-    // (garage) have no per-record modal or highlight target yet, and (unlike
-    // application above) most still have zero real rows logged; activity.json
-    // has two real rows already but still nothing on the page to jump to.
-    // Intentionally absent, not an oversight.
+    application: 'application',
+    activity: 'activity',
+    engagement: 'engagement'
+    // sale/expense/dispute/supply/acquisition/comp (garage) still have no
+    // per-record highlight target: unlike activity/engagement above, all six
+    // have zero real rows logged today, so there is nothing yet to jump to
+    // and nothing a real search would actually surface. Intentionally
+    // absent, not an oversight.
   };
 
   function recordHref(r) {

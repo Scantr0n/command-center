@@ -14,27 +14,30 @@ const assert = require('node:assert/strict');
 const { RECORD_TYPE_PARAMS, recordHref } = require('./search-core.js');
 const { SEARCH_SOURCES } = require('../../data/search-sources-core.js');
 
-// Garage's eight bulk-tracked entity types have no per-record modal or
-// highlight target on their own hub page yet: six of them (unlike every
-// other real type below) also still have zero real rows logged in any of
-// their files, so there is nothing real yet to jump to; activity.json is the
-// one exception with real rows already (the Haggar corduroy photo-audit
-// catch, the eBay return-policy fix) but still no query param an app.js page
-// consumes to jump to one. A real, small, explicit allowlist of intentional
-// exceptions, not a silent skip. Requiring SEARCH_SOURCES directly here
-// (rather than a second hand-typed snapshot of "every type it emits", which
-// is exactly the kind of copy that drifted for Sondrik's own lead/channel/
-// release/goal types before search-core.js existed) means a genuinely new
-// type added there is real input to the assertion below on its very next
-// test run, not something this file also has to be told about by hand.
-// 'standout' (job-search's next-up.json) joins the same allowlist for the
-// same reason: a real row (unlike the six still-empty garage types above)
-// but no stable id (an editorial highlight, not a per-record entity keyed
-// like applications.json's own num) and no per-record modal on job-search's
-// own page to jump to yet, so recordHref's existing "falls back to the bare
-// hub page" behavior for a missing id is the correct, already-tested result
-// here, not a gap to close with a fabricated id or a modal that doesn't exist.
-const INTENTIONALLY_UNLINKED_TYPES = new Set(['sale', 'expense', 'dispute', 'supply', 'acquisition', 'comp', 'activity', 'engagement', 'standout']);
+// Six of Garage's bulk-tracked entity types (sale/expense/dispute/supply/
+// acquisition/comp) still have zero real rows logged in any of their files,
+// so there is nothing real yet to jump to and no per-record highlight target
+// on their own hub page to build one for. activity/engagement used to be in
+// this same allowlist (activity.json had real rows already, the Haggar
+// corduroy photo-audit catch and the eBay return-policy fix, but no query
+// param an app.js page consumed to jump to one); both now have a real
+// mapping above and a scroll-and-flash target on garage's own page, so they
+// moved out. A real, small, explicit allowlist of intentional exceptions,
+// not a silent skip. Requiring SEARCH_SOURCES directly here (rather than a
+// second hand-typed snapshot of "every type it emits", which is exactly the
+// kind of copy that drifted for Sondrik's own lead/channel/release/goal
+// types before search-core.js existed) means a genuinely new type added
+// there is real input to the assertion below on its very next test run, not
+// something this file also has to be told about by hand.
+// 'standout' (job-search's next-up.json) is in the same allowlist for a
+// different reason: a real row (unlike the six still-empty garage types
+// above) but no stable id (an editorial highlight, not a per-record entity
+// keyed like applications.json's own num) and no per-record modal on
+// job-search's own page to jump to yet, so recordHref's existing "falls back
+// to the bare hub page" behavior for a missing id is the correct,
+// already-tested result here, not a gap to close with a fabricated id or a
+// modal that doesn't exist.
+const INTENTIONALLY_UNLINKED_TYPES = new Set(['sale', 'expense', 'dispute', 'supply', 'acquisition', 'comp', 'standout']);
 
 test('every real SEARCH_SOURCES type either has a param mapping or is a documented, intentional exception', () => {
   const realTypes = [...new Set(SEARCH_SOURCES.map(s => s.type))];
@@ -67,6 +70,10 @@ test('recordHref builds a hub-relative link with the matching query param', () =
     '/cgt/?card=malkin-210');
   assert.equal(recordHref({ hub: 'job-search', type: 'application', id: '42' }),
     '/job-search/?application=42');
+  assert.equal(recordHref({ hub: 'garage', type: 'activity', id: 'depop-photo-audit' }),
+    '/garage/?activity=depop-photo-audit');
+  assert.equal(recordHref({ hub: 'garage', type: 'engagement', id: 'boot-listing-2026-09-15' }),
+    '/garage/?engagement=boot-listing-2026-09-15');
 });
 
 test('recordHref falls back to the bare hub page for an unsupported type or a missing id', () => {

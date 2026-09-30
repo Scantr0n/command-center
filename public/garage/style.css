@@ -966,6 +966,30 @@ table.card-table {
   margin-top: 8px;
 }
 
+/* Real "you clicked through, here's where you landed" confirmation for a
+   search result jumping to a specific activity event, same pattern as CSM/
+   Sondrik's own .section-flash: a silent scrollIntoView gives no feedback
+   that the link actually did anything. */
+.section-flash {
+  animation: sectionFlash 1.6s ease-out;
+  border-radius: 12px;
+}
+@keyframes sectionFlash {
+  0% { box-shadow: 0 0 0 2px var(--hairlineHover), 0 0 32px -8px var(--hairlineHover); background: rgba(255,255,255,0.035); }
+  100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+}
+/* Same confirmation for a search result jumping to a specific engagement
+   snapshot row. Animates the cells, not the <tr> itself: box-shadow does
+   not render on a table row in most browsers, same reasoning as Job
+   Search's own .row-flash. */
+.row-flash td {
+  animation: rowFlash 1.6s ease-out;
+}
+@keyframes rowFlash {
+  0% { background: rgba(255,255,255,0.06); }
+  100% { background: transparent; }
+}
+
 /* Data changelog: real git commit history of the hand-edited data files,
    same compact row shape CSM's, Sondrik's, and CGT's own .changelog-*
    rules already use, distinct from the card-style activity log above since

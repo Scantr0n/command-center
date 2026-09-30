@@ -15,6 +15,13 @@ let activePlatform = 'all';
 // this only needs to answer "open this one listing once, from a link",
 // not track "is a modal currently open" as ongoing page state.
 let initialListingId = null;
+// Same one-shot pattern as initialListingId above, for the two record types
+// search results can now deep-link into that have no modal of their own
+// (see search-core.js's RECORD_TYPE_PARAMS): scrolled to and flashed once,
+// rather than opened, since neither activity events nor engagement
+// snapshots have a dedicated detail view to open.
+let initialActivityId = null;
+let initialEngagementId = null;
 let sortKey = null;
 let sortDir = 'asc';
 let currentStages = [];
@@ -45,11 +52,15 @@ function restoreStateFromUrl() {
   const sort = params.get('sort');
   const dir = params.get('dir');
   const listing = params.get('listing');
+  const activity = params.get('activity');
+  const engagement = params.get('engagement');
   if (q) searchTerm = q;
   if (platform && VALID_PLATFORMS.includes(platform)) activePlatform = platform;
   if (sort) sortKey = sort;
   if (dir === 'desc') sortDir = 'desc';
   if (listing) initialListingId = listing;
+  if (activity) initialActivityId = activity;
+  if (engagement) initialEngagementId = engagement;
 }
 
 function setInitialChipState(containerId, dataAttr, value) {
@@ -57,6 +68,30 @@ function setInitialChipState(containerId, dataAttr, value) {
   container.querySelectorAll('.chip').forEach(chip => {
     chip.setAttribute('aria-pressed', chip.getAttribute(dataAttr) === value ? 'true' : 'false');
   });
+}
+
+// Real "you clicked through, here's where you landed" confirmation, same
+// pattern as CSM/Sondrik's own .section-flash: a silent scrollIntoView gives
+// no feedback that a search result's link actually did anything.
+function flashElementOnce(el) {
+  if (!el) return;
+  el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.classList.add('section-flash');
+    setTimeout(() => el.classList.remove('section-flash'), 1600);
+  }));
+}
+
+// Same idea as flashElementOnce above, but for a <tr>: box-shadow does not
+// render on a table row in most browsers, so this animates its <td>s
+// instead, same reasoning as Job Search's own .row-flash.
+function flashRowOnce(tr) {
+  if (!tr) return;
+  tr.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    tr.classList.add('row-flash');
+    setTimeout(() => tr.classList.remove('row-flash'), 1600);
+  }));
 }
 
 function syncUrl() {
@@ -856,6 +891,7 @@ async function loadData() {
 
   if (activityData) {
     renderActivity(activityData.events || []);
+    if (initialActivityId) flashElementOnce(document.getElementById('activity-item-' + initialActivityId));
   } else {
     document.getElementById('activityList').innerHTML =
       '<div class="activity-item" role="alert"><div class="activity-item-detail">Failed to load activity data: ' +
@@ -946,6 +982,7 @@ async function loadData() {
   if (engagementData) {
     engagementLog = engagementSnapshots;
     renderEngagement(engagementSnapshots, listings);
+    if (initialEngagementId) flashRowOnce(document.getElementById('engagement-row-' + initialEngagementId));
   } else {
     engagementLog = [];
     document.getElementById('engagementTableBody').innerHTML = '';
@@ -2805,7 +2842,7 @@ function renderActivity(events) {
     return;
   }
   list.innerHTML = events.map(e => `
-    <div class="activity-item">
+    <div class="activity-item" id="${e.id ? 'activity-item-' + escapeHtml(e.id) : ''}">
       <div class="activity-item-head">
         <span class="activity-item-title">${escapeHtml(e.title || 'Untitled event')}</span>
         <span class="badge badge-${escapeHtml(e.type || 'other')}">${escapeHtml(EVENT_TYPE_LABELS[e.type] || e.type || 'other')}</span>
@@ -3467,7 +3504,7 @@ function renderEngagement(snapshots, currentListings) {
       ? escapeHtml(String(s.saves)) + formatEngagementDelta(s.savesDelta)
       : '<span class="cell-value empty">not logged</span>';
     return `
-    <tr>
+    <tr id="${s.id ? 'engagement-row-' + escapeHtml(s.id) : ''}">
       <td>${itemHtml}</td>
       <td><span class="badge badge-${escapeHtml(s.platform)}">${escapeHtml(PLATFORM_LABELS[s.platform] || s.platform)}</span></td>
       <td class="cell-muted">${dateHtml}</td>
