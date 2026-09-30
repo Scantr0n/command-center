@@ -278,6 +278,16 @@ const {
 // before relying on this number," not that the price is wrong.
 const PRICE_STALE_AFTER_DAYS = 180;
 
+// A live eBay listing is a different clock than a researched price: eBay's
+// own sellers and multiple 2026 eBay-selling guides treat 60-90 days with no
+// sale as the point a listing is "stale" and worth a reprice or a relist
+// (some sellers cut it at 60, one eBay exec has called OOAK listings stale
+// at 90), well short of PRICE_STALE_AFTER_DAYS' 180-day window for the
+// researched estimate behind it. 90 days, the top of that real range: a
+// listing sitting past it either isn't priced to move or has been forgotten
+// about, either way worth a look, not an error.
+const LISTING_STALE_AFTER_DAYS = 90;
+
 // The Grading service tiers reference table below is hand-researched prose,
 // not data-file driven, so nothing else in the app notices when it goes
 // stale -- the SGC $15->$50/card hike, the BGS-vs-SGC turnaround mixup
@@ -459,6 +469,21 @@ function isCandidateStale(c) {
   return age != null && age > PRICE_STALE_AFTER_DAYS;
 }
 
+// Same age-check shape as isStale/isCandidateStale above, applied to
+// listedDate instead of datePriced and gated on the shorter
+// LISTING_STALE_AFTER_DAYS window: a live, unsold listing is a different
+// real signal than a researched price going stale, and is worth flagging on
+// its own even when estimatedValue was only just re-checked. isListed(c)
+// already implies !isSold(c) is the caller's job to check the same way
+// every other "currently listed" check on this page does (isListed doesn't
+// know about soldDate, same separation as the badge-listed rendering it
+// already drives).
+function isListingStale(c) {
+  if (!isListed(c)) return false;
+  const age = daysSince(c.listedDate);
+  return age != null && age > LISTING_STALE_AFTER_DAYS;
+}
+
 // submissions.json is fetched alongside cards.json rather than treated as
 // optional, since the "Grading submissions" section always renders (even if
 // only to show its own empty state) instead of silently staying blank when
@@ -594,6 +619,7 @@ async function loadCards() {
     renderDuplicateCandidates();
     renderGradeLadderFlags();
     renderListingPriceFlags();
+    renderStaleListing();
     renderAttentionBar();
     checkSubmissionAlerts();
     startSubmissionAlertPoll();
@@ -2023,6 +2049,16 @@ function buildStalePricingFlags() {
     .sort((a, b) => daysSince(b.datePriced) - daysSince(a.datePriced));
 }
 
+// Same shape as buildStalePricingFlags above, for listings instead of
+// prices: !isSold(c) is still required even though isListingStale already
+// calls isListed(c) (which doesn't check soldDate), same separation
+// isListed's own callers already keep everywhere else on this page.
+function buildStaleListingFlags() {
+  return cards
+    .filter(c => !isExample(c) && !isSold(c) && isListingStale(c))
+    .sort((a, b) => daysSince(b.listedDate) - daysSince(a.listedDate));
+}
+
 function renderStalePricing() {
   const section = document.getElementById('stalePricingSection');
   const list = document.getElementById('stalePricingList');
@@ -2185,6 +2221,32 @@ function renderListingPriceFlags() {
   });
 }
 
+// Same clickable-panel shape as renderListingPriceFlags above, flagging a
+// different real signal: not a mispriced ask, but one that's been sitting
+// live for LISTING_STALE_AFTER_DAYS with no sale at all (see that constant's
+// own comment for the real 60-90-day eBay-relist convention this follows).
+function renderStaleListing() {
+  const section = document.getElementById('staleListingSection');
+  const list = document.getElementById('staleListingList');
+  const flagged = buildStaleListingFlags();
+
+  if (!flagged.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flagged.map(c => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</span>
+      <span class="dq-meta">Listed ${escapeHtml(formatUsd(c.listedPrice))} on ${escapeHtml(c.listedDate)}</span>
+      <span class="dq-why">SITTING ${daysSince(c.listedDate)} DAYS WITH NO SALE</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
 // Same attention-bar convention as CSM's own renderAttentionBar: these
 // panels (unpriced, data quality, stale pricing, duplicates, grade ladder,
 // candidates stuck without a verdict) each already hide themselves when
@@ -2205,6 +2267,7 @@ function renderAttentionBar() {
   const duplicateCandidateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateCandidateGroups(realCandidatesForDupes).length : 0;
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
   const listingPriceCount = window.CGTValidateCore ? CGTValidateCore.findListingPriceMismatches(realCards).length : 0;
+  const staleListingCount = buildStaleListingFlags().length;
   const orphanSubmissionCount = window.CGTValidateCore ? CGTValidateCore.findOrphanSubmissionRefs(realCards, submissions).length : 0;
   const returnedMissingCardsCount = window.CGTValidateCore
     ? CGTValidateCore.findReturnedSubmissionsMissingCards(realSubmissions(), realCards).length
@@ -2279,6 +2342,9 @@ function renderAttentionBar() {
   }
   if (listingPriceCount) {
     items.push({ n: listingPriceCount, tone: 'warn', target: 'listingPriceSection', label: listingPriceCount === 1 ? 'listing is 50%+ off its own researched estimate' : 'listings are 50%+ off their own researched estimate' });
+  }
+  if (staleListingCount) {
+    items.push({ n: staleListingCount, tone: 'warn', target: 'staleListingSection', label: staleListingCount === 1 ? 'listing has sat 90+ days with no sale' : 'listings have sat 90+ days with no sale' });
   }
   if (orphanSubmissionCount) {
     items.push({ n: orphanSubmissionCount, tone: 'warn', target: 'inventorySection', label: orphanSubmissionCount === 1 ? 'card references a submission id that doesn’t exist' : 'cards reference a submission id that doesn’t exist' });
@@ -2839,7 +2905,9 @@ function renderCardGallery(filtered) {
         </div>
       </div>
       ${isSold(c) ? '<span class="badge badge-sold gallery-card-flag" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>'
-        : isListed(c) ? '<span class="badge badge-listed gallery-card-flag" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>' : ''}
+        : isListed(c) ? (isListingStale(c)
+          ? '<span class="badge badge-stale gallery-card-flag" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + ', ' + daysSince(c.listedDate) + ' days with no sale">sitting</span>'
+          : '<span class="badge badge-listed gallery-card-flag" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>') : ''}
     </div>
   `).join('');
 
@@ -2893,7 +2961,7 @@ function applyFiltersAndRender() {
   tbody.innerHTML = filtered.map(c => `
     <tr tabindex="0" role="button" data-id="${escapeHtml(c.id)}">
       <td>
-        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isBgsBlackLabel(c) ? ' <span class="badge badge-black-label" title="All four BGS subgrades are a perfect 10">black label</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}${!isSold(c) && isListed(c) ? ' <span class="badge badge-listed" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>' : ''}</div>
+        <div class="cell-card-name">${escapeHtml(c.cardName || 'Untitled card')}${isExample(c) ? ' <span class="badge badge-example">example</span>' : ''}${isBgsBlackLabel(c) ? ' <span class="badge badge-black-label" title="All four BGS subgrades are a perfect 10">black label</span>' : ''}${isSold(c) ? ' <span class="badge badge-sold" title="Sold ' + escapeHtml(c.soldDate) + ' for ' + escapeHtml(formatUsd(c.soldPrice)) + '">sold</span>' : ''}${!isSold(c) && isListed(c) ? ' <span class="badge badge-listed" title="Listed ' + escapeHtml(c.listedDate) + ' at ' + escapeHtml(formatUsd(c.listedPrice)) + '">listed</span>' : ''}${!isSold(c) && isListingStale(c) ? ' <span class="badge badge-stale" title="Listed ' + escapeHtml(c.listedDate) + ', ' + daysSince(c.listedDate) + ' days with no sale">sitting</span>' : ''}</div>
         ${c.year ? `<div class="cell-card-meta">${escapeHtml(String(c.year))}</div>` : ''}
       </td>
       <td class="cell-muted">${c.sport ? `<span class="badge badge-sport">${escapeHtml(c.sport)}</span>` : '<span class="cell-value empty">unknown</span>'}</td>
@@ -3582,7 +3650,10 @@ function openModal(id) {
       body += field('Unrealized gain / loss', formatSignedUsd(gl.abs) + (gl.pct != null ? ' (' + (gl.pct >= 0 ? '+' : '') + gl.pct.toFixed(1) + '%)' : ''), false);
     }
     if (isListed(activeCard)) {
-      body += field('Listed date', activeCard.listedDate, false);
+      const listedDateDisplay = isListingStale(activeCard)
+        ? activeCard.listedDate + ' (' + daysSince(activeCard.listedDate) + ' days with no sale, worth a reprice or relist)'
+        : activeCard.listedDate;
+      body += field('Listed date', listedDateDisplay, false);
       let listedPriceDisplay = activeCard.listedPrice != null ? formatUsd(activeCard.listedPrice) : null;
       if (activeCard.listedPrice != null && activeCard.estimatedValue > 0) {
         const ratio = activeCard.listedPrice / activeCard.estimatedValue;
