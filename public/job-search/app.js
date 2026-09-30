@@ -138,7 +138,7 @@
   function checkFollowupAlerts(applicationsData) {
     if (!notifySupported) return;
     const apps = (applicationsData && applicationsData.applications) || [];
-    const awaiting = apps.filter(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate));
+    const awaiting = apps.filter(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status));
     const awaitingNums = awaiting.map(a => a.num);
     const isFirstCheck = previousAwaitingNums === null;
     const grewMoreAwaiting = JobSearchFollowupCore.hasNewDueId(awaitingNums, previousAwaitingNums);
@@ -211,16 +211,19 @@
   const { csvField } = window.JobSearchExportCore;
 
   // Same real local CSV export the other 5 hubs already have, just never
-  // shipped on this one. Exports the same 6 columns as the on-page
+  // shipped on this one. Exports the same 7 columns as the on-page
   // Applications table (renderApplications below), in the same order,
   // so the file matches what's on screen.
   document.getElementById('csvBtn').addEventListener('click', () => {
     if (!rawApplicationsData) return;
     const apps = rawApplicationsData.applications || [];
-    const header = ['#', 'Role', 'Company', 'Location', 'Pay', 'Applied'].map(csvField).join(',');
-    const lines = apps.map(a => [
-      a.num, a.role, a.company, a.location, a.pay, fmtDate(a.appliedDate) || 'undated'
-    ].map(csvField).join(','));
+    const header = ['#', 'Role', 'Company', 'Location', 'Pay', 'Applied', 'Status'].map(csvField).join(',');
+    const lines = apps.map(a => {
+      const status = JobSearchFollowupCore.isTerminalStatus(a.status)
+        ? JobSearchFollowupCore.STATUS_LABELS[a.status]
+        : (JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status) || '');
+      return [a.num, a.role, a.company, a.location, a.pay, fmtDate(a.appliedDate) || 'undated', status].map(csvField).join(',');
+    });
     const csv = [header, ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -346,7 +349,7 @@
     // is the only thing telling Jack an application needs a look without
     // scrolling into the table first.
     if (apps.length) {
-      const tiers = apps.map(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate));
+      const tiers = apps.map(a => JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status));
       const awaitingCount = tiers.filter(Boolean).length;
       const coldCount = tiers.filter(t => t === 'cold').length;
       chips.push({
@@ -396,13 +399,17 @@
     { key: 'status', label: 'Status' }
   ];
 
-  // applications.json only ever logs appliedDate, no status field, so this
-  // is the only real signal available: real elapsed time with nothing else
-  // on record. See followup-core.js's own header for where the 14/28-day
-  // thresholds come from.
+  // A real hand-logged status (see followup-core.js's STATUS_LABELS) always
+  // wins: it's a fact, not a guess. With no status logged, appliedDate's own
+  // elapsed time is the only signal available, see followup-core.js's own
+  // header for where the 14/28-day thresholds come from.
   function statusCellHtml(a) {
+    if (JobSearchFollowupCore.isTerminalStatus(a.status)) {
+      return '<span class="status-badge status-badge-' + escapeHtml(a.status) + '">' +
+        escapeHtml(JobSearchFollowupCore.STATUS_LABELS[a.status]) + '</span>';
+    }
     const days = JobSearchFollowupCore.daysSinceApplied(a.appliedDate);
-    const tier = JobSearchFollowupCore.awaitingResponseTier(a.appliedDate);
+    const tier = JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, undefined, a.status);
     if (!tier) return '<span class="status-cell-quiet">-</span>';
     const dayWord = days === 1 ? 'day' : 'days';
     return tier === 'cold'

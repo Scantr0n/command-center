@@ -440,6 +440,14 @@ section { margin-bottom: 36px; }
 }
 .status-badge-watch { color: #E0A030; border: 1px solid rgba(224,160,48,0.35); background: rgba(224,160,48,0.1); }
 .status-badge-cold { color: #F65156; border: 1px solid rgba(229,72,77,0.35); background: rgba(229,72,77,0.1); font-weight: 600; }
+/* Real hand-logged status, not a guess: interview reuses this hub's own
+   accent blue (already the chip-accent color above), offer reuses the
+   same green already used for notify-on state elsewhere on this page,
+   rejected/withdrawn are deliberately neutral, a closed application isn't
+   an alert. */
+.status-badge-interview { color: #4F9FD9; border: 1px solid rgba(79,159,217,0.35); background: rgba(79,159,217,0.1); }
+.status-badge-offer { color: #3DDC84; border: 1px solid rgba(61,220,132,0.35); background: rgba(61,220,132,0.1); font-weight: 600; }
+.status-badge-rejected, .status-badge-withdrawn { color: var(--dim); border: 1px solid var(--hairline); background: none; }
 
 @media (max-width: 640px) {
   .data-table, .data-table tbody, .data-table tr, .data-table th, .data-table td { display: block; width: auto; }
@@ -976,7 +984,10 @@ footer.page-foot code { overflow-wrap: anywhere; }
   .snapshot-chip-number, .lead-name { color: #111; }
   .snapshot-chip-label, .snapshot-chip-meta, .lead-meta-row, .lead-detail, .criteria-item, .dealbreaker-item, .sub-list-item, .section-note { color: #333; }
   .lead-caveat { color: #7a5000; }
-  .lead-badge, .status-badge-watch, .status-badge-cold { border-color: #999; background: none; color: #111; }
+  .lead-badge, .status-badge-watch, .status-badge-cold,
+  .status-badge-interview, .status-badge-offer, .status-badge-rejected, .status-badge-withdrawn {
+    border-color: #999; background: none; color: #111;
+  }
   .data-table { background: none; }
   .data-table th, .data-table td { border-color: #ccc; color: #111; }
   .empty-state { border-color: #ccc; color: #555; }

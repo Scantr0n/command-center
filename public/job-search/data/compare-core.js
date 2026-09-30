@@ -65,7 +65,7 @@
     return { added, removed, changed };
   }
 
-  const APPLICATION_FIELDS = ['role', 'company', 'location', 'pay', 'appliedDate'];
+  const APPLICATION_FIELDS = ['role', 'company', 'location', 'pay', 'appliedDate', 'status'];
   const DROPPED_FIELDS = ['reason'];
   const SKIPPED_FIELDS = ['reason'];
 

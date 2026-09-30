@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { WATCH_AFTER_DAYS, COLD_AFTER_DAYS, daysSinceApplied, awaitingResponseTier, hasNewDueId } = require('./followup-core.js');
+const { WATCH_AFTER_DAYS, COLD_AFTER_DAYS, STATUS_LABELS, isTerminalStatus, daysSinceApplied, awaitingResponseTier, hasNewDueId } = require('./followup-core.js');
 
 test('daysSinceApplied returns null for a missing or invalid appliedDate', () => {
   assert.equal(daysSinceApplied(null, '2026-09-29'), null);
@@ -39,6 +39,34 @@ test('awaitingResponseTier ignores a future appliedDate typo rather than flaggin
 test('WATCH_AFTER_DAYS/COLD_AFTER_DAYS are the real documented thresholds, not silently drifted', () => {
   assert.equal(WATCH_AFTER_DAYS, 14);
   assert.equal(COLD_AFTER_DAYS, 28);
+});
+
+test('isTerminalStatus recognizes exactly the four hand-loggable statuses', () => {
+  assert.equal(isTerminalStatus('interview'), true);
+  assert.equal(isTerminalStatus('offer'), true);
+  assert.equal(isTerminalStatus('rejected'), true);
+  assert.equal(isTerminalStatus('withdrawn'), true);
+  assert.equal(isTerminalStatus(undefined), false);
+  assert.equal(isTerminalStatus(null), false);
+  assert.equal(isTerminalStatus('applied'), false);
+  assert.equal(isTerminalStatus(''), false);
+});
+
+test('STATUS_LABELS has a real label for every terminal status', () => {
+  assert.deepEqual(Object.keys(STATUS_LABELS).sort(), ['interview', 'offer', 'rejected', 'withdrawn']);
+  Object.values(STATUS_LABELS).forEach(label => assert.ok(label && label.length > 0));
+});
+
+test('awaitingResponseTier returns null once a terminal status is logged, even 28+ days quiet', () => {
+  assert.equal(awaitingResponseTier('2026-08-01', '2026-09-29', 'rejected'), null);
+  assert.equal(awaitingResponseTier('2026-08-01', '2026-09-29', 'interview'), null);
+  assert.equal(awaitingResponseTier('2026-08-01', '2026-09-29', 'offer'), null);
+  assert.equal(awaitingResponseTier('2026-08-01', '2026-09-29', 'withdrawn'), null);
+});
+
+test('awaitingResponseTier still applies the silence rule when no status is logged', () => {
+  assert.equal(awaitingResponseTier('2026-08-01', '2026-09-29', undefined), 'cold');
+  assert.equal(awaitingResponseTier('2026-08-01', '2026-09-29', null), 'cold');
 });
 
 test('hasNewDueId returns false on the first check, previousKeys null', () => {

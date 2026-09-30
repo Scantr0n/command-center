@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications } = require('./validate-core.js');
+const { STATUS_LABELS } = require('./followup-core.js');
 
 const DATA_DIR = __dirname;
 const CHANGELOG_TRACKED_FILES = ['applications.json', 'criteria.json', 'next-up.json', 'digest-latest.json'];
@@ -72,6 +73,9 @@ function main() {
     if (!isDateOrNull(a.appliedDate)) errors.push(where + ': "appliedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(a.appliedDate));
     else if (!a.appliedDate) warnings.push(where + ': no appliedDate logged, an application row with no real date reads as unconfirmed');
     else if (isFutureDate(a.appliedDate)) warnings.push(where + ': "appliedDate" (' + a.appliedDate + ') is in the future, check for a typo');
+    if (a.status != null && !Object.prototype.hasOwnProperty.call(STATUS_LABELS, a.status)) {
+      errors.push(where + ': "status" must be one of ' + Object.keys(STATUS_LABELS).join(', ') + ' or omitted, got ' + JSON.stringify(a.status));
+    }
     emDashFields(a, ['role', 'company', 'location', 'pay']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this is a transcription field, check it against the source tracker'));
   });
