@@ -16,7 +16,8 @@ const {
   relativeTime,
   isStale,
   STATUS_SEVERITY,
-  sortForGrid
+  sortForGrid,
+  reliabilityPct
 } = require('./dashboard-core.js');
 
 const NOW = new Date(2026, 8, 24, 15, 0, 0); // local midday, 2026-09-24
@@ -99,4 +100,23 @@ test('sortForGrid never mutates the input list', () => {
   const copy = SAMPLE.slice();
   sortForGrid(SAMPLE, 'name');
   assert.deepEqual(SAMPLE, copy);
+});
+
+test('reliabilityPct parses a real "X/Y succeeded" string into a rounded percentage', () => {
+  // Both Grid's own reliability bar (reliabilityBarHtml) and the cluster
+  // detail modal used to each hand-roll this exact regex-then-round inline,
+  // a real duplication risk even though the two copies happened to still
+  // agree. This is the one shared function both now call.
+  assert.equal(reliabilityPct('10/10 succeeded'), 100);
+  assert.equal(reliabilityPct('1/3 succeeded'), 33);
+  assert.equal(reliabilityPct('2/3 succeeded'), 67);
+  assert.equal(reliabilityPct('0/5 succeeded'), 0);
+});
+
+test('reliabilityPct returns null, never a guessed percentage, for anything that does not real-parse', () => {
+  assert.equal(reliabilityPct(null), null);
+  assert.equal(reliabilityPct(undefined), null);
+  assert.equal(reliabilityPct(''), null);
+  assert.equal(reliabilityPct('no runs yet'), null, 'text with no N/M shape at all');
+  assert.equal(reliabilityPct('5/0 succeeded'), null, 'a real M of 0 would divide by zero');
 });

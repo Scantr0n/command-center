@@ -100,12 +100,28 @@
     return sorted;
   }
 
+  // Parses a cluster's real "X/Y succeeded" recentSuccessRate string into a
+  // percentage, shared between Grid's own reliability bar (reliabilityBarHtml
+  // in index.html) and the cluster detail modal's own copy of the identical
+  // bar, which used to each hand-roll the same regex-then-round math inline.
+  // Both render paths already carried a comment claiming they'd "never
+  // disagree" about this field, but nothing actually enforced that beyond
+  // the two copies happening to stay byte-for-byte identical; this is that
+  // enforcement. Returns null, never a guessed percentage, whenever the
+  // string is missing or doesn't match the real "N/M" shape, or M is 0.
+  function reliabilityPct(recentSuccessRate) {
+    const m = recentSuccessRate ? /(\d+)\s*\/\s*(\d+)/.exec(recentSuccessRate) : null;
+    if (!m || !parseInt(m[2], 10)) return null;
+    return Math.round((parseInt(m[1], 10) / parseInt(m[2], 10)) * 100);
+  }
+
   return {
     daysAgoLocal,
     shortRelativeTime,
     relativeTime,
     isStale,
     STATUS_SEVERITY,
-    sortForGrid
+    sortForGrid,
+    reliabilityPct
   };
 });

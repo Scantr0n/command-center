@@ -937,7 +937,8 @@ const {
   shortRelativeTime,
   relativeTime,
   isStale,
-  sortForGrid: sortForGridCore
+  sortForGrid: sortForGridCore,
+  reliabilityPct
 } = window.DashboardCore;
 const {
   groupByCategory,
@@ -2635,12 +2636,11 @@ function reliabilityBarHtml(c) {
   const failed = r.lastRunStatus === 'failed';
   const paused = r.lastRunStatus === 'paused';
   const barColor = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
-  const m = /(\d+)\s*\/\s*(\d+)/.exec(r.recentSuccessRate);
   const title = `Recent scheduled-task runs: ${escapeHtml(r.recentSuccessRate)}${r.lastRunAt ? ` (last: ${escapeHtml(r.lastRunAt)})` : ''}`;
-  if (!m || !parseInt(m[2], 10)) {
+  const pct = reliabilityPct(r.recentSuccessRate);
+  if (pct == null) {
     return `<span class="text-[10px] font-mono" style="color: ${barColor}" title="${title}">${escapeHtml(r.recentSuccessRate)}</span>`;
   }
-  const pct = Math.round((parseInt(m[1], 10) / parseInt(m[2], 10)) * 100);
   return `
     <div class="flex items-center gap-1.5" title="${title}">
       <span style="width: 26px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden;">
@@ -2855,15 +2855,15 @@ function openModal(id, opts = {}) {
     const text = document.getElementById('reliabilityText');
     text.textContent = `${r.recentSuccessRate || 'unknown'}${failed ? ', last run failed' : ''}${paused ? ', currently paused' : ''}${r.lastRunAt ? ` (last: ${r.lastRunAt})` : ''}`;
     text.style.color = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
-    // Same real percentage-width bar Grid's own reliability parse uses
-    // (reliabilityBarHtml), so the modal and Grid never disagree about how
-    // this same field is visualized. Bar only, no text/title duplicate here
-    // since the adjacent #reliabilityText already spells out the detail.
+    // Same reliabilityPct DashboardCore function Grid's own reliability bar
+    // (reliabilityBarHtml) calls, so the modal and Grid can't disagree about
+    // how this same field is visualized. Bar only, no text/title duplicate
+    // here since the adjacent #reliabilityText already spells out the detail.
     const barColor = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
-    const m = /(\d+)\s*\/\s*(\d+)/.exec(r.recentSuccessRate || '');
-    document.getElementById('reliabilityBar').innerHTML = (m && parseInt(m[2], 10)) ? `
+    const modalPct = reliabilityPct(r.recentSuccessRate);
+    document.getElementById('reliabilityBar').innerHTML = modalPct != null ? `
       <span style="width: 34px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden; vertical-align: middle;">
-        <span style="display:block; height:100%; width:${Math.round((parseInt(m[1], 10) / parseInt(m[2], 10)) * 100)}%; background:${barColor}; border-radius:2px;"></span>
+        <span style="display:block; height:100%; width:${modalPct}%; background:${barColor}; border-radius:2px;"></span>
       </span>
     ` : '';
   } else {
