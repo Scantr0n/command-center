@@ -295,6 +295,21 @@
   </section>
 
   <section>
+    <details class="section-details" id="replyLatencyDetails">
+    <summary class="section-title">Reply latency by channel</summary>
+    <p class="section-note">Real days from the first outbound touch (<code>outreachLog</code>'s
+      <code>initial-send</code>, or earliest <code>nudge</code> if none was logged) to the first real
+      <code>reply</code> entry, grouped by contact channel type. Different signal from channel effectiveness
+      above: that shows whether a channel gets a reply at all, this shows how long a real reply actually takes
+      once one comes, since a slower named-decision-maker reply can still be worth more than a faster generic-inbox
+      one. Only counts prospects with both a logged outbound touch and a logged reply, both with real dates.</p>
+    <div class="channel-eff-list" id="replyLatencyList">
+      <p class="channel-eff-empty">Loading...</p>
+    </div>
+    </details>
+  </section>
+
+  <section>
     <details class="section-details" id="socialReachDetails">
     <summary class="section-title">Social reach by platform</summary>
     <p class="section-note">Real <code>socialSnapshots</code> logged on any prospect, aggregated by platform. Uses

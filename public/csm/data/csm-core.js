@@ -586,6 +586,48 @@
       .sort((a, b) => b.contacted - a.contacted || a.label.localeCompare(b.label));
   }
 
+  // Real gap this closes: outreachLog's own schema doc (index.html) already
+  // says a logged "reply" entry exists "to measure real reply latency", but
+  // until now daysToFirstReply only ever surfaced per-prospect (a single
+  // field on that prospect's own detail view and CSV row), never rolled up
+  // across the pipeline the way stage velocity or channel effectiveness are.
+  // Grouped by contactChannel.type for the same reason channel effectiveness
+  // is: that field is this project's single most predictive real signal, so
+  // whether a named decision-maker actually replies faster than a generic
+  // inbox (not just more often) is worth seeing as its own number, not
+  // buried one prospect at a time. Same bucket order/labels as
+  // computeChannelEffectiveness so the two sections read as one family.
+  function computeReplyLatency(prospects) {
+    const order = ['named-decision-maker', 'generic-inbox', 'unlogged'];
+    const labels = {
+      'named-decision-maker': 'Named decision-maker',
+      'generic-inbox': 'Generic inbox',
+      'unlogged': 'Channel not logged'
+    };
+    const days = {};
+    order.forEach(key => { days[key] = []; });
+    prospects.forEach(p => {
+      const gap = daysToFirstReply(p);
+      if (gap == null) return;
+      const rawType = p.contactChannel && p.contactChannel.type;
+      const key = days[rawType] ? rawType : 'unlogged';
+      days[key].push(gap);
+    });
+    const allDays = order.reduce((acc, key) => acc.concat(days[key]), []);
+    function summarize(list) {
+      return {
+        n: list.length,
+        avgDays: list.length > 0 ? Math.round(list.reduce((sum, d) => sum + d, 0) / list.length) : null,
+        minDays: list.length > 0 ? Math.min(...list) : null,
+        maxDays: list.length > 0 ? Math.max(...list) : null
+      };
+    }
+    return {
+      overall: summarize(allDays),
+      byChannel: order.map(key => Object.assign({ key, label: labels[key] }, summarize(days[key])))
+    };
+  }
+
   // Every prospect currently past its stage's real staleAfterDays threshold,
   // worst (longest stalled) first. Thin wrapper over stallInfo across the
   // whole pipeline, same board-wide-rollup role computeColdSignal and
@@ -1078,7 +1120,7 @@
     CHINA_HOLIDAYS_2026, CHINA_HOLIDAYS_COVERED_YEAR, chinaHolidayOnDate, chinaHolidayCalendarCoversDate,
     rollPastChinaHolidays,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
-    computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
+    computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness, computeReplyLatency,
     computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,

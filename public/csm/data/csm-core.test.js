@@ -22,7 +22,7 @@ const {
   CHINA_HOLIDAYS_2026, CHINA_HOLIDAYS_COVERED_YEAR, chinaHolidayOnDate, chinaHolidayCalendarCoversDate,
   rollPastChinaHolidays,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
-  computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
+  computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness, computeReplyLatency,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
   escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
@@ -876,6 +876,64 @@ test('computeCategoryEffectiveness sorts categories by contacted count descendin
 test('CHANNEL_EFF_MIN_N_FOR_RATE is the shared minimum sample size gate used by both effectiveness breakdowns', () => {
   assert.equal(typeof CHANNEL_EFF_MIN_N_FOR_RATE, 'number');
   assert.ok(CHANNEL_EFF_MIN_N_FOR_RATE > 0);
+});
+
+test('computeReplyLatency is all-null/zero-n with no logged replies anywhere', () => {
+  const result = computeReplyLatency([{ stage: 'outreach-sent', outreachLog: [] }]);
+  assert.equal(result.overall.n, 0);
+  assert.equal(result.overall.avgDays, null);
+  result.byChannel.forEach(r => assert.equal(r.n, 0));
+});
+
+test('computeReplyLatency buckets a real reply gap under the prospect\'s own contact channel type', () => {
+  const p = {
+    contactChannel: { type: 'named-decision-maker' },
+    outreachLog: [
+      { date: '2026-09-01', type: 'initial-send' },
+      { date: '2026-09-06', type: 'reply' }
+    ]
+  };
+  const result = computeReplyLatency([p]);
+  const bucket = result.byChannel.find(r => r.key === 'named-decision-maker');
+  assert.equal(bucket.n, 1);
+  assert.equal(bucket.avgDays, 5);
+  assert.equal(bucket.minDays, 5);
+  assert.equal(bucket.maxDays, 5);
+  assert.equal(result.overall.n, 1);
+  assert.equal(result.overall.avgDays, 5);
+});
+
+test('computeReplyLatency averages multiple real replies within the same channel bucket', () => {
+  const prospects = [
+    {
+      contactChannel: { type: 'generic-inbox' },
+      outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-04', type: 'reply' }]
+    },
+    {
+      contactChannel: { type: 'generic-inbox' },
+      outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-11', type: 'reply' }]
+    }
+  ];
+  const result = computeReplyLatency(prospects);
+  const bucket = result.byChannel.find(r => r.key === 'generic-inbox');
+  assert.equal(bucket.n, 2);
+  assert.equal(bucket.avgDays, 7);
+  assert.equal(bucket.minDays, 3);
+  assert.equal(bucket.maxDays, 10);
+});
+
+test('computeReplyLatency buckets an unrecognized or missing channel type as unlogged', () => {
+  const p = { outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-03', type: 'reply' }] };
+  const result = computeReplyLatency([p]);
+  const bucket = result.byChannel.find(r => r.key === 'unlogged');
+  assert.equal(bucket.n, 1);
+  assert.equal(bucket.avgDays, 2);
+});
+
+test('computeReplyLatency ignores a prospect with no real reply logged yet', () => {
+  const p = { contactChannel: { type: 'named-decision-maker' }, outreachLog: [{ date: '2026-09-01', type: 'initial-send' }] };
+  const result = computeReplyLatency([p]);
+  assert.equal(result.overall.n, 0);
 });
 
 const STALL_STAGES = [{ id: 'outreach-sent', staleAfterDays: 10 }, { id: 'in-exploration', staleAfterDays: 30 }];

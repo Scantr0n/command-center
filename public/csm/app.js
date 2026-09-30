@@ -12,7 +12,7 @@
     chinaHolidayOnDate, chinaHolidayCalendarCoversDate, CHINA_HOLIDAYS_COVERED_YEAR, rollPastChinaHolidays,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
-    CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
+    computeReplyLatency, CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
     escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
@@ -52,6 +52,7 @@
   const funnelListEl = document.getElementById('funnelList');
   const channelEffListEl = document.getElementById('channelEffList');
   const categoryEffListEl = document.getElementById('categoryEffList');
+  const replyLatencyListEl = document.getElementById('replyLatencyList');
   const socialReachListEl = document.getElementById('socialReachList');
   const attentionBarEl = document.getElementById('attentionBar');
   const changelogFeedEl = document.getElementById('changelogFeed');
@@ -1034,6 +1035,44 @@
         rateHtml +
         '</div>';
     }).join('');
+  }
+
+  // Pure reply-latency rollup math now lives in csm-core.js
+  // (computeReplyLatency), same shared-core-with-tests pattern as the other
+  // pure math above, reusing daysToFirstReply (already computed per
+  // prospect for the detail view and CSV export) rather than a second copy
+  // of that gap math.
+  function renderReplyLatency(prospects) {
+    const result = computeReplyLatency(prospects);
+    if (result.overall.n === 0) {
+      replyLatencyListEl.innerHTML = '<p class="channel-eff-empty">No real reply logged in any prospect&rsquo;s ' +
+        'outreachLog yet. This fills in once a "reply" entry with a real date is logged against an earlier ' +
+        'outbound touch.</p>';
+      return;
+    }
+    const rows = result.byChannel.map(r => {
+      if (r.n === 0) {
+        return '<div class="channel-eff-row">' +
+          '<div class="channel-eff-row-head">' +
+          '<span class="channel-eff-label">' + escapeHtml(r.label) + '</span>' +
+          '<span class="channel-eff-count-empty">No real reply logged on this channel yet</span>' +
+          '</div></div>';
+      }
+      return '<div class="channel-eff-row">' +
+        '<div class="channel-eff-row-head">' +
+        '<span class="channel-eff-label">' + escapeHtml(r.label) + '</span>' +
+        '<span class="channel-eff-count font-mono">' + r.avgDays + 'd avg &middot; ' + r.minDays + '-' + r.maxDays +
+          'd range &middot; n=' + r.n + '</span>' +
+        '</div></div>';
+    }).join('');
+    const overallHtml = '<div class="channel-eff-row">' +
+      '<div class="channel-eff-row-head">' +
+      '<span class="channel-eff-label">All channels</span>' +
+      '<span class="channel-eff-rate font-mono">' + result.overall.avgDays + 'd avg &middot; ' +
+        result.overall.minDays + '-' + result.overall.maxDays + 'd range &middot; n=' + result.overall.n +
+        '</span>' +
+      '</div></div>';
+    replyLatencyListEl.innerHTML = overallHtml + rows;
   }
 
   // Pure per-platform social reach rollup math now lives in csm-core.js
@@ -4165,6 +4204,7 @@
       renderStageVelocity(allStages, allProspects);
       renderChannelEffectiveness(allProspects);
       renderCategoryEffectiveness(allProspects);
+      renderReplyLatency(allProspects);
       renderSocialReach(allProspects);
       applyFilter();
       if (initialProspectId && byId[initialProspectId]) openModal(initialProspectId);
