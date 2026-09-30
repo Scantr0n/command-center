@@ -17,7 +17,7 @@ const {
   COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-  buildPortfolioValueTimeline, cardsForSubmission
+  buildPortfolioValueTimeline, cardsForSubmission, declaredValueForSubmission
 } = require('./grading-core.js');
 
 test('missing rawValue, expectedGradedValue, or estimatedGradingCost returns null, never a guessed verdict', () => {
@@ -357,4 +357,34 @@ test('cardsForSubmission returns an empty array for a submission with no cards y
   assert.deepEqual(cardsForSubmission(cards, 'batch-99'), []);
   assert.deepEqual(cardsForSubmission(cards, null), []);
   assert.deepEqual(cardsForSubmission([], 'batch-1'), []);
+});
+
+test('declaredValueForSubmission sums only costBasis, the outbound-shipment insurance figure, not post-grade estimatedValue', () => {
+  const cards = [
+    { id: 'a', submissionId: 'batch-1', costBasis: 10, estimatedValue: 40 },
+    { id: 'b', submissionId: 'batch-1', costBasis: 25, estimatedValue: null },
+    { id: 'c', submissionId: 'batch-2', costBasis: 999 }
+  ];
+  const result = declaredValueForSubmission(cards, 'batch-1');
+  assert.equal(result.total, 35);
+  assert.equal(result.missingCount, 0);
+  assert.deepEqual(result.cards.map(x => x.card.id), ['a', 'b']);
+});
+
+test('declaredValueForSubmission counts cards with no costBasis logged as missing rather than treating them as worth $0', () => {
+  const cards = [
+    { id: 'a', submissionId: 'batch-1', costBasis: 10 },
+    { id: 'b', submissionId: 'batch-1', costBasis: null }
+  ];
+  const result = declaredValueForSubmission(cards, 'batch-1');
+  assert.equal(result.total, 10);
+  assert.equal(result.missingCount, 1);
+  assert.equal(result.cards.length, 1);
+});
+
+test('declaredValueForSubmission returns a zero total with no missing cards for a submission with no linked cards', () => {
+  const result = declaredValueForSubmission([{ id: 'a', submissionId: 'batch-9' }], 'batch-1');
+  assert.equal(result.total, 0);
+  assert.equal(result.missingCount, 0);
+  assert.deepEqual(result.cards, []);
 });

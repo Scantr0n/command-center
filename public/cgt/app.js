@@ -1374,7 +1374,8 @@ const {
   computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-  buildPortfolioValueTimeline: buildPortfolioValueTimelineCore, cardsForSubmission
+  buildPortfolioValueTimeline: buildPortfolioValueTimelineCore, cardsForSubmission,
+  declaredValueForSubmission
 } = window.CGTGradingCore;
 
 const CANDIDATE_VERDICT_META = {
@@ -1759,6 +1760,26 @@ function openSubmissionModal(id) {
         `<a href="?card=${encodeURIComponent(c.id)}" class="cert-link font-mono">${escapeHtml(c.cardName || c.id)}</a>`
       ).join('<br>')}</div>
     </div>`;
+
+    // Real declared-value figure for the outbound shipment to the grader,
+    // not the home/rider insurance the "Insurance coverage check" section
+    // covers (that's for holding graded cards long-term, this is for the
+    // few days these specific cards spend in transit and at the grader
+    // ungraded). See declaredValueForSubmission in grading-core.js for why
+    // costBasis, never estimatedValue, is the figure used here.
+    if (s.status !== 'returned') {
+      const declared = declaredValueForSubmission(cards, s.id);
+      body += `<div class="field-row">
+        <div class="field-label">Declared value for this batch, shipping insurance</div>
+        <div class="field-value${declared.cards.length ? '' : ' empty'}">${
+          declared.cards.length
+            ? formatUsd(declared.total) + ' total (sum of cost basis on the ' + declared.cards.length + ' card' + (declared.cards.length === 1 ? '' : 's') + ' with one logged)'
+            : 'not logged, none of these cards have a cost basis on file'
+        }</div>
+        ${declared.missingCount ? `<div class="field-note">${declared.missingCount} card${declared.missingCount === 1 ? '' : 's'} in this batch ${declared.missingCount === 1 ? 'has' : 'have'} no cost basis logged, so this total is a floor, not the real total, until that's backfilled.</div>` : ''}
+        <div class="field-note">This is what was paid, the real replacement cost for a still-ungraded card, not the post-grade <code class="inline-code">estimatedValue</code> the "Insurance coverage check" section above uses for owned graded cards. USPS Priority Mail's own added insurance tops out at $5,000 as of this writing; a batch declared above that needs Registered Mail or third-party shipping insurance instead. See <a href="https://www.usps.com/ship/insurance.htm" target="_blank" rel="noopener noreferrer">usps.com/ship/insurance</a> directly before relying on this.</div>
+      </div>`;
+    }
   } else if (s.status === 'returned') {
     body += `<div class="field-row">
       <div class="field-label">Cards from this submission</div>

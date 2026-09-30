@@ -306,12 +306,35 @@
     return (cards || []).filter(c => c.submissionId === submissionId);
   }
 
+  // What to actually declare for shipping insurance on the outbound package
+  // to the grader: a card sitting in a submission is still raw/ungraded in
+  // transit, so its post-grade estimatedValue isn't the right figure (that's
+  // what it might be worth *after* coming back, not what's lost if the
+  // package goes missing on the way there) and would also usually be null
+  // anyway for a card still mid-grading. costBasis (what Jack actually paid)
+  // is the one real, already-logged number that represents replacement cost
+  // for an ungraded card, so that's the only basis used here, never a guess
+  // at raw market value. Cards with no costBasis on file are counted
+  // separately rather than silently left out of the total with no trace, so
+  // the UI can say the total is a floor, not the real total, when any are
+  // missing.
+  function declaredValueForSubmission(cards, submissionId) {
+    const linked = cardsForSubmission(cards, submissionId);
+    const priced = linked.filter(c => c.costBasis != null);
+    const missing = linked.filter(c => c.costBasis == null);
+    return {
+      total: priced.reduce((s, c) => s + c.costBasis, 0),
+      cards: priced.map(c => ({ card: c, value: c.costBasis })),
+      missingCount: missing.length
+    };
+  }
+
   return {
     computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
     classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
     COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
     isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
     estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-    buildPortfolioValueTimeline, cardsForSubmission
+    buildPortfolioValueTimeline, cardsForSubmission, declaredValueForSubmission
   };
 });
