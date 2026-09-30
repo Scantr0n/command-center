@@ -218,12 +218,9 @@
     if (!rawApplicationsData) return;
     const apps = rawApplicationsData.applications || [];
     const header = ['#', 'Role', 'Company', 'Location', 'Pay', 'Applied', 'Status'].map(csvField).join(',');
-    const lines = apps.map(a => {
-      const status = JobSearchFollowupCore.isTerminalStatus(a.status)
-        ? JobSearchFollowupCore.STATUS_LABELS[a.status]
-        : (JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, todayIso(), a.status) || '');
-      return [a.num, a.role, a.company, a.location, a.pay, fmtDate(a.appliedDate) || 'undated', status].map(csvField).join(',');
-    });
+    const lines = apps.map(a =>
+      [a.num, a.role, a.company, a.location, a.pay, fmtDate(a.appliedDate) || 'undated', statusText(a)].map(csvField).join(',')
+    );
     const csv = [header, ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -403,18 +400,27 @@
   // wins: it's a fact, not a guess. With no status logged, appliedDate's own
   // elapsed time is the only signal available, see followup-core.js's own
   // header for where the 14/28-day thresholds come from.
-  function statusCellHtml(a) {
+  // Plain text, shared by statusCellHtml below and the CSV export, so the
+  // file can't show a bare internal tier key ("cold"/"watch") where the
+  // page itself shows the real "No response, N days" sentence.
+  function statusText(a) {
     if (JobSearchFollowupCore.isTerminalStatus(a.status)) {
-      return '<span class="status-badge status-badge-' + escapeHtml(a.status) + '">' +
-        escapeHtml(JobSearchFollowupCore.STATUS_LABELS[a.status]) + '</span>';
+      return JobSearchFollowupCore.STATUS_LABELS[a.status];
     }
     const days = JobSearchFollowupCore.daysSinceApplied(a.appliedDate, todayIso());
     const tier = JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, todayIso(), a.status);
-    if (!tier) return '<span class="status-cell-quiet">-</span>';
+    if (!tier) return '';
     const dayWord = days === 1 ? 'day' : 'days';
-    return tier === 'cold'
-      ? '<span class="status-badge status-badge-cold">No response, ' + days + ' ' + dayWord + '</span>'
-      : '<span class="status-badge status-badge-watch">Awaiting response, ' + days + ' ' + dayWord + '</span>';
+    return tier === 'cold' ? 'No response, ' + days + ' ' + dayWord : 'Awaiting response, ' + days + ' ' + dayWord;
+  }
+
+  function statusCellHtml(a) {
+    if (JobSearchFollowupCore.isTerminalStatus(a.status)) {
+      return '<span class="status-badge status-badge-' + escapeHtml(a.status) + '">' + escapeHtml(statusText(a)) + '</span>';
+    }
+    const tier = JobSearchFollowupCore.awaitingResponseTier(a.appliedDate, todayIso(), a.status);
+    if (!tier) return '<span class="status-cell-quiet">-</span>';
+    return '<span class="status-badge status-badge-' + tier + '">' + escapeHtml(statusText(a)) + '</span>';
   }
 
   // Same scroll-edge fade convention already proven on CGT/Garage/CSM/
