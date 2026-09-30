@@ -27,7 +27,14 @@ const { SEARCH_SOURCES } = require('../../data/search-sources-core.js');
 // release/goal types before search-core.js existed) means a genuinely new
 // type added there is real input to the assertion below on its very next
 // test run, not something this file also has to be told about by hand.
-const INTENTIONALLY_UNLINKED_TYPES = new Set(['sale', 'expense', 'dispute', 'supply', 'acquisition', 'comp', 'activity', 'engagement']);
+// 'standout' (job-search's next-up.json) joins the same allowlist for the
+// same reason: a real row (unlike the six still-empty garage types above)
+// but no stable id (an editorial highlight, not a per-record entity keyed
+// like applications.json's own num) and no per-record modal on job-search's
+// own page to jump to yet, so recordHref's existing "falls back to the bare
+// hub page" behavior for a missing id is the correct, already-tested result
+// here, not a gap to close with a fabricated id or a modal that doesn't exist.
+const INTENTIONALLY_UNLINKED_TYPES = new Set(['sale', 'expense', 'dispute', 'supply', 'acquisition', 'comp', 'activity', 'engagement', 'standout']);
 
 test('every real SEARCH_SOURCES type either has a param mapping or is a documented, intentional exception', () => {
   const realTypes = [...new Set(SEARCH_SOURCES.map(s => s.type))];

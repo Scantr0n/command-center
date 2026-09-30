@@ -161,6 +161,19 @@
       hub: 'sondrik', clusterId: 'sondrik', file: 'goals.json', key: 'goals', type: 'goal',
       label: g => g.label, detail: g => g.metric || '',
       fields: g => [g.label]
+    },
+    // next-up.json's standouts were a real, verified gap: a role name
+    // mentioned nowhere else (Think Academy, Jane Addams Peace Association,
+    // etc.) had no way to turn up in search at all, unlike every application
+    // once it's actually logged in applications.json above. detail is often
+    // null on a standout with nothing more to add beyond pay/hours/remote
+    // (see e.g. Golden Pet Brands), so caveat is included too since that's
+    // where a real, searchable detail (a company name in an email address, a
+    // location) sometimes ends up instead.
+    {
+      hub: 'job-search', clusterId: 'job-search', file: 'next-up.json', key: 'standouts', type: 'standout',
+      label: s => s.name, detail: s => [s.pay, s.remote].filter(Boolean).join(' · '),
+      fields: s => [s.name, s.detail, s.caveat]
     }
   ];
   const SEARCH_RESULT_CAP = 20;
