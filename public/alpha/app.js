@@ -53,6 +53,7 @@ const {
   computeHeadline,
   appendDedupedStringObservation,
   formatDuration,
+  durationMinutesFloor,
   mostRecentConnectedAt,
   currentStateStartedAt,
   computeIncidents,
@@ -3092,7 +3093,7 @@ document.getElementById('incidentsCsvBtn').addEventListener('click', () => {
   if (!lastIncidentsSnapshot.length) return;
   const rows = [...lastIncidentsSnapshot].reverse().map(incident => {
     const endMs = incident.ongoing ? Date.now() : new Date(incident.end).getTime();
-    const durationMinutes = Math.round((endMs - new Date(incident.start).getTime()) / 60000);
+    const durationMinutes = durationMinutesFloor(endMs - new Date(incident.start).getTime());
     return {
       start: formatAbsolute(incident.start),
       end: incident.ongoing ? 'Ongoing' : formatAbsolute(incident.end),
@@ -3127,7 +3128,7 @@ document.getElementById('killSwitchHistoryCsvBtn').addEventListener('click', () 
   if (!lastKillSwitchEpisodesSnapshot.length) return;
   const rows = [...lastKillSwitchEpisodesSnapshot].reverse().map(episode => {
     const endMs = episode.ongoing ? Date.now() : new Date(episode.end).getTime();
-    const durationMinutes = Math.round((endMs - new Date(episode.start).getTime()) / 60000);
+    const durationMinutes = durationMinutesFloor(endMs - new Date(episode.start).getTime());
     return {
       start: formatAbsolute(episode.start),
       end: episode.ongoing ? 'Still engaged' : formatAbsolute(episode.end),
@@ -3165,7 +3166,7 @@ document.getElementById('regimeHistoryCsvBtn').addEventListener('click', () => {
   if (!lastRegimeHistorySnapshot.length) return;
   const rows = [...lastRegimeHistorySnapshot].reverse().map(seg => {
     const endMs = regimeSegmentEndMs(seg);
-    const durationMinutes = Math.round((endMs - new Date(seg.start).getTime()) / 60000);
+    const durationMinutes = durationMinutesFloor(endMs - new Date(seg.start).getTime());
     return {
       regime: seg.regime,
       start: formatAbsolute(seg.start),
@@ -3200,7 +3201,7 @@ document.getElementById('sizingModeHistoryCsvBtn').addEventListener('click', () 
   if (!lastSizingModeHistorySnapshot.length) return;
   const rows = [...lastSizingModeHistorySnapshot].reverse().map(seg => {
     const endMs = regimeSegmentEndMs(seg);
-    const durationMinutes = Math.round((endMs - new Date(seg.start).getTime()) / 60000);
+    const durationMinutes = durationMinutesFloor(endMs - new Date(seg.start).getTime());
     return {
       mode: seg.regime,
       start: formatAbsolute(seg.start),

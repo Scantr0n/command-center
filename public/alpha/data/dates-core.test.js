@@ -19,6 +19,7 @@ const {
   computeHeadline,
   appendDedupedStringObservation,
   formatDuration,
+  durationMinutesFloor,
   mostRecentConnectedAt,
   currentStateStartedAt,
   computeIncidents,
@@ -173,6 +174,21 @@ test('formatDuration rejects negative/non-finite and rolls minutes/hours/days', 
   assert.equal(formatDuration(120 * 60000), '2h', 'no trailing " 0m"');
   assert.equal(formatDuration(26 * 3600000), '1d 2h');
   assert.equal(formatDuration(48 * 3600000), '2d', 'no trailing " 0h"');
+});
+
+test('durationMinutesFloor floors the same way formatDuration does, never rounds up', () => {
+  // Real bug: the Recent incidents/Kill switch history/Regime history/Sizing
+  // mode history CSV exports each had their own inline
+  // Math.round(ms / 60000), so a 44m40s duration showed "44m" on screen
+  // (formatDuration floors) but exported 45 in the CSV, on any duration
+  // whose seconds remainder is >=30s. durationMinutesFloor is the one
+  // shared function both the page and every CSV export now call, so they
+  // can never again disagree on the same duration.
+  assert.equal(durationMinutesFloor(44 * 60000 + 40000), 44, 'a 44m40s duration floors to 44, not rounds to 45');
+  assert.equal(durationMinutesFloor(5 * 60000), 5);
+  assert.equal(durationMinutesFloor(29000), 0, 'under a minute floors to 0, never negative or rounded up to 1');
+  assert.equal(durationMinutesFloor(-1), null, 'negative never guesses a duration');
+  assert.equal(durationMinutesFloor(NaN), null);
 });
 
 test('mostRecentConnectedAt finds the newest connected=true entry, null with none', () => {

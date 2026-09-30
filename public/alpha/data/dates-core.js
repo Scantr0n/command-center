@@ -299,6 +299,20 @@
     return days + 'd' + (remHours ? ' ' + remHours + 'h' : '');
   }
 
+  // Same floor semantics as formatDuration above, as a plain integer for a
+  // CSV "Duration (min)" column. The 4 CSV exports on this page (Recent
+  // incidents, Kill switch history, Regime history, Sizing mode history)
+  // each had their own inline Math.round(ms / 60000) instead of calling
+  // this, so a duration whose seconds remainder was >=30s exported one
+  // minute higher than the exact same duration's on-screen formatDuration
+  // text (e.g. a real 44m40s incident showed "44m" on the page but exported
+  // 45 in the CSV), on roughly half of all real durations. Floor, not
+  // round, so a CSV row and its on-screen minute figure always agree.
+  function durationMinutesFloor(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    return Math.floor(ms / 60000);
+  }
+
   function mostRecentConnectedAt(history) {
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i] && history[i].connected) return history[i].at;
@@ -501,6 +515,7 @@
     computeHeadline,
     appendDedupedStringObservation,
     formatDuration,
+    durationMinutesFloor,
     mostRecentConnectedAt,
     currentStateStartedAt,
     computeIncidents,
