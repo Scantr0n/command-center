@@ -110,6 +110,30 @@ test('computePositionsTotals leaves totalPlPct null when total cost basis is zer
   assert.equal(flat.totalPlPct, null);
 });
 
+test('computePositionsTotals sums real dayChangeDollar and computes day-change% against real yesterday-close basis', () => {
+  // Row A: worth 120 today, up 20 today (was 100 at yesterday's close).
+  // Row B: worth 270 today, down 30 today (was 300 at yesterday's close).
+  const positions = [
+    { marketValue: 120, unrealizedPl: 5, dayChangeDollar: 20 },
+    { marketValue: 270, unrealizedPl: 5, dayChangeDollar: -30 }
+  ];
+  const result = computePositionsTotals(positions);
+  assert.equal(result.totalDayChangeDollar, -10);
+  // Yesterday's aggregate value: 390 - (-10) = 400. Day change%: -10/400*100 = -2.5.
+  assert.equal(result.totalDayChangePct, -2.5);
+});
+
+test('computePositionsTotals reports totalDayChangeDollar/Pct as null (not partial) when any row is missing dayChangeDollar', () => {
+  const positions = [
+    { marketValue: 100, unrealizedPl: 10, dayChangeDollar: 5 },
+    { marketValue: 200, unrealizedPl: 10, dayChangeDollar: null }
+  ];
+  const result = computePositionsTotals(positions);
+  assert.equal(result.totalsKnown, true, 'a missing dayChangeDollar must not also block the known mv/pl totals');
+  assert.equal(result.totalDayChangeDollar, null);
+  assert.equal(result.totalDayChangePct, null);
+});
+
 test('positionConcentrationPct is a real position-size / real equity percentage', () => {
   assert.equal(positionConcentrationPct(500, 1000), 50);
   assert.equal(positionConcentrationPct(120, 1000), 12);

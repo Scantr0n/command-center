@@ -80,12 +80,29 @@
     const plValues = list.map(p => p.unrealizedPl);
     const allNumeric = arr => arr.length > 0 && arr.every(v => typeof v === 'number' && Number.isFinite(v));
     const totalsKnown = allNumeric(mvValues) && allNumeric(plValues);
-    if (!totalsKnown) return { totalsKnown: false, totalMv: null, totalPl: null, totalPlPct: null };
+    if (!totalsKnown) {
+      return { totalsKnown: false, totalMv: null, totalPl: null, totalPlPct: null, totalDayChangeDollar: null, totalDayChangePct: null };
+    }
     const totalMv = mvValues.reduce((sum, v) => sum + v, 0);
     const totalPl = plValues.reduce((sum, v) => sum + v, 0);
     const totalCostBasis = totalMv - totalPl;
     const totalPlPct = totalCostBasis > 0 ? (totalPl / totalCostBasis) * 100 : null;
-    return { totalsKnown: true, totalMv, totalPl, totalPlPct };
+    // Kept independent of totalsKnown above: dayChangeDollar (see
+    // mapPositions in live-core.js) can be genuinely absent on an older
+    // cached snapshot or a feed that hasn't reported intraday figures yet
+    // even while marketValue/unrealizedPl are both known, so this must be
+    // able to report its own honest-unknown rather than block, or falsely
+    // report, the P&L totals above.
+    const dayChangeValues = list.map(p => p.dayChangeDollar);
+    const dayChangeKnown = allNumeric(dayChangeValues);
+    const totalDayChangeDollar = dayChangeKnown ? dayChangeValues.reduce((sum, v) => sum + v, 0) : null;
+    // Same "% against real yesterday's-close basis, not an averaged
+    // per-row percentage" rule as totalPlPct above: yesterday's aggregate
+    // value is today's totalMv minus today's aggregate move.
+    const totalDayChangePct = dayChangeKnown && (totalMv - totalDayChangeDollar) > 0
+      ? (totalDayChangeDollar / (totalMv - totalDayChangeDollar)) * 100
+      : null;
+    return { totalsKnown: true, totalMv, totalPl, totalPlPct, totalDayChangeDollar, totalDayChangePct };
   }
 
   // Real risk-dashboard convention (portfolio concentration risk): pairing a

@@ -44,20 +44,31 @@ test('computeDrawdowns never divides by a zero or negative peak', () => {
 
 test('mapPositions converts Alpaca string fields to real numbers and sorts by market value descending', () => {
   const raw = {
-    a: { symbol: 'AAA', side: 'long', qty: '1', avg_entry_price: '10', current_price: '12', market_value: '12', unrealized_pl: '2', unrealized_plpc: '0.2' },
-    b: { symbol: 'BBB', side: 'long', qty: '5', avg_entry_price: '20', current_price: '22', market_value: '110', unrealized_pl: '10', unrealized_plpc: '0.1' }
+    a: { symbol: 'AAA', side: 'long', qty: '1', avg_entry_price: '10', current_price: '12', market_value: '12', unrealized_pl: '2', unrealized_plpc: '0.2', unrealized_intraday_pl: '0.5', unrealized_intraday_plpc: '0.05' },
+    b: { symbol: 'BBB', side: 'long', qty: '5', avg_entry_price: '20', current_price: '22', market_value: '110', unrealized_pl: '10', unrealized_plpc: '0.1', unrealized_intraday_pl: '-1', unrealized_intraday_plpc: '-0.01' }
   };
   const result = mapPositions(raw);
   assert.equal(result.length, 2);
   assert.equal(result[0].symbol, 'BBB', 'larger market value sorts first');
   assert.equal(result[0].marketValue, 110);
   assert.equal(result[1].unrealizedPlPct, 20, 'unrealized_plpc is a fraction, converted to a real percent');
+  assert.equal(result[0].dayChangeDollar, -1, 'unrealized_intraday_pl is today\'s change, distinct from all-time unrealizedPl');
+  assert.equal(result[0].dayChangePct, -1, 'unrealized_intraday_plpc is a fraction, converted to a real percent');
+  assert.equal(result[1].dayChangeDollar, 0.5);
+  assert.equal(result[1].dayChangePct, 5);
 });
 
 test('mapPositions handles a missing/empty positions object as an empty book, not a crash', () => {
   assert.deepEqual(mapPositions(null), []);
   assert.deepEqual(mapPositions(undefined), []);
   assert.deepEqual(mapPositions({}), []);
+});
+
+test('mapPositions reports dayChangeDollar/dayChangePct as null, never NaN, when Alpaca omits the intraday fields', () => {
+  const raw = { a: { symbol: 'AAA', side: 'long', qty: '1', avg_entry_price: '10', current_price: '12', market_value: '12', unrealized_pl: '2', unrealized_plpc: '0.2' } };
+  const result = mapPositions(raw);
+  assert.equal(result[0].dayChangeDollar, null);
+  assert.equal(result[0].dayChangePct, null);
 });
 
 test('mapAccount computes real day change dollar and percent from equity vs last_equity', () => {

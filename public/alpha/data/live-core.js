@@ -55,16 +55,34 @@
   // actually needs; converts Alpaca's string numbers to real numbers once
   // here rather than in every render function.
   function mapPositions(rawPositions) {
-    return Object.values(rawPositions || {}).map(p => ({
-      symbol: p.symbol,
-      side: p.side,
-      qty: Number(p.qty),
-      avgEntryPrice: Number(p.avg_entry_price),
-      currentPrice: Number(p.current_price),
-      marketValue: Number(p.market_value),
-      unrealizedPl: Number(p.unrealized_pl),
-      unrealizedPlPct: Number(p.unrealized_plpc) * 100
-    })).sort((a, b) => b.marketValue - a.marketValue);
+    return Object.values(rawPositions || {}).map(p => {
+      // unrealizedPl/unrealizedPlPct above are since the position was
+      // opened; unrealized_intraday_pl/plpc are Alpaca's own separate
+      // "since yesterday's close" figures, the same distinction
+      // mapAccount's dayChangeDollar/dayChangePct already draws at the
+      // account level (equity vs. lastEquity). A position held for weeks
+      // can show a large all-time gain while being flat or down today, and
+      // there was previously no way to tell those apart per-symbol without
+      // opening the broker's own app. Number.isFinite-guarded the same way
+      // dayChangeDollar/dayChangePct are: a missing/malformed field must
+      // stay null, not NaN, so a null-guard downstream (same trap
+      // unrealizedPl's own NaN >= 0 already caught once) doesn't have to
+      // special-case this one too.
+      const dayChangeDollarRaw = Number(p.unrealized_intraday_pl);
+      const dayChangePctRaw = Number(p.unrealized_intraday_plpc);
+      return {
+        symbol: p.symbol,
+        side: p.side,
+        qty: Number(p.qty),
+        avgEntryPrice: Number(p.avg_entry_price),
+        currentPrice: Number(p.current_price),
+        marketValue: Number(p.market_value),
+        unrealizedPl: Number(p.unrealized_pl),
+        unrealizedPlPct: Number(p.unrealized_plpc) * 100,
+        dayChangeDollar: Number.isFinite(dayChangeDollarRaw) ? dayChangeDollarRaw : null,
+        dayChangePct: Number.isFinite(dayChangePctRaw) ? dayChangePctRaw * 100 : null
+      };
+    }).sort((a, b) => b.marketValue - a.marketValue);
   }
 
   function mapAccount(rawAccount) {

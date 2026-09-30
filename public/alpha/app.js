@@ -1600,6 +1600,7 @@ const POSITIONS_SORT_COLUMNS = [
   ['currentPrice', 'Current'],
   ['marketValue', 'Mkt value'],
   ['unrealizedPl', 'Unrealized P&amp;L'],
+  ['dayChangeDollar', 'Today'],
   ['concPct', '% of equity']
 ];
 
@@ -1724,6 +1725,10 @@ function renderPositions(data) {
     // value's dash would have been colored red, falsely reading as "losing".
     const plIsNumber = typeof p.unrealizedPl === 'number' && Number.isFinite(p.unrealizedPl);
     const goodClass = plIsNumber ? (p.unrealizedPl >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
+    // Same nullable-number guard as plIsNumber above, for the separate
+    // since-yesterday's-close figure (see mapPositions in live-core.js).
+    const dayChangeIsNumber = typeof p.dayChangeDollar === 'number' && Number.isFinite(p.dayChangeDollar);
+    const dayGoodClass = dayChangeIsNumber ? (p.dayChangeDollar >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
     const concPct = p.concPct;
     const concHigh = concPct != null && concPct >= POSITION_CONCENTRATION_CAUTION_PCT;
     const concText = concPct != null ? concPct.toFixed(1) + '%' : '-';
@@ -1742,6 +1747,9 @@ function renderPositions(data) {
         <td class="font-mono pos-num ${goodClass}">${escapeHtml(fmtDollar(p.unrealizedPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(p.unrealizedPlPct) || '')}</span>
         </td>
+        <td class="font-mono pos-num ${dayGoodClass}">${escapeHtml(fmtDollar(p.dayChangeDollar) || '-')}
+          <span class="pos-plpct">${escapeHtml(fmtPct(p.dayChangePct) || '')}</span>
+        </td>
         <td class="font-mono pos-num${concHigh ? ' pos-conc-high' : ''}" title="${concTitle}">${escapeHtml(concText)}</td>
       </tr>
     `;
@@ -1751,10 +1759,12 @@ function renderPositions(data) {
   // a per-row scan doesn't give at a glance. Math itself (all-or-nothing
   // summation, cost-basis-weighted P&L%) lives in computePositionsTotals in
   // account-core.js now, see the destructure near the top of this file.
-  const { totalsKnown, totalMv, totalPl, totalPlPct } = computePositionsTotals(positions);
+  const { totalsKnown, totalMv, totalPl, totalPlPct, totalDayChangeDollar, totalDayChangePct } = computePositionsTotals(positions);
   let totalsRow = '';
   if (totalsKnown) {
     const totalGoodClass = totalPl >= 0 ? 'pl-good' : 'pl-bad';
+    const totalDayChangeIsNumber = typeof totalDayChangeDollar === 'number' && Number.isFinite(totalDayChangeDollar);
+    const totalDayGoodClass = totalDayChangeIsNumber ? (totalDayChangeDollar >= 0 ? 'pl-good' : 'pl-bad') : 'pl-neutral';
     // The totals row's own "% of equity" cell is exactly computeExposure's
     // pctDeployed (already shown as the Account section's "Invested" tile,
     // see renderAccount above), reused rather than re-derived, so the two
@@ -1766,6 +1776,9 @@ function renderPositions(data) {
         <td class="font-mono pos-num">${escapeHtml(fmtDollar(totalMv) || '-')}</td>
         <td class="font-mono pos-num ${totalGoodClass}">${escapeHtml(fmtDollar(totalPl) || '-')}
           <span class="pos-plpct">${escapeHtml(fmtPct(totalPlPct) || '')}</span>
+        </td>
+        <td class="font-mono pos-num ${totalDayGoodClass}">${escapeHtml(fmtDollar(totalDayChangeDollar) || '-')}
+          <span class="pos-plpct">${escapeHtml(fmtPct(totalDayChangePct) || '')}</span>
         </td>
         <td class="font-mono pos-num">${pctDeployed != null ? escapeHtml(pctDeployed.toFixed(1) + '%') : '-'}</td>
       </tr>
@@ -1784,7 +1797,7 @@ function renderPositions(data) {
     exposureRow = `
       <tr class="pos-totals-row">
         <td class="font-mono" colspan="5">Exposure (${sideExposure.longCount} long / ${sideExposure.shortCount} short)</td>
-        <td class="font-mono pos-num" colspan="3" title="Gross exposure per side, from each real position's own signed market value grouped by its real side; net is the same figure the Total row above already reports.">
+        <td class="font-mono pos-num" colspan="4" title="Gross exposure per side, from each real position's own signed market value grouped by its real side; net is the same figure the Total row above already reports.">
           <span class="pos-exposure-long">Long ${escapeHtml(fmtDollar(sideExposure.longMv) || '-')}</span>
           &nbsp;/&nbsp;
           <span class="pos-exposure-short">Short ${escapeHtml(fmtDollar(Math.abs(sideExposure.shortMv)) || '-')}</span>
@@ -1807,7 +1820,9 @@ function renderPositions(data) {
     const ariaSort = positionsSortKey === key ? (positionsSortDir === 'asc' ? 'ascending' : 'descending') : 'none';
     const titleAttr = key === 'concPct'
       ? ' title="Real position market value as a percentage of real account equity, computed client-side from the two figures this page already has"'
-      : '';
+      : key === 'dayChangeDollar'
+        ? ' title="Change since yesterday\'s close, distinct from Unrealized P&amp;L which is since this position was opened"'
+        : '';
     return `<th scope="col" class="sortable" data-sort="${key}" tabindex="0" aria-sort="${ariaSort}"${titleAttr}>${label}</th>`;
   }).join('');
 
@@ -2956,7 +2971,8 @@ const { csvField } = AlphaExportCore;
 const POSITIONS_CSV_COLUMNS = [
   ['symbol', 'Symbol'], ['side', 'Side'], ['qty', 'Qty'], ['avgEntryPrice', 'Avg entry'],
   ['currentPrice', 'Current'], ['marketValue', 'Mkt value'], ['unrealizedPl', 'Unrealized P&L'],
-  ['unrealizedPlPct', 'Unrealized P&L %'], ['concentrationPct', '% of equity']
+  ['unrealizedPlPct', 'Unrealized P&L %'], ['dayChangeDollar', 'Today $'], ['dayChangePct', 'Today %'],
+  ['concentrationPct', '% of equity']
 ];
 
 // Exports exactly the real open positions currently on screen, read straight
