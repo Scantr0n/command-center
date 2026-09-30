@@ -476,6 +476,24 @@
     .attn-flash { animation: none; box-shadow: 0 0 0 3px rgba(224,74,74,0.35); }
   }
 
+  /* Windows/browser forced-colors mode strips background-color to the system
+     Canvas color, the only thing distinguishing the reliability bar's fill
+     (recent scheduled-task success rate, shown on both the Grid card and the
+     cluster detail modal) from its own track, so a real 40% success rate and
+     a real 95% one render as an identical empty box. Same real gap already
+     fixed this session on every sub-hub's own progress fills (CGT/Garage/
+     Sondrik/Alpha); the main hub had no forced-colors treatment anywhere
+     until now. CanvasText border on the track keeps it visible at all, plus
+     one on the fill's own leading edge for the value itself. */
+  @media (forced-colors: active) {
+    .reliability-bar-track {
+      border: 1px solid CanvasText;
+    }
+    .reliability-bar-fill {
+      border-right: 2px solid CanvasText;
+    }
+  }
+
   /* Below ~768px, shrinking the 900x900 viewBox to fit the screen makes node
      labels a few px tall and unreadable. Keep the graph at a legible fixed
      size instead and let #graphScroll (not #graphView, so the hint below
@@ -2643,8 +2661,8 @@ function reliabilityBarHtml(c) {
   }
   return `
     <div class="flex items-center gap-1.5" title="${title}">
-      <span style="width: 26px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden;">
-        <span style="display:block; height:100%; width:${pct}%; background:${barColor}; border-radius:2px;"></span>
+      <span class="reliability-bar-track" style="width: 26px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden;">
+        <span class="reliability-bar-fill" style="display:block; height:100%; width:${pct}%; background:${barColor}; border-radius:2px;"></span>
       </span>
       <span class="text-[9.5px] font-mono" style="color: ${barColor}">${pct}%</span>
     </div>`;
@@ -2862,8 +2880,8 @@ function openModal(id, opts = {}) {
     const barColor = failed ? '#E0725A' : paused ? '#E0A030' : 'var(--faint)';
     const modalPct = reliabilityPct(r.recentSuccessRate);
     document.getElementById('reliabilityBar').innerHTML = modalPct != null ? `
-      <span style="width: 34px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden; vertical-align: middle;">
-        <span style="display:block; height:100%; width:${modalPct}%; background:${barColor}; border-radius:2px;"></span>
+      <span class="reliability-bar-track" style="width: 34px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); display: inline-block; overflow: hidden; vertical-align: middle;">
+        <span class="reliability-bar-fill" style="display:block; height:100%; width:${modalPct}%; background:${barColor}; border-radius:2px;"></span>
       </span>
     ` : '';
   } else {
