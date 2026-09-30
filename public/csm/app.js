@@ -9,6 +9,7 @@
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
+    chinaHolidayOnDate, rollPastChinaHolidays,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
@@ -129,13 +130,19 @@
   // timezone get the best reply rates, the same category of signal
   // rollToWeekdayIso already applies to which day a nudge rolls onto; this
   // surfaces the hour, computed once at page load like every other
-  // "computed against this clock" note on this page, not a live tick.
+  // "computed against this clock" note on this page, not a live tick. A
+  // real public holiday in China (checked against the same 2026 calendar
+  // rollPastChinaHolidays uses) takes priority over the weekday/weekend
+  // verdict below, an office closed for Golden Week is closed regardless
+  // of what hour it is there.
   const beijingTimeNoteEl = document.getElementById('beijingTimeNote');
   if (beijingTimeNoteEl) {
     const b = beijingTimeInfo();
     const clock = String(b.hour).padStart(2, '0') + ':' + String(b.minute).padStart(2, '0');
+    const holiday = chinaHolidayOnDate(b.dateIso);
     let verdict;
-    if (b.isPrimeReplyWindow) verdict = 'Inside the Tue-Thu morning window general cold-outreach benchmarks report as strongest for replies.';
+    if (holiday) verdict = holiday.name + ' in China; a message sent now likely sits unread until it ends ' + fmtDate(holiday.end) + '.';
+    else if (b.isPrimeReplyWindow) verdict = 'Inside the Tue-Thu morning window general cold-outreach benchmarks report as strongest for replies.';
     else if (b.isBusinessHours) verdict = 'Inside typical business hours, outside that Tue-Thu-morning window.';
     else if (b.isWeekday) verdict = 'Outside typical business hours; a message sent now likely sits unread until morning there.';
     else verdict = 'A weekend in China; a message sent now likely sits unread until Monday there.';
@@ -420,6 +427,17 @@
           ? '<span class="nudge-action nudge-action-missing">NOT ON THE QUEUE &middot; nudgeSchedule.nudgePoint ' +
             'passed but nextNudgeDate was never set, log a real nextNudgeDate or this keeps going unseen</span>'
           : '');
+      // Checked against the same real 2026 China public holiday calendar
+      // rollPastChinaHolidays uses, so a hand-typed nextNudgeDate that
+      // happens to land inside one (the suggested-date flow already avoids
+      // this, a hand-typed date can still hit it) gets flagged here instead
+      // of just silently reading as due.
+      const holidayIso = badDate ? null : (unqueued ? p.nudgeSchedule.nudgePoint : p.nextNudgeDate);
+      const holiday = holidayIso ? chinaHolidayOnDate(holidayIso) : null;
+      const holidayNote = holiday
+        ? '<span class="nudge-action nudge-action-missing">FALLS DURING ' + escapeHtml(holiday.name.toUpperCase()) +
+          ' IN CHINA &middot; expect no reply until it ends ' + fmtDate(holiday.end) + '</span>'
+        : '';
       const actionLine = p.nextAction
         ? '<span class="nudge-action">' + escapeHtml(p.nextAction) + '</span>'
         : (unqueued ? '' : '<span class="nudge-action nudge-action-missing">NO NEXT ACTION LOGGED &middot; a due date alone tends to stall</span>');
@@ -438,6 +456,7 @@
         dateShown + ' (' + when + ')' + notBefore +
         '</span></span>' +
         unqueuedNote +
+        holidayNote +
         actionLine +
         touchLine +
         '</button>';
@@ -2976,7 +2995,9 @@
       // Cadence suggestion for the touch AFTER this one, based on real
       // cold-outreach practice (widening follow-up gaps). This is a starting
       // guess only, both fields stay editable before copying, nothing here
-      // is pasted automatically.
+      // is pasted automatically. Rolled past weekends and the real 2026
+      // China public holiday calendar (rollPastChinaHolidays), never past
+      // doNotNudgeBefore itself, which is applied first.
       const realTouchCount = log.filter(e => e && e.date).length;
       const thisTouchNumber = realTouchCount + 1;
       const nextTouchNumber = thisTouchNumber + 1;
@@ -2985,7 +3006,7 @@
       if (doNotNudgeBefore && isValidDateStr(doNotNudgeBefore) && doNotNudgeBefore > suggestedDate) {
         suggestedDate = doNotNudgeBefore;
       }
-      suggestedDate = rollToWeekdayIso(suggestedDate);
+      suggestedDate = rollPastChinaHolidays(suggestedDate);
       suggestDateInput.value = suggestedDate;
       suggestActionInput.value = nextTouchNumber > COLD_TOUCH_THRESHOLD
         ? 'Reconsider hook/channel before touch #' + nextTouchNumber + ', ' + thisTouchNumber + ' touches with no reply so far'

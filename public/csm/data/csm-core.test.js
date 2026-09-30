@@ -19,6 +19,7 @@ const {
   socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
   nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
   todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
+  CHINA_HOLIDAYS_2026, chinaHolidayOnDate, rollPastChinaHolidays,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
@@ -281,6 +282,65 @@ test('beijingTimeInfo defaults to the real current instant when called with no a
   const info = beijingTimeInfo();
   assert.ok(info.hour >= 0 && info.hour <= 23);
   assert.ok(info.dayOfWeek >= 0 && info.dayOfWeek <= 6);
+});
+
+test('beijingTimeInfo reports the Beijing-local calendar date, not just the hour/weekday', () => {
+  // 2026-09-25T20:00:00Z (Friday) +8h lands at 2026-09-26 04:00, a Saturday.
+  const info = beijingTimeInfo(new Date('2026-09-25T20:00:00Z'));
+  assert.equal(info.dateIso, '2026-09-26');
+});
+
+test('chinaHolidayOnDate returns null for an ordinary working day', () => {
+  assert.equal(chinaHolidayOnDate('2026-09-30'), null);
+  assert.equal(chinaHolidayOnDate('2026-09-28'), null); // real Monday right after Mid-Autumn Festival ends
+});
+
+test('chinaHolidayOnDate matches both boundary dates of a real holiday range, inclusive', () => {
+  const start = chinaHolidayOnDate('2026-10-01');
+  const end = chinaHolidayOnDate('2026-10-07');
+  assert.equal(start.name, 'National Day (Golden Week)');
+  assert.equal(end.name, 'National Day (Golden Week)');
+  assert.equal(chinaHolidayOnDate('2026-09-25').name, 'Mid-Autumn Festival');
+  assert.equal(chinaHolidayOnDate('2026-09-27').name, 'Mid-Autumn Festival');
+});
+
+test('chinaHolidayOnDate covers all seven real 2026 statutory holidays from the official State Council schedule', () => {
+  assert.equal(CHINA_HOLIDAYS_2026.length, 7);
+  const names = CHINA_HOLIDAYS_2026.map(h => h.name);
+  assert.deepEqual(names, [
+    'New Year', 'Spring Festival', 'Qingming Festival', 'Labour Day',
+    'Dragon Boat Festival', 'Mid-Autumn Festival', 'National Day (Golden Week)'
+  ]);
+});
+
+test('rollPastChinaHolidays leaves an ordinary weekday alone', () => {
+  assert.equal(rollPastChinaHolidays('2026-09-30'), '2026-09-30'); // Wednesday, no holiday
+});
+
+test('rollPastChinaHolidays still rolls a plain weekend with no holiday involved, same as rollToWeekdayIso', () => {
+  assert.equal(rollPastChinaHolidays('2026-07-04'), '2026-07-06'); // Saturday -> Monday
+});
+
+test('rollPastChinaHolidays rolls a date inside Golden Week forward past the whole holiday', () => {
+  // 2026-10-01 (Thu) through 2026-10-07 (Wed) is National Day; the first
+  // real working day after is Thursday 2026-10-08, itself neither a
+  // weekend nor another holiday.
+  assert.equal(rollPastChinaHolidays('2026-10-01'), '2026-10-08');
+  assert.equal(rollPastChinaHolidays('2026-10-05'), '2026-10-08');
+});
+
+test('rollPastChinaHolidays chains a second roll when the day right after a holiday is itself a weekend', () => {
+  // New Year 2026 runs Thursday 01-01 through Saturday 01-03; the day right
+  // after (Sunday 01-04) is a real weekend too, so this needs the loop, not
+  // a single fixed jump, to land on the real next working day, Monday 01-05.
+  assert.equal(rollPastChinaHolidays('2026-01-01'), '2026-01-05');
+});
+
+test('rollPastChinaHolidays handles a holiday date landing mid-week after the initial weekday roll', () => {
+  // Spring Festival 2026 runs Sunday 02-15 through Monday 02-23. Starting
+  // from the Sunday, rollToWeekdayIso first rolls to Monday 02-16, still
+  // inside the holiday, which is exactly the case the loop exists for.
+  assert.equal(rollPastChinaHolidays('2026-02-15'), '2026-02-24');
 });
 
 test('byUrgency sorts a sooner nextNudgeDate before a later one', () => {

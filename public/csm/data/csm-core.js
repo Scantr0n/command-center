@@ -215,6 +215,44 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // Official 2026 China public holiday schedule, General Office of the
+  // State Council notice published 2025-11-04. A nudge that lands inside
+  // one of these is not just low-effort like a weekend send, the recipient
+  // is genuinely out of office, so this gets checked separately from
+  // rollToWeekdayIso above rather than folded into "weekend". 2026 only:
+  // that is the only year with an official notice out as of when this was
+  // written, extend with the next year's real notice once one exists
+  // instead of guessing a pattern forward.
+  const CHINA_HOLIDAYS_2026 = [
+    { name: 'New Year', start: '2026-01-01', end: '2026-01-03' },
+    { name: 'Spring Festival', start: '2026-02-15', end: '2026-02-23' },
+    { name: 'Qingming Festival', start: '2026-04-04', end: '2026-04-06' },
+    { name: 'Labour Day', start: '2026-05-01', end: '2026-05-05' },
+    { name: 'Dragon Boat Festival', start: '2026-06-19', end: '2026-06-21' },
+    { name: 'Mid-Autumn Festival', start: '2026-09-25', end: '2026-09-27' },
+    { name: 'National Day (Golden Week)', start: '2026-10-01', end: '2026-10-07' }
+  ];
+
+  function chinaHolidayOnDate(iso) {
+    return CHINA_HOLIDAYS_2026.find(h => iso >= h.start && iso <= h.end) || null;
+  }
+
+  // Rolls a proposed date past both weekends and the real holiday calendar
+  // above, so a suggested nudge date never lands inside a stretch when a
+  // Chinese business contact is genuinely unreachable. Loops one range at a
+  // time, not a single fixed skip, since Spring Festival (9 days in 2026)
+  // straddles a real weekend on both ends, jumping to the day after a
+  // holiday can land back on a weekend or, in principle, another holiday.
+  function rollPastChinaHolidays(iso) {
+    let candidate = rollToWeekdayIso(iso);
+    let holiday = chinaHolidayOnDate(candidate);
+    while (holiday) {
+      candidate = rollToWeekdayIso(addDaysIso(holiday.end, 1));
+      holiday = chinaHolidayOnDate(candidate);
+    }
+    return candidate;
+  }
+
   // China runs a single national timezone, China Standard Time, UTC+8
   // year-round with no daylight saving, so this offset never needs a real
   // timezone database, unlike almost any other cross-border time
@@ -236,8 +274,10 @@
     // Tue-Thu, roughly 8-11am recipient-local: the mid-week-morning window
     // general cold-outreach benchmarks report as the strongest for replies.
     const isPrimeReplyWindow = dayOfWeek >= 2 && dayOfWeek <= 4 && hour >= 8 && hour < 11;
+    const dateIso = shifted.getUTCFullYear() + '-' + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-' +
+      String(shifted.getUTCDate()).padStart(2, '0');
     return {
-      hour, minute, dayOfWeek, weekdayName: WEEKDAY_NAMES[dayOfWeek],
+      hour, minute, dayOfWeek, weekdayName: WEEKDAY_NAMES[dayOfWeek], dateIso,
       isWeekday, isBusinessHours, isPrimeReplyWindow
     };
   }
@@ -1020,6 +1060,7 @@
     socialSnapshotStaleInfo, socialSnapshotsStaleInfo, computeSocialSnapshotGrowth,
     nudgeUrgencyLevel, computeNudgeRows, byUrgency, touchCount, daysSinceLastTouch, daysToFirstReply,
     todayIso, addDaysIso, suggestedNudgeOffsetDays, rollToWeekdayIso, beijingTimeInfo,
+    CHINA_HOLIDAYS_2026, chinaHolidayOnDate, rollPastChinaHolidays,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
