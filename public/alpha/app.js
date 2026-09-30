@@ -1224,16 +1224,26 @@ function statTile(value, label, sub, awaiting, subTitle) {
   `;
 }
 
+// Real status pages (Statuspage, UptimeRobot) make each component in this
+// kind of grid a link into the section with its actual detail and history,
+// not just a glance-sized dot: this is the same page's own data, one click
+// closer. targetSectionId is one of the id="sec..." anchors on the section
+// elements in index.html; a component with nowhere more detailed to go
+// (anomaly detection, the debate panel) still points at Summary, the one
+// section that already shows its own tile, rather than being the sole
+// non-clickable card in an otherwise-clickable grid.
 function componentCard(comp) {
+  const tag = comp.targetSectionId ? 'a' : 'div';
+  const href = comp.targetSectionId ? ` href="#${comp.targetSectionId}" data-jump-target="${comp.targetSectionId}"` : '';
   return `
-    <div class="component-card">
+    <${tag} class="component-card"${href}>
       <div class="component-card-head">
         <span class="component-dot ${comp.status}" aria-hidden="true"></span>
         <span class="component-name">${escapeHtml(comp.name)}</span>
       </div>
       <div class="component-status ${comp.status}">${escapeHtml(comp.label)}</div>
       ${comp.detail ? `<div class="component-detail">${escapeHtml(comp.detail)}</div>` : ''}
-    </div>
+    </${tag}>
   `;
 }
 
@@ -1300,6 +1310,21 @@ function renderComponentGrid(data, summaryData, isLastKnown) {
   comps.push((data.live && data.live.account)
     ? { name: 'Account & positions feed', status: 'good', label: 'Live' }
     : { name: 'Account & positions feed', status: 'unknown', label: 'Awaiting data' });
+
+  // Anomaly detection and the debate panel have no dedicated section of
+  // their own below, only a Summary tile, so they point there instead of
+  // being the only cards in this grid with nowhere to click through to.
+  const COMPONENT_SECTION_TARGETS = {
+    'Daemon connection': 'secConnection',
+    'Kill switch': 'secSummary',
+    'Regime detection': 'secRegimeHistory',
+    'Position sizing': 'secPositionSizing',
+    'Anomaly detection': 'secSummary',
+    'Debate panel': 'secSummary',
+    'Genealogy wall': 'secGenealogy',
+    'Account & positions feed': 'secAccount'
+  };
+  comps.forEach(c => { c.targetSectionId = COMPONENT_SECTION_TARGETS[c.name] || null; });
 
   componentGridEl.innerHTML = comps.map(componentCard).join('');
 
@@ -3400,13 +3425,29 @@ document.getElementById('jumpNavList').addEventListener('click', (e) => {
   const link = e.target.closest('.jump-nav-link');
   if (!link) return;
   e.preventDefault();
-  const target = document.getElementById(link.dataset.jumpTarget);
+  const targetId = link.dataset.jumpTarget;
   closeJumpNav();
-  if (target) {
-    // The scroll-lock release above needs a frame to settle, starting the
-    // smooth scroll before that clobbers it.
-    requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
-  }
+  // The scroll-lock release above needs a frame to settle, starting the
+  // smooth scroll before that clobbers it.
+  requestAnimationFrame(() => scrollToPageSection(targetId));
+});
+
+// Same anchor-into-a-section jump as the jump-nav links above, reused by the
+// Components grid's own cards (see componentCard) so a component pointing at
+// the section with its real detail scrolls the same way everything else on
+// this page already does, honoring prefers-reduced-motion rather than a bare
+// scrollIntoView() default.
+function scrollToPageSection(id) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+}
+
+document.getElementById('componentGrid').addEventListener('click', (e) => {
+  const link = e.target.closest('a.component-card[data-jump-target]');
+  if (!link) return;
+  e.preventDefault();
+  scrollToPageSection(link.dataset.jumpTarget);
 });
 
 document.addEventListener('keydown', (e) => {
