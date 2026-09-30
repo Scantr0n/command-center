@@ -3,8 +3,8 @@
  * Regression tests for compare-core.js, the field-by-field diff behind the
  * page's "Compare with backup..." button. Covers: rejecting a file that
  * isn't a real Garage backup, added/removed/changed detection across all
- * ten lists (pipeline stages keyed by stage name, everything else keyed by
- * id), the null-vs-omitted-field equality rule, and that an exact match
+ * eleven lists (pipeline stages keyed by stage name, everything else keyed
+ * by id), the null-vs-omitted-field equality rule, and that an exact match
  * reports no differences.
  *
  * Usage: node --test public/garage/data/compare-core.test.js
@@ -110,6 +110,22 @@ test('compareWithBackup diffs pipeline stages by stage name', () => {
   assert.deepEqual(result.pipeline.changed[0].fields, ['count']);
 });
 
+test('compareWithBackup diffs the posting log by id, catching a real count change', () => {
+  const current = { rawPipelineData: { postingLog: [{ id: 'p1', date: '2026-10-05', count: 6 }] } };
+  const backup = backupFile({ pipelineJson: { stages: [], postingLog: [{ id: 'p1', date: '2026-10-05', count: 4 }] } });
+  const result = compareWithBackup(current, backup);
+  assert.equal(result.postingLog.changed.length, 1);
+  assert.deepEqual(result.postingLog.changed[0].fields, ['count']);
+});
+
+test('compareWithBackup detects a new posting log entry added since the backup', () => {
+  const current = { rawPipelineData: { postingLog: [{ id: 'p1', date: '2026-10-05', count: 6 }] } };
+  const backup = backupFile({ pipelineJson: { stages: [], postingLog: [] } });
+  const result = compareWithBackup(current, backup);
+  assert.equal(result.postingLog.added.length, 1);
+  assert.equal(result.postingLog.added[0].id, 'p1');
+});
+
 test('compareWithBackup detects a new sale added since the backup', () => {
   const current = { rawSalesData: { sales: [{ id: 'sale1', title: 'Jacket', salePrice: 40 }] } };
   const backup = backupFile({ salesJson: { sales: [] } });
@@ -163,7 +179,7 @@ test('compareWithBackup finds no differences when current data exactly matches t
   const current = { rawListingsData: { listings }, rawCompsData: { comps } };
   const backup = backupFile({ listingsJson: { listings }, compsJson: { comps } });
   const result = compareWithBackup(current, backup);
-  const totalDiffs = ['listings', 'pipeline', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement']
+  const totalDiffs = ['listings', 'pipeline', 'postingLog', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement']
     .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
   assert.equal(totalDiffs, 0);
 });

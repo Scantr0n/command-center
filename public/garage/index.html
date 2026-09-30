@@ -77,7 +77,7 @@
           <tr><th>ebayReturnPolicy</th><td>The real return policy name set on the actual eBay listing, e.g. <code>"No Return Accepted"</code>, or <code>null</code> until confirmed. Only meaningful when <code>ebay</code> is in <code>platforms</code>. Exists because of a real bug: three eBay listings silently inherited a "30-Day Seller-Paid Returns (Parts &amp; Accessories)" policy meant for auto parts, which blocked publish (see the Activity log below). A live eBay listing with this left <code>null</code>, or set to anything mentioning parts/accessories/auto, gets flagged in "Needs backfill" below so that exact bug can't repeat unnoticed.</td></tr>
           <tr><th>handlingTimeDays</th><td>The real handling time set on the actual eBay listing, a whole number of business days from 1 to 30 (eBay's own real range for that setting), or <code>null</code> until confirmed. Only meaningful when <code>ebay</code> is in <code>platforms</code>. Feeds the real eBay late-shipment-rate calc on the Seller status &amp; standards table below: a sale is judged late once its own <code>shipDate</code> falls after this many business days from its <code>saleDate</code>. A live eBay listing with this left <code>null</code> gets flagged in "Needs backfill" below, since no sale of that item can be judged pass/fail without it.</td></tr>
           <tr><th>itemSpecifics</th><td>Object with <code>brand</code>, <code>size</code>, <code>color</code>, <code>condition</code>, each a real string or <code>null</code> until logged. Not eBay-only: eBay's Cassini search excludes a listing entirely from a buyer's filtered results once that filter (brand, size, condition, etc.) is applied and the field is missing, it doesn't just rank it lower, but Poshmark, Vinted, and Depop all expose the same fields as buyer search filters, so a listing missing one drops out of a filtered search there too. <code>brand</code> and <code>condition</code> are checked on every live listing regardless of platform; <code>size</code> and <code>color</code> only on the <code>"shoes"</code> category, since they don't meaningfully apply to something like the swing analyzer. Missing required fields show up in "Needs backfill" below for whichever platforms the listing is actually live on.</td></tr>
-          <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>.</td></tr>
+          <tr><th>pipeline.json</th><td>One object per pipeline stage in the <code>stages</code> array, each with a <code>stage</code>, integer <code>count</code>, and optional <code>note</code>. Also holds <code>postingLog</code>, see the Posting pace planner section below for that array's own fields.</td></tr>
           <tr><th>activity.json</th><td>One object per logged event in the <code>events</code> array: real bug fixes, photo audits, and other quality checks. Requires <code>id</code>, <code>title</code>, and <code>type</code> (<code>bug-fix</code>, <code>photo-audit</code>, or <code>other</code>).</td></tr>
           <tr><th>sales.json</th><td>One object per real completed sale in the <code>sales</code> array. Log a sale here <em>and</em> add that platform to the item's <code>soldOn</code> array in listings.json, both matter: this is the sale history, soldOn is what still needs delisting elsewhere.</td></tr>
           <tr><th>id</th><td>Unique slug for the sale, e.g. <code>"black-boots-ebay-2026-09"</code></td></tr>
@@ -243,7 +243,10 @@
       platform in one day reads as spam to that platform's own search-ranking algorithm and risks a review
       hold, while posting the same items spread over more days gets better reach per listing. This turns the
       real <code>ready-to-post</code> count from <code>pipeline.json</code> into a plan, enter how many
-      listings actually get posted per day below. Nothing here is saved anywhere but this browser.
+      listings actually get posted per day below. That projection is only ever a hypothetical rate typed in here,
+      it's never saved anywhere but this browser and never checked against what actually happened. The real actual
+      pace comes from <code>pipeline.json</code>'s own <code>postingLog</code> instead, logged below once something
+      actually gets posted.
     </div>
     <div class="calc-row">
       <div class="calc-price-input-wrap">
@@ -260,6 +263,66 @@
       </div>
     </div>
     <div id="paceResult" class="pace-result" aria-live="polite"></div>
+
+    <details class="schema-help" id="quickLogPostingTool">
+      <summary>Quick log a posting day (generates JSON to paste into pipeline.json, saves nothing)</summary>
+      <div class="schema-help-body">
+        <p>Runs the same checks <code>node public/garage/data/validate.js</code> does on <code>pipeline.json</code>'s
+          own <code>postingLog</code> array (a unique id, a real non-future date, a positive whole-number count),
+          then builds the JSON object to paste into that array yourself. This is a plain historical log, logging a
+          day here doesn't automatically change the <code>ready-to-post</code>/<code>live</code> stage counts above,
+          update those by hand too if items actually went live from this. Fields:</p>
+        <table class="schema-table">
+          <tbody>
+            <tr><th>id</th><td>Unique slug, e.g. <code>"2026-10-05-depop-batch-1"</code></td></tr>
+            <tr><th>date</th><td>ISO date (<code>YYYY-MM-DD</code>) of the real day this actually happened, can't be
+              in the future, this is a log of what was actually posted, not a plan</td></tr>
+            <tr><th>count</th><td>Real positive whole number of listings actually posted that day</td></tr>
+            <tr><th>note</th><td>Free text, e.g. which item(s) or platform, or <code>null</code></td></tr>
+          </tbody>
+        </table>
+        <p>This never writes a file or sends anything, it only puts text on your clipboard.</p>
+
+        <div id="nplDraftBanner" class="quick-log-draft-banner" hidden>
+          <span>Restored an unsaved draft from <span id="nplDraftBannerTime"></span>, this form is autosaved to
+            this browser only (never sent anywhere) so an accidental close doesn't lose real typed data.</span>
+          <button type="button" id="nplDiscardDraftBtn" class="print-btn font-mono">Discard draft</button>
+        </div>
+
+        <div class="quick-log-grid">
+          <form class="quick-log-form" id="quickPostingForm">
+            <h3 class="quick-log-title font-mono">New posting day &rarr; pipeline.json</h3>
+            <label class="quick-log-label" for="nplId">Id (unique slug)</label>
+            <input class="quick-log-input" type="text" id="nplId" placeholder="e.g. 2026-10-05-depop-batch-1" required>
+            <label class="quick-log-label" for="nplDate">Date</label>
+            <input class="quick-log-input" type="date" id="nplDate" required>
+            <label class="quick-log-label" for="nplCount">Count (whole number, actually posted)</label>
+            <input class="quick-log-input" type="number" id="nplCount" min="1" step="1" required>
+            <label class="quick-log-label" for="nplNote">Note (optional)</label>
+            <input class="quick-log-input" type="text" id="nplNote">
+            <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
+            <div class="quick-log-warnings" id="nplWarnings" role="alert"></div>
+            <textarea class="quick-log-output" id="nplOutput" readonly rows="7" hidden aria-label="Generated posting log JSON, ready to paste into the postingLog array"></textarea>
+            <button type="button" class="print-btn quick-log-copy" id="nplCopyBtn" hidden>Copy JSON</button>
+            <p class="quick-log-hint" id="quickLogPostingLive" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <div class="table-wrap">
+      <table class="card-table" id="postingLogTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Posted</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="postingLogTableBody"></tbody>
+      </table>
+      <div class="table-empty" id="postingLogTableEmpty" hidden></div>
+    </div>
   </section>
 
   <section>

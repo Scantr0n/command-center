@@ -484,6 +484,33 @@
     return days < 0 ? null : days;
   }
 
+  // Turns pipeline.json's own real postingLog (one entry per real day items
+  // actually got posted from the "ready-to-post" backlog, see the Posting
+  // pace planner's quick-log form in app.js) into an actual pace, kept
+  // entirely separate from that planner's own "if today's pace holds"
+  // figure: that one is a hypothetical rate typed into a plain number
+  // input and never checked against anything, this is the real log checked
+  // against the real calendar. daysActive spans from the earliest logged
+  // date through today, inclusive, using daysBetweenDates above so this
+  // can't drift a day off from the rest of this file's date math. Returns a
+  // null postedPerDay with no entries logged yet, or with an entry dated
+  // after todayStr (daysBetweenDates itself returns null for that, the same
+  // "future date" guard validate.js separately enforces), rather than a
+  // divide-by-zero or a guessed rate, the same "unknown, not a guess" rule
+  // the rest of this file already follows.
+  function actualPostingPace(postingLog, todayStr) {
+    const entries = (postingLog || []).filter(e => e && e.date && e.count != null);
+    const postedCount = entries.reduce((sum, e) => sum + e.count, 0);
+    if (!entries.length) return { postedCount: 0, firstDate: null, daysActive: 0, postedPerDay: null };
+
+    const firstDate = entries.reduce((min, e) => (e.date < min ? e.date : min), entries[0].date);
+    const daysSinceFirst = daysBetweenDates(firstDate, todayStr);
+    if (daysSinceFirst == null) return { postedCount, firstDate, daysActive: 0, postedPerDay: null };
+
+    const daysActive = daysSinceFirst + 1;
+    return { postedCount, firstDate, daysActive, postedPerDay: postedCount / daysActive };
+  }
+
   // Real on-time-shipping rate among the sales in the window that actually
   // have both a saleDate and a shipDate logged, e.g. Depop's own "90%+
   // shipped within 5 days" Top Seller requirement. Returns null (not 0) when
@@ -694,7 +721,7 @@
     EBAY_LATE_SHIPMENT_RATE_TARGET,
     DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
     DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
-    daysBetweenDates, onTimeShipRate, avgDaysToShip,
+    daysBetweenDates, actualPostingPace, onTimeShipRate, avgDaysToShip,
     shipDeadline, isLateShipment, ebayLateShipmentRate,
     ebayTrsProgress, depopTopSellerProgress,
     isSupplyLowStock,

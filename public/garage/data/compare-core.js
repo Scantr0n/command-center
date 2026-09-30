@@ -67,6 +67,7 @@
     'status', 'datePublished', 'notes', 'location', 'ebayReturnPolicy', 'handlingTimeDays', 'itemSpecifics'
   ];
   const PIPELINE_STAGE_FIELDS = ['count', 'note'];
+  const POSTING_LOG_FIELDS = ['date', 'count', 'note'];
   const ACTIVITY_FIELDS = ['date', 'type', 'platform', 'title', 'detail', 'itemsReviewed', 'issuesFound'];
   const SALE_FIELDS = ['title', 'listingId', 'platform', 'salePrice', 'askingPrice', 'costBasis', 'shippingCost', 'saleDate', 'shipDate'];
   const EXPENSE_FIELDS = ['description', 'category', 'miles', 'amount', 'date'];
@@ -97,6 +98,8 @@
     const backupListings = (backupFile.listingsJson && backupFile.listingsJson.listings) || [];
     const currentStages = (current.rawPipelineData && current.rawPipelineData.stages) || [];
     const backupStages = (backupFile.pipelineJson && backupFile.pipelineJson.stages) || [];
+    const currentPostingLog = (current.rawPipelineData && current.rawPipelineData.postingLog) || [];
+    const backupPostingLog = (backupFile.pipelineJson && backupFile.pipelineJson.postingLog) || [];
     const currentActivity = (current.rawActivityData && current.rawActivityData.events) || [];
     const backupActivity = (backupFile.activityJson && backupFile.activityJson.events) || [];
     const currentSales = (current.rawSalesData && current.rawSalesData.sales) || [];
@@ -118,6 +121,7 @@
       exportedAt: backupFile.exportedAt || null,
       listings: diffByKey(currentListings, backupListings, l => l.id, LISTING_FIELDS),
       pipeline: diffByKey(currentStages, backupStages, s => s.stage, PIPELINE_STAGE_FIELDS),
+      postingLog: diffByKey(currentPostingLog, backupPostingLog, p => p.id, POSTING_LOG_FIELDS),
       activity: diffByKey(currentActivity, backupActivity, e => e.id, ACTIVITY_FIELDS),
       sales: diffByKey(currentSales, backupSales, s => s.id, SALE_FIELDS),
       expenses: diffByKey(currentExpenses, backupExpenses, e => e.id, EXPENSE_FIELDS),

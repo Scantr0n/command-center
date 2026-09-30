@@ -25,6 +25,7 @@ let initialEngagementId = null;
 let sortKey = null;
 let sortDir = 'asc';
 let currentStages = [];
+let postingLog = [];
 let rawListingsData = null;
 let rawPipelineData = null;
 let rawActivityData = null;
@@ -120,7 +121,7 @@ const {
   remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
-  isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId
+  isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -827,6 +828,7 @@ async function loadData() {
   compareBackupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData);
   compareBackupBtn.title = compareBackupBtn.disabled ? "Can't compare, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
+  const postingLogEntries = (pipelineData && pipelineData.postingLog) || [];
   const sales = (salesData && salesData.sales) || [];
   const expenses = (expensesData && expensesData.expenses) || [];
   const disputes = (disputesData && disputesData.disputes) || [];
@@ -879,10 +881,13 @@ async function loadData() {
 
   if (pipelineData) {
     currentStages = stages;
+    postingLog = postingLogEntries;
     renderPipeline(stages);
-    renderPacePlanner(stages);
+    renderPacePlanner(stages, postingLogEntries);
+    renderPostingLog(postingLogEntries);
   } else {
     currentStages = [];
+    postingLog = [];
     document.getElementById('pipelineRow').innerHTML =
       '<div class="table-empty" role="alert">Failed to load pipeline data: ' + escapeHtml(pipelineResult.reason.message) + '</div>';
     document.getElementById('paceResult').innerHTML =
@@ -1166,22 +1171,35 @@ function savePaceRate(rate) {
 // clear date at a seller-entered daily rate. Plain calendar days, not
 // business days, since posting isn't tied to a work week here. Never
 // invents the backlog count itself, only does arithmetic on the real
-// pipeline stage.
-function renderPacePlanner(stages) {
+// pipeline stage. Also shows the real actual-pace figure from
+// pipeline.json's own postingLog (see actualPostingPace in garage-core.js)
+// right alongside it, entirely separate math: the projection above is a
+// hypothetical rate typed into a number input and never checked against
+// anything, this is what the real logged posting days actually add up to.
+function renderPacePlanner(stages, postingLogEntries) {
   const result = document.getElementById('paceResult');
   const input = document.getElementById('pacePerDayInput');
   const stage = stages.find(s => s.stage === 'ready-to-post');
   const backlog = stage ? stage.count : 0;
 
+  const actual = actualPostingPace(postingLogEntries || [], todayDateStr());
+  const actualHtml = actual.postedPerDay != null
+    ? `<p class="pace-result-note">Actually posted: <span class="pace-result-figure">${actual.postedCount}</span> ` +
+      `over <span class="pace-result-figure">${actual.daysActive}</span> day${actual.daysActive === 1 ? '' : 's'} ` +
+      `since ${escapeHtml(actual.firstDate)}, a real <span class="pace-result-figure">${actual.postedPerDay.toFixed(1)}</span>/day pace.</p>`
+    : (actual.postedCount
+      ? '<p class="pace-result-note">Posting days logged with a date after today, check for a typo\'d year.</p>'
+      : '<p class="pace-result-note">No posting days logged yet, use "Quick log a posting day" below once something actually gets posted.</p>');
+
   if (!backlog) {
-    result.innerHTML = '<p class="pace-result-note">Nothing in "ready to post" right now, no pace to plan.</p>';
+    result.innerHTML = actualHtml + '<p class="pace-result-note">Nothing in "ready to post" right now, no pace to plan.</p>';
     return;
   }
 
   const raw = input.value.trim();
   const rate = raw === '' ? null : Number(raw);
   if (raw === '' || Number.isNaN(rate) || rate <= 0) {
-    result.innerHTML = `<p class="pace-result-note">Enter how many of the real ${backlog} ready-to-post listing(s) actually get posted per day to see a projected clear date.</p>`;
+    result.innerHTML = actualHtml + `<p class="pace-result-note">Enter how many of the real ${backlog} ready-to-post listing(s) actually get posted per day to see a projected clear date.</p>`;
     return;
   }
 
@@ -1189,13 +1207,39 @@ function renderPacePlanner(stages) {
   const finishStr = addDaysToDateStr(todayDateStr(), days);
   const dayWord = days === 1 ? 'day' : 'days';
 
-  result.innerHTML = `
+  result.innerHTML = actualHtml + `
     <p class="pace-result-note">
       <span class="pace-result-figure">${days} ${dayWord}</span> to clear the real
       <span class="pace-result-figure">${backlog}</span>-listing backlog at
       <span class="pace-result-figure">${rate}</span>/day, done around
       <span class="pace-result-figure">${finishStr}</span> if today's pace holds.
     </p>`;
+}
+
+// Plain reverse-chronological history of pipeline.json's real postingLog,
+// same "not logged yet" empty state every other log table on this page
+// already uses (see renderSupplies above).
+function renderPostingLog(entries) {
+  const tbody = document.getElementById('postingLogTableBody');
+  const empty = document.getElementById('postingLogTableEmpty');
+
+  if (!entries.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No posting days logged yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...entries].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  tbody.innerHTML = sorted.map(p => `
+    <tr>
+      <td class="cell-muted">${p.date ? escapeHtml(p.date) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-value">${p.count != null ? p.count : ''}</td>
+      <td class="cell-muted">${p.note ? escapeHtml(p.note) : ''}</td>
+    </tr>
+  `).join('');
 }
 
 function wirePacePlanner() {
@@ -1206,7 +1250,7 @@ function wirePacePlanner() {
     const raw = input.value.trim();
     const rate = raw === '' ? null : Number(raw);
     if (rate && rate > 0) savePaceRate(rate);
-    renderPacePlanner(currentStages);
+    renderPacePlanner(currentStages, postingLog);
   });
 }
 
@@ -4830,7 +4874,7 @@ function renderCompareBackupResult(result) {
   const exportedLabel = result.exportedAt
     ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : 'unknown export date (an older backup, or a hand-edited file)';
-  const totalDiffs = ['listings', 'pipeline', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement']
+  const totalDiffs = ['listings', 'pipeline', 'postingLog', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement']
     .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
   let html = '<p class="field-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
   if (totalDiffs === 0) {
@@ -4840,6 +4884,7 @@ function renderCompareBackupResult(result) {
   }
   html += renderCompareSection('Listings (listings.json)', result.listings, l => l.title || l.id, l => l.status);
   html += renderCompareSection('Pipeline stages (pipeline.json)', result.pipeline, s => s.stage, s => s.count != null ? s.count + ' item(s)' : null);
+  html += renderCompareSection('Posting log (pipeline.json)', result.postingLog, p => p.date || p.id, p => p.count != null ? p.count + ' posted' : null);
   html += renderCompareSection('Activity log (activity.json)', result.activity, e => e.title || e.id, e => e.type);
   html += renderCompareSection('Sales (sales.json)', result.sales, s => s.title || s.id, s => s.platform);
   html += renderCompareSection('Expenses (expenses.json)', result.expenses, e => e.description || e.id, e => e.category);
@@ -6187,6 +6232,76 @@ function wireQuickLogEngagementTool() {
   });
 }
 
+// Same quick-log convention as the tools above, for pipeline.json's own
+// postingLog array: a real day items actually got posted from the
+// "ready-to-post" backlog, feeding the Posting pace planner's actual-pace
+// figure (actualPostingPace in garage-core.js). A future date is blocked
+// the same way a comp's soldDate or an engagement snapshot's date already
+// are above, this is a log of what happened, not a plan.
+function wireQuickLogPostingTool() {
+  const form = document.getElementById('quickPostingForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('nplWarnings');
+  const output = document.getElementById('nplOutput');
+  const copyBtn = document.getElementById('nplCopyBtn');
+  const live = document.getElementById('quickLogPostingLive');
+  const draftGuard = attachDraftGuard(form, 'garage-npl-draft-v1', {
+    bannerId: 'nplDraftBanner', timeId: 'nplDraftBannerTime', discardId: 'nplDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('nplId').value.trim();
+    const date = document.getElementById('nplDate').value || null;
+    const count = readOptionalNonNegativeInteger(document.getElementById('nplCount'));
+    const note = document.getElementById('nplNote').value.trim() || null;
+
+    const blockers = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (postingLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another posting log entry, ids must be unique.');
+    }
+    if (!date) {
+      blockers.push('Enter the real date this posting day actually happened.');
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (new Date(date + 'T00:00:00') > tomorrow) {
+        blockers.push('Date is in the future, this is a real logged posting day, not a plan.');
+      }
+    }
+    if (!count) blockers.push('Enter a valid positive whole-number count, a posting day with nothing posted has nothing to log.');
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const entry = { id, date, count, note };
+
+    const advisory = emDashAdvisory(entry, ['note']);
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(entry, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Posting log JSON copied to clipboard.';
+      draftGuard.clearDraft();
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 // AI photo-to-listing drafter. Two-stage flow: stage 1 (draft) sends real
 // item photos to /api/garage/draft-listing and shows every field with its
 // confidence and reasoning, purely informational, nothing saved. Stage 2
@@ -6498,6 +6613,7 @@ wireQuickLogSupplyTool();
 wireQuickLogAcquisitionTool();
 wireQuickLogCompTool();
 wireQuickLogEngagementTool();
+wireQuickLogPostingTool();
 wirePhotoDraftTool();
 initPhotoAudit();
 renderSeasonalCalendarHighlight();

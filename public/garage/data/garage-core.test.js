@@ -21,7 +21,7 @@ const {
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
-  ebayTrsProgress, depopTopSellerProgress, daysBetweenDates,
+  ebayTrsProgress, depopTopSellerProgress, daysBetweenDates, actualPostingPace,
   shipDeadline, isLateShipment, ebayLateShipmentRate,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
   DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
@@ -667,4 +667,46 @@ test('hasNewDueId returns true when a new reminder becomes due even if the count
 
 test('hasNewDueId returns false when a reminder drops out and nothing new becomes due', () => {
   assert.equal(hasNewDueId(['a-dispute-respond'], ['a-dispute-respond', 'b-dispute-respond']), false);
+});
+
+test('actualPostingPace returns a null rate with no posting log entries yet, not a divide-by-zero', () => {
+  const result = actualPostingPace([], '2026-10-05');
+  assert.equal(result.postedCount, 0);
+  assert.equal(result.firstDate, null);
+  assert.equal(result.daysActive, 0);
+  assert.equal(result.postedPerDay, null);
+});
+
+test('actualPostingPace ignores an entry missing a date or a count rather than throwing', () => {
+  const result = actualPostingPace([{ id: 'a', date: null, count: 5 }, { id: 'b', date: '2026-10-01', count: null }], '2026-10-05');
+  assert.equal(result.postedCount, 0);
+  assert.equal(result.postedPerDay, null);
+});
+
+test('actualPostingPace: a single day logged today is a 1-day-active rate', () => {
+  const result = actualPostingPace([{ id: 'a', date: '2026-10-05', count: 6 }], '2026-10-05');
+  assert.equal(result.postedCount, 6);
+  assert.equal(result.firstDate, '2026-10-05');
+  assert.equal(result.daysActive, 1);
+  assert.equal(result.postedPerDay, 6);
+});
+
+test('actualPostingPace sums every entry and spans from the earliest logged date through today, inclusive', () => {
+  const log = [
+    { id: 'a', date: '2026-10-03', count: 4 },
+    { id: 'b', date: '2026-10-01', count: 2 },
+    { id: 'c', date: '2026-10-03', count: 3 }
+  ];
+  const result = actualPostingPace(log, '2026-10-05');
+  assert.equal(result.postedCount, 9);
+  assert.equal(result.firstDate, '2026-10-01');
+  assert.equal(result.daysActive, 5);
+  assert.ok(Math.abs(result.postedPerDay - 9 / 5) < 1e-9);
+});
+
+test('actualPostingPace returns a null rate rather than a negative span when every entry is dated after todayStr', () => {
+  const result = actualPostingPace([{ id: 'a', date: '2026-10-10', count: 3 }], '2026-10-05');
+  assert.equal(result.postedCount, 3);
+  assert.equal(result.daysActive, 0);
+  assert.equal(result.postedPerDay, null);
 });

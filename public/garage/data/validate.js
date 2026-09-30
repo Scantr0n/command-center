@@ -16,7 +16,11 @@
  * what listings.json actually contains, since the two files are hand-edited
  * separately and can drift out of sync (the "ready-to-post" stage is left
  * alone: those items, e.g. the 48 Depop drafts, aren't itemized individually
- * in listings.json yet). It also cross-checks sales.json against every
+ * in listings.json yet). pipeline.json's own "postingLog" needs a unique id,
+ * a real non-future date, and a positive integer count, same "not a guess"
+ * rule as everything else here, it stays a plain historical log rather than
+ * being cross-checked against "ready-to-post" for the same reason that
+ * stage is left alone above. It also cross-checks sales.json against every
  * listing's "soldOn" array in both directions, since a real sale should show
  * up in exactly one place: logged once as a sale, and marked once as sold on
  * that platform. A sale's optional "shipDate" can't be in the future or fall
@@ -339,6 +343,40 @@ function main() {
     if (typeof s.count !== 'number' || s.count < 0 || !Number.isInteger(s.count)) {
       errors.push(where + ': "count" must be a non-negative integer');
     }
+  });
+
+  // postingLog is a pure historical log of real days items actually got
+  // posted from the "ready-to-post" backlog, not cross-checked against the
+  // stages' own counts above for the same reason those are left alone from
+  // each other (see this file's header): the two are hand-maintained
+  // separately, and "ready-to-post" isn't itemized anywhere else this could
+  // reconcile against.
+  const postingLogEntries = pipelineData.postingLog || [];
+  const seenPostingLogIds = new Set();
+
+  postingLogEntries.forEach((p, idx) => {
+    const where = 'postingLog[' + idx + ']' + (p && p.id ? ' (' + p.id + ')' : '');
+
+    if (!p.id) errors.push(where + ': missing "id"');
+    else if (seenPostingLogIds.has(p.id)) errors.push(where + ': duplicate id "' + p.id + '"');
+    else seenPostingLogIds.add(p.id);
+
+    if (!isDateOrNull(p.date) || !p.date) {
+      errors.push(where + ': "date" must be a real YYYY-MM-DD date: ' + JSON.stringify(p.date));
+    } else if (isFutureDate(p.date)) {
+      errors.push(where + ': "date" (' + p.date + ') is in the future, this is a real logged posting day, not a plan');
+    }
+
+    if (typeof p.count !== 'number' || p.count <= 0 || !Number.isInteger(p.count)) {
+      errors.push(where + ': "count" must be a positive integer, a posting day with nothing actually posted has nothing to log');
+    }
+
+    if (p.note !== null && p.note !== undefined && typeof p.note !== 'string') {
+      errors.push(where + ': "note" must be a string or null');
+    }
+
+    emDashFields(p, ['note']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
   const events = activityData.events || [];
@@ -829,6 +867,7 @@ function main() {
   }
 
   console.log('Garage data is valid (' + listings.length + ' listing(s), ' + stages.length + ' stage(s), ' +
+    postingLogEntries.length + ' posting log entr' + (postingLogEntries.length === 1 ? 'y' : 'ies') + ', ' +
     events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
     disputes.length + ' dispute(s), ' + supplies.length + ' suppl' + (supplies.length === 1 ? 'y' : 'ies') + ', ' +
     acquisitions.length + ' acquisition(s), ' + comps.length + ' comp(s), ' + engagementSnapshots.length + ' engagement snapshot(s)).');
