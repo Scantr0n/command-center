@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-25T20:21:48.067Z",
+  "generatedAt": "2026-09-30T20:19:20.737Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "e93f01c",
+      "fullHash": "e93f01c18a22969e1015c18eeb95106c879f4722",
+      "date": "2026-09-29",
+      "author": "Claude",
+      "subject": "Sondrik: turn the stale re-check prompt into a real link once checkUrl is set",
+      "historyReset": false,
+      "files": [
+        "downloads.json"
+      ]
+    },
     {
       "hash": "f384460",
       "fullHash": "f384460b540ef787f905959248f9d87402bb406f",
