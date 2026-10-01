@@ -21,6 +21,7 @@
 <script src="/data/graph-core.js"></script>
 <script src="/data/html-core.js"></script>
 <script src="/data/search-core.js"></script>
+<script src="/data/compare-core.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -144,11 +145,11 @@
      tactile controls, not flat labels - box-shadow/transform only, never
      `background`, since every one of these already sets that inline
      (a shorthand that would silently reset any background-image layer). */
-  #searchInput, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn {
+  #searchInput, #paletteBtn, #backupBtn, #compareBackupBtn, #printBtn, #shortcutsBtn {
     box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05);
     transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   }
-  #paletteBtn:hover, #backupBtn:not(:disabled):hover, #printBtn:hover, #shortcutsBtn:hover {
+  #paletteBtn:hover, #backupBtn:not(:disabled):hover, #compareBackupBtn:not(:disabled):hover, #printBtn:hover, #shortcutsBtn:hover {
     box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.09), 0 6px 16px -6px rgba(0,0,0,0.5);
     transform: translateY(-1px);
   }
@@ -208,6 +209,31 @@
   .cat-filter-chip:hover { opacity: 0.8; }
   .kbd-chip { font-family: 'JetBrains Mono', monospace; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--hairline); background: rgba(255,255,255,0.03); }
   #paletteBtn:hover { border-color: var(--hairlineHover) !important; }
+
+  /* Compare with backup: same field-by-field diff list chrome already
+     proven at Alpha/CGT/CSM/Garage/Job Search/Sondrik's own compare-core.js
+     modal, reused verbatim rather than inventing a new look for the one
+     hub that didn't have this feature yet. */
+  .compare-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--hairline);
+    font-size: 0.85rem;
+    color: var(--ink);
+  }
+  .compare-row:first-of-type { border-top: none; }
+  .compare-row strong { font-weight: 600; }
+  .compare-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    color: #E0A030;
+    flex-shrink: 0;
+  }
+  .compare-tag.compare-tag-removed { font-weight: 600; }
+  .compare-list { display: flex; flex-direction: column; margin-top: 6px; }
+  .compare-section-label { margin: 16px 0 0; font-size: 0.85rem; color: var(--sub); }
+  .compare-section-label:first-of-type { margin-top: 12px; }
 
   /* Quick-jump palette: same overlay chrome as the project modal, but a
      single scrollable list of every project instead of a fixed layout, since
@@ -316,7 +342,7 @@
     border: 1px solid var(--hairline);
     background: rgba(255,255,255,0.03);
   }
-  #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled, #backupBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #chatInput:disabled, #sendChat:disabled, #toggleBtn:disabled, #backupBtn:disabled, #compareBackupBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Stat tiles: icon-badge + number pattern pulled from refs 1/7/8 (every
      reference dashboard opens with a row of these), replacing the old bare
@@ -585,9 +611,9 @@
       filter: none !important;
     }
 
-    #searchWrap, #paletteBtn, #backupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner, #driveStatusBadge,
+    #searchWrap, #paletteBtn, #backupBtn, #compareBackupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner, #driveStatusBadge,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
-    #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay,
+    #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay, #compareBackupOverlay,
     /* Both added after the comment above was written, and both missed being
        added here: neither is part of the documented "grid + needs-attention +
        activity feed" printed report, Venture Snapshot is a live-glance panel
@@ -730,6 +756,9 @@
         <button id="backupBtn" type="button" aria-label="Download a backup of all project data as JSON" disabled title="Loading data..."
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">Backup</button>
+        <button id="compareBackupBtn" type="button" aria-label="Compare the currently loaded project data with a downloaded backup" disabled title="Loading data..."
+          class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
+          style="color: var(--sub); background: var(--panelLight)">Compare&hellip;</button>
         <button id="printBtn" type="button" aria-label="Print a project status report"
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">Print</button>
@@ -937,6 +966,29 @@
         <button id="closeShortcuts" type="button" aria-label="Close" class="w-7 h-7 flex items-center justify-center text-xl leading-none" style="color: var(--sub)">&times;</button>
       </div>
       <div id="shortcutsList" class="px-5 py-4 flex flex-col gap-3 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Compare with backup: same read-only field-by-field diff every
+       per-project hub already has (Alpha/CGT/CSM/Garage/Job Search/
+       Sondrik's own compare-core.js), scoped here to the hub's own
+       `clusters` array instead of a single hub's data file. -->
+  <input type="file" id="compareBackupInput" accept="application/json,.json" hidden>
+  <div id="compareBackupOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
+    <div class="corner-notch rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)" role="dialog" aria-modal="true" aria-labelledby="compareBackupTitle">
+      <div class="flex items-center justify-between px-5 py-3.5 border-b hairline flex-shrink-0">
+        <h2 id="compareBackupTitle" class="font-display font-bold text-sm" style="color: var(--ink)">Compare with a backup</h2>
+        <button id="closeCompareBackup" type="button" aria-label="Close" class="w-7 h-7 flex items-center justify-center text-xl leading-none" style="color: var(--sub)">&times;</button>
+      </div>
+      <div class="px-5 py-4 flex-1 overflow-y-auto">
+        <p class="text-xs mb-3" style="color: var(--sub)">Read-only: this never writes anything back to any project file, it only
+          shows what changed in the project data currently loaded on this page versus a backup taken earlier, so a bad hand-edit
+          or an unexpected Drive merge can be caught before it's trusted.</p>
+        <p class="text-xs mb-3" id="compareBackupHint" style="color: var(--faint)">Pick a file downloaded earlier from this page's
+          <strong>Backup</strong> button.</p>
+        <button type="button" id="compareBackupPickBtn" class="text-xs font-mono px-3 py-1.5 rounded-lg border hairline" style="color: var(--sub); background: var(--panelLight)">Choose backup file&hellip;</button>
+        <div id="compareBackupResult" class="mt-3" aria-live="polite"></div>
+      </div>
     </div>
   </div>
 
@@ -1201,6 +1253,9 @@ async function loadClusters() {
     const backupBtn = document.getElementById('backupBtn');
     backupBtn.disabled = false;
     backupBtn.title = 'Download a backup of all project data as JSON';
+    const compareBackupBtn = document.getElementById('compareBackupBtn');
+    compareBackupBtn.disabled = false;
+    compareBackupBtn.title = '';
     renderStats();
     renderAttention();
     renderRecentCommits();
@@ -3435,6 +3490,99 @@ document.getElementById('shortcutsOverlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('shortcutsOverlay')) closeShortcuts();
 });
 
+// Compare with backup: DashboardCompareCore.compareWithBackup (data/
+// compare-core.js) does the actual field-by-field comparison; everything
+// here just reads the file the user picks and renders the result. Nothing
+// is uploaded anywhere and nothing is written back to any cluster file.
+// Same approach as every per-project hub's own Compare with backup.
+let compareBackupOpen = false;
+let compareBackupLastFocusedEl = null;
+
+function openCompareBackup() {
+  if (compareBackupOpen) return;
+  compareBackupOpen = true;
+  compareBackupLastFocusedEl = document.activeElement;
+  document.getElementById('compareBackupOverlay').classList.remove('hidden');
+  document.getElementById('compareBackupOverlay').classList.add('flex');
+  lockBodyScroll();
+  document.getElementById('compareBackupPickBtn').focus();
+}
+
+function closeCompareBackup() {
+  if (!compareBackupOpen) return;
+  compareBackupOpen = false;
+  document.getElementById('compareBackupOverlay').classList.add('hidden');
+  document.getElementById('compareBackupOverlay').classList.remove('flex');
+  unlockBodyScroll();
+  if (compareBackupLastFocusedEl && typeof compareBackupLastFocusedEl.focus === 'function') compareBackupLastFocusedEl.focus();
+  compareBackupLastFocusedEl = null;
+  document.getElementById('compareBackupResult').innerHTML = '';
+  document.getElementById('compareBackupInput').value = '';
+}
+
+function compareBackupTag(fields, removed) {
+  const text = removed ? 'NOT IN CURRENT DATA' : (fields ? fields.map(f => f.toUpperCase()).join(', ') + ' CHANGED' : 'NEW SINCE BACKUP');
+  return `<span class="compare-tag${removed ? ' compare-tag-removed' : ''}">${escapeHtml(text)}</span>`;
+}
+
+function compareBackupRow(label, sub, tagHtml) {
+  return `<div class="compare-row"><span><strong>${escapeHtml(label)}</strong>${sub ? ` <span style="color:var(--sub)">${escapeHtml(sub)}</span>` : ''}</span>${tagHtml}</div>`;
+}
+
+function renderCompareBackupResult(result) {
+  const exportedLabel = result.exportedAt
+    ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : 'unknown export date (an older backup, or a hand-edited file)';
+  const diff = result.clusters;
+  const totalDiffs = diff.added.length + diff.removed.length + diff.changed.length;
+  let html = `<p class="text-xs mb-1.5" style="color: var(--sub)">Backup taken: <strong style="color: var(--ink)">${escapeHtml(exportedLabel)}</strong></p>`;
+  if (totalDiffs === 0) {
+    html += '<p class="text-xs" style="color: var(--sub)">No differences. The project data currently loaded matches this backup exactly.</p>';
+    document.getElementById('compareBackupResult').innerHTML = html;
+    return;
+  }
+  const labelFor = c => c.name || c.id;
+  html += `<p class="compare-section-label">Projects</p><div class="compare-list">` +
+    diff.added.map(c => compareBackupRow(labelFor(c), c.id, compareBackupTag(null, false))).join('') +
+    diff.changed.map(c => compareBackupRow(labelFor(c.current), c.key, compareBackupTag(c.fields, false))).join('') +
+    diff.removed.map(c => compareBackupRow(labelFor(c), c.id, compareBackupTag(null, true))).join('') +
+    '</div>';
+  document.getElementById('compareBackupResult').innerHTML = html;
+}
+
+document.getElementById('compareBackupPickBtn').addEventListener('click', () => document.getElementById('compareBackupInput').click());
+
+document.getElementById('compareBackupInput').addEventListener('change', () => {
+  const input = document.getElementById('compareBackupInput');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = `<p class="text-xs" role="alert" style="color: var(--sub)">Could not read that file as JSON: ${escapeHtml(err.message)}</p>`;
+      return;
+    }
+    try {
+      renderCompareBackupResult(window.DashboardCompareCore.compareWithBackup(clusters, parsed));
+    } catch (err) {
+      document.getElementById('compareBackupResult').innerHTML = `<p class="text-xs" role="alert" style="color: var(--sub)">${escapeHtml(err.message)}</p>`;
+    }
+  };
+  reader.onerror = () => {
+    document.getElementById('compareBackupResult').innerHTML = '<p class="text-xs" role="alert" style="color: var(--sub)">Could not read that file.</p>';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('compareBackupBtn').addEventListener('click', openCompareBackup);
+document.getElementById('closeCompareBackup').addEventListener('click', closeCompareBackup);
+document.getElementById('compareBackupOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('compareBackupOverlay')) closeCompareBackup();
+});
+
 // Same "copy the shareable URL" affordance as the CSM/Garage/CGT hubs, here
 // copying a direct link to the open project's modal rather than a filtered
 // view.
@@ -3658,6 +3806,12 @@ document.addEventListener('keydown', (e) => {
   if (shortcutsOpen) {
     if (e.key === 'Escape') { e.preventDefault(); closeShortcuts(); return; }
     if (e.key === 'Tab') { trapTabInside('shortcutsOverlay', e); }
+    return;
+  }
+
+  if (compareBackupOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeCompareBackup(); return; }
+    if (e.key === 'Tab') { trapTabInside('compareBackupOverlay', e); }
     return;
   }
 
