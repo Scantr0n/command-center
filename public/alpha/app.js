@@ -59,6 +59,7 @@ const {
   computeIncidents,
   computeIncidentFreeStreak,
   computeMTTR,
+  computeMTBF,
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
@@ -1076,6 +1077,29 @@ function renderIncidentMttr(data, clientHistory) {
   el.hidden = false;
   const durationText = formatDuration(mttr.ms) || 'under 1m';
   el.textContent = 'avg recovery ' + durationText + ' (' + mttr.count + ' incident' + (mttr.count === 1 ? '' : 's') + ')';
+}
+
+// Statuspage/Datadog-style mean-time-between-failures, completing the same
+// reliability trio as the streak and MTTR badges beside it: uptime says how
+// often it broke, MTTR says how long it took to come back each time, this
+// says how long it ran between breaking in the first place. Built from
+// computeMTBF (dates-core.js), which already measures only real gaps between
+// this same real connection.history's observed incident starts; this only
+// formats it, never recomputes it. Hidden until at least 2 incidents have
+// been observed, same honest-empty-state rule as the streak and MTTR badges.
+function renderIncidentMtbf(data, clientHistory) {
+  const el = document.getElementById('incidentMtbf');
+  if (!el) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  const mtbf = computeMTBF(history);
+  if (!mtbf) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  const durationText = formatDuration(mtbf.ms) || 'under 1m';
+  el.textContent = 'avg between failures ' + durationText + ' (' + mtbf.count + ' gap' + (mtbf.count === 1 ? '' : 's') + ')';
 }
 
 function killSwitchEpisodeItem(episode) {
@@ -2719,6 +2743,7 @@ async function loadStatus() {
     renderIncidents(data, clientConnHistory);
     renderIncidentStreak(data, clientConnHistory);
     renderIncidentMttr(data, clientConnHistory);
+    renderIncidentMtbf(data, clientConnHistory);
     renderKillSwitchHistory(data, clientConnHistory);
     renderRegimeHistory(clientRegimeHistory, lastKnown && lastKnown.asOf);
     // Kill switch engaged outranks plain connection freshness for the one
@@ -2793,6 +2818,7 @@ window.addEventListener('storage', (e) => {
   renderIncidents(lastRawData, connHistory);
   renderIncidentStreak(lastRawData, connHistory);
   renderIncidentMttr(lastRawData, connHistory);
+  renderIncidentMtbf(lastRawData, connHistory);
   renderKillSwitchHistory(lastRawData, connHistory);
   // Same last-known/frozen distinction loadStatus applies via `lastKnown`:
   // lastStatusIsLastKnown and lastStatusData are the same two values this

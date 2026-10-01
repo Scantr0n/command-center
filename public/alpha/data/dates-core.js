@@ -391,6 +391,29 @@
     return { ms: totalMs / completed.length, count: completed.length };
   }
 
+  // Reliability-engineering "mean time between failures", the other half of
+  // the uptime/MTTR/MTBF trio real monitoring tools (Statuspage, Datadog)
+  // report together: uptime says how often it broke, MTTR says how long it
+  // took to come back each time, this says how long it ran between breaking
+  // in the first place. Built from the same computeIncidents output MTTR and
+  // the incident list already use, so it can never disagree with what's on
+  // screen. Measured between consecutive incidents' real start times rather
+  // than requiring a completed end, since an incident's start is always a
+  // real reading the moment it happens, unlike its recovery time; the most
+  // recent incident is still a genuine failure-to-failure gap even while it
+  // remains ongoing. Needs at least 2 observed incidents to have a real gap
+  // to average (one incident alone has no prior failure to measure from),
+  // same honest-empty-state rule as computeMTTR above.
+  function computeMTBF(history) {
+    const incidents = computeIncidents(history);
+    if (incidents.length < 2) return null;
+    let totalMs = 0;
+    for (let i = 1; i < incidents.length; i++) {
+      totalMs += new Date(incidents[i].start).getTime() - new Date(incidents[i - 1].start).getTime();
+    }
+    return { ms: totalMs / (incidents.length - 1), count: incidents.length - 1 };
+  }
+
   // Statuspage-style "N days without an incident" streak, the one-line trust
   // signal real status pages lead with above their own incident list (see
   // computeIncidents just above, whose output this reuses rather than
@@ -521,6 +544,7 @@
     computeIncidents,
     computeIncidentFreeStreak,
     computeMTTR,
+    computeMTBF,
     computeKillSwitchEpisodes,
     dayKeyLocal,
     computeDailyUptimeBuckets,

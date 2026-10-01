@@ -25,6 +25,7 @@ const {
   computeIncidents,
   computeIncidentFreeStreak,
   computeMTTR,
+  computeMTBF,
   computeKillSwitchEpisodes,
   dayKeyLocal,
   computeDailyUptimeBuckets,
@@ -306,6 +307,42 @@ test('computeMTTR is null with no completed incidents, or no history', () => {
   assert.equal(computeMTTR([
     { at: '2026-09-10T10:00:00Z', connected: true },
     { at: '2026-09-10T10:05:00Z', connected: false }
+  ]), null);
+});
+
+test('computeMTBF averages the real gaps between consecutive incident start times', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false }, // incident 1 starts here
+    { at: '2026-09-10T10:15:00Z', connected: true },
+    { at: '2026-09-12T10:05:00Z', connected: false }, // incident 2 starts 2d later
+    { at: '2026-09-12T10:30:00Z', connected: true },
+    { at: '2026-09-16T10:05:00Z', connected: false }, // incident 3 starts 4d later
+    { at: '2026-09-16T10:30:00Z', connected: true }
+  ];
+  const mtbf = computeMTBF(history);
+  assert.deepEqual(mtbf, { ms: 3 * 86400000, count: 2 });
+});
+
+test('computeMTBF counts a still-ongoing incident as a real gap endpoint', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:15:00Z', connected: true },
+    { at: '2026-09-11T10:05:00Z', connected: false } // still ongoing, 1d after incident 1 started
+  ];
+  const mtbf = computeMTBF(history);
+  assert.deepEqual(mtbf, { ms: 86400000, count: 1 });
+});
+
+test('computeMTBF is null with fewer than 2 observed incidents, or no history', () => {
+  assert.equal(computeMTBF([]), null);
+  assert.equal(computeMTBF(undefined), null);
+  assert.equal(computeMTBF([{ at: 'x', connected: true }]), null);
+  assert.equal(computeMTBF([
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:15:00Z', connected: true }
   ]), null);
 });
 

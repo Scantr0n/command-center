@@ -171,6 +171,14 @@
             one incident has actually completed, same honest-empty-state rule as the streak badge beside it. The
             other headline pairing real status pages (Statuspage, incident.io) lead with alongside an uptime
             percentage: uptime says how often it broke, this says how long it took to come back each time.</td></tr>
+          <tr><th scope="row">Avg between failures (MTBF badge)</th><td>Not its own field: a client-side average of
+            the real gaps between consecutive incidents' start times, from the same incident list the streak and
+            MTTR badges beside it already use. Unlike MTTR, it needs no completed end time, an incident's start is
+            always a real reading the moment it happens, so even a still-ongoing incident counts as a real gap
+            endpoint. Hidden until at least 2 incidents have been observed, since one incident alone has no prior
+            failure to measure the gap from. Completes the same reliability trio real monitoring tools report
+            together: uptime says how often it broke, MTTR says how long it took to come back, this says how long
+            it ran between breaking in the first place.</td></tr>
           <tr><th scope="row">Components (section)</th><td>Not its own field, a client-side recomposition of eight
             fields that already appear in the sections below (daemon connection, kill switch, regime detection,
             position sizing, anomaly detection, debate panel, genealogy wall, account/positions feed), each reduced
@@ -261,7 +269,7 @@
     </div>
     <div class="incident-list-wrap">
       <div class="section-toolbar">
-        <div class="incident-list-label font-mono">RECENT INCIDENTS <span class="incident-streak font-mono" id="incidentStreak" hidden></span><span class="incident-mttr font-mono" id="incidentMttr" hidden></span></div>
+        <div class="incident-list-label font-mono">RECENT INCIDENTS <span class="incident-streak font-mono" id="incidentStreak" hidden></span><span class="incident-mttr font-mono" id="incidentMttr" hidden></span><span class="incident-mttr font-mono" id="incidentMtbf" hidden></span></div>
         <button type="button" id="incidentsCsvBtn" class="refresh-btn font-mono" disabled title="No incidents recorded yet.">Export CSV</button>
       </div>
       <ol class="incident-list" id="incidentList"></ol>
