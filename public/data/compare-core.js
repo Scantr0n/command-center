@@ -66,7 +66,7 @@
   const CLUSTER_FIELDS = [
     'name', 'category', 'priority', 'lastUpdate', 'summary', 'status',
     'sessionTitle', 'link', 'linkLabel', 'reliability', 'relatedTo',
-    'relationReasons', 'toggleable', 'enabled'
+    'relationReasons', 'toggleable', 'toggleId', 'enabled'
   ];
 
   // current is the hub's own already-loaded `clusters` array; backupFile is

@@ -117,12 +117,31 @@ test('compareWithBackup flags a real enabled toggle flip', () => {
 test('compareWithBackup checks every real field a cluster carries, not a stale subset', () => {
   // Locks CLUSTER_FIELDS itself: adding a new cluster field to
   // data/clusters/*.json without also adding it here would otherwise make
-  // a real change in that field compare silently equal forever.
+  // a real change in that field compare silently equal forever. Every real
+  // hand-edited field data/clusters/*.json actually carries today (checked
+  // against every file in that directory, 'id' excluded since it's the key
+  // field diffByKey matches records on, never a diffed field itself) must
+  // be in this list, same shape as the real CGT bug this guard is modeled
+  // on (012cf69, a hand-maintained field list that drifted behind the real
+  // schema and silently dropped two real fields from the diff).
+  const REAL_CLUSTER_FIELDS = [
+    'name', 'category', 'priority', 'lastUpdate', 'summary', 'status',
+    'sessionTitle', 'link', 'linkLabel', 'reliability', 'relatedTo',
+    'relationReasons', 'toggleable', 'toggleId'
+  ];
+  REAL_CLUSTER_FIELDS.forEach(f => assert.ok(CLUSTER_FIELDS.includes(f), `CLUSTER_FIELDS is missing real field "${f}"`));
+
   const current = [{ id: 'sondrik', lastUpdate: '2026-09-07' }];
   const backup = backupFile({ clusters: [{ id: 'sondrik', lastUpdate: '2026-08-01' }] });
-  assert.ok(CLUSTER_FIELDS.includes('lastUpdate'));
   const result = compareWithBackup(current, backup);
   assert.deepEqual(result.clusters.changed[0].fields, ['lastUpdate']);
+});
+
+test('compareWithBackup flags a real toggleId change', () => {
+  const current = [{ id: 'job-search', toggleable: true, toggleId: 'daily-job-search-digest' }];
+  const backup = backupFile({ clusters: [{ id: 'job-search', toggleable: true, toggleId: 'old-digest-id' }] });
+  const result = compareWithBackup(current, backup);
+  assert.deepEqual(result.clusters.changed[0].fields, ['toggleId']);
 });
 
 test('compareWithBackup finds no differences when current data exactly matches the backup', () => {
