@@ -4225,6 +4225,7 @@ const CSV_COLUMNS = [
   [c => c.subgradeEdges, 'BGS edges'], [c => c.subgradeSurface, 'BGS surface'],
   [c => isBgsBlackLabel(c) ? 'yes' : '', 'Black Label'],
   [c => c.certNumber, 'Cert number'], [c => c.storageLocation, 'Storage location'],
+  [c => c.submissionId, 'From submission id'],
   [c => c.estimatedValue, 'Estimated value'],
   [c => computeValueTrend(c)?.prevValue ?? null, 'Previous value'],
   [c => computeValueTrend(c)?.abs ?? null, 'Change since last check'],
