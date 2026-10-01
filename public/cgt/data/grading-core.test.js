@@ -17,7 +17,8 @@ const {
   COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-  buildPortfolioValueTimeline, cardsForSubmission, declaredValueForSubmission
+  buildPortfolioValueTimeline, cardsForSubmission, declaredValueForSubmission,
+  recoupedValueForSubmission
 } = require('./grading-core.js');
 
 test('missing rawValue, expectedGradedValue, or estimatedGradingCost returns null, never a guessed verdict', () => {
@@ -421,4 +422,43 @@ test('declaredValueForSubmission returns a zero total with no missing cards for 
   assert.equal(result.total, 0);
   assert.equal(result.missingCount, 0);
   assert.deepEqual(result.cards, []);
+});
+
+test('recoupedValueForSubmission sums only post-grade estimatedValue, not pre-grade costBasis, and nets it against the real cost', () => {
+  const cards = [
+    { id: 'a', submissionId: 'batch-1', costBasis: 10, estimatedValue: 40 },
+    { id: 'b', submissionId: 'batch-1', costBasis: 25, estimatedValue: 15 },
+    { id: 'c', submissionId: 'batch-2', estimatedValue: 999 }
+  ];
+  const result = recoupedValueForSubmission(cards, 'batch-1', 45);
+  assert.equal(result.total, 55);
+  assert.equal(result.missingCount, 0);
+  assert.equal(result.net, 10);
+  assert.deepEqual(result.cards.map(x => x.card.id), ['a', 'b']);
+});
+
+test('recoupedValueForSubmission counts cards with no estimatedValue logged as missing rather than treating them as worth $0', () => {
+  const cards = [
+    { id: 'a', submissionId: 'batch-1', estimatedValue: 40 },
+    { id: 'b', submissionId: 'batch-1', estimatedValue: null }
+  ];
+  const result = recoupedValueForSubmission(cards, 'batch-1', 45);
+  assert.equal(result.total, 40);
+  assert.equal(result.missingCount, 1);
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.net, -5);
+});
+
+test('recoupedValueForSubmission leaves net as null, not a guessed 0, when the submission has no cost logged', () => {
+  const result = recoupedValueForSubmission([{ id: 'a', submissionId: 'batch-1', estimatedValue: 40 }], 'batch-1', null);
+  assert.equal(result.total, 40);
+  assert.equal(result.net, null);
+});
+
+test('recoupedValueForSubmission returns a zero total with no missing cards for a submission with no linked cards', () => {
+  const result = recoupedValueForSubmission([{ id: 'a', submissionId: 'batch-9' }], 'batch-1', 45);
+  assert.equal(result.total, 0);
+  assert.equal(result.missingCount, 0);
+  assert.deepEqual(result.cards, []);
+  assert.equal(result.net, -45);
 });

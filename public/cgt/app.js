@@ -1375,7 +1375,7 @@ const {
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
   buildPortfolioValueTimeline: buildPortfolioValueTimelineCore, cardsForSubmission,
-  declaredValueForSubmission
+  declaredValueForSubmission, recoupedValueForSubmission
 } = window.CGTGradingCore;
 
 const CANDIDATE_VERDICT_META = {
@@ -1799,6 +1799,24 @@ function openSubmissionModal(id) {
         }</div>
         ${declared.missingCount ? `<div class="field-note">${declared.missingCount} card${declared.missingCount === 1 ? '' : 's'} in this batch ${declared.missingCount === 1 ? 'has' : 'have'} no cost basis logged, so this total is a floor, not the real total, until that's backfilled.</div>` : ''}
         <div class="field-note">This is what was paid, the real replacement cost for a still-ungraded card, not the post-grade <code class="inline-code">estimatedValue</code> the "Insurance coverage check" section above uses for owned graded cards. USPS Priority Mail's own added insurance tops out at $5,000 as of this writing; a batch declared above that needs Registered Mail or third-party shipping insurance instead. See <a href="https://www.usps.com/ship/insurance.htm" target="_blank" rel="noopener noreferrer">usps.com/ship/insurance</a> directly before relying on this.</div>
+      </div>`;
+    } else {
+      // The after-the-fact counterpart to the declared-value block above:
+      // now that this batch is actually back, did the real post-grade value
+      // of what came back clear what grading it cost? See
+      // recoupedValueForSubmission in grading-core.js for why estimatedValue,
+      // never costBasis, is the figure used here.
+      const recouped = recoupedValueForSubmission(cards, s.id, s.cost);
+      body += `<div class="field-row">
+        <div class="field-label">Recouped value vs. grading cost</div>
+        <div class="field-value${recouped.cards.length ? '' : ' empty'}">${
+          recouped.cards.length
+            ? formatUsd(recouped.total) + ' total estimated value (sum of the ' + recouped.cards.length + ' card' + (recouped.cards.length === 1 ? '' : 's') + ' priced so far)' +
+              (recouped.net != null ? ', ' + (recouped.net >= 0 ? 'up ' : 'down ') + formatUsd(Math.abs(recouped.net)) + ' vs. the ' + formatUsd(s.cost) + ' grading fee' : '')
+            : 'not yet priced, none of these cards have an estimated value on file'
+        }</div>
+        ${recouped.missingCount ? `<div class="field-note">${recouped.missingCount} card${recouped.missingCount === 1 ? '' : 's'} from this batch ${recouped.missingCount === 1 ? 'has' : 'have'} no estimated value logged yet, so this total is a floor, not the real total, until that's backfilled.</div>` : ''}
+        ${recouped.net == null && recouped.cards.length ? `<div class="field-note">This batch has no cost (grading fee) logged, so there's nothing to compare the ${formatUsd(recouped.total)} total against yet.</div>` : ''}
       </div>`;
     }
   } else if (s.status === 'returned') {

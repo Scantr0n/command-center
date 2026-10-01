@@ -349,12 +349,38 @@
     };
   }
 
+  // The after-the-fact counterpart to declaredValueForSubmission above: once
+  // a batch is actually back from the grader, did the real post-grade
+  // estimatedValue of what came back actually clear what grading it cost?
+  // estimatedValue (never costBasis, that's the pre-grade replacement-cost
+  // figure declaredValueForSubmission uses) is the only real figure that
+  // means anything here, since the whole point of grading was to find out
+  // what each card is worth now. Cards from this batch with no estimatedValue
+  // yet are counted separately rather than treated as worth $0, same
+  // missingCount pattern as declaredValueForSubmission, so the total stays a
+  // floor until every card is priced instead of silently understating the
+  // real recoup. net is null (not a guess at 0) whenever cost itself was
+  // never logged on the submission.
+  function recoupedValueForSubmission(cards, submissionId, cost) {
+    const linked = cardsForSubmission(cards, submissionId);
+    const priced = linked.filter(c => c.estimatedValue != null);
+    const missing = linked.filter(c => c.estimatedValue == null);
+    const total = priced.reduce((s, c) => s + c.estimatedValue, 0);
+    return {
+      total,
+      cards: priced.map(c => ({ card: c, value: c.estimatedValue })),
+      missingCount: missing.length,
+      net: cost != null ? total - cost : null
+    };
+  }
+
   return {
     computeGradingMath, breakEvenGradedValue, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
     classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
     COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
     isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
     estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
-    buildPortfolioValueTimeline, cardsForSubmission, declaredValueForSubmission
+    buildPortfolioValueTimeline, cardsForSubmission, declaredValueForSubmission,
+    recoupedValueForSubmission
   };
 });
