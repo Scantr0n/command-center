@@ -428,7 +428,13 @@
         : (leads.length > 0 ? 'no outreach pending' : 'none logged yet')
     });
 
-    const dated = ((releasesData && releasesData.releases) || []).filter(r => r.date)
+    // isValidDateStr guard added for the same reason launchWindowHtml's and
+    // relativeDaysLabel's got one (see release-core.js's computeLaunchWindow
+    // comment): a malformed date here would have made daysBetween return
+    // NaN, and Math.max(0, NaN) is itself NaN, not 0, so this is the one
+    // place that bug would have shown as literal "NaN" in the big number of
+    // the Snapshot strip's hero tile rather than in a smaller relative label.
+    const dated = ((releasesData && releasesData.releases) || []).filter(r => r.date && isValidDateStr(r.date))
       .slice().sort((a, b) => b.date.localeCompare(a.date));
     if (dated.length > 0) {
       const latestRelease = dated[0];
