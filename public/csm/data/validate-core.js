@@ -3,7 +3,8 @@
  * APIs (no fs/path), so the exact same rules run in two places: the CLI
  * validator (public/csm/data/validate.js, which reads prospects.json off disk
  * and calls this) and the dashboard's own "Possible duplicates", "Casing
- * drift", and "Reused verified hook" panels (public/csm/app.js), which need
+ * drift", "Reused verified hook", and "Reused named contact" panels
+ * (public/csm/app.js), which need
  * the real prospect objects to render clickable rows, not just a
  * pre-formatted warning string. Keeping one
  * copy of the grouping logic means the two can never quietly drift apart, the
@@ -91,5 +92,28 @@
     return [...byNorm.values()].filter(group => group.length > 1);
   }
 
-  return { findDuplicateProspects, findCasingDrift, findDuplicateHooks };
+  // Groups by contactChannel.detail, case/whitespace-insensitive, scoped to
+  // contactChannel.type === 'named-decision-maker' only: the same generic
+  // agency inbox legitimately fields outreach for many unrelated brands (not
+  // a bug), but a named decision-maker is a specific real person, so the
+  // exact same email/handle logged as the named contact for two different
+  // companies is almost always a copy-paste left over from a previous
+  // prospect, not a real coincidence. Returns every group of two or more
+  // prospects sharing the same normalized detail; a prospect with no detail,
+  // or a generic-inbox/unlogged channel, is skipped rather than grouped under
+  // an empty key.
+  function findReusedContactDetail(prospects) {
+    const byNorm = new Map();
+    (prospects || []).forEach(p => {
+      const cc = p.contactChannel;
+      if (!cc || cc.type !== 'named-decision-maker' || !cc.detail || typeof cc.detail !== 'string') return;
+      const norm = cc.detail.trim().toLowerCase();
+      if (!norm) return;
+      if (!byNorm.has(norm)) byNorm.set(norm, []);
+      byNorm.get(norm).push(p);
+    });
+    return [...byNorm.values()].filter(group => group.length > 1);
+  }
+
+  return { findDuplicateProspects, findCasingDrift, findDuplicateHooks, findReusedContactDetail };
 });

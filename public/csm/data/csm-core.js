@@ -942,6 +942,25 @@
       x.verifiedHook.trim().toLowerCase().replace(/\s+/g, ' ') === norm) || null;
   }
 
+  // Whether a candidate contactChannel exactly matches a named-decision-maker
+  // detail (an email/handle) already logged on a different prospect, the
+  // entry-time version of CSMValidateCore.findReusedContactDetail. Scoped to
+  // named-decision-maker only: the same generic agency inbox legitimately
+  // fields outreach for many unrelated brands, so reuse there is expected and
+  // not flagged, but a named decision-maker's own personal contact being
+  // identical across two different companies is almost always a copy-paste
+  // left over from a previous prospect, not a real coincidence. Returns the
+  // matching existing prospect, or null.
+  function findContactDetailReuseMatch(contactChannel, existingProspects) {
+    const type = contactChannel && contactChannel.type;
+    const detail = contactChannel && contactChannel.detail;
+    if (type !== 'named-decision-maker' || !detail || typeof detail !== 'string') return null;
+    const norm = detail.trim().toLowerCase();
+    if (!norm) return null;
+    return existingProspects.find(x => x.contactChannel && x.contactChannel.type === 'named-decision-maker' &&
+      typeof x.contactChannel.detail === 'string' && x.contactChannel.detail.trim().toLowerCase() === norm) || null;
+  }
+
   // Warnings shown before drafting a real outreach message (the "Copy
   // outreach brief"/stage-move generators): missing the two fields most
   // predictive of a real reply, so a message goes out without either ever
@@ -1128,6 +1147,7 @@
     computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
+    findContactDetailReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
     emDashFields, emDashHits, compareWithBackup, hasNewDueId

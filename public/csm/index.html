@@ -364,6 +364,16 @@
     <div class="data-quality-list" id="duplicateHooksList"></div>
   </section>
 
+  <section id="reusedContactSection" hidden>
+    <h2 class="section-title">Reused named contact</h2>
+    <p class="section-note">The exact same <code>contactChannel.detail</code> logged as a named decision-maker for
+      more than one prospect. A generic agency inbox legitimately fields outreach for many unrelated brands, so this
+      only checks named decision-makers: the same specific person's contact being logged for two different
+      companies is usually a copy-paste left over from a previous prospect, not a real coincidence. Same
+      normalize-and-group check <code>validate.js</code> runs.</p>
+    <div class="data-quality-list" id="reusedContactList"></div>
+  </section>
+
   <section id="dataQualitySection" hidden>
     <h2 class="section-title">Needs backfill</h2>
     <div class="data-quality-list" id="dataQualityList"></div>

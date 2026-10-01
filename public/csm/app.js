@@ -16,6 +16,7 @@
     escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
     channelSortRank, listComparator, computeDataQualityFlags,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
+    findContactDetailReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, emDashHits, compareWithBackup, hasNewDueId
   } = CSMCore;
@@ -495,6 +496,10 @@
     // passes every other check, since both copies are individually valid
     // strings.
     const duplicateHookCount = CSMValidateCore.findDuplicateHooks(prospects).length;
+    // Same "passes every other check, since both copies are individually
+    // valid strings" reasoning as the reused-hook count above, for a reused
+    // named-decision-maker contact instead of a reused hook sentence.
+    const reusedContactCount = CSMValidateCore.findReusedContactDetail(prospects).length;
 
     const items = [];
     // Same reasoning as Sondrik's own Next Steps widget: a drifted changelog
@@ -548,6 +553,12 @@
       items.push({
         n: duplicateHookCount, tone: 'warn', target: 'duplicateHooksList',
         label: duplicateHookCount === 1 ? 'group with a reused verified hook' : 'groups with a reused verified hook'
+      });
+    }
+    if (reusedContactCount) {
+      items.push({
+        n: reusedContactCount, tone: 'warn', target: 'reusedContactList',
+        label: reusedContactCount === 1 ? 'group with a reused named contact' : 'groups with a reused named contact'
       });
     }
 
@@ -653,6 +664,36 @@
       ).join('');
     }).join('');
     wireRowsToModal(duplicateHooksEl);
+  }
+
+  const reusedContactEl = document.getElementById('reusedContactList');
+  const reusedContactSection = document.getElementById('reusedContactSection');
+
+  // Same shape as renderDuplicateHooks just above, grouping logic shared via
+  // CSMValidateCore.findReusedContactDetail: a generic agency inbox fielding
+  // outreach for many unrelated brands is expected and never flagged, but
+  // the same named decision-maker's contact logged on two different
+  // prospects almost always means one entry still has a previous prospect's
+  // detail left in it.
+  function renderReusedContactDetail(prospects) {
+    const groups = CSMValidateCore.findReusedContactDetail(prospects);
+    if (groups.length === 0) {
+      reusedContactSection.hidden = true;
+      return;
+    }
+    reusedContactSection.hidden = false;
+    reusedContactEl.innerHTML = groups.map(group => {
+      const detailText = group[0].contactChannel.detail.trim();
+      return group.map(p =>
+        '<button type="button" class="data-quality-row" data-prospect-id="' + escapeHtml(p.id) + '">' +
+        '<strong>' + escapeHtml(p.name) + '</strong>' +
+        '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+        '<span class="dq-why">SAME NAMED CONTACT AS ' + (group.length - 1) + ' OTHER' + (group.length - 1 === 1 ? '' : 'S') +
+        ': &ldquo;' + escapeHtml(detailText) + '&rdquo;</span>' +
+        '</button>'
+      ).join('');
+    }).join('');
+    wireRowsToModal(reusedContactEl);
   }
 
   const casingDriftEl = document.getElementById('casingDriftList');
@@ -1429,7 +1470,8 @@
   // Reuses the exact same compute functions renderAttentionBar already
   // calls (computeNudgeRows, computeStalled, computeColdSignal,
   // computeDataQualityFlags, CSMValidateCore.findDuplicateProspects,
-  // findCasingDrift x2, findDuplicateHooks), so this card's numbers can
+  // findCasingDrift x2, findDuplicateHooks, findReusedContactDetail), so
+  // this card's numbers can
   // never drift from what the attention bar itself shows for the same real
   // data. Keep this list in sync by hand: findCasingDrift/findDuplicateHooks
   // were added to renderAttentionBar after this function existed and were
@@ -1452,7 +1494,8 @@
     const attentionCount = overdueCount + computeStalled(stages, prospects).length +
       computeColdSignal(prospects).active.length + computeDataQualityFlags(stages, prospects).length +
       CSMValidateCore.findDuplicateProspects(prospects).length + casingDriftCount +
-      CSMValidateCore.findDuplicateHooks(prospects).length;
+      CSMValidateCore.findDuplicateHooks(prospects).length +
+      CSMValidateCore.findReusedContactDetail(prospects).length;
 
     // Skipped on a failed load rather than called with the empty-array
     // overdueCount of 0: that would quietly replace a real "nudges due"
@@ -2659,6 +2702,13 @@
         (hookMatch.company ? ', ' + hookMatch.company : '') + '" (id "' + hookMatch.id + '"). A hook copy-pasted ' +
         'across different prospects is not a real, per-prospect verified reason, double check this one is ' +
         'actually researched on its own.');
+    }
+    const contactMatch = findContactDetailReuseMatch(edited.contactChannel, allProspects.filter(x => x.id !== p.id));
+    if (contactMatch) {
+      warnings.push('This named decision-maker contact is identical to the one already logged for "' + contactMatch.name +
+        (contactMatch.company ? ', ' + contactMatch.company : '') + '" (id "' + contactMatch.id + '"). A generic ' +
+        'inbox can field outreach for more than one brand, but the same named person usually cannot, double ' +
+        'check this is not a leftover from a previous prospect.');
     }
     // Same em-dash paste-in catch the "Log new prospect" forms already got
     // (see emDashHits' own header comment): this edit form was the one real
@@ -3951,6 +4001,13 @@
         'across different prospects is not a real, per-prospect verified reason, double check this one was ' +
         'actually researched on its own.');
     }
+    const contactMatch = findContactDetailReuseMatch(p.contactChannel, allProspects);
+    if (contactMatch) {
+      warnings.push('This named decision-maker contact is identical to the one already logged for "' + contactMatch.name +
+        (contactMatch.company ? ', ' + contactMatch.company : '') + '" (id "' + contactMatch.id + '"). A generic ' +
+        'inbox can field outreach for more than one brand, but the same named person usually cannot, double ' +
+        'check this is not a leftover from a previous prospect.');
+    }
     const emDashHitFields = emDashHits(p);
     if (emDashHitFields.length) {
       warnings.push('Em dash found in ' + emDashHitFields.join(', ') + '. This board never uses one, check ' +
@@ -4203,6 +4260,7 @@
       renderColdSignal(allStages, allProspects);
       renderDuplicates(allProspects);
       renderDuplicateHooks(allProspects);
+      renderReusedContactDetail(allProspects);
       renderCasingDrift(allProspects);
       renderDataQuality(allStages, allProspects);
       renderActivityFeed(allProspects, allStages);

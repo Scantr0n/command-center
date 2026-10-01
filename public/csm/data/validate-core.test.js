@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /*
  * Regression tests for validate-core.js, the shared duplicate-prospect,
- * casing-drift, and reused-hook rules the CLI validator (validate.js) and the
+ * casing-drift, reused-hook, and reused-contact rules the CLI validator
+ * (validate.js) and the
  * dashboard's own "Possible duplicates" / "Casing drift" / "Reused verified
- * hook" panels (app.js) both rely on. No
+ * hook" / "Reused named contact" panels (app.js) both rely on. No
  * test framework or dependency: node:test and node:assert ship with Node
  * itself, matching this repo's own no-extra-dependency convention (see
  * public/cgt/data/validate-core.test.js and public/garage/data/*.test.js for
@@ -13,7 +14,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { findDuplicateProspects, findCasingDrift, findDuplicateHooks } = require('./validate-core.js');
+const { findDuplicateProspects, findCasingDrift, findDuplicateHooks, findReusedContactDetail } = require('./validate-core.js');
 
 test('findDuplicateProspects flags the same name/company logged under two ids', () => {
   const prospects = [
@@ -142,7 +143,43 @@ test('findDuplicateHooks skips prospects with no verifiedHook rather than groupi
   assert.deepEqual(findDuplicateHooks(prospects), []);
 });
 
-test('the real prospects.json on disk has no duplicate prospects, casing drift, or reused hooks', () => {
+test('findReusedContactDetail flags the same named-decision-maker detail logged on two different prospects', () => {
+  const prospects = [
+    { id: 'a', contactChannel: { type: 'named-decision-maker', detail: 'Someone@Brand.com' } },
+    { id: 'b', contactChannel: { type: 'named-decision-maker', detail: '  someone@brand.com  ' } }
+  ];
+  const groups = findReusedContactDetail(prospects);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].map(p => p.id).sort(), ['a', 'b']);
+});
+
+test('findReusedContactDetail never flags a reused generic-inbox detail, only named-decision-maker', () => {
+  const prospects = [
+    { id: 'a', contactChannel: { type: 'generic-inbox', detail: 'business@agency.com' } },
+    { id: 'b', contactChannel: { type: 'generic-inbox', detail: 'business@agency.com' } }
+  ];
+  assert.deepEqual(findReusedContactDetail(prospects), []);
+});
+
+test('findReusedContactDetail does not flag two real, distinct named contacts', () => {
+  const prospects = [
+    { id: 'a', contactChannel: { type: 'named-decision-maker', detail: 'a@brand.com' } },
+    { id: 'b', contactChannel: { type: 'named-decision-maker', detail: 'b@brand.com' } }
+  ];
+  assert.deepEqual(findReusedContactDetail(prospects), []);
+});
+
+test('findReusedContactDetail skips prospects with no logged detail, or no contactChannel at all, rather than grouping them on a blank key', () => {
+  const prospects = [
+    { id: 'a', contactChannel: { type: 'named-decision-maker', detail: null } },
+    { id: 'b', contactChannel: { type: 'named-decision-maker', detail: '' } },
+    { id: 'c', contactChannel: null },
+    { id: 'd' }
+  ];
+  assert.deepEqual(findReusedContactDetail(prospects), []);
+});
+
+test('the real prospects.json on disk has no duplicate prospects, casing drift, reused hooks, or reused named contacts', () => {
   const data = require('./prospects.json');
   const prospects = data.prospects || [];
   assert.deepEqual(findDuplicateProspects(prospects), []);
@@ -152,4 +189,5 @@ test('the real prospects.json on disk has no duplicate prospects, casing drift, 
     []
   );
   assert.deepEqual(findDuplicateHooks(prospects), []);
+  assert.deepEqual(findReusedContactDetail(prospects), []);
 });

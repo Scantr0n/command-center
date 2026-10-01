@@ -26,7 +26,7 @@ const {
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
   escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
-  findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
+  findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch, findContactDetailReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
   emDashFields, emDashHits, compareWithBackup, hasNewDueId
@@ -1451,6 +1451,29 @@ test('findHookReuseMatch returns null for a genuinely distinct hook, or when the
   assert.equal(findHookReuseMatch('Real hook for prospect B.', existing), null);
   assert.equal(findHookReuseMatch(null, existing), null);
   assert.equal(findHookReuseMatch('Real hook for prospect A.', [{ id: 'b', verifiedHook: null }]), null);
+});
+
+test('findContactDetailReuseMatch flags a named-decision-maker detail already logged on a different prospect, case/whitespace-insensitively', () => {
+  const existing = [{ id: 'a', contactChannel: { type: 'named-decision-maker', detail: 'Someone@Brand.com' } }];
+  const match = findContactDetailReuseMatch({ type: 'named-decision-maker', detail: '  someone@brand.com  ' }, existing);
+  assert.equal(match.id, 'a');
+});
+
+test('findContactDetailReuseMatch never flags a reused generic-inbox detail, only named-decision-maker', () => {
+  const existing = [{ id: 'a', contactChannel: { type: 'generic-inbox', detail: 'business@agency.com' } }];
+  assert.equal(findContactDetailReuseMatch({ type: 'generic-inbox', detail: 'business@agency.com' }, existing), null);
+  // Same detail text, but the candidate itself is logged as a named decision-maker against a generic-inbox
+  // existing entry: not a real match, the two channel types mean different things.
+  assert.equal(findContactDetailReuseMatch({ type: 'named-decision-maker', detail: 'business@agency.com' }, existing), null);
+});
+
+test('findContactDetailReuseMatch returns null for a genuinely distinct detail, or when there is nothing to match on', () => {
+  const existing = [{ id: 'a', contactChannel: { type: 'named-decision-maker', detail: 'a@brand.com' } }];
+  assert.equal(findContactDetailReuseMatch({ type: 'named-decision-maker', detail: 'b@brand.com' }, existing), null);
+  assert.equal(findContactDetailReuseMatch({ type: 'named-decision-maker', detail: null }, existing), null);
+  assert.equal(findContactDetailReuseMatch(null, existing), null);
+  assert.equal(findContactDetailReuseMatch({ type: 'named-decision-maker', detail: 'a@brand.com' },
+    [{ id: 'b', contactChannel: { type: 'named-decision-maker', detail: null } }]), null);
 });
 
 test('missingContactChannelType is false while still researched, true once past it with nothing logged', () => {

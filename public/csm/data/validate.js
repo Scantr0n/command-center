@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findDuplicateProspects, findCasingDrift, findDuplicateHooks } = require('./validate-core.js');
+const { findDuplicateProspects, findCasingDrift, findDuplicateHooks, findReusedContactDetail } = require('./validate-core.js');
 const { emDashFields, hasLegacySocialSnapshotField } = require('./csm-core.js');
 
 const DATA_DIR = __dirname;
@@ -432,6 +432,20 @@ function main() {
       group.map(p => p.id).join(', ') + '): "' + group[0].verifiedHook.trim() + '". A hook copy-pasted across ' +
       'different prospects is not a real, per-prospect verified reason, double check each one was actually ' +
       'researched individually.');
+  });
+
+  // A generic agency inbox legitimately fields outreach for many unrelated
+  // brands, so this is scoped to contactChannel.type === 'named-decision-maker'
+  // only: the same named person's contact being logged as the decision-maker
+  // detail for two different companies is almost always a copy-paste left
+  // over from a previous prospect, not a real coincidence. Grouping logic
+  // shared with app.js's own "Reused named contact" panel via
+  // CSMValidateCore, same reasoning as the two checks above.
+  findReusedContactDetail(prospects).forEach(group => {
+    warnings.push('contactChannel.detail is identical across ' + group.length + ' named-decision-maker prospects (' +
+      group.map(p => p.id).join(', ') + '): "' + group[0].contactChannel.detail.trim() + '". The same named ' +
+      'decision-maker logged for different companies is usually a copy-paste left over from a previous prospect, ' +
+      'double check each one is a real, distinct contact.');
   });
 
   checkChangelogFreshness(warnings);
