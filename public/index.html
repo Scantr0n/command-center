@@ -228,6 +228,19 @@
   .palette-record-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .palette-record-detail { color: var(--faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
   .palette-section-label { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.5px; color: var(--faint); padding: 10px 16px 4px; border-top: 1px solid var(--hairline); margin-top: 4px; }
+  /* highlightMatch (html-core.js) wraps whichever substring actually made a
+     result match in a real <mark>, so a user sees why each row is here
+     instead of the order just looking arbitrary (2026 command-palette UX
+     research). One neutral background tint, not a category color: the
+     match can land in palette-item-cat/palette-record-detail too, both
+     already dimmer than palette-item-name, so this needs to read clearly
+     against either rather than matching one specific field's own color. */
+  .palette-item mark {
+    background: rgba(245,246,247,0.22);
+    color: var(--ink);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
   #paletteResults::-webkit-scrollbar { width: 6px; }
   #paletteResults::-webkit-scrollbar-thumb { background: #23262b; border-radius: 3px; }
 
@@ -965,7 +978,7 @@ const {
   curveMinClearance,
   computeRelationBulge
 } = window.GraphCore;
-const { escapeHtml } = window.HtmlCore;
+const { escapeHtml, highlightMatch } = window.HtmlCore;
 
 let clusters = [];
 let activeCluster = null;
@@ -3228,14 +3241,20 @@ function renderPaletteResults() {
   // user sees, so that heading is aria-hidden to avoid announcing it twice.
   const projectItems = paletteResultsCache.filter(x => x.kind === 'project');
   const recordItems = paletteResultsCache.filter(x => x.kind === 'record');
+  // term is whatever's currently in #paletteInput (closed over from
+  // renderPaletteResults above). highlightMatch no-ops to a plain escaped
+  // string when term is empty or doesn't actually appear in a given field,
+  // so the empty-input "show every project" state and a field that matched
+  // on some other reason (a project's category, not its name) both render
+  // exactly as escapeHtml always did, nothing to migrate case-by-case here.
   function paletteItemHtml(item, i) {
     if (item.kind === 'project') {
       const c = item.c;
       return `
         <div class="palette-item" role="option" id="palette-opt-${i}" aria-selected="${i === paletteSelectedIndex}">
           <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${categoryColor(c.category)}"></span>
-          <span class="palette-item-name">${escapeHtml(c.name)}</span>
-          <span class="palette-item-cat">${escapeHtml((c.category || 'Uncategorized').toUpperCase())}</span>
+          <span class="palette-item-name">${highlightMatch(c.name, term)}</span>
+          <span class="palette-item-cat">${highlightMatch((c.category || 'Uncategorized').toUpperCase(), term)}</span>
           <span class="palette-item-status" style="${pillStyle(c.status)}">${escapeHtml(c.status)}</span>
         </div>
       `;
@@ -3246,8 +3265,8 @@ function renderPaletteResults() {
       <div class="palette-item palette-item-record" role="option" id="palette-opt-${i}" aria-selected="${i === paletteSelectedIndex}">
         <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:var(--faint)"></span>
         <span class="palette-record-body">
-          <span class="palette-item-name">${escapeHtml(r.label)}</span>
-          ${r.detail ? `<span class="palette-record-detail">${escapeHtml(r.detail)}</span>` : ''}
+          <span class="palette-item-name">${highlightMatch(r.label, term)}</span>
+          ${r.detail ? `<span class="palette-record-detail">${highlightMatch(r.detail, term)}</span>` : ''}
         </span>
         <span class="palette-item-cat">${escapeHtml(projectName.toUpperCase())} · ${escapeHtml(r.type.toUpperCase())}</span>
       </div>
