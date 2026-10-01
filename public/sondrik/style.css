@@ -325,6 +325,19 @@ header.page-head .sub {
   box-shadow: 0 10px 24px -14px var(--chip-accent), 0 0 0 1px var(--chip-accent);
   outline: none;
 }
+/* North-star treatment (see renderSnapshot's heroIndex logic): the Goal
+   card renders first and spans two grid tracks with a bigger number, so it
+   visually dominates the top-left of the strip the way 2026 dashboard UX
+   research says a single headline metric should, instead of five
+   equal-weight tiles competing for attention. Falls back to a normal
+   single-column tile on narrow viewports since there's only one column to
+   span there anyway. */
+.snapshot-chip-hero {
+  grid-column: span 2;
+}
+.snapshot-chip-hero .snapshot-chip-number {
+  font-size: 2.6rem;
+}
 .snapshot-chip-downloads { --chip-accent: #4F9FD9; }
 .snapshot-chip-leads { --chip-accent: #DB5C82; }
 .snapshot-chip-release { --chip-accent: #D9A441; }

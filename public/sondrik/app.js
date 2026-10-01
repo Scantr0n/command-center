@@ -479,8 +479,19 @@
       chips.push({ kind: 'channels', number: '-', label: 'no channels logged yet', meta: 'add one once there is a real one to watch' });
     }
 
-    snapshotStrip.innerHTML = chips.map(c =>
-      '<a href="#' + SNAPSHOT_TARGET[c.kind] + '" class="snapshot-chip snapshot-chip-' + c.kind + '" data-target="' + SNAPSHOT_TARGET[c.kind] + '">' +
+    // Research into 2026 traction-dashboard UX patterns (product-analytics
+    // and indie-hacker dashboard writeups) converges on a "single north
+    // star metric" rule: one card should visually dominate the top-left of
+    // an at-a-glance strip rather than every stat competing at equal
+    // weight. The Goal card is Sondrik's real north star (it's the direct
+    // translation of Jack's actual Sep 20 commitment, launch for real by
+    // end of year), so it moves first and renders larger; the other four
+    // cards keep their existing order and are unchanged otherwise.
+    const heroIndex = chips.findIndex(c => c.kind === 'goal');
+    if (heroIndex > 0) chips.unshift(chips.splice(heroIndex, 1)[0]);
+
+    snapshotStrip.innerHTML = chips.map((c, i) =>
+      '<a href="#' + SNAPSHOT_TARGET[c.kind] + '" class="snapshot-chip snapshot-chip-' + c.kind + (i === 0 ? ' snapshot-chip-hero' : '') + '" data-target="' + SNAPSHOT_TARGET[c.kind] + '">' +
       '<div class="snapshot-chip-icon"><svg viewBox="-10 -10 20 20" width="18" height="18" aria-hidden="true">' + SNAPSHOT_ICON[c.kind] + '</svg></div>' +
       '<div class="snapshot-chip-number font-display">' + escapeHtml(c.number) + '</div>' +
       '<div class="snapshot-chip-label">' + escapeHtml(c.label) + '</div>' +
