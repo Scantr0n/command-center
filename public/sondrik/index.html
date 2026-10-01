@@ -342,6 +342,49 @@
     <div id="goalsSection"></div>
   </section>
 
+  <section id="goalNormsSection">
+    <details class="schema-help">
+      <summary>Reading a raw download-count goal (general guidance, not Sondrik data)
+        <span class="reference-freshness" id="goalNormsFreshness"></span>
+      </summary>
+      <div class="schema-help-body">
+        <p>General context for the one number the Goal card above tracks, reviewed September 2026 from Google's
+          own OKR goal-setting guide and the lean-startup literature on metric types (sources linked below). This
+          is <strong>not</strong> a claim about whether 150 is the right target, that's Jack's own call recorded
+          in goals.json, it exists so the percentage and pace shown on the Goal card get read in context instead
+          of as a pass/fail bar.</p>
+        <div class="schema-table-wrap">
+        <table class="schema-table">
+          <tbody>
+            <tr><th>A raw download count<br>is a vanity metric</th><td>Eric Ries's actionable-vs-vanity framing
+              (popularized in The Lean Startup, and TechCrunch's own write-up of it) names download/install counts
+              specifically as a vanity metric: a number that documents the product's current state without saying
+              how anyone got there or what to do next. It still has to be tracked (it's the only real signal
+              Sondrik has right now, see the Download count norms table above), but a rising count alone doesn't
+              say whether any of those installs turned into a real user, which this hub has no way to measure
+              yet.</td></tr>
+            <tr><th>A missed stretch target<br>isn't automatically a problem</th><td>Google's own re:Work OKR
+              guide deliberately sets targets meant to land around 60 to 70% attainment, and treats consistently
+              hitting 100% as a sign the target wasn't ambitious enough, not a sign the lower scores were failures.
+              A goal card reading well under 100% partway through its window is the expected shape of an
+              intentionally stretchy target, not necessarily a sign the plan isn't working.</td></tr>
+            <tr><th>Re-baseline the target,<br>not the deadline</th><td>The same OKR guidance treats the number
+              as the part that's meant to flex once real pace data comes in, while the committed date stays fixed.
+              goals.json's own note on this goal already follows that pattern (150 is called a placeholder Jack can
+              change any time; Dec 31 is the real commitment), this table is just the outside reasoning for why
+              that's the right way to hold the two apart.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="schema-help-body" style="margin-top:.75rem; padding:0;">
+          Sources:
+          <a href="https://rework.withgoogle.com/intl/en/guides/set-goals-with-okrs" target="_blank" rel="noopener noreferrer">Google re:Work, set goals with OKRs</a>,
+          <a href="https://techcrunch.com/2011/07/30/vanity-metrics/" target="_blank" rel="noopener noreferrer">TechCrunch, don't be fooled by vanity metrics</a>.
+        </p>
+      </div>
+    </details>
+  </section>
+
   <section>
     <div class="section-toolbar">
       <h2 class="section-title">Channels</h2>
