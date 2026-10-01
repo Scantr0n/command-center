@@ -3010,11 +3010,17 @@ function renderSales(sales) {
   // recomputed separately, so the totals below can't drift from what the
   // table itself shows), grouped by platform since nothing else on this page
   // shows which platform is actually the profitable one, only aggregate
-  // realized-revenue/profit stat tiles at the top of the page.
+  // realized-revenue/profit stat tiles at the top of the page. Grouped by
+  // category too: category already drives eBay's fee rate and Depop
+  // eligibility elsewhere on this page, but nothing anywhere groups real
+  // sales by it, so "shoes vs. electronics, which one's actually worth
+  // sourcing more of" has no answer on this page without a spreadsheet.
   const byPlatform = {};
+  const byCategory = {};
 
   tbody.innerHTML = sorted.map(s => {
-    const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
+    const category = categoryForListingId(s.listingId);
+    const net = estimateNetPayout(s.platform, s.salePrice, category);
     const profit = computeSaleProfit(net, s);
     const marginPct = computeSaleMarginPct(profit, s.costBasis);
     const askingPct = computeAskingPct(s);
@@ -3026,6 +3032,18 @@ function renderSales(sales) {
     if (profit != null) {
       byPlatform[platformKey].profit += profit;
       byPlatform[platformKey].profitCount++;
+    }
+
+    // Unlike platform, a sale's listing can be gone from listings.json by the
+    // time this renders (the real "delist elsewhere" workflow removes it),
+    // so category here can be genuinely unknown, not just unset.
+    const categoryKey = category || 'uncategorized';
+    if (!byCategory[categoryKey]) byCategory[categoryKey] = { revenue: 0, count: 0, profit: 0, profitCount: 0 };
+    byCategory[categoryKey].count++;
+    byCategory[categoryKey].revenue += s.salePrice || 0;
+    if (profit != null) {
+      byCategory[categoryKey].profit += profit;
+      byCategory[categoryKey].profitCount++;
     }
 
     return `
@@ -3086,13 +3104,40 @@ function renderSales(sales) {
     })
     .join('; ');
 
+  // Same sort/format convention as platformParts above, grouped by category
+  // instead so "which category is actually worth sourcing more of" has a
+  // real answer once there's more than a sale or two to compare.
+  const categoryParts = Object.keys(byCategory)
+    .sort((a, b) => byCategory[b].revenue - byCategory[a].revenue)
+    .map(c => {
+      const bucket = byCategory[c];
+      const label = categoryLabel(c);
+      const profitText = bucket.profitCount === bucket.count ? formatUsd(bucket.profit) + ' profit'
+        : bucket.profitCount ? formatUsd(bucket.profit) + ` profit (${bucket.profitCount}/${bucket.count} tracked)`
+        : 'profit not tracked';
+      return `${label}: ${formatUsd(bucket.revenue)} revenue, ${profitText}`;
+    })
+    .join('; ');
+
   totalsEl.innerHTML = `
     <p class="pace-result-note">
       <span class="pace-result-figure">${formatUsd(totalRevenue)}</span> total realized revenue across
       ${sales.length} real logged sale(s)${platformParts ? ', by platform: ' + escapeHtml(platformParts) : ''}.
       ${profitTrackedCount ? `${formatUsd(totalProfit)} total profit across the ${profitTrackedCount}/${sales.length} sale(s) with cost data logged.` : 'No sale has a cost basis or shipping cost logged yet, so profit by platform is not tracked.'}
       ${overallMarginPct != null ? `${overallMarginPct.toFixed(0)}% overall margin (profit over cost basis) across the ${marginTrackable.length}/${sales.length} sale(s) with a real cost basis logged.` : 'No sale has a real (non-zero) cost basis logged yet, so overall margin isn’t tracked.'}
+      ${categoryParts ? 'By category: ' + escapeHtml(categoryParts) + '.' : ''}
     </p>`;
+}
+
+// Turns a listing's raw category slug ("shoes", "home-goods") into a real
+// display label ("Shoes", "Home Goods"). Listings have no fixed enum of
+// categories (only "shoes" and "electronics" get special fee/eligibility
+// handling elsewhere on this page), so this stays a generic slug formatter
+// rather than a lookup table that would silently fall through to the raw
+// slug for any category added later.
+function categoryLabel(category) {
+  if (!category) return 'Uncategorized';
+  return category.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
 // What the real sale price came out to as a percent of the asking price
