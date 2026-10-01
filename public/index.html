@@ -3209,6 +3209,18 @@ function renderPaletteResults() {
     // there's genuinely nothing to select. Same real text already shown on
     // screen, not a separate message.
     resultsStatus.textContent = empty.textContent;
+    // The comment above says there's no real aria-activedescendant target
+    // in this state, but until this line nothing actually acted on that:
+    // list.innerHTML was just cleared, destroying whatever #palette-opt-N
+    // node a previous, non-empty render pointed this at, and the attribute
+    // itself was left standing, a reference to an id that no longer exists
+    // anywhere in the DOM. That is an invalid aria-activedescendant value
+    // per the ARIA spec (confirmed with axe-core: aria-valid-attr-value,
+    // critical), not just an unhelpful one. Removing it here, the one place
+    // a render can legitimately leave zero options on screen, keeps every
+    // value this attribute ever holds pointing at a real, currently-mounted
+    // option.
+    document.getElementById('paletteInput').removeAttribute('aria-activedescendant');
     return;
   }
   empty.classList.add('hidden');
