@@ -29,6 +29,20 @@ test('formatChatReply does not read an underscore inside an identifier as emphas
   assert.equal(formatChatReply('see next_nudge_date for the real field'), '<p>see next_nudge_date for the real field</p>');
 });
 
+test('formatChatReply renders a real emphasis span nested inside a bold one, not stray asterisks', () => {
+  // "**bold *emphasis* still bold**" is a common real reply shape. Bold's
+  // content must be matched up to the nearest closing delimiter, not "no
+  // delimiter char at all", or this whole span falls through unconverted.
+  assert.equal(
+    formatChatReply('**bold *emphasis* still bold**'),
+    '<p><strong>bold <em>emphasis</em> still bold</strong></p>'
+  );
+});
+
+test('formatChatReply renders two separate **bold** spans on one line independently', () => {
+  assert.equal(formatChatReply('**a** plain **b**'), '<p><strong>a</strong> plain <strong>b</strong></p>');
+});
+
 test('formatChatReply renders a `code` span as <code>', () => {
   assert.equal(formatChatReply('run `npm test` first'), '<p>run <code>npm test</code> first</p>');
 });

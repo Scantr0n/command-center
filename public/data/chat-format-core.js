@@ -42,9 +42,18 @@
       codeSpans.push(code);
       return `\u0000${codeSpans.length - 1}\u0000`;
     });
+    // Bold's own content is matched non-greedily up to the NEAREST closing
+    // "**"/"__", not "no asterisk/underscore at all" - a real, common reply
+    // shape like "**bold *emphasis* still bold**" has a single-delimiter
+    // emphasis span nested inside a double-delimiter bold one, and excluding
+    // every inner delimiter char left that whole case unmatched, falling
+    // through to the emphasis pass below and leaving the real "**" bold
+    // delimiters in as stray literal asterisks instead of real <strong>.
+    // Running emphasis AFTER bold, over the already-substituted string,
+    // still finds and converts that inner "*emphasis*" span on its own.
     withPlaceholders = withPlaceholders
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
       .replace(/(?<![A-Za-z0-9])_([^_]+)_(?![A-Za-z0-9])/g, '<em>$1</em>');
     return withPlaceholders.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codeSpans[+i]}</code>`);
