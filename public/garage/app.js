@@ -115,7 +115,7 @@ function syncUrl() {
 // relist) now live in one place a test suite can actually exercise.
 const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
-  estimateNetPayout, computeSaleProfit, minListingPriceForNet,
+  estimateNetPayout, computeSaleProfit, computeSaleMarginPct, minListingPriceForNet,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
@@ -3016,6 +3016,7 @@ function renderSales(sales) {
   tbody.innerHTML = sorted.map(s => {
     const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
     const profit = computeSaleProfit(net, s);
+    const marginPct = computeSaleMarginPct(profit, s.costBasis);
     const askingPct = computeAskingPct(s);
 
     const platformKey = s.platform || 'unknown';
@@ -3037,6 +3038,7 @@ function renderSales(sales) {
       <td class="cell-value${s.costBasis == null ? ' empty' : ''}">${s.costBasis != null ? formatUsd(s.costBasis) : 'not logged'}</td>
       <td class="cell-value${s.shippingCost == null ? ' empty' : ''}">${s.shippingCost != null ? formatUsd(s.shippingCost) : 'not logged'}</td>
       <td class="cell-value${profit == null ? ' empty' : (profit < 0 ? ' cell-value-loss' : '')}">${profit != null ? formatUsd(profit) : 'not logged'}</td>
+      <td class="cell-value${marginPct == null ? ' empty' : (marginPct < 0 ? ' cell-value-loss' : '')}">${marginPct != null ? marginPct.toFixed(0) + '%' : (s.costBasis === 0 ? 'free item' : 'not logged')}</td>
       <td class="cell-muted">${s.saleDate ? escapeHtml(s.saleDate) : '<span class="cell-value empty">not logged</span>'}</td>
       <td class="cell-muted">${(() => {
         if (!s.shipDate) return '<span class="cell-value empty">not logged</span>';
@@ -3055,6 +3057,20 @@ function renderSales(sales) {
   const totalRevenue = sales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
   const profitTrackedCount = Object.values(byPlatform).reduce((sum, b) => sum + b.profitCount, 0);
   const totalProfit = Object.values(byPlatform).reduce((sum, b) => sum + b.profit, 0);
+
+  // Weighted (not averaged) margin: sum of profit over sum of cost basis
+  // across only the sales where both are real numbers, so one tiny-cost-basis
+  // sale with a freak 900% margin can't skew a simple average of percentages.
+  const marginTrackable = sales.filter(s => {
+    const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
+    return computeSaleMarginPct(computeSaleProfit(net, s), s.costBasis) != null;
+  });
+  const marginTotalProfit = marginTrackable.reduce((sum, s) => {
+    const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
+    return sum + computeSaleProfit(net, s);
+  }, 0);
+  const marginTotalCostBasis = marginTrackable.reduce((sum, s) => sum + s.costBasis, 0);
+  const overallMarginPct = marginTrackable.length ? (marginTotalProfit / marginTotalCostBasis) * 100 : null;
 
   // Sorted by revenue so the biggest platform leads, same convention as
   // renderExpenses' by-category breakdown below its own table.
@@ -3075,6 +3091,7 @@ function renderSales(sales) {
       <span class="pace-result-figure">${formatUsd(totalRevenue)}</span> total realized revenue across
       ${sales.length} real logged sale(s)${platformParts ? ', by platform: ' + escapeHtml(platformParts) : ''}.
       ${profitTrackedCount ? `${formatUsd(totalProfit)} total profit across the ${profitTrackedCount}/${sales.length} sale(s) with cost data logged.` : 'No sale has a cost basis or shipping cost logged yet, so profit by platform is not tracked.'}
+      ${overallMarginPct != null ? `${overallMarginPct.toFixed(0)}% overall margin (profit over cost basis) across the ${marginTrackable.length}/${sales.length} sale(s) with a real cost basis logged.` : 'No sale has a real (non-zero) cost basis logged yet, so overall margin isn’t tracked.'}
     </p>`;
 }
 
@@ -5063,8 +5080,8 @@ document.addEventListener('keydown', e => {
 const SALES_CSV_COLUMNS = [
   ['title', 'Item'], ['platform', 'Platform'], ['salePrice', 'Sale price'], ['askingPrice', 'Asking price'],
   ['netPayout', 'Est. net payout'], ['costBasis', 'Cost basis'], ['shippingCost', 'Shipping paid'],
-  ['profit', 'Profit'], ['saleDate', 'Sale date'], ['shipDate', 'Ship date'], ['deliveryDate', 'Delivery date'],
-  ['fundsAvailableEst', 'Funds available (est.)']
+  ['profit', 'Profit'], ['marginPct', 'Margin %'], ['saleDate', 'Sale date'], ['shipDate', 'Ship date'],
+  ['deliveryDate', 'Delivery date'], ['fundsAvailableEst', 'Funds available (est.)']
 ];
 
 // Exports every real logged sale, same computed net-payout/profit columns as
@@ -5077,11 +5094,13 @@ document.getElementById('salesCsvBtn').addEventListener('click', () => {
   const rows = salesLog.map(s => {
     const net = estimateNetPayout(s.platform, s.salePrice, categoryForListingId(s.listingId));
     const profit = computeSaleProfit(net, s);
+    const marginPct = computeSaleMarginPct(profit, s.costBasis);
     return {
       ...s,
       platform: PLATFORM_LABELS[s.platform] || s.platform || '',
       netPayout: net != null ? net.toFixed(2) : '',
       profit: profit != null ? profit.toFixed(2) : '',
+      marginPct: marginPct != null ? marginPct.toFixed(1) : '',
       fundsAvailableEst: expectedBalanceDate(s) || ''
     };
   });

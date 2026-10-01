@@ -14,7 +14,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  estimateNetPayout, computeSaleProfit, ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet,
+  estimateNetPayout, computeSaleProfit, computeSaleMarginPct, ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet,
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
@@ -94,6 +94,19 @@ test('computeSaleProfit: real net payout minus cost basis and shipping, missing 
   const sale2 = { platform: 'vinted', salePrice: 40, costBasis: null, shippingCost: 5 };
   const net2 = estimateNetPayout(sale2.platform, sale2.salePrice);
   assert.equal(computeSaleProfit(net2, sale2), 35);
+});
+
+test('computeSaleMarginPct: no profit yet or zero/missing cost basis never guesses a percent', () => {
+  assert.equal(computeSaleMarginPct(null, 10), null);
+  assert.equal(computeSaleMarginPct(30, null), null);
+  assert.equal(computeSaleMarginPct(30, 0), null);
+});
+
+test('computeSaleMarginPct: profit as a real percent of cost basis, loss gives a real negative percent', () => {
+  // $30 profit on a $10 cost basis is 300% ROI, the real reseller margin
+  // figure the dollar-only Profit column can't show on its own.
+  assert.equal(computeSaleMarginPct(30, 10), 300);
+  assert.equal(computeSaleMarginPct(-5, 20), -25);
 });
 
 test('minListingPriceForNet inverts estimateNetPayout for every platform', () => {

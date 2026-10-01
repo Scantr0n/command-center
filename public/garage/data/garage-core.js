@@ -101,6 +101,18 @@
     return net - (sale.costBasis || 0) - (sale.shippingCost || 0);
   }
 
+  // Profit as a percent of what the item actually cost to acquire, the real
+  // reseller ROI figure: the sales table and CSV already show profit in raw
+  // dollars, which doesn't say whether a $20 profit is great (on a $5 thrift
+  // find) or a loss of margin (on a $90 wholesale lot item). Needs a real
+  // costBasis to divide by, a $0 costBasis is "free item" and would make this
+  // read as infinite rather than a real percent, so both return null, same
+  // "can't compute this yet" convention as computeSaleProfit above.
+  function computeSaleMarginPct(profit, costBasis) {
+    if (profit == null || !costBasis) return null;
+    return (profit / costBasis) * 100;
+  }
+
   function ebayMinPriceForNet(targetNet, category) {
     const rate = ebayFinalValueRate(category);
     const lowStep = (targetNet + 0.30) / (1 - rate);
@@ -810,7 +822,7 @@
   return {
     PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
     POSHMARK_WEIGHT_TIERS, EBAY_STANDARD_RATE, EBAY_CATEGORY_RATES,
-    estimateNetPayout, computeSaleProfit, ebayFinalValueRate,
+    estimateNetPayout, computeSaleProfit, computeSaleMarginPct, ebayFinalValueRate,
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
     MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
     computeYtdNetProfit,
