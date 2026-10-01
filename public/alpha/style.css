@@ -1835,8 +1835,15 @@ footer.page-foot {
      here rather than trying to preserve the color coding on paper. */
   .incident-ongoing .incident-duration { color: #111 !important; }
 
+  /* .event-filter-select (the Activity log's "All types" dropdown, added
+     after this print block was last touched) was missing from this list: an
+     interactive filter control has no meaning on a printed page, same reason
+     .refresh-btn and the other controls below are already hidden here, but
+     it kept rendering as a live-looking gray dropdown next to the ACTIVITY
+     LOG heading on paper. Found by actually printing the page and checking,
+     not by inspection alone. */
   .sticky-critical-bar, .refresh-btn, .conn-next-refresh, .back-link, .schema-help,
-  .modal-overlay, .toast-container, .jump-nav-fab {
+  .modal-overlay, .toast-container, .jump-nav-fab, .event-filter-select {
     display: none !important;
   }
   body.has-sticky-critical { padding-top: 0 !important; }
