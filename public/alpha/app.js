@@ -75,7 +75,8 @@ const {
   SPARK_W,
   SPARK_H,
   computeSparklinePoints,
-  averageLatency
+  averageLatency,
+  p95Latency
 } = AlphaSparklineCore;
 const MARKET_CALENDAR_SOURCE_CHECKED_AT = '2026-09-17';
 
@@ -749,8 +750,12 @@ function renderConnection(data, clientHistory, latencyHistory) {
   if (latencyEl) {
     const latest = latencyHistory && latencyHistory.length ? latencyHistory[latencyHistory.length - 1].ms : null;
     const avg = averageLatency(latencyHistory || []);
+    const p95 = p95Latency(latencyHistory || []);
     latencyEl.textContent = (typeof latest === 'number')
-      ? 'Fetch ' + latest + 'ms' + (avg != null ? ' (avg ' + avg + 'ms)' : '')
+      ? 'Fetch ' + latest + 'ms' + (avg != null ? ' (avg ' + avg + 'ms' + (p95 != null ? ', p95 ' + p95 + 'ms' : '') + ')' : '')
+      : '';
+    latencyEl.title = p95 != null
+      ? 'p95 of the last ' + Math.min(latencyHistory.length, LATENCY_AVG_WINDOW) + ' fetches: ' + p95 + 'ms. The average can look fine while occasional slow round trips hide inside it; this is the one that catches those.'
       : '';
   }
   const latencySparkEl = document.getElementById('connLatencySpark');

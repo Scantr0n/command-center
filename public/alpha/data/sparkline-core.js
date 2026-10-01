@@ -59,11 +59,36 @@
     return Math.round(sum / recent.length);
   }
 
+  // The average above hides exactly the thing a round-trip reading exists to
+  // catch: a daemon that answers fast almost every time but occasionally
+  // stalls reads as a low, reassuring average right up until the stall is
+  // long enough to matter. Real monitoring dashboards (Grafana, Datadog,
+  // CloudWatch) pair a mean latency with a tail percentile for this reason;
+  // p95 is the one this page adds, same real-reading-only rule as
+  // averageLatency (invalid `ms` entries are dropped, never coerced to 0,
+  // since folding a bad reading in as a 0 would pull the tail figure toward
+  // "fast" instead of leaving it honestly unknown). Nearest-rank method,
+  // same `window` default as averageLatency so the two figures describe the
+  // same real window. Returns null with fewer than 5 valid samples: a
+  // percentile computed from a handful of points is not a tail reading, it's
+  // just the max relabeled, so this withholds it rather than showing a
+  // number that implies more data than it has.
+  function p95Latency(history, window) {
+    if (!history || !history.length) return null;
+    const valid = history.filter(e => typeof e.ms === 'number' && Number.isFinite(e.ms));
+    const recent = valid.slice(-(window == null ? 20 : window));
+    if (recent.length < 5) return null;
+    const sorted = recent.map(e => e.ms).sort((a, b) => a - b);
+    const rank = Math.min(sorted.length - 1, Math.ceil(0.95 * sorted.length) - 1);
+    return sorted[rank];
+  }
+
   return {
     SPARK_W,
     SPARK_H,
     SPARK_PAD,
     computeSparklinePoints,
-    averageLatency
+    averageLatency,
+    p95Latency
   };
 });

@@ -107,7 +107,12 @@
         <code>app.js</code>. It reports this page's own speed talking to Command Center, not Alpha's daemon's own
         internal latency, since Command Center may itself be answering from the static fallback file rather than a
         live round trip to Jack's Mac. Recorded per browser only, in <code>localStorage</code>, same as the
-        connectivity and regime histories above; the averaged figure next to it covers the most recent 20 samples.</p>
+        connectivity and regime histories above; the averaged figure next to it covers the most recent 20 samples.
+        Once at least 5 of those samples are real numbers, a p95 figure joins it: the average can read as fast and
+        steady while an occasional slow round trip hides inside it, and p95 is the one reading on this page built to
+        surface that tail instead of smoothing over it, same real-monitoring-dashboard convention (Grafana, Datadog,
+        CloudWatch) of pairing a mean with a tail percentile. Computed only from this browser's own real recorded
+        readings, nothing estimated, same as the average beside it.</p>
       <p>The small trend line next to the Current drawdown and Robustness score meters under Position sizing is the
         same idea applied to those two readings: Alpha's live feed sends only the current value, never a history, so
         this browser keeps its own honest, capped log of real readings it has actually polled and draws it as a

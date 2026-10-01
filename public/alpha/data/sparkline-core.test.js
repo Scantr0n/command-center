@@ -13,7 +13,8 @@ const {
   SPARK_H,
   SPARK_PAD,
   computeSparklinePoints,
-  averageLatency
+  averageLatency,
+  p95Latency
 } = require('./sparkline-core.js');
 
 test('computeSparklinePoints: one point per input value, in the same order', () => {
@@ -77,4 +78,40 @@ test('averageLatency: defaults the window to 20', () => {
 test('averageLatency: a non-numeric ms on an entry counts as 0 rather than breaking the average', () => {
   const history = [{ ms: 100 }, { ms: null }, { ms: 200 }];
   assert.equal(averageLatency(history), 100); // (100+0+200)/3
+});
+
+test('p95Latency: empty or missing history returns null, never NaN', () => {
+  assert.equal(p95Latency([]), null);
+  assert.equal(p95Latency(null), null);
+  assert.equal(p95Latency(undefined), null);
+});
+
+test('p95Latency: fewer than 5 valid samples returns null rather than a misleadingly precise figure', () => {
+  const history = [{ ms: 100 }, { ms: 200 }, { ms: 300 }, { ms: 400 }];
+  assert.equal(p95Latency(history), null);
+});
+
+test('p95Latency: the 95th percentile of the real readings, nearest-rank method', () => {
+  const history = Array.from({ length: 20 }, (_, i) => ({ ms: (i + 1) * 10 })); // 10..200
+  // ceil(0.95 * 20) = 19th ranked value (1-indexed) = 190
+  assert.equal(p95Latency(history), 190);
+});
+
+test('p95Latency: a real outlier within the top 5% of the window surfaces in the reading', () => {
+  const fast = Array.from({ length: 9 }, () => ({ ms: 50 }));
+  const history = [...fast, { ms: 5000 }]; // the outlier is exactly 1 of 10, the top 5%
+  assert.equal(p95Latency(history), 5000);
+});
+
+test('p95Latency: only considers the most recent `window` entries, same as averageLatency', () => {
+  const stale = Array.from({ length: 10 }, () => ({ ms: 9999 }));
+  const recent = Array.from({ length: 5 }, () => ({ ms: 50 }));
+  assert.equal(p95Latency([...stale, ...recent], 5), 50);
+});
+
+test('p95Latency: a non-numeric ms on an entry is dropped rather than coerced to 0', () => {
+  const history = [{ ms: 100 }, { ms: null }, { ms: 110 }, { ms: 120 }, { ms: 130 }, { ms: 140 }];
+  // With the null dropped, 5 valid readings remain (100,110,120,130,140); a
+  // coerced 0 would have pulled this toward "fast" instead of being ignored.
+  assert.equal(p95Latency(history), 140);
 });
