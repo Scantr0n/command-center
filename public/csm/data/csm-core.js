@@ -732,8 +732,12 @@
   // copyable outreach brief same as verifiedHook/nextAction, so a pasted-in
   // em dash there was going uncaught by both validate.js and this same
   // live Data Quality panel that catches one in every other free-text field.
+  // category was missed the same way: it is hand-typed free text (not a
+  // fixed enum), shown as its own filter chip and category-effectiveness
+  // group label, so a pasted-in em dash there renders same as anywhere else
+  // but was never checked.
   function emDashHits(p) {
-    const hits = emDashFields(p, ['name', 'company', 'verifiedHook', 'nextAction', 'replyStatus', 'notes']);
+    const hits = emDashFields(p, ['name', 'company', 'category', 'verifiedHook', 'nextAction', 'replyStatus', 'notes']);
     if (emDashFields(p.contactChannel, ['detail']).length) hits.push('contactChannel.detail');
     (p.outreachLog || []).forEach((entry, i) => {
       if (emDashFields(entry, ['note']).length) hits.push('outreachLog[' + i + '].note');
