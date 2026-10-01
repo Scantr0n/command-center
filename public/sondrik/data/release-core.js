@@ -217,6 +217,35 @@
     return markers;
   }
 
+  // Where the latest real release sits against the 30/60/90-day post-launch
+  // windows early-stage products are commonly evaluated against (the "first
+  // 30/60/90 days" framing traction dashboards use). Purely a time-since-ship
+  // calculation off the real logged ship date, it states no benchmark or
+  // judgment about whether the real numbers elsewhere on the page are good
+  // or bad for that window, only which window today falls in.
+  //
+  // Pulled out of app.js's launchWindowHtml (which only built the markup)
+  // because that function skipped the isValidDateStr guard every other date
+  // calculation in this file applies, the exact gap that produced the real
+  // NaN-date bug documented in this file's header comment for
+  // bugfixCheckinStatus: a malformed shipDateIso would make daysBetween
+  // return NaN, `days < 0` is false for NaN so the early return never fired,
+  // and the page would have rendered "DAY NAN" instead of nothing. Returns
+  // null for a missing, malformed, or future-dated shipDateIso, same as
+  // bugfixCheckinStatus does for its own date argument.
+  function computeLaunchWindow(shipDateIso, todayIsoStr) {
+    if (!shipDateIso || !isValidDateStr(shipDateIso)) return null;
+    const days = daysBetween(shipDateIso, todayIsoStr);
+    if (days < 0) return null;
+    const cappedDays = Math.min(days, 90);
+    const pct = Math.round((cappedDays / 90) * 100);
+    const windowLabel = days <= 30 ? '0-30 day window since ship'
+      : days <= 60 ? '30-60 day window since ship'
+      : days <= 90 ? '60-90 day window since ship'
+      : 'past the 90-day window since ship';
+    return { days, cappedDays, pct, windowLabel, dayLabel: 'Day ' + days };
+  }
+
   return {
     daysBetween,
     addDays,
@@ -226,6 +255,7 @@
     bugfixCheckinStatus,
     suggestedCheckCadence,
     computeReminders,
-    releaseMarkersForChecks
+    releaseMarkersForChecks,
+    computeLaunchWindow
   };
 });

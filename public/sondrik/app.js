@@ -46,7 +46,7 @@
   // has already produced two real bugs (a NaN-date crash, a silently
   // dropped missed-checkpoint) now lives in one place a test suite can
   // actually exercise. See release-core.js's own header for both bugs.
-  const { bugfixCheckinStatus, suggestedCheckCadence, computeReminders: computeRemindersCore, releaseMarkersForChecks } = window.SondrikReleaseCore;
+  const { bugfixCheckinStatus, suggestedCheckCadence, computeReminders: computeRemindersCore, releaseMarkersForChecks, computeLaunchWindow } = window.SondrikReleaseCore;
 
   // Shared, unit-tested CSV/ICS serialization (export-core.js): csvField's
   // CSV/formula-injection guard and icsFoldLine's UTF-8-byte-aware line
@@ -549,25 +549,15 @@
       escapeHtml(status.text.toUpperCase()) + '</div>';
   }
 
-  // Where the latest real release sits against the 30/60/90-day post-launch
-  // windows early-stage products are commonly evaluated against (see the
-  // "first 30/60/90 days" framing traction dashboards use). Purely a
-  // time-since-ship calculation off the real logged ship date, it states no
-  // benchmark or judgment about whether the real numbers elsewhere on the
-  // page are good or bad for that window, only which window today falls in.
-  // Skipped for an undated release (no real ship date to measure from) or a
-  // future-dated one (a typo, not a real elapsed span).
+  // Markup wrapper around release-core.js's computeLaunchWindow (see that
+  // function's own comment for why the date validation it does was pulled
+  // out of here): this function now only turns an already-validated result
+  // into HTML. Skipped for an undated release, a malformed release.date, or
+  // a future-dated one (a typo, not a real elapsed span).
   function launchWindowHtml(shipDateIso) {
-    if (!shipDateIso) return '';
-    const days = daysBetween(shipDateIso, todayIso());
-    if (days < 0) return '';
-    const cappedDays = Math.min(days, 90);
-    const pct = Math.round((cappedDays / 90) * 100);
-    const windowLabel = days <= 30 ? '0-30 day window since ship'
-      : days <= 60 ? '30-60 day window since ship'
-      : days <= 90 ? '60-90 day window since ship'
-      : 'past the 90-day window since ship';
-    const dayLabel = 'Day ' + days;
+    const win = computeLaunchWindow(shipDateIso, todayIso());
+    if (!win) return '';
+    const { pct, windowLabel, dayLabel } = win;
     return '<div class="launch-window">' +
       '<div class="launch-window-label font-mono">' + escapeHtml((dayLabel + ', ' + windowLabel).toUpperCase()) + '</div>' +
       '<div class="launch-window-track" role="img" aria-label="' +

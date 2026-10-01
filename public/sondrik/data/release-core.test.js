@@ -15,7 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   daysBetween, addDays, isValidDateStr, BUGFIX_CHECKPOINTS, bugfixCheckinStatus,
-  suggestedCheckCadence, computeReminders, releaseMarkersForChecks
+  suggestedCheckCadence, computeReminders, releaseMarkersForChecks, computeLaunchWindow
 } = require('./release-core.js');
 
 const identity = iso => iso;
@@ -242,4 +242,47 @@ test('releaseMarkersForChecks returns an all-empty parallel array for no release
   assert.deepEqual(releaseMarkersForChecks([], checks), [[]]);
   assert.deepEqual(releaseMarkersForChecks(null, checks), [[]]);
   assert.deepEqual(releaseMarkersForChecks([{ version: '0.3.7', date: '2026-09-01' }], []), []);
+});
+
+test('computeLaunchWindow returns null for a missing, malformed, or future-dated ship date rather than "Day NaN", the same bug class bugfixCheckinStatus above already hit for real', () => {
+  assert.equal(computeLaunchWindow(null, '2026-09-23'), null);
+  assert.equal(computeLaunchWindow(undefined, '2026-09-23'), null);
+  assert.equal(computeLaunchWindow('2026-9-7', '2026-09-23'), null, 'non-zero-padded month/day, the real 244bb86-style malformed date');
+  assert.equal(computeLaunchWindow('not-a-date', '2026-09-23'), null);
+  assert.equal(computeLaunchWindow('2026-09-30', '2026-09-23'), null, 'future-dated, a typo not a real elapsed span');
+});
+
+test('computeLaunchWindow reports day 0 at 0%, in the 0-30 day window, on the real ship date itself', () => {
+  const win = computeLaunchWindow('2026-09-07', '2026-09-07');
+  assert.deepEqual(win, { days: 0, cappedDays: 0, pct: 0, windowLabel: '0-30 day window since ship', dayLabel: 'Day 0' });
+});
+
+test('computeLaunchWindow reports the real day-16 case this page shows today, inside the 0-30 day window', () => {
+  const win = computeLaunchWindow('2026-09-07', '2026-09-23');
+  assert.equal(win.days, 16);
+  assert.equal(win.cappedDays, 16);
+  assert.equal(win.pct, 18);
+  assert.equal(win.windowLabel, '0-30 day window since ship');
+  assert.equal(win.dayLabel, 'Day 16');
+});
+
+test('computeLaunchWindow switches window label at the real day-30/31 and day-60/61 boundaries', () => {
+  assert.equal(computeLaunchWindow('2026-09-07', '2026-10-07').windowLabel, '0-30 day window since ship');
+  assert.equal(computeLaunchWindow('2026-09-07', '2026-10-08').windowLabel, '30-60 day window since ship');
+  assert.equal(computeLaunchWindow('2026-09-07', '2026-11-06').windowLabel, '30-60 day window since ship');
+  assert.equal(computeLaunchWindow('2026-09-07', '2026-11-07').windowLabel, '60-90 day window since ship');
+});
+
+test('computeLaunchWindow caps pct at 100% and the label reads "past the 90-day window" once day 90 is cleared, rather than overrunning the progress bar', () => {
+  const atNinety = computeLaunchWindow('2026-09-07', '2026-12-06');
+  assert.equal(atNinety.days, 90);
+  assert.equal(atNinety.cappedDays, 90);
+  assert.equal(atNinety.pct, 100);
+  assert.equal(atNinety.windowLabel, '60-90 day window since ship');
+
+  const pastNinety = computeLaunchWindow('2026-09-07', '2027-03-01');
+  assert.equal(pastNinety.days, 175);
+  assert.equal(pastNinety.cappedDays, 90, 'still capped, not an out-of-range fill width');
+  assert.equal(pastNinety.pct, 100);
+  assert.equal(pastNinety.windowLabel, 'past the 90-day window since ship');
 });
