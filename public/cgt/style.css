@@ -1275,7 +1275,7 @@ code.inline-code {
   resize: vertical;
   margin-bottom: 12px;
 }
-.import-textarea:focus { outline: none; border-color: var(--hairlineHover); }
+.import-textarea:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 .import-textarea::placeholder { color: var(--dim); }
 .import-primary-btn { color: var(--ink); border-color: var(--hairlineHover); background: rgba(255,255,255,0.05); }
 .import-error { color: #E0503C; font-size: 0.8rem; margin-top: 10px; }
@@ -1305,7 +1305,7 @@ code.inline-code {
   font-size: 0.75rem;
   width: 100%;
 }
-.mapping-select:focus { outline: none; border-color: var(--hairlineHover); }
+.mapping-select:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 
 /* Below ~560px the row's minimum column widths (140px source + 20px arrow +
    180px select, plus gaps) no longer fit inside .wrap's own side padding,
@@ -1493,7 +1493,7 @@ code.inline-code {
   font-family: 'Inter', sans-serif;
   width: 100%;
 }
-.np-input:focus { outline: none; border-color: var(--hairlineHover); }
+.np-input:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 textarea.np-input { resize: vertical; }
 .np-generate-btn { color: var(--ink); border-color: var(--hairlineHover); background: rgba(255,255,255,0.04); }
 .np-result { border-top: 1px solid var(--hairline); padding-top: 16px; margin-top: 4px; }

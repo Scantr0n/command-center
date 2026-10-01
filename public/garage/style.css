@@ -632,7 +632,7 @@ section { margin-bottom: 36px; }
   padding: 0 4px 0 12px;
   transition: border-color 0.15s ease;
 }
-.calc-price-input-wrap:focus-within { border-color: var(--hairlineHover); }
+.calc-price-input-wrap:focus-within { border-color: var(--accent); outline: 1.5px solid var(--accent); outline-offset: 1px; }
 .calc-price-prefix { color: var(--dim); font-size: 0.78rem; }
 .calc-price-input {
   background: none;
@@ -1538,7 +1538,7 @@ footer.page-foot {
   font-family: 'Inter', sans-serif;
   width: 100%;
 }
-.np-input:focus { outline: none; border-color: var(--hairlineHover); }
+.np-input:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 textarea.np-input { resize: vertical; }
 .np-generate-btn { color: var(--ink); border-color: var(--hairlineHover); background: rgba(255,255,255,0.04); }
 .np-result { border-top: 1px solid var(--hairline); padding-top: 16px; margin-top: 4px; }

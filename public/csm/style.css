@@ -1491,9 +1491,10 @@ header.page-head .sub {
   font-family: 'Inter', sans-serif;
   width: 100%;
 }
-.np-input:focus {
-  outline: none;
-  border-color: var(--hairlineHover);
+.np-input:focus-visible {
+  outline: 1.5px solid var(--dim);
+  outline-offset: 1px;
+  border-color: var(--dim);
 }
 textarea.np-input { resize: vertical; }
 
