@@ -266,6 +266,51 @@ function renderListingUpkeepFreshness() {
   el.title = 'Last hand-verified against each platform\'s own current seller guidance on ' + LISTING_UPKEEP_REVIEWED_ON + '.';
 }
 
+// Same freshness-badge pattern as the tables above, closing a real gap: the
+// Poshmark weight-tier calculator and the eBay Promoted Listings cost check
+// are the two real-dollar reference tools on this page that shipped with no
+// tracked verification date at all, unlike every other reference table here,
+// despite both stating real, checkable numbers (Poshmark's $6.49/$11.49/
+// $16.49 label tiers, eBay's 2% minimum ad rate and January 2026 attribution
+// change). Verified 2026-10-01 via WebSearch: Poshmark's own blog
+// (blog.poshmark.com/2026/02/13, "Shipping Heavier Items on Poshmark is Now
+// Simpler and Cheaper") confirms the current $6.49 flat rate up to 5 lb, a
+// $5 seller-absorbed step-up for 5.1-10 lb, and a $10 step-up for 10.1-15 lb,
+// exactly matching POSHMARK_WEIGHT_TIERS below. eBay's own seller community
+// (community.ebay.com, "Promoted Listings Standard - Ad Rate Minimum
+// Increasing (1% to 2%)") confirms the 2% minimum, and current reselling
+// coverage confirms the January 2026 attribution-window change is still in
+// effect. Same 45-day window as every other badge on this page.
+const POSH_WEIGHT_REVIEWED_ON = '2026-10-01';
+const POSH_WEIGHT_STALE_AFTER_DAYS = 45;
+
+function renderPoshWeightFreshness() {
+  const el = document.getElementById('poshWeightFreshness');
+  if (!el) return;
+  const age = daysSincePublished(POSH_WEIGHT_REVIEWED_ON);
+  const stale = age != null && age > POSH_WEIGHT_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against Poshmark\'s own published shipping rate update on ' + POSH_WEIGHT_REVIEWED_ON + '.';
+}
+
+const PROMOTED_REVIEWED_ON = '2026-10-01';
+const PROMOTED_STALE_AFTER_DAYS = 45;
+
+function renderPromotedFreshness() {
+  const el = document.getElementById('promotedFreshness');
+  if (!el) return;
+  const age = daysSincePublished(PROMOTED_REVIEWED_ON);
+  const stale = age != null && age > PROMOTED_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against eBay\'s own published Promoted Listings ad-rate and attribution rules on ' + PROMOTED_REVIEWED_ON + '.';
+}
+
 // Same freshness-badge pattern as the tables above: this one gates the
 // highest-stakes numbers on the page (the exact eBay Top Rated Seller and
 // Depop Top Seller thresholds "Real progress" is computed against below),
@@ -6829,6 +6874,8 @@ renderElectronicsRulesFreshness();
 renderPackagingRulesFreshness();
 renderAuthenticationRulesFreshness();
 renderShippingCostFreshness();
+renderPoshWeightFreshness();
+renderPromotedFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch
