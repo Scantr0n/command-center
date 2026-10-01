@@ -2071,8 +2071,52 @@ function eventItem(evt) {
 
 // Kept purely so the Activity log's "Export CSV" button can build its file
 // from the same real, already-sorted rows just rendered, never a second
-// fetch or a re-sort that could disagree with what's on screen.
+// fetch or a re-sort that could disagree with what's on screen. Holds
+// whatever is currently on screen, i.e. after the type filter below is
+// applied, so a filtered CSV export never disagrees with the filtered list
+// Jack is looking at.
 let lastEventLogSnapshot = [];
+
+// Full, unfiltered, already-sorted event list from the most recent render,
+// kept separately from lastEventLogSnapshot above so changing the type
+// filter can re-render instantly from real already-fetched data instead of
+// waiting on the next 30s poll.
+let lastEventLogAllSorted = [];
+
+// Human-readable labels for the real event types server.js/live-core.js
+// actually emit (see connectionStateEvents/killSwitchStateEvents/
+// evolutionEvents/the anomaly map in server.js). Deliberately falls back to
+// the raw type string for anything not listed here instead of hiding it,
+// so a genuinely new event type server.js starts emitting later still gets
+// a usable filter option on day one, not a silent gap.
+const EVENT_TYPE_LABELS = {
+  'connection': 'Connection',
+  'kill-switch': 'Kill switch',
+  'evolution': 'Evolution',
+  'anomaly': 'Anomaly'
+};
+
+function eventTypeLabel(type) {
+  return EVENT_TYPE_LABELS[type] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Event');
+}
+
+// Rebuilds the filter's own <option> list from whatever types are actually
+// present in this real event log right now, same "never show a control for
+// data that doesn't exist" rule the rest of this page already follows (see
+// e.g. the Components section only ever listing real features). Preserves
+// the currently-selected filter across a data refresh when that type is
+// still present, so a 30s poll landing mid-read never silently resets what
+// Jack was just looking at.
+function populateEventLogTypeFilter(sorted) {
+  const select = document.getElementById('eventLogTypeFilter');
+  if (!select) return;
+  const previous = select.value;
+  const types = [...new Set(sorted.map(evt => evt.type).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">All types</option>' +
+    types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(eventTypeLabel(t))}</option>`).join('');
+  select.value = types.includes(previous) ? previous : '';
+  select.disabled = types.length === 0;
+}
 
 // Connection already tells Jack "Down for Xh" right in its own header, so a
 // dead feed reads as dead at a glance instead of requiring him to scroll the
@@ -2095,20 +2139,27 @@ function renderEventLogMeta(sorted) {
   meta.title = 'Newest of ' + sorted.length + ' logged event(s), at ' + formatAbsolute(mostRecent);
 }
 
-function renderEventLog(data) {
+// Renders whichever subset of lastEventLogAllSorted the type filter above
+// currently selects. Split out from renderEventLog so moving the filter can
+// re-render instantly from the real data already in hand, without waiting
+// on the next 30s poll or re-fetching anything.
+function renderFilteredEventLog() {
   const log = document.getElementById('eventLog');
-  const events = Array.isArray(data.events) ? data.events : [];
   const csvBtn = document.getElementById('eventLogCsvBtn');
+  const select = document.getElementById('eventLogTypeFilter');
+  const filterType = select ? select.value : '';
+  const filtered = filterType ? lastEventLogAllSorted.filter(evt => evt.type === filterType) : lastEventLogAllSorted;
+  lastEventLogSnapshot = filtered;
+  renderEventLogMeta(filtered);
 
-  if (!events.length) {
-    lastEventLogSnapshot = [];
-    renderEventLogMeta([]);
+  if (!filtered.length) {
+    log.classList.add('event-log-empty');
+    const noneAtAll = !lastEventLogAllSorted.length;
     if (csvBtn) {
       csvBtn.disabled = true;
-      csvBtn.title = 'No events recorded yet.';
+      csvBtn.title = noneAtAll ? 'No events recorded yet.' : 'No events match this filter.';
     }
-    log.classList.add('event-log-empty');
-    log.innerHTML = `
+    log.innerHTML = noneAtAll ? `
       <li class="empty-panel">
         <div class="empty-panel-title font-mono">NO EVENTS RECORDED YET</div>
         <div class="empty-panel-sub">
@@ -2116,19 +2167,31 @@ function renderEventLog(data) {
           happen, oldest at the bottom. Nothing to show from this sandbox yet.
         </div>
       </li>
+    ` : `
+      <li class="empty-panel">
+        <div class="empty-panel-title font-mono">NO ${escapeHtml(eventTypeLabel(filterType).toUpperCase())} EVENTS</div>
+        <div class="empty-panel-sub">
+          None of the ${lastEventLogAllSorted.length} logged event(s) are this type. Choose "All types" above to see
+          the rest of the log again.
+        </div>
+      </li>
     `;
     return;
   }
 
   log.classList.remove('event-log-empty');
-  const sorted = [...events].sort((a, b) => new Date(b.at) - new Date(a.at));
-  lastEventLogSnapshot = sorted;
-  renderEventLogMeta(sorted);
   if (csvBtn) {
     csvBtn.disabled = false;
     csvBtn.title = '';
   }
-  log.innerHTML = sorted.map(eventItem).join('');
+  log.innerHTML = filtered.map(eventItem).join('');
+}
+
+function renderEventLog(data) {
+  const events = Array.isArray(data.events) ? data.events : [];
+  lastEventLogAllSorted = [...events].sort((a, b) => new Date(b.at) - new Date(a.at));
+  populateEventLogTypeFilter(lastEventLogAllSorted);
+  renderFilteredEventLog();
 }
 
 // Renders changelog.json, a file no one hand-edits: it's regenerated from
@@ -3055,13 +3118,21 @@ document.getElementById('positionsCsvBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// Re-renders instantly from lastEventLogAllSorted (already in hand from the
+// last real fetch), never a re-fetch: picking a type is a pure view change,
+// not a new read of Alpha's real data.
+document.getElementById('eventLogTypeFilter').addEventListener('change', renderFilteredEventLog);
+
 const EVENT_LOG_CSV_COLUMNS = [
   ['at', 'When'], ['type', 'Type'], ['tone', 'Tone'], ['label', 'Label'], ['detail', 'Detail']
 ];
 
 // Same real-rows-on-screen export as the Positions CSV button above, for the
 // Activity log's own real events (kill-switch triggers, regime changes,
-// evolution runs, anomalies) instead of positions.
+// evolution runs, anomalies) instead of positions. lastEventLogSnapshot is
+// already whatever the type filter currently leaves on screen (see
+// renderFilteredEventLog), so a filtered view exports exactly what's
+// filtered, never the full unfiltered log behind it.
 document.getElementById('eventLogCsvBtn').addEventListener('click', () => {
   if (!lastEventLogSnapshot.length) return;
   const header = EVENT_LOG_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
@@ -3071,7 +3142,9 @@ document.getElementById('eventLogCsvBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'alpha-events-' + new Date().toISOString().slice(0, 10) + '.csv';
+  const filterType = document.getElementById('eventLogTypeFilter').value;
+  const suffix = filterType ? '-' + filterType : '';
+  a.download = 'alpha-events' + suffix + '-' + new Date().toISOString().slice(0, 10) + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

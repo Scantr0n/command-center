@@ -534,6 +534,26 @@ header.page-head .sub {
 .refresh-btn:disabled { opacity: 0.6; cursor: default; }
 .refresh-btn:disabled:hover { border-color: var(--hairline); color: var(--sub); }
 
+/* Activity log's type filter: same pill shape and border language as
+   .refresh-btn beside it, so the toolbar reads as one family of controls
+   rather than a button style and an unrelated native select bolted on.
+   Disabled (same dimmed treatment as .refresh-btn:disabled) whenever the log
+   has no real events to filter, same honest-empty-state rule as the Export
+   CSV button right next to it. */
+.event-filter-select {
+  font-size: 0.72rem;
+  color: var(--sub);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.event-filter-select:hover, .event-filter-select:focus-visible { border-color: var(--hairlineHover); color: var(--ink); outline: 2px solid var(--hairlineHover); outline-offset: 2px; }
+.event-filter-select:disabled { opacity: 0.6; cursor: default; }
+
 /* Notify button: distinct "on" state so the header shows at a glance whether
    critical-alert notifications are armed, same visual language as the good
    headline/toast states elsewhere on the page (see headline-status.good). */
