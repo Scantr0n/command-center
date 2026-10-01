@@ -14,7 +14,7 @@
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeReplyLatency, CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
     escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
-    channelSortRank, listComparator, computeDataQualityFlags,
+    channelSortRank, listComparator, computeDataQualityFlags, computePriorityQueue,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     findContactDetailReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
@@ -48,6 +48,8 @@
   const snapshotBtn = document.getElementById('snapshotBtn');
   const dataQualitySection = document.getElementById('dataQualitySection');
   const dataQualityList = document.getElementById('dataQualityList');
+  const upNextSection = document.getElementById('upNextSection');
+  const upNextList = document.getElementById('upNextList');
   const activityFeedEl = document.getElementById('activityFeed');
   const velocityListEl = document.getElementById('velocityList');
   const funnelListEl = document.getElementById('funnelList');
@@ -808,6 +810,30 @@
       '</button>'
     ).join('');
     wireRowsToModal(dataQualityList);
+  }
+
+  // One row per prospect instead of one row per panel: computePriorityQueue
+  // (csm-core.js) already merges the nudge/stalled/cold-signal/backfill
+  // checks those four panels below compute, this just renders the result.
+  // Rank 1 (a passed nudge date or a stalled stage) gets the same red
+  // .data-quality-list-stale already uses for Stalled in stage, rank 2
+  // (cold signal, or a nudge due soon) the same amber the rest of this
+  // page's reason text already uses, rank 3 (backfill-only) stays plain.
+  function renderUpNext(stages, prospects) {
+    const rows = computePriorityQueue(stages, prospects);
+    if (rows.length === 0) {
+      upNextSection.hidden = true;
+      return;
+    }
+    upNextSection.hidden = false;
+    upNextList.innerHTML = rows.map(({ p, rank, reasons }) =>
+      '<button type="button" class="data-quality-row up-next-row-' + rank + '" data-prospect-id="' + escapeHtml(p.id) + '">' +
+      '<strong>' + escapeHtml(p.name) + '</strong>' +
+      '<span style="color:var(--sub)">' + escapeHtml(p.company || '') + '</span>' +
+      '<span class="dq-why">' + reasons.map(escapeHtml).join(' &middot; ') + '</span>' +
+      '</button>'
+    ).join('');
+    wireRowsToModal(upNextList);
   }
 
   // Pulls stage moves and content-ideas entries out of every prospect's own
@@ -4250,6 +4276,7 @@
     if (stagesData || prospectsData) {
       renderSnapshot(allStages, allProspects, loadStatus);
       renderAttentionBar(allStages, allProspects, driftStatus);
+      renderUpNext(allStages, allProspects);
       renderNudgeQueue(allProspects);
       checkNudgeAlerts(allProspects);
       setInterval(() => checkNudgeAlerts(allProspects), NUDGE_ALERT_POLL_MS);

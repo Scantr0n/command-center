@@ -61,6 +61,16 @@
 
   <div class="attention-bar" id="attentionBar" role="status" aria-live="polite" hidden></div>
 
+  <section id="upNextSection" hidden>
+    <h2 class="section-title">Up next</h2>
+    <p class="section-note">One row per prospect, merging the nudge queue, stalled-in-stage, cold-signal, and
+      needs-backfill panels further down this page into a single ranked list: a passed nudge date or a stalled
+      stage first, a cold-signal prospect or a nudge due within 2 days next, a backfill-only gap last. Every
+      reason comes straight from those panels, nothing new is computed here, so this never disagrees with them,
+      it only tells you which prospect to open first.</p>
+    <div class="data-quality-list" id="upNextList"></div>
+  </section>
+
   <details class="schema-help">
     <summary>How to log a real prospect (until a backend is wired in)</summary>
     <div class="schema-help-body">

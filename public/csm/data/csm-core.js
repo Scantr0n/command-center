@@ -801,6 +801,71 @@
       .filter(x => x.reasons.length > 0);
   }
 
+  // Real "what do I actually do next" view: the nudge queue, stalled,
+  // cold-signal, and data-quality panels above each answer a different
+  // question, so acting on the pipeline today means sweeping all four
+  // before anything registers as the one urgent thing. This merges them
+  // into one row per prospect (every real reason that prospect needs
+  // attention right now, not one row per panel) ranked worst-first: an
+  // overdue/due-today nudge or a stalled stage (a date has already passed)
+  // outranks a cold-signal prospect (effort already spent, no reply),
+  // which outranks a nudge merely due soon, which outranks a prospect
+  // whose only open item is a backfill gap (real, but never time-critical
+  // the way a passed date is). Reuses the same four compute* functions
+  // above rather than re-deriving any of their logic, so this can never
+  // independently drift from what each of those panels already shows.
+  function computePriorityQueue(stages, prospects) {
+    const stageById = Object.fromEntries(stages.map(s => [s.id, s]));
+    // Keyed by the prospect object itself, not p.id: a test fixture (and,
+    // in principle, a hand-edited record never assigned a real id yet)
+    // can leave id undefined, and every prospect missing one would then
+    // collide on the same object-key slot below.
+    const nudgeByProspect = new Map();
+    computeNudgeRows(prospects).forEach(r => { nudgeByProspect.set(r.p, r); });
+    const stalledByProspect = new Map();
+    computeStalled(stages, prospects).forEach(r => { stalledByProspect.set(r.p, r.info); });
+    const coldByProspect = new Map();
+    computeColdSignal(prospects).active.forEach(r => { coldByProspect.set(r.p, r.touches); });
+    const dqByProspect = new Map();
+    computeDataQualityFlags(stages, prospects).forEach(r => { dqByProspect.set(r.p, r.reasons); });
+
+    const rows = [];
+    prospects.forEach(p => {
+      const reasons = [];
+      let rank = null;
+      const nudge = nudgeByProspect.get(p);
+      if (nudge && nudge.badDate) {
+        reasons.push('NUDGE DATE IS NOT VALID');
+        rank = 1;
+      } else if (nudge && nudge.days <= 0) {
+        reasons.push(nudge.days === 0 ? 'NUDGE DUE TODAY' : (-nudge.days) + 'D OVERDUE NUDGE');
+        rank = 1;
+      }
+      const stalled = stalledByProspect.get(p);
+      if (stalled) {
+        reasons.push(stalled.days + 'D STALLED IN ' + (stageById[p.stage] ? stageById[p.stage].label.toUpperCase() : String(p.stage).toUpperCase()));
+        rank = 1;
+      }
+      const coldTouches = coldByProspect.get(p);
+      if (coldTouches != null) {
+        reasons.push(coldTouches + ' TOUCHES LOGGED, NO REPLY YET');
+        rank = rank === null ? 2 : Math.min(rank, 2);
+      }
+      if (nudge && !nudge.badDate && nudge.days > 0 && nudge.days <= 2) {
+        reasons.push('NUDGE DUE IN ' + nudge.days + 'D');
+        rank = rank === null ? 2 : Math.min(rank, 2);
+      }
+      const dqReasons = dqByProspect.get(p);
+      if (dqReasons && dqReasons.length) {
+        reasons.push(dqReasons.length + (dqReasons.length === 1 ? ' BACKFILL GAP' : ' BACKFILL GAPS'));
+        rank = rank === null ? 3 : Math.min(rank, 3);
+      }
+      if (reasons.length) rows.push({ p, rank, reasons });
+    });
+
+    return rows.sort((a, b) => a.rank - b.rank || (a.p.name || '').localeCompare(b.p.name || ''));
+  }
+
   // Real XSS guard (OWASP): this page renders hand-editable JSON field
   // values (a prospect's name, a note, a channel detail) straight into
   // innerHTML, so a value containing "<script>" or an "onerror=" attribute
@@ -1144,7 +1209,8 @@
     rollPastChinaHolidays,
     reachedActiveExploration, computeStageVelocity, computeColdSignal, computeFunnel,
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness, computeReplyLatency,
-    computeStalled, hasNudgePlan, computeDataQualityFlags, escapeHtml, csvField, icsEscapeText, icsFoldLine,
+    computeStalled, hasNudgePlan, computeDataQualityFlags, computePriorityQueue,
+    escapeHtml, csvField, icsEscapeText, icsFoldLine,
     outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     findContactDetailReuseMatch,

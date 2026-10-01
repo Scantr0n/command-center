@@ -715,6 +715,15 @@ header.page-head .sub {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* Up next mixes every rank in one list, unlike Stalled in stage (red
+   throughout) or Needs backfill (amber throughout) below, so only the
+   top rank gets its own color here: rank 1 (a passed nudge date, or a
+   stalled stage) reuses the same red .data-quality-list-stale already
+   uses. Ranks 2 and 3 stay the plain default .dq-why amber; the reason
+   text itself already spells out which one a row is. */
+.up-next-row-1 .dq-why { color: #E5484D; }
+.up-next-row-1:hover, .up-next-row-1:focus-visible { background: rgba(229,72,77,0.08); }
+
 /* Recent activity feed: merges stage moves and content ideas from every
    prospect into one pipeline-wide, newest-first list. */
 .activity-feed {

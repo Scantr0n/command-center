@@ -23,7 +23,7 @@ const {
   rollPastChinaHolidays,
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness, computeReplyLatency,
-  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags,
+  CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags, computePriorityQueue,
   escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch, findContactDetailReuseMatch,
@@ -1355,6 +1355,56 @@ test('computeDataQualityFlags flags a pasted-in em dash and names the field it i
   const p = { stage: 'researched', name: 'Jane Doe', nextAction: 'Call them' + EM_DASH + 'soon' };
   const flagged = computeDataQualityFlags([], [p]);
   assert.deepEqual(flagged[0].reasons, ['EM DASH IN NEXTACTION, CHECK FOR A PASTE-IN']);
+});
+
+const PRIORITY_STAGES = [
+  { id: 'outreach-sent', label: 'Outreach Sent', staleAfterDays: 10 },
+  { id: 'in-exploration', label: 'In Exploration', staleAfterDays: 30 }
+];
+
+test('computePriorityQueue leaves out a prospect with nothing flagged by any of the four panels it merges', () => {
+  const p = { id: 'clean', name: 'Clean', stage: 'outreach-sent', verifiedHook: 'real hook', nextAction: 'Follow up', contactChannel: { type: 'named-decision-maker', detail: 'a@b.com' }, nextNudgeDate: addDaysIso(todayIso(), 5) };
+  assert.deepEqual(computePriorityQueue(PRIORITY_STAGES, [p]), []);
+});
+
+test('computePriorityQueue ranks an overdue nudge above a cold-signal prospect, which ranks above a backfill-only gap', () => {
+  const overdue = { id: 'overdue', name: 'Overdue', stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), -2), outreachLog: [{ date: addDaysIso(todayIso(), -2), type: 'initial-send' }] };
+  const cold = {
+    id: 'cold', name: 'Cold', stage: 'outreach-sent', verifiedHook: 'h', contactChannel: { type: 'named-decision-maker', detail: 'x' }, nextNudgeDate: addDaysIso(todayIso(), 20),
+    outreachLog: [0, 1, 2].map(n => ({ date: addDaysIso(todayIso(), -30 + n), type: 'nudge' }))
+  };
+  const backfillOnly = { id: 'backfill', name: 'Backfill', stage: 'in-exploration' };
+  const rows = computePriorityQueue(PRIORITY_STAGES, [backfillOnly, cold, overdue]);
+  assert.deepEqual(rows.map(r => r.p.name), ['Overdue', 'Cold', 'Backfill']);
+  assert.deepEqual(rows.map(r => r.rank), [1, 2, 3]);
+});
+
+test('computePriorityQueue merges every real reason for one prospect into a single row, not one row per panel', () => {
+  const p = {
+    id: 'multi', name: 'Multi', stage: 'outreach-sent', stageEnteredDate: addDaysIso(todayIso(), -15),
+    nextNudgeDate: addDaysIso(todayIso(), -1)
+  };
+  const rows = computePriorityQueue(PRIORITY_STAGES, [p]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].rank, 1);
+  assert.ok(rows[0].reasons.some(r => r.includes('OVERDUE NUDGE')));
+  assert.ok(rows[0].reasons.some(r => r.includes('STALLED IN OUTREACH SENT')));
+  assert.ok(rows[0].reasons.some(r => r.includes('BACKFILL GAP')));
+});
+
+test('computePriorityQueue treats two prospects with no id the same as any other real pair, not as one colliding record', () => {
+  const a = { name: 'Alpha', stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), -1) };
+  const b = { name: 'Beta', stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), -3) };
+  const rows = computePriorityQueue(PRIORITY_STAGES, [a, b]);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map(r => r.p.name).sort(), ['Alpha', 'Beta']);
+});
+
+test('computePriorityQueue sorts same-rank rows by name for a deterministic order', () => {
+  const b = { id: 'b', name: 'Bravo', stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), -1) };
+  const a = { id: 'a', name: 'Alpha', stage: 'outreach-sent', nextNudgeDate: addDaysIso(todayIso(), -1) };
+  const rows = computePriorityQueue(PRIORITY_STAGES, [b, a]);
+  assert.deepEqual(rows.map(r => r.p.name), ['Alpha', 'Bravo']);
 });
 
 test('slugifyProspectId builds a real, readable id from a real name and company', () => {
