@@ -1913,6 +1913,15 @@ footer.page-foot {
   .pos-table th.sortable::after { content: none !important; }
   .pos-table td { border-color: #ddd; color: #111; }
   .pos-side-long, .pos-side-short, .pos-exposure-long, .pos-exposure-short { color: #111 !important; }
+  /* Same hardcoded-hex-survives-onto-paper bug already fixed four times
+     above, found here too: .pos-table td.pos-conc-high (the >=10%
+     single-position concentration warning) sets its own explicit #E0A030
+     with two classes plus an element, which outranks the plain
+     ".pos-table td { color: #111; }" reset two lines up (one class, one
+     element) on specificity alone, no !important involved on either side.
+     The real risk flag this color exists to carry was landing on white
+     paper at roughly 2.3:1 contrast, under WCAG AA at any text size. */
+  .pos-conc-high { color: #111 !important; }
 
   footer.page-foot { border-color: #ccc; color: #555; }
 }
