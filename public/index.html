@@ -611,7 +611,7 @@
       filter: none !important;
     }
 
-    #searchWrap, #paletteBtn, #backupBtn, #compareBackupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #errorBanner, #driveStatusBadge,
+    #searchWrap, #paletteBtn, #backupBtn, #compareBackupBtn, #printBtn, #shortcutsBtn, #viewToggleGroup, #offlineBanner, #errorBanner, #driveStatusBadge,
     #filterStatus, #attnCompact, #statusLegend, #categoryFilterRow,
     #noResultsMsg, #graphView, #gridSkeleton, #gridToolbar, #modalOverlay, #paletteOverlay, #shortcutsOverlay, #compareBackupOverlay,
     /* Both added after the comment above was written, and both missed being
@@ -769,6 +769,7 @@
     </header>
 
     <main id="mainContent">
+    <div id="offlineBanner" class="hidden text-xs font-mono px-3 py-2.5 rounded-lg mb-4" role="status" aria-atomic="true" style="background: #E0A0301A; color: #E0A030; border: 1px solid #E0A03040"></div>
     <div id="errorBanner" class="hidden text-xs font-mono px-3 py-2 rounded-lg mb-4" role="alert" style="background: #E04A4A1A; color: #E0807A; border: 1px solid #E04A4A40"></div>
     <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
 
@@ -1156,6 +1157,10 @@ const ICON_CLOCK = '<circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 2"/
 
 let lastClustersRaw = null;
 let lastFullRenderAt = 0;
+// Set on every successful /api/clusters resolution, cache-served or fresh,
+// purely to give the offline banner below an honest "as of" time. Never a
+// guess: null until the very first load actually completes.
+let lastClustersLoadedAt = null;
 let deepLinkChecked = false;
 
 // True once the user has manually scrolled the mobile graph strip
@@ -1197,6 +1202,7 @@ async function loadClusters() {
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
     if (requestId !== latestClustersRequestId) return;
+    lastClustersLoadedAt = Date.now();
     document.getElementById('graphSkeleton').classList.add('hidden');
     firstLoadDone = true;
     document.getElementById('gridSkeleton').classList.add('hidden');
@@ -3842,6 +3848,37 @@ document.addEventListener('keydown', (e) => {
 if (!/mac|iphone|ipad|ipod/i.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent)) {
   document.getElementById('paletteBtnKbd').textContent = 'Ctrl K';
 }
+
+// Offline banner: navigator.onLine plus the real 'online'/'offline' window
+// events are the browser's own signal for whether this device has a network
+// path at all, a different question from whether /api/clusters itself
+// succeeded. This matters specifically because the service worker (sw.js)
+// resolves /api/clusters from its own runtime cache while genuinely offline
+// (see its networkFirst helper), so loadClusters() completing without
+// hitting errorBanner is not proof this page is current. Every per-project
+// hub already has this exact banner for the same reason; the hub page
+// itself, the one Jack actually leaves open, never did.
+function updateOfflineBanner() {
+  const banner = document.getElementById('offlineBanner');
+  if (!banner) return;
+  const offline = !navigator.onLine;
+  banner.classList.toggle('hidden', !offline);
+  if (offline) {
+    const detail = lastClustersLoadedAt
+      ? `Showing the snapshot last loaded ${relativeTimeFine(lastClustersLoadedAt)}; it may not reflect the latest hand-edit or Drive sync.`
+      : 'Showing the last snapshot this device saw; it may not reflect the latest hand-edit or Drive sync.';
+    banner.innerHTML = `<strong>This device is offline.</strong> ${escapeHtml(detail)}`;
+  }
+}
+window.addEventListener('offline', updateOfflineBanner);
+window.addEventListener('online', () => {
+  updateOfflineBanner();
+  loadClusters();
+});
+// Covers the case where the page itself loads while already offline (the
+// service worker can still serve the cached app shell), so the banner
+// doesn't wait for a later 'offline' event that will never fire.
+updateOfflineBanner();
 
 loadClusters();
 let lastLoadAt = Date.now();
