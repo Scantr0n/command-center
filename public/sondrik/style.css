@@ -100,7 +100,12 @@ header.page-head .sub {
 /* Skip link: same bypass-blocks precedent as Alpha's style.css. The header
    carries up to eight interactive controls before main content, so a
    keyboard or screen-reader user landing on the page would otherwise have
-   to tab through all of them first. Off-screen until focused. */
+   to tab through all of them first. Off-screen until focused. The link's
+   real target, <main id="mainContent">, carries its own tabindex="-1" (see
+   index.html): without it, activating this link scrolls Safari/VoiceOver to
+   #mainContent but never actually moves keyboard focus there, so a user
+   would still land back at the top of body on their next Tab. Alpha's own
+   #mainContent already had this, this page didn't. */
 .skip-link {
   position: absolute;
   top: -60px;

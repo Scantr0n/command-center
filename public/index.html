@@ -456,7 +456,12 @@
      before any real content, so a keyboard or screen-reader user landing on
      the page would otherwise have to tab through all of them first.
      Off-screen until focused. No sidebar offset needed: sidebar.js
-     deliberately skips injecting its nav rail on this page. */
+     deliberately skips injecting its nav rail on this page. The link's real
+     target, <main id="mainContent">, needs its own tabindex="-1" (see the
+     element itself): without it, activating this link scrolls Safari/
+     VoiceOver to #mainContent but never actually moves keyboard focus there,
+     so a user would still land back at the top of body on their next Tab.
+     Alpha's own #mainContent already carried this; the other 6 pages didn't. */
   .skip-link {
     position: absolute;
     top: -60px;
@@ -768,7 +773,7 @@
       </div>
     </header>
 
-    <main id="mainContent">
+    <main id="mainContent" tabindex="-1">
     <div id="offlineBanner" class="hidden text-xs font-mono px-3 py-2.5 rounded-lg mb-4" role="status" aria-atomic="true" style="background: #E0A0301A; color: #E0A030; border: 1px solid #E0A03040"></div>
     <div id="errorBanner" class="hidden text-xs font-mono px-3 py-2 rounded-lg mb-4" role="alert" style="background: #E04A4A1A; color: #E0807A; border: 1px solid #E04A4A40"></div>
     <div id="filterStatus" class="sr-only" role="status" aria-live="polite"></div>
