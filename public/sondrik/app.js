@@ -1071,11 +1071,20 @@
   // a visitor can tell, at a glance, whether the whole hub (not just the
   // download count) reflects anything recent or is running on old input.
   function renderLastUpdated(releasesData, downloadsData, leadsData, goalsData) {
+    // isValidDateStr filter added for the same reason the Traction card's
+    // freshness badge and Snapshot strip's hero tile got guards above: this
+    // header line is the single most prominent piece of text on the page,
+    // and an unguarded daysBetween below would have made isStale silently
+    // false (NaN > N is always false) for a malformed date among these four
+    // sources, hiding a real staleness warning rather than showing a wrong
+    // one. Dropping the bad entry here also avoids a malformed date (e.g.
+    // "2026-9-20") sorting out of real chronological order against a valid
+    // one (e.g. "2026-09-07") and getting picked as "latest" by mistake.
     const dates = [];
-    ((releasesData && releasesData.releases) || []).forEach(r => { if (r.date) dates.push(r.date); });
-    (((downloadsData && downloadsData.metric) || {}).checks || []).forEach(c => { if (c.date) dates.push(c.date); });
-    ((leadsData && leadsData.leads) || []).forEach(l => { if (l.loggedDate) dates.push(l.loggedDate); });
-    ((goalsData && goalsData.goals) || []).forEach(g => { if (g.setDate) dates.push(g.setDate); });
+    ((releasesData && releasesData.releases) || []).forEach(r => { if (isValidDateStr(r.date)) dates.push(r.date); });
+    (((downloadsData && downloadsData.metric) || {}).checks || []).forEach(c => { if (isValidDateStr(c.date)) dates.push(c.date); });
+    ((leadsData && leadsData.leads) || []).forEach(l => { if (isValidDateStr(l.loggedDate)) dates.push(l.loggedDate); });
+    ((goalsData && goalsData.goals) || []).forEach(g => { if (isValidDateStr(g.setDate)) dates.push(g.setDate); });
 
     if (dates.length === 0) {
       lastUpdatedSub.hidden = true;
