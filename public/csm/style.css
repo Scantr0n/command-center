@@ -883,9 +883,10 @@ header.page-head .sub {
   max-width: 560px;
   transition: border-color 0.15s ease;
 }
-.search-input:focus {
-  outline: none;
-  border-color: var(--hairlineHover);
+.search-input:focus-visible {
+  outline: 1.5px solid var(--dim);
+  outline-offset: 1px;
+  border-color: var(--dim);
 }
 .search-input::placeholder { color: var(--dim); }
 

@@ -41,7 +41,10 @@ test('isFutureDate is false for null, today, and the past', () => {
   assert.equal(isFutureDate('2020-01-01'), false);
 });
 
-test('isFutureDate is true for a date after tomorrow', () => {
+test('isFutureDate is true for tomorrow and any date after it', () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  assert.equal(isFutureDate(tomorrow.toISOString().slice(0, 10)), true);
   assert.equal(isFutureDate('2099-01-01'), true);
 });
 

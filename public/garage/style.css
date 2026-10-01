@@ -465,9 +465,10 @@ section { margin-bottom: 36px; }
   max-width: 480px;
   transition: border-color 0.15s ease;
 }
-.search-input:focus {
-  outline: none;
-  border-color: var(--hairlineHover);
+.search-input:focus-visible {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
 }
 .search-input::placeholder { color: var(--dim); }
 

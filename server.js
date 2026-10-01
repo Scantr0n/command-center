@@ -708,10 +708,10 @@ app.get('/api/alpha/live', async (req, res) => {
   }
 });
 
-// Every hub with a changelog.json (Sondrik, Alpha, CSM, CGT, Garage) had its
-// own hand-copied route here, identical except for dataDir and which data
-// files to check, five copies of the same real bug fix drifting slightly
-// further apart every time one got copy-pasted for the next hub. Collapsed
+// Every hub with a changelog.json (Sondrik, Alpha, CSM, CGT, Garage, Job
+// Search) had its own hand-copied route here, identical except for dataDir
+// and which data files to check, six copies of the same real bug fix drifting
+// slightly further apart every time one got copy-pasted for the next hub. Collapsed
 // into one factory: validate.js's own changelog-drift check (comparing
 // changelog.json's recorded commit hashes against this repo's real git log
 // for a hub's tracked data files) only ever ran from the command line, so a

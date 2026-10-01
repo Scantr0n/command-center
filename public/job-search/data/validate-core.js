@@ -30,10 +30,9 @@
 
   function isFutureDate(v) {
     if (!v || !DATE_RE.test(v)) return false;
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    return new Date(v + 'T00:00:00') > tomorrow;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(v + 'T00:00:00') > today;
   }
 
   // Every real field on this page is transcribed straight out of the tracker,
