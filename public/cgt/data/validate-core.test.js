@@ -159,6 +159,30 @@ test('validateCards passes a fully-labeled real-sale card clean', () => {
   assert.deepEqual(errors, []);
 });
 
+test('validateCards requires a labeled basis on every priceHistory entry, same rule as the current price', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', estimatedValue: 50, valuationBasis: 'recent-sale',
+    datePriced: '2026-08-08', priceHistory: [{ value: 20, date: '2026-07-01', basis: null }]
+  }]);
+  assert.ok(errors.some(e => e.includes('priceHistory[0]') && e.includes('basis')));
+});
+
+test('validateCards rejects a priceHistory basis outside the recent-sale/comp-estimate enum', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', estimatedValue: 50, valuationBasis: 'recent-sale',
+    datePriced: '2026-08-08', priceHistory: [{ value: 20, date: '2026-07-01', basis: 'guess' }]
+  }]);
+  assert.ok(errors.some(e => e.includes('priceHistory[0]') && e.includes('basis "guess"')));
+});
+
+test('validateCards passes a priceHistory entry with a real labeled basis clean', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', estimatedValue: 50, valuationBasis: 'recent-sale',
+    datePriced: '2026-08-08', priceHistory: [{ value: 20, date: '2026-07-01', basis: 'comp-estimate' }]
+  }]);
+  assert.deepEqual(errors, []);
+});
+
 test('validateCards requires soldDate and soldPrice together, not one without the other', () => {
   const missingDate = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', soldPrice: 20, soldDate: null }]);
   assert.ok(missingDate.errors.some(e => e.includes('soldDate')));

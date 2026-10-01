@@ -386,7 +386,16 @@
               errors.push(hWhere + ': dated ' + h.date + ', which is not before the card\'s current datePriced (' +
                 c.datePriced + '). priceHistory should only hold prices from before the current one.');
             }
-            if (h.basis !== undefined && h.basis !== null && !VALUATION_BASES.includes(h.basis)) {
+            // Same "never left ambiguous" rule as the card's own current
+            // estimatedValue/valuationBasis pair above, applied to every past
+            // price too: without this, a hand-edited priceHistory entry could
+            // carry a real dollar value with no basis, and the modal's price
+            // history list would silently render it as "unlabeled" instead of
+            // catching it here at validation time.
+            if (!h.basis) {
+              errors.push(hWhere + ': has a "value" but no "basis". Every price, past or current, must be labeled ' +
+                '"recent-sale" or "comp-estimate", never left ambiguous.');
+            } else if (!VALUATION_BASES.includes(h.basis)) {
               errors.push(hWhere + ': basis "' + h.basis + '" is not "recent-sale" or "comp-estimate"');
             }
           });
