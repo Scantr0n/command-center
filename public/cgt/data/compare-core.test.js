@@ -102,6 +102,14 @@ test('compareWithBackup detects a candidate decision change', () => {
   assert.deepEqual(result.candidates.changed[0].fields, ['decision']);
 });
 
+test('compareWithBackup catches a BGS subgrade or photo URL change, not just the fields cards.json started with', () => {
+  const current = { rawCardsData: { cards: [{ id: 'x', cardName: 'Neal Broten Rookie', subgradeCentering: 9.5, imageUrl: 'https://example.com/new.jpg' }] } };
+  const backup = backupFile({ cardsJson: { cards: [{ id: 'x', cardName: 'Neal Broten Rookie', subgradeCentering: 9, imageUrl: 'https://example.com/old.jpg' }] } });
+  const result = compareWithBackup(current, backup);
+  assert.equal(result.cards.changed.length, 1);
+  assert.deepEqual(result.cards.changed[0].fields.sort(), ['imageUrl', 'subgradeCentering']);
+});
+
 test('compareWithBackup treats a missing key and an explicit null certNumber as equal, not a false change', () => {
   const current = { rawCardsData: { cards: [{ id: 'x', cardName: 'Neal Broten Rookie' }] } };
   const backup = backupFile({ cardsJson: { cards: [{ id: 'x', cardName: 'Neal Broten Rookie', certNumber: null }] } });
