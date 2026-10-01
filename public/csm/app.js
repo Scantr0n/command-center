@@ -1967,6 +1967,24 @@
   const PLATFORM_REFERENCE_REVIEWED_ON = '2026-09-25';
   const PLATFORM_REFERENCE_STALE_AFTER_DAYS = 45;
 
+  // Same seven rows as the Platform outreach reference table above (index.html),
+  // offered as datalist suggestions everywhere a real platform name gets typed
+  // into socialSnapshots[].platform (the "Log new prospect" form and a
+  // prospect's own "Add social snapshot" generator), so the casing this board
+  // already dedicates a whole "Casing drift" panel and validate.js check to
+  // catching after the fact (e.g. "Wechat" vs "WeChat") has a real chance of
+  // never happening in the first place. Unlike npCategoryList just below,
+  // which is seeded from whatever categories are already logged (there is no
+  // fixed real-world vocabulary for a business category), these platform
+  // names are a closed, real, documented set, so seeding this one from the
+  // reference table instead of from already-logged data still offers real
+  // suggestions even before a single socialSnapshot has ever been logged. A
+  // datalist is a suggestion only, never a restriction, so a real platform
+  // this list hasn't caught up with yet can still be typed freely. Keep this
+  // list in sync with the Platform outreach reference table's own rows if one
+  // is ever added or renamed there.
+  const KNOWN_SOCIAL_PLATFORMS = ['Douyin', 'Xiaohongshu', 'Weibo', 'Bilibili', 'WeChat', 'WeChat Channels', 'Kuaishou'];
+
   // Independent of stages/prospects load state (no fetch involved, see
   // PLATFORM_REFERENCE_REVIEWED_ON above), so this runs unconditionally at
   // page load rather than from inside the Promise.allSettled load below.
@@ -3148,7 +3166,8 @@
     return '<div class="inline-gen">' +
       '<div class="inline-gen-row inline-gen-row-idea">' +
       '<label class="sr-only" for="modalSnapPlatform">Platform</label>' +
-      '<input type="text" id="modalSnapPlatform" class="np-input" placeholder="Platform, e.g. Douyin">' +
+      '<input type="text" id="modalSnapPlatform" class="np-input" placeholder="Platform, e.g. Douyin" list="modalSnapPlatformList">' +
+      '<datalist id="modalSnapPlatformList">' + KNOWN_SOCIAL_PLATFORMS.map(pl => '<option value="' + escapeHtml(pl) + '"></option>').join('') + '</datalist>' +
       '<label class="sr-only" for="modalSnapFollowers">Followers</label>' +
       '<input type="number" min="0" id="modalSnapFollowers" class="np-input inline-gen-date" placeholder="Followers">' +
       '<label class="sr-only" for="modalSnapEngagement">Engagement %</label>' +
@@ -3548,6 +3567,7 @@
   const npCopyBtn = document.getElementById('npCopyBtn');
   const npStageSelect = document.getElementById('npStage');
   const npCategoryList = document.getElementById('npCategoryList');
+  const npSocialPlatformList = document.getElementById('npSocialPlatformList');
   const npModeToggle = document.getElementById('npModeToggle');
   const npFullFormWrap = document.getElementById('npFullFormWrap');
   const npQuickAddWrap = document.getElementById('npQuickAddWrap');
@@ -4103,6 +4123,11 @@
     npCategoryList.innerHTML = categories.map(c => '<option value="' + escapeHtml(c) + '"></option>').join('');
   }
 
+  function npPopulateSocialPlatformList() {
+    if (!npSocialPlatformList) return;
+    npSocialPlatformList.innerHTML = KNOWN_SOCIAL_PLATFORMS.map(pl => '<option value="' + escapeHtml(pl) + '"></option>').join('');
+  }
+
   function npResetForm() {
     NP_FIELD_IDS.forEach(id => { document.getElementById(id).value = ''; });
     npStageSelect.value = 'researched';
@@ -4115,6 +4140,7 @@
     npLastFocusedEl = document.activeElement;
     npPopulateStageOptions();
     npPopulateCategoryList();
+    npPopulateSocialPlatformList();
     npResetForm();
     setNpMode('full');
     const draft = npLoadDraft();
