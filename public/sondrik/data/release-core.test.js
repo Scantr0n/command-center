@@ -142,6 +142,22 @@ test('suggestedCheckCadence rounds a fractional average gap to the nearest whole
   assert.equal(result.avgGap, 11);
 });
 
+test('suggestedCheckCadence drops a malformed check date rather than letting it poison avgGap into NaN, the real "suggested check was NaN days ago" bug', () => {
+  const result = suggestedCheckCadence({
+    metric: { checks: [{ date: '2026-01-01', count: 5 }, { date: '2026-1-11', count: 8 }, { date: '2026-01-21', count: 12 }] }
+  });
+  // The malformed 2026-1-11 entry is dropped; only the real 01-01 -> 01-21 gap (20 days) remains.
+  assert.equal(result.gapCount, 1);
+  assert.equal(result.avgGap, 20);
+  assert.equal(result.nextDate, '2026-02-10');
+});
+
+test('suggestedCheckCadence returns null when fewer than 2 checks have a valid date, even if more entries exist', () => {
+  assert.equal(suggestedCheckCadence({
+    metric: { checks: [{ date: '2026-01-01', count: 5 }, { date: 'not-a-date', count: 8 }] }
+  }), null);
+});
+
 test('computeReminders returns no reminders when there is nothing forward-looking to remind about', () => {
   assert.deepEqual(computeReminders({}, {}, '2026-09-23'), []);
   assert.deepEqual(computeReminders(null, null, '2026-09-23'), []);

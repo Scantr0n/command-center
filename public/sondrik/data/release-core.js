@@ -117,7 +117,14 @@
   // gaps. Needs at least two real checks (no gap exists off a single point).
   function suggestedCheckCadence(downloadsData) {
     const metric = (downloadsData && downloadsData.metric) || {};
-    const checks = (metric.checks || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    // Filters out a malformed check date rather than letting it poison
+    // every gap through it: an unguarded daysBetween here made avgGap (and
+    // the nextDate addDays derives from it) NaN, which rendered as
+    // "suggested check was NaN days ago (NaN-NaN-NaN)", the same bug class
+    // documented in this file's header comment, reached through a
+    // different call site than bugfixCheckinStatus's own fix for it.
+    const checks = (metric.checks || []).filter(c => c && isValidDateStr(c.date))
+      .slice().sort((a, b) => a.date.localeCompare(b.date));
     if (checks.length < 2) return null;
     const gaps = [];
     for (let i = 1; i < checks.length; i++) gaps.push(daysBetween(checks[i - 1].date, checks[i].date));

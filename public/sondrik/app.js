@@ -603,7 +603,13 @@
 
     let deltaHtml = '';
     let rateHtml = '';
-    if (checks.length > 1) {
+    // isValidDateStr guard added for the same reason launchWindowHtml's and
+    // the Snapshot strip's got one above: first.date/latest.date come
+    // straight off metric.checks with no format check, and a malformed one
+    // would have made span (and the perDay rate derived from it) NaN,
+    // rendering "NaNd earlier" and "~NaN/day" instead of just skipping
+    // this card's delta/rate lines.
+    if (checks.length > 1 && isValidDateStr(first.date) && isValidDateStr(latest.date)) {
       const delta = latest.count - first.count;
       const span = daysBetween(first.date, latest.date);
       deltaHtml = '<div class="stat-delta">' + (delta >= 0 ? '+' : '') + delta +
@@ -655,11 +661,20 @@
       cadenceHtml = '<div class="stat-cadence font-mono" title="Based on ' + escapeHtml(gapBasis) + '">' + escapeHtml(dueLabel) + '</div>';
     }
 
-    const ageDays = daysBetween(latest.date, todayIso());
-    const isStale = ageDays > STALE_AFTER_DAYS;
-    const isAging = !isStale && ageDays > AGING_AFTER_DAYS;
-    const ageLabel = ageDays <= 0 ? 'checked today' : ageDays === 1 ? 'checked 1 day ago' : 'checked ' + ageDays + ' days ago';
-    const freshnessTier = isStale ? 'freshness-stale' : isAging ? 'freshness-aging' : 'freshness-fresh';
+    // isValidDateStr guard added for the same reason the delta/rate block
+    // above got one: an unguarded daysBetween(latest.date, ...) here would
+    // have made ageDays NaN, and both `NaN > N` comparisons below are
+    // always false, so a malformed latest check date would have silently
+    // rendered the "fresh" (green, no warning) badge instead of flagging
+    // that the freshness check itself couldn't run, the worst direction for
+    // a trust signal to fail in.
+    const dateUnreadable = !isValidDateStr(latest.date);
+    const ageDays = dateUnreadable ? null : daysBetween(latest.date, todayIso());
+    const isStale = !dateUnreadable && ageDays > STALE_AFTER_DAYS;
+    const isAging = !dateUnreadable && !isStale && ageDays > AGING_AFTER_DAYS;
+    const ageLabel = dateUnreadable ? 'check date unreadable'
+      : ageDays <= 0 ? 'checked today' : ageDays === 1 ? 'checked 1 day ago' : 'checked ' + ageDays + ' days ago';
+    const freshnessTier = dateUnreadable || isStale ? 'freshness-stale' : isAging ? 'freshness-aging' : 'freshness-fresh';
     // The re-check prompt used to be plain text even once it was telling
     // Jack exactly what to go do ("RE-CHECK GITHUB API"), so acting on it
     // meant leaving the page to go find the real releases URL himself. When
@@ -667,14 +682,14 @@
     // supplies the real one, see downloads.json) this turns the same prompt
     // into a one-click link straight to it; toUpperCase runs only on the
     // plain-text pieces so it never mangles the href.
-    const recheckText = isStale ? 'RE-CHECK GITHUB API' : isAging ? 'CHECK AGAIN SOON' : '';
+    const recheckText = dateUnreadable ? 'FIX THE DATE' : isStale ? 'RE-CHECK GITHUB API' : isAging ? 'CHECK AGAIN SOON' : '';
     const recheckHtml = !recheckText ? '' :
-      (metric.checkUrl
+      (metric.checkUrl && !dateUnreadable
         ? ', <a href="' + escapeHtml(metric.checkUrl) + '" target="_blank" rel="noopener noreferrer">' +
           recheckText + ' <span aria-hidden="true">&#8599;</span></a>'
         : ', ' + recheckText);
     const freshnessHtml = '<div class="freshness-badge ' + freshnessTier + ' font-mono">' +
-      (isStale ? 'STALE, ' : isAging ? 'AGING, ' : '') + ageLabel.toUpperCase() +
+      (dateUnreadable ? '' : isStale ? 'STALE, ' : isAging ? 'AGING, ' : '') + ageLabel.toUpperCase() +
       recheckHtml +
       '</div>';
 

@@ -127,19 +127,34 @@
       });
     } else {
       const latest = checks[checks.length - 1];
-      const ageDays = daysBetween(latest.date, todayIsoStr);
-      if (ageDays > staleAfterDays) {
+      // Guards the real gap this staleness check used to have: a malformed
+      // latest.date made daysBetween return NaN, and both `NaN > N`
+      // comparisons below are always false, so a check logged with a bad
+      // date silently never triggered the stale/aging warning at all,
+      // rather than rendering a wrong one. Surfaced as its own urgent item
+      // instead, same visibility the undatedReleases/undatedLeads items
+      // above already give a missing (rather than malformed) date.
+      if (!isValidDateStr(latest.date)) {
         steps.push({
           urgent: true,
-          text: 'Pull a fresh ' + (metric.label || 'download') + ' count, the last one logged is ' + ageDays + ' days old.',
+          text: 'Fix the malformed date on the latest ' + (metric.label || 'download') + ' check, the staleness check above cannot read it.',
           href: '#tractionSection'
         });
-      } else if (ageDays > agingAfterDays) {
-        steps.push({
-          urgent: false,
-          text: 'The last ' + (metric.label || 'download') + ' count is ' + ageDays + ' days old, plan to pull a fresh one soon before it goes stale.',
-          href: '#tractionSection'
-        });
+      } else {
+        const ageDays = daysBetween(latest.date, todayIsoStr);
+        if (ageDays > staleAfterDays) {
+          steps.push({
+            urgent: true,
+            text: 'Pull a fresh ' + (metric.label || 'download') + ' count, the last one logged is ' + ageDays + ' days old.',
+            href: '#tractionSection'
+          });
+        } else if (ageDays > agingAfterDays) {
+          steps.push({
+            urgent: false,
+            text: 'The last ' + (metric.label || 'download') + ' count is ' + ageDays + ' days old, plan to pull a fresh one soon before it goes stale.',
+            href: '#tractionSection'
+          });
+        }
       }
       if (!metric.source) {
         steps.push({

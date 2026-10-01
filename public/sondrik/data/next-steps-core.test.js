@@ -199,6 +199,17 @@ test('flags a download check older than agingAfterDays but not yet stale as non-
   assert.equal(urgentTexts(steps).length, 0);
 });
 
+test('flags a malformed latest download check date as its own urgent item rather than silently skipping the staleness check, the real NaN-comparison bug class', () => {
+  const steps = computeNextSteps(
+    { downloadsData: { metric: { label: 'downloads', source: 'gh api', checks: [{ date: '2026-9-10', count: 15 }] } } },
+    baseDeps()
+  );
+  assert.ok(urgentTexts(steps).some(t => t === 'Fix the malformed date on the latest downloads check, the staleness check above cannot read it.'));
+  // Confirms this isn't just an extra step alongside a wrong stale/aging one:
+  // neither of those should fire off an unreadable date.
+  assert.equal(urgentTexts(steps).filter(t => t.includes('days old')).length, 0);
+});
+
 test('does not flag a fresh download check', () => {
   const steps = computeNextSteps(
     quietData({ downloadsData: { metric: { label: 'downloads', source: 'gh api', checks: [{ date: TODAY, count: 15 }] } } }),
