@@ -116,6 +116,7 @@
           <tr><th scope="row">sellingFees</th><td>Optional USD number, the real marketplace/final-value fee(s) actually charged on this specific sale (eBay, PWCC, auction house, etc.), taken from the real payout statement, never an estimated percentage. Only meaningful once <code>soldPrice</code> is also set. When logged, "Realized gain / loss" and the collectibles-tax estimate net it out of <code>soldPrice</code> before comparing to <code>costBasis</code>, since a marketplace payout is never the full sale price. Leave <code>null</code> when not yet looked up, the gain/loss then still computes off the gross <code>soldPrice</code> the same as before, it just isn't fee-adjusted yet.</td></tr>
           <tr><th scope="row">listedDate</th><td>ISO date this card actually went up for sale somewhere (eBay, etc), while still unsold. Leave <code>null</code> when not currently listed. <strong>Required together with <code>listedPrice</code></strong>, one without the other is a validation error. Clear both once the card actually sells, that's what <code>soldDate</code>/<code>soldPrice</code> are for. A listing still open 90+ days after this date shows a "sitting" badge and shows up under "Sitting listings" on the dashboard, the real 60-90-day window eBay sellers treat as worth a reprice or relist.</td></tr>
           <tr><th scope="row">listedPrice</th><td>USD number, the real current asking price. <strong>Required together with <code>listedDate</code>.</strong> Independent of <code>estimatedValue</code> (the researched number, not the ask); a listing 50%+ off the card's own <code>estimatedValue</code> in either direction shows up on the dashboard under "Listing price check" as a nudge to double-check the ask, not an error.</td></tr>
+          <tr><th scope="row">listingUrl</th><td>Optional URL to the real live listing (the actual eBay/marketplace page, not a search results page). <strong>Only meaningful with <code>listedPrice</code> also set</strong>, a validation error otherwise. Shows up as a direct link next to the "listed" badge in the detail view, so checking on a listing doesn't mean re-searching for it. Leave <code>null</code> until the real listing exists, never a placeholder or search link.</td></tr>
           <tr><th scope="row">backlogBatch</th><td>Optional label grouping cards priced in the same pass, e.g. <code>"2026-08-08-full-backlog"</code></td></tr>
           <tr><th scope="row">priceHistory</th><td>Optional array of <code>{ "value": number, "date": "YYYY-MM-DD", "basis": "recent-sale" | "comp-estimate" }</code> objects, one per prior real price this card has had, each dated before the current <code>datePriced</code>. Leave off or empty until the card has actually been re-priced once; see the note above on how to fill it in when that happens. Powers the up/down indicator next to the value in the table, the price-history list in the detail view, and the "Price trend since last check" summary tile.</td></tr>
         </tbody>
@@ -148,6 +149,7 @@
   "sellingFees": null,
   "listedDate": null,
   "listedPrice": null,
+  "listingUrl": null,
   "backlogBatch": null,
   "priceHistory": [],
   "notes": null
@@ -237,6 +239,8 @@
           <input class="quick-log-input" type="date" id="ncListedDate">
           <label class="quick-log-label" for="ncListedPrice">Listed price, USD, if already up for sale (optional, needs listed date too)</label>
           <input class="quick-log-input" type="number" id="ncListedPrice" min="0" step="0.01">
+          <label class="quick-log-label" for="ncListingUrl">Listing URL (optional, the real live listing, needs listed price too)</label>
+          <input class="quick-log-input" type="url" id="ncListingUrl" placeholder="e.g. https://www.ebay.com/itm/...">
           <label class="quick-log-label" for="ncBacklogBatch">Backlog batch (optional)</label>
           <input class="quick-log-input" type="text" id="ncBacklogBatch" placeholder="e.g. 2026-08-08-full-backlog">
           <label class="quick-log-label" for="ncNotes">Notes (optional)</label>

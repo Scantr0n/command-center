@@ -3207,6 +3207,7 @@ function cardEditFormHtml(c) {
     ceInputInner('ceListedDate', 'Listed date (leave blank if not currently for sale)', c.listedDate, 'date') +
     ceInputInner('ceListedPrice', 'Listed price, USD (real current asking price)', c.listedPrice, 'number') +
     '</div>' +
+    ceFieldRow('ceListingUrl', 'Listing URL (real live listing, optional)', c.listingUrl, 'url') +
     ceFieldRow('ceBacklogBatch', 'Backlog batch', c.backlogBatch) +
     ceFieldRow('ceNotes', 'Notes', c.notes, 'textarea') +
     '</div>' +
@@ -3527,6 +3528,7 @@ function wireCardEditForm(c) {
       sellingFees: sellingFeesRaw === '' ? null : Number(sellingFeesRaw),
       listedDate: document.getElementById('ceListedDate').value || null,
       listedPrice: listedPriceRaw === '' ? null : Number(listedPriceRaw),
+      listingUrl: ceVal('ceListingUrl'),
       backlogBatch: ceVal('ceBacklogBatch'),
       notes: ceVal('ceNotes')
     });
@@ -3727,6 +3729,11 @@ function openModal(id) {
         }
       }
       body += field('Listed price', listedPriceDisplay, activeCard.listedPrice == null);
+      if (activeCard.listingUrl) {
+        body += `<div class="field-row">
+          <a href="${escapeHtml(activeCard.listingUrl)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">Open real listing &rarr;</a>
+        </div>`;
+      }
     }
   }
   body += field('Comp note', activeCard.compNote, !activeCard.compNote);
@@ -4238,6 +4245,7 @@ const CSV_COLUMNS = [
   [c => isSold(c) ? c.sellingFees : null, 'Selling fees'],
   [c => !isSold(c) && isListed(c) ? c.listedDate : null, 'Listed date'],
   [c => !isSold(c) && isListed(c) ? c.listedPrice : null, 'Listed price'],
+  [c => !isSold(c) && isListed(c) ? c.listingUrl : null, 'Listing URL'],
   // Realized once a card is sold (soldPrice vs costBasis), unrealized otherwise
   // (estimatedValue vs costBasis), same branch the detail modal already uses;
   // the label column says which one a given row is so the two never get
@@ -4746,6 +4754,7 @@ function initQuickLogTool() {
         const raw = document.getElementById('ncListedPrice').value.trim();
         return raw === '' ? null : Number(raw);
       })(),
+      listingUrl: document.getElementById('ncListingUrl').value.trim() || null,
       backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
       priceHistory: [],
       notes: document.getElementById('ncNotes').value.trim() || null

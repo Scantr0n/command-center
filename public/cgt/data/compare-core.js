@@ -55,7 +55,7 @@
     'certNumber', 'storageLocation', 'imageUrl',
     'submissionId', 'estimatedValue', 'valuationBasis', 'compNote', 'sourceNote',
     'acquisitionDate', 'costBasis', 'datePriced', 'soldDate', 'soldPrice', 'sellingFees',
-    'listedDate', 'listedPrice', 'backlogBatch', 'priceHistory', 'notes'
+    'listedDate', 'listedPrice', 'listingUrl', 'backlogBatch', 'priceHistory', 'notes'
   ];
   const SUBMISSION_FIELDS = [
     'gradingCompany', 'serviceLevel', 'description', 'cardCount', 'submittedDate',

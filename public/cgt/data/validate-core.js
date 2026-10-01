@@ -350,6 +350,24 @@
       if (!isDateOrNull(c.listedDate)) {
         errors.push(where + ': "listedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(c.listedDate));
       }
+
+      // Same "wrong type passes clean and only shows up garbled on render"
+      // risk as imageUrl above, since listingUrl also only ever gets
+      // rendered as-is (an <a href>, never re-validated as a URL string at
+      // render time). Only meaningful once the card is actually listed, same
+      // "needs the event it modifies" rule as sellingFees needing soldPrice
+      // above: a listingUrl with no listedPrice is a link to nothing real on
+      // this card.
+      if (c.listingUrl !== null && c.listingUrl !== undefined) {
+        if (typeof c.listingUrl !== 'string') {
+          errors.push(where + ': "listingUrl" must be a string or null');
+        } else if (!c.listingUrl.trim()) {
+          errors.push(where + ': "listingUrl" is an empty string, use null instead of a blank string');
+        }
+        if (c.listedPrice == null) {
+          errors.push(where + ': has a "listingUrl" but no "listedPrice". A listing link only applies to a card that is actually listed.');
+        }
+      }
       // A sold card that still carries listing fields reads as both sold and
       // for sale at once, almost always because the listing was never
       // cleared once the sale went through rather than a real double state.

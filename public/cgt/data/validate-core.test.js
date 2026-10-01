@@ -258,6 +258,28 @@ test('validateCards requires listedDate and listedPrice together, not one withou
   assert.ok(missingPrice.errors.some(e => e.includes('listedPrice')));
 });
 
+test('validateCards requires listedPrice before a listingUrl means anything', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', listingUrl: 'https://www.ebay.com/itm/123'
+  }]);
+  assert.ok(errors.some(e => e.includes('listingUrl') && e.includes('listedPrice')));
+});
+
+test('validateCards rejects an empty-string listingUrl, requiring null instead', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', listedPrice: 20, listedDate: '2026-08-08', listingUrl: ''
+  }]);
+  assert.ok(errors.some(e => e.includes('listingUrl') && e.includes('empty string')));
+});
+
+test('validateCards passes a real listingUrl paired with listedPrice/listedDate clean', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', listedPrice: 20, listedDate: '2026-08-08',
+    listingUrl: 'https://www.ebay.com/itm/123'
+  }]);
+  assert.deepEqual(errors, []);
+});
+
 test('validateCards warns when a card is both sold and still carries listing fields', () => {
   const { warnings } = validateCards([{
     id: 'a', cardName: 'X', sport: 'hockey',

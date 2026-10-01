@@ -22,6 +22,7 @@
       "sellingFees": null,
       "listedDate": "2026-07-13",
       "listedPrice": 20.0,
+      "listingUrl": null,
       "backlogBatch": "2026-07-13-hockey-already-graded",
       "priceHistory": [],
       "notes": "1982-83 O-Pee-Chee #164. Currently listed on eBay at $20 -- about 10x book value, but Jack confirmed the listing price is fine as-is, not re-litigating."
@@ -48,6 +49,7 @@
       "sellingFees": null,
       "listedDate": "2026-07-13",
       "listedPrice": 30.0,
+      "listingUrl": null,
       "backlogBatch": null,
       "priceHistory": [],
       "notes": "2006-07 Upper Deck Black Diamond #210. No book value established at PSA 6 specifically (raw books $35, PSA 8 books $52, PSA 10 books $239 -- no exact PSA 6 comp found, so left unpriced rather than guessing between those numbers). Currently listed on eBay at $30, which looks reasonable."
@@ -74,6 +76,7 @@
       "sellingFees": null,
       "listedDate": "2026-07-13",
       "listedPrice": 100.0,
+      "listingUrl": null,
       "backlogBatch": "2026-07-13-hockey-already-graded",
       "priceHistory": [],
       "notes": "2015-16 Upper Deck UD Portraits #P-100. Currently listed on eBay at $100 -- roughly 2x book PSA 9 value, which may explain why it hasn't sold. Jack's call whether to reprice the listing."
