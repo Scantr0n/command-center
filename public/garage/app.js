@@ -121,7 +121,8 @@ const {
   remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
-  isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace
+  isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace,
+  expectedBalanceDate
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -179,6 +180,36 @@ function renderReturnDisputeFreshness() {
     : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
   el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
   el.title = 'Last hand-verified against each platform\'s own published return/dispute documentation on ' + RETURN_DISPUTE_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as RETURN_DISPUTE_REVIEWED_ON above: the real
+// payout timing this table claims (eBay's 2-day Seller Hub availability,
+// Poshmark's 3-day-after-delivery release, Depop's whichever-comes-first
+// rule, Vinted's 2-day wallet release, and each platform's own bank-transfer
+// window) is a checkable claim sitting right next to the Sales log's own
+// "Funds available (est.)" column, which this exact table's first-step
+// numbers feed via garage-core.js's expectedBalanceDate. First written and
+// verified 2026-10-01 against eBay's own Seller Center "Payments and
+// earnings" page, Poshmark's own support article "When do I get paid for a
+// shipped order?", Depop Help Center's "How do I get paid? - US" article,
+// and Vinted's own help page "Getting paid for a completed sale". Depop's
+// own second step (balance to bank account) has no fixed window published
+// in Depop's own help center as of this review, that cell is reseller-
+// reporting, not an official number, same honest distinction the table's
+// own callout draws.
+const PAYOUT_TIMELINE_REVIEWED_ON = '2026-10-01';
+const PAYOUT_TIMELINE_STALE_AFTER_DAYS = 45;
+
+function renderPayoutTimelineFreshness() {
+  const el = document.getElementById('payoutTimelineFreshness');
+  if (!el) return;
+  const age = daysSincePublished(PAYOUT_TIMELINE_REVIEWED_ON);
+  const stale = age != null && age > PAYOUT_TIMELINE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against each platform\'s own published payout documentation on ' + PAYOUT_TIMELINE_REVIEWED_ON + '.';
 }
 
 // Same freshness-badge pattern as RETURN_DISPUTE_REVIEWED_ON above: the scam
@@ -3008,6 +3039,11 @@ function renderSales(sales) {
         const gap = daysBetweenDates(s.saleDate, s.shipDate);
         return escapeHtml(s.shipDate) + (gap != null ? `<div class="cell-muted">${gap}d after sale</div>` : '');
       })()}</td>
+      <td class="cell-muted">${s.deliveryDate ? escapeHtml(s.deliveryDate) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-muted">${(() => {
+        const est = expectedBalanceDate(s);
+        return est ? escapeHtml(est) : '<span class="cell-value empty">not enough dates logged</span>';
+      })()}</td>
     </tr>
   `;
   }).join('');
@@ -5023,7 +5059,8 @@ document.addEventListener('keydown', e => {
 const SALES_CSV_COLUMNS = [
   ['title', 'Item'], ['platform', 'Platform'], ['salePrice', 'Sale price'], ['askingPrice', 'Asking price'],
   ['netPayout', 'Est. net payout'], ['costBasis', 'Cost basis'], ['shippingCost', 'Shipping paid'],
-  ['profit', 'Profit'], ['saleDate', 'Sale date'], ['shipDate', 'Ship date']
+  ['profit', 'Profit'], ['saleDate', 'Sale date'], ['shipDate', 'Ship date'], ['deliveryDate', 'Delivery date'],
+  ['fundsAvailableEst', 'Funds available (est.)']
 ];
 
 // Exports every real logged sale, same computed net-payout/profit columns as
@@ -5040,7 +5077,8 @@ document.getElementById('salesCsvBtn').addEventListener('click', () => {
       ...s,
       platform: PLATFORM_LABELS[s.platform] || s.platform || '',
       netPayout: net != null ? net.toFixed(2) : '',
-      profit: profit != null ? profit.toFixed(2) : ''
+      profit: profit != null ? profit.toFixed(2) : '',
+      fundsAvailableEst: expectedBalanceDate(s) || ''
     };
   });
   const header = SALES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
@@ -5712,6 +5750,7 @@ function wireQuickLogSaleTool() {
     const shippingCost = readOptionalNonNegativeInput(document.getElementById('nsShippingCost'));
     const saleDate = document.getElementById('nsSaleDate').value || null;
     const shipDate = document.getElementById('nsShipDate').value || null;
+    const deliveryDate = document.getElementById('nsDeliveryDate').value || null;
 
     const blockers = [];
     const advisory = [];
@@ -5739,6 +5778,18 @@ function wireQuickLogSaleTool() {
         blockers.push('Ship date can\'t be before the sale date, an item can\'t ship before it sells.');
       } else if (!saleDate) {
         advisory.push('A ship date with no sale date logged can\'t feed the real on-time-shipping math on the Seller status & standards table, log a sale date too once known.');
+      }
+    }
+    if (deliveryDate) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (new Date(deliveryDate + 'T00:00:00') > tomorrow) {
+        blockers.push('Delivery date is in the future, this is a real logged delivery date, not a plan.');
+      } else if (shipDate && deliveryDate < shipDate) {
+        blockers.push('Delivery date can\'t be before the ship date, an item can\'t be delivered before it ships.');
+      } else if (!shipDate) {
+        advisory.push('A delivery date with no ship date logged, worth backfilling once known.');
       }
     }
 
@@ -5771,7 +5822,8 @@ function wireQuickLogSaleTool() {
       costBasis: costBasis === undefined ? null : costBasis,
       shippingCost: shippingCost === undefined ? null : shippingCost,
       saleDate,
-      shipDate
+      shipDate,
+      deliveryDate
     };
 
     advisory.push(...emDashAdvisory(sale, ['title']));
@@ -6699,6 +6751,7 @@ renderOfferGuideFreshness();
 renderTitleSpecsFreshness();
 renderDescriptionSpecsFreshness();
 renderReturnDisputeFreshness();
+renderPayoutTimelineFreshness();
 renderScamPatternsFreshness();
 renderSellerStandardsFreshness();
 renderSalesTaxFreshness();

@@ -575,6 +575,59 @@
     return sale.shipDate > deadline;
   }
 
+  // Real per-platform timing for the first of the two real steps between a
+  // sale and money actually sitting in Jack's bank account: funds landing in
+  // that platform's own in-app balance (eBay's Seller Hub balance, the
+  // Poshmark balance, the Depop Balance, the Vinted Wallet). Each rule below
+  // is sourced from that platform's own current help documentation as of
+  // September 2026 (see the "Payout timeline by platform" reference table on
+  // the page for the full citations). This deliberately stops at that first
+  // step and never computes the second one, the actual bank transfer/
+  // redemption, because that step depends on a real setting this dashboard
+  // has no data source for: eBay's payout schedule (daily vs.
+  // weekly/biweekly/monthly, which changes whether the transfer is initiated
+  // within 2 days or only on the next Tuesday) and Poshmark's chosen
+  // redemption method (Instant Transfer, direct deposit, PayPal/Venmo, or a
+  // mailed check all take different real amounts of time). That second step
+  // stays reference-only in the table instead of a guessed number here.
+  function expectedBalanceDate(sale) {
+    if (!sale || !sale.platform) return null;
+    if (sale.platform === 'ebay') {
+      // eBay generally makes funds available in Seller Hub within 2 days of
+      // confirming the buyer's payment (eBay Seller Center, "Payments and
+      // earnings"). A sale is only ever logged here once payment is
+      // confirmed, so that's 2 real days after the sale's own saleDate.
+      return sale.saleDate ? addDaysToDateStr(sale.saleDate, 2) : null;
+    }
+    if (sale.platform === 'poshmark') {
+      // Released to the Poshmark balance 3 days after delivery, sooner if
+      // the buyer accepts the order first (support.poshmark.com, "When do I
+      // get paid for a shipped order?"). Keyed off delivery, not the sale
+      // itself, so this needs a real deliveryDate logged, same as the
+      // dispute-window clock on the Return & dispute handling table above.
+      return sale.deliveryDate ? addDaysToDateStr(sale.deliveryDate, 3) : null;
+    }
+    if (sale.platform === 'depop') {
+      // Whichever comes first: 2 business days after delivery, or 10
+      // business days after the sale (Depop Help Center, "How do I get
+      // paid? - US"). Computes both sides when both dates are known and
+      // takes the earlier one, the real "whichever comes first" rule;
+      // either date alone is enough to compute its own side.
+      const fromDelivery = sale.deliveryDate ? addBusinessDays(sale.deliveryDate, 2) : null;
+      const fromSale = sale.saleDate ? addBusinessDays(sale.saleDate, 10) : null;
+      if (fromDelivery && fromSale) return fromDelivery < fromSale ? fromDelivery : fromSale;
+      return fromDelivery || fromSale;
+    }
+    if (sale.platform === 'vinted') {
+      // To the Vinted Wallet within 2 days of delivery, whether or not the
+      // buyer actively confirms receipt (vinted.com/help, "Getting paid for
+      // a completed sale"). Same delivery-keyed clock as Poshmark's above,
+      // just a shorter real window.
+      return sale.deliveryDate ? addDaysToDateStr(sale.deliveryDate, 2) : null;
+    }
+    return null;
+  }
+
   // eBay's own late-shipment-rate requirement, judged for real: for each
   // sale in the window, looks up its matching listing by the sale's own
   // optional listingId (added once sales.json started tracking that join)
@@ -737,7 +790,7 @@
     DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,
     DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
     daysBetweenDates, actualPostingPace, onTimeShipRate, avgDaysToShip,
-    shipDeadline, isLateShipment, ebayLateShipmentRate,
+    shipDeadline, isLateShipment, ebayLateShipmentRate, expectedBalanceDate,
     ebayTrsProgress, depopTopSellerProgress,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend,

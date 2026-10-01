@@ -69,7 +69,7 @@
   const PIPELINE_STAGE_FIELDS = ['count', 'note'];
   const POSTING_LOG_FIELDS = ['date', 'count', 'note'];
   const ACTIVITY_FIELDS = ['date', 'type', 'platform', 'title', 'detail', 'itemsReviewed', 'issuesFound'];
-  const SALE_FIELDS = ['title', 'listingId', 'platform', 'salePrice', 'askingPrice', 'costBasis', 'shippingCost', 'saleDate', 'shipDate'];
+  const SALE_FIELDS = ['title', 'listingId', 'platform', 'salePrice', 'askingPrice', 'costBasis', 'shippingCost', 'saleDate', 'shipDate', 'deliveryDate'];
   const EXPENSE_FIELDS = ['description', 'category', 'miles', 'amount', 'date'];
   const DISPUTE_FIELDS = ['title', 'listingId', 'platform', 'type', 'status', 'openedDate', 'resolvedDate', 'outcome', 'notes'];
   const SUPPLY_FIELDS = ['name', 'category', 'qtyOnHand', 'reorderThreshold', 'lastRestocked', 'notes'];

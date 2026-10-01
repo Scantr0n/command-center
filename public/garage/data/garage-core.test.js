@@ -22,7 +22,7 @@ const {
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
   ebayTrsProgress, depopTopSellerProgress, daysBetweenDates, actualPostingPace,
-  shipDeadline, isLateShipment, ebayLateShipmentRate,
+  shipDeadline, isLateShipment, ebayLateShipmentRate, expectedBalanceDate,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
   DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
   isSupplyLowStock,
@@ -527,6 +527,59 @@ test('ebayLateShipmentRate: joins sales to listings by listingId, only judges sa
 test('ebayLateShipmentRate: null rate (not 0) with nothing real to judge yet', () => {
   assert.deepEqual(ebayLateShipmentRate([], []), { rate: null, sampleSize: 0 });
   assert.deepEqual(ebayLateShipmentRate([{ listingId: 'black-boots', saleDate: '2026-09-01', shipDate: '2026-09-02' }], []), { rate: null, sampleSize: 0 });
+});
+
+test('expectedBalanceDate: eBay, 2 calendar days after the real saleDate (Seller Hub funds-available timing)', () => {
+  assert.equal(expectedBalanceDate({ platform: 'ebay', saleDate: '2026-09-18' }), '2026-09-20');
+  assert.equal(expectedBalanceDate({ platform: 'ebay', saleDate: null }), null, 'no real saleDate to compute from');
+});
+
+test('expectedBalanceDate: Poshmark, 3 calendar days after a real deliveryDate, never keyed off saleDate', () => {
+  assert.equal(expectedBalanceDate({ platform: 'poshmark', deliveryDate: '2026-09-18' }), '2026-09-21');
+  assert.equal(
+    expectedBalanceDate({ platform: 'poshmark', saleDate: '2026-09-18', deliveryDate: null }),
+    null,
+    'Poshmark\'s own clock runs from delivery, a sale date alone can\'t compute it'
+  );
+});
+
+test('expectedBalanceDate: Vinted, 2 calendar days after a real deliveryDate, never keyed off saleDate', () => {
+  assert.equal(expectedBalanceDate({ platform: 'vinted', deliveryDate: '2026-09-18' }), '2026-09-20');
+  assert.equal(expectedBalanceDate({ platform: 'vinted', saleDate: '2026-09-18', deliveryDate: null }), null);
+});
+
+test('expectedBalanceDate: Depop, whichever real rule fires first, delivery+2 business days winning on a fast delivery', () => {
+  // Delivered fast (4 days after sale): 2 business days after delivery
+  // (2026-09-16) lands before 10 business days after the sale (2026-09-24),
+  // so the earlier, delivery-based date is the real one that applies.
+  assert.equal(
+    expectedBalanceDate({ platform: 'depop', saleDate: '2026-09-10', deliveryDate: '2026-09-14' }),
+    '2026-09-16'
+  );
+});
+
+test('expectedBalanceDate: Depop, whichever real rule fires first, sale+10 business days winning on a slow/unconfirmed delivery', () => {
+  // Delivery confirmation lagged (17 days after sale): 10 business days
+  // after the sale (2026-09-15) lands before 2 business days after that
+  // late delivery (2026-09-22), so the sale-based cap is the real one that
+  // applies, the actual protection the "whichever comes first" rule gives
+  // a seller against a buyer who never confirms.
+  assert.equal(
+    expectedBalanceDate({ platform: 'depop', saleDate: '2026-09-01', deliveryDate: '2026-09-18' }),
+    '2026-09-15'
+  );
+});
+
+test('expectedBalanceDate: Depop, computes off whichever single date is actually known', () => {
+  assert.equal(expectedBalanceDate({ platform: 'depop', saleDate: '2026-09-01' }), '2026-09-15', 'sale date alone');
+  assert.equal(expectedBalanceDate({ platform: 'depop', deliveryDate: '2026-09-14' }), '2026-09-16', 'delivery date alone');
+});
+
+test('expectedBalanceDate: null (not a guess) with no sale, no platform, or an unknown platform', () => {
+  assert.equal(expectedBalanceDate(null), null);
+  assert.equal(expectedBalanceDate({}), null);
+  assert.equal(expectedBalanceDate({ platform: 'unknown', saleDate: '2026-09-18', deliveryDate: '2026-09-18' }), null);
+  assert.equal(expectedBalanceDate({ platform: 'depop' }), null, 'depop with neither date logged');
 });
 
 test('ebayTrsProgress: lateShipmentRate stays null when no listings are passed, same as every caller before this existed', () => {

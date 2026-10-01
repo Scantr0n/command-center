@@ -1890,6 +1890,68 @@
     </details>
   </section>
 
+  <section id="payoutTimelineSection">
+    <details class="section-details" id="payoutTimelineDetails">
+    <summary class="section-title">Payout timeline, by platform
+      <span class="reference-freshness" id="payoutTimelineFreshness"></span>
+    </summary>
+    <div class="callout">
+      Real per-platform timing between a sale and money actually landing in a bank account, sourced from each
+      platform's own current help-center documentation as of September 2026. Two separate real steps, not one:
+      first the sale's funds move into that platform's own in-app balance (eBay's Seller Hub balance, the
+      Poshmark balance, the Depop Balance, the Vinted Wallet), then that balance has to actually be transferred
+      or redeemed to a bank account, a second step whose timing depends on a real setting this dashboard has no
+      data source for (eBay's chosen payout schedule, Poshmark's chosen redemption method), so it stays
+      reference-only below. The Sales log's own "Funds available (est.)" column computes the first step for
+      real, once a sale has the real date each platform's own rule actually keys off logged (<code>saleDate</code>
+      for eBay, <code>deliveryDate</code> for Poshmark and Vinted, whichever of <code>saleDate</code>/
+      <code>deliveryDate</code> fires first for Depop).
+    </div>
+    <div class="table-wrap">
+      <table class="card-table">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Sale &rarr; platform balance</th>
+            <th>Balance &rarr; bank account</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>eBay</td>
+            <td>Funds show as Processing, then eBay generally makes them available in Seller Hub within 2 days
+              of confirming the buyer's payment.</td>
+            <td>Depends on the seller's own payout schedule: daily payouts are initiated within 2 days of
+              confirmed payment; weekly, biweekly, or monthly payouts are only initiated on Tuesdays. Either way,
+              the bank then generally takes an additional 1-3 days to make the funds available.</td>
+          </tr>
+          <tr>
+            <td>Vinted</td>
+            <td>Within 2 days of the buyer confirming receipt ("Everything is OK"), or 2 days after delivery if
+              the buyer never confirms or reports an issue, released to the Vinted Wallet.</td>
+            <td>Up to 5 business days for a wallet withdrawal to reach a bank account.</td>
+          </tr>
+          <tr>
+            <td>Poshmark</td>
+            <td>Released to the Poshmark balance 3 days after delivery, or sooner if the buyer accepts the order
+              first; auto-released at 3 days either way.</td>
+            <td>Depends on the redemption method chosen: Instant Transfer lands in minutes (up to ~30); direct
+              deposit takes 2-3 business days; PayPal/Venmo up to 3 days; a mailed paper check longer still.</td>
+          </tr>
+          <tr>
+            <td>Depop</td>
+            <td>Whichever comes first: 2 business days after delivery is confirmed, or 10 business days after
+              the sale, paid into the Depop Balance. A brand-new Depop Payments seller's first payout can be held
+              longer while the account is verified.</td>
+            <td>Not separately published as a fixed window by Depop's own help center as of this review; reseller
+              reporting generally puts a Depop Balance withdrawal at 1-3 business days to a linked bank account.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </details>
+  </section>
+
   <section id="scamPatternsSection">
     <details class="section-details" id="scamPatternsDetails">
     <summary class="section-title">Common seller scam patterns, by platform
@@ -2178,7 +2240,10 @@
       both done, one to log the sale itself and one to flag that item for delisting elsewhere. Profit is only
       shown once a real <code>costBasis</code> or <code>shippingCost</code> is logged for that sale, it stays
       honestly blank otherwise rather than assuming either one is $0, and only ever subtracts the one(s) that
-      are actually logged.
+      are actually logged. "Funds available (est.)" is this platform's own real rule for when a sale's money
+      lands in its in-app balance (not yet a bank account, see the Payout timeline table below for that second
+      step), computed once a real <code>deliveryDate</code> is logged, same "estimated from real logged dates,
+      never a guess" convention as the on-time-shipping math above.
     </div>
 
     <details class="schema-help" id="quickLogSaleTool">
@@ -2225,6 +2290,8 @@
             <input class="quick-log-input" type="date" id="nsSaleDate">
             <label class="quick-log-label" for="nsShipDate">Ship date (optional, feeds the real on-time-shipping math on the Seller status &amp; standards table below)</label>
             <input class="quick-log-input" type="date" id="nsShipDate">
+            <label class="quick-log-label" for="nsDeliveryDate">Delivery date (optional, feeds the real payout-timing estimate on the Payout timeline table below)</label>
+            <input class="quick-log-input" type="date" id="nsDeliveryDate">
             <button type="submit" class="print-btn quick-log-generate">Generate JSON</button>
             <div class="quick-log-warnings" id="nsWarnings" role="alert"></div>
             <textarea class="quick-log-output" id="nsOutput" readonly rows="10" hidden aria-label="Generated sale JSON, ready to paste into the sales array"></textarea>
@@ -2249,6 +2316,8 @@
             <th>Profit</th>
             <th>Date</th>
             <th>Shipped</th>
+            <th>Delivered</th>
+            <th>Funds available (est.)</th>
           </tr>
         </thead>
         <tbody id="salesTableBody"></tbody>

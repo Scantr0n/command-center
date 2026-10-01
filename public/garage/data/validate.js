@@ -469,6 +469,18 @@ function main() {
       }
     }
 
+    if (!isDateOrNull(s.deliveryDate)) {
+      errors.push(where + ': "deliveryDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(s.deliveryDate));
+    } else if (s.deliveryDate) {
+      if (isFutureDate(s.deliveryDate)) {
+        errors.push(where + ': "deliveryDate" (' + s.deliveryDate + ') is in the future, this is a real logged delivery date, not a plan');
+      } else if (isDateOrNull(s.shipDate) && s.shipDate && s.deliveryDate < s.shipDate) {
+        errors.push(where + ': "deliveryDate" (' + s.deliveryDate + ') is before "shipDate" (' + s.shipDate + '), an item can\'t be delivered before it ships, check for a typo\'d date');
+      } else if (!s.shipDate) {
+        warnings.push(where + ': "deliveryDate" is logged but "shipDate" is not, worth backfilling once known');
+      }
+    }
+
     if (s.listingId && listingById[s.listingId] && s.platform) {
       const soldOn = listingById[s.listingId].soldOn || [];
       if (!soldOn.includes(s.platform)) {
