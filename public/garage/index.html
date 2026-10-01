@@ -2445,6 +2445,35 @@
   </section>
 
   <section>
+    <h2 class="section-title">Quarterly estimated tax deadlines
+      <span class="reference-freshness" id="estimatedTaxFreshness"></span>
+    </h2>
+    <div class="callout">
+      <strong>Not tax advice.</strong> The IRS generally expects quarterly estimated payments from anyone who
+      expects to owe $1,000 or more in tax for the year after withholding and credits, which can apply once a side
+      business like this one has real net self-employment income. This table only lists the real federal
+      <a href="https://www.irs.gov/forms-pubs/about-form-1040-es" target="_blank" rel="noopener">Form 1040-ES</a>
+      due dates for <span id="estimatedTaxYear"></span>, each the 15th of the month unless that date falls on a
+      weekend or federal holiday (none of this year's four do). It does not calculate an amount owed, that depends
+      on your full tax situation, not just this page's own Net profit snapshot above, consult a real tax
+      professional for that.
+    </div>
+    <div class="table-wrap">
+      <table class="card-table" id="estimatedTaxTable">
+        <thead>
+          <tr>
+            <th>Period covered</th>
+            <th>Payment due</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="estimatedTaxBody"></tbody>
+      </table>
+    </div>
+    <p class="tax-tracker-note" id="estimatedTaxNote" hidden></p>
+  </section>
+
+  <section>
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Sourcing / acquisitions log</h2>
       <button type="button" id="acquisitionsCsvBtn" class="print-btn font-mono">Export CSV</button>

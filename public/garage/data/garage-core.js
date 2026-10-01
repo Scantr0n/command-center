@@ -359,6 +359,21 @@
     return Math.max(0, Math.floor((now - published.getTime()) / 86400000));
   }
 
+  // Signed day count from todayStr to dateStr, negative once dateStr is
+  // already in the past, zero on the day itself. Unlike daysSincePublished
+  // above (which clamps to a non-negative "age") or daysBetweenDates below
+  // (which treats a negative gap as not a real value at all, correct for a
+  // ship date that can't precede its sale), a fixed calendar deadline like a
+  // quarterly estimated-tax due date genuinely has a distinct "still ahead"
+  // vs. "already passed" state worth telling apart, not just a floor of 0.
+  function daysUntil(dateStr, todayStr) {
+    if (!dateStr || !todayStr) return null;
+    const target = new Date(dateStr + 'T00:00:00');
+    const today = new Date(todayStr + 'T00:00:00');
+    if (Number.isNaN(target.getTime()) || Number.isNaN(today.getTime())) return null;
+    return Math.round((target.getTime() - today.getTime()) / 86400000);
+  }
+
   // A live listing still counts as "due for relist" only if it actually has
   // a remaining platform to relist on: one sold on its only listed platform
   // but not yet flipped to status 'sold' should not inflate this, the same
@@ -712,7 +727,7 @@
     MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
     computeYtdNetProfit,
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
-    remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
+    remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
     poshmarkWeightTier, bundleNetComparison,
     computePoshmarkShareStreak,
     OFFER_TIER_ACCEPT_PCT, OFFER_TIER_COUNTER_PCT, OFFER_TIER_BORDERLINE_PCT,

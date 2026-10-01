@@ -17,7 +17,7 @@ const {
   estimateNetPayout, computeSaleProfit, ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet,
   minListingPriceForNet, addDaysToDateStr, addBusinessDays, disputeResponseDeadline,
   openDisputesDueForResponse,
-  remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
+  remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
@@ -193,6 +193,18 @@ test('daysSincePublished counts whole days against a fixed reference clock', () 
   const now = new Date('2026-09-25T12:00:00').getTime();
   assert.equal(daysSincePublished('2026-09-18', now), 7);
   assert.equal(daysSincePublished('2026-09-25', now), 0);
+});
+
+test('daysUntil returns null for a missing or invalid date on either side', () => {
+  assert.equal(daysUntil(null, '2026-09-25'), null);
+  assert.equal(daysUntil('2026-10-01', null), null);
+  assert.equal(daysUntil('not-a-date', '2026-09-25'), null);
+});
+
+test('daysUntil is signed: positive ahead of today, negative once the date has passed, zero on the day itself', () => {
+  assert.equal(daysUntil('2026-10-15', '2026-09-25'), 20);
+  assert.equal(daysUntil('2026-09-01', '2026-09-25'), -24);
+  assert.equal(daysUntil('2026-09-25', '2026-09-25'), 0);
 });
 
 test('isDueForRelist: the real bug (c142a62), a stale listing sold on its only platform is not due', () => {

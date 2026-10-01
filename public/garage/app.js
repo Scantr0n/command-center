@@ -118,7 +118,7 @@ const {
   estimateNetPayout, computeSaleProfit, minListingPriceForNet,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
-  remainingPlatforms, daysSincePublished, isDueForRelist, relistGuidanceParts,
+  remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
   isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace
@@ -314,6 +314,41 @@ function renderTaxTrackerFreshness() {
     : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
   el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
   el.title = 'Last hand-verified against current IRS Form 1099-K reporting-threshold guidance on ' + TAX_TRACKER_REVIEWED_ON + '.';
+}
+
+// Real federal Form 1040-ES quarterly estimated-tax due dates for the 2026
+// tax year: the 15th of April, June, and September, then the following
+// January, each pushed to the next business day only when the 15th itself
+// falls on a weekend or federal holiday. Verified against the actual 2026
+// calendar (none of the four do: April 15 is a Wednesday, June 15 a Monday,
+// September 15 a Tuesday, and January 15, 2027 a Friday), not scraped from
+// a secondary source, since at least one aggregator found during that same
+// search had June 16 wrong for 2026 (that shift is real for 2025, when
+// June 15 fell on a Sunday, not for this year). Same "not tax advice"
+// discipline as the 1099-K tracker and Net profit snapshot above: this only
+// ever shows the real calendar, never a computed amount owed, which would
+// need assumptions (self-employment tax rate, other income, filing status)
+// this page has no real data for.
+const ESTIMATED_TAX_DUE_DATES = [
+  { period: 'Jan 1 - Mar 31, 2026', due: '2026-04-15' },
+  { period: 'Apr 1 - May 31, 2026', due: '2026-06-15' },
+  { period: 'Jun 1 - Aug 31, 2026', due: '2026-09-15' },
+  { period: 'Sep 1 - Dec 31, 2026', due: '2027-01-15' }
+];
+const ESTIMATED_TAX_REVIEWED_ON = '2026-10-01';
+const ESTIMATED_TAX_STALE_AFTER_DAYS = 45;
+const ESTIMATED_TAX_DUE_SOON_DAYS = 14;
+
+function renderEstimatedTaxFreshness() {
+  const el = document.getElementById('estimatedTaxFreshness');
+  if (!el) return;
+  const age = daysSincePublished(ESTIMATED_TAX_REVIEWED_ON);
+  const stale = age != null && age > ESTIMATED_TAX_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against real IRS Form 1040-ES due-date rules on ' + ESTIMATED_TAX_REVIEWED_ON + '.';
 }
 
 // Same freshness-badge pattern as the tables above. Found a real error while
@@ -933,6 +968,7 @@ async function loadData() {
   }
 
   renderNetProfitSnapshot(salesLog, expensesLog);
+  renderEstimatedTaxTracker(salesLog, expensesLog);
 
   if (disputesData) {
     disputesLog = disputes;
@@ -3271,6 +3307,53 @@ function renderNetProfitSnapshot(sales, expenses) {
   }
   note.hidden = gaps.length === 0;
   note.textContent = gaps.join(' ');
+}
+
+// Real federal Form 1040-ES due-date calendar (ESTIMATED_TAX_DUE_DATES
+// above), judged against today's real date, status only, never a computed
+// payment amount (see that constant's own comment for why). Ties to the Net
+// profit snapshot just above it by surfacing that same real YTD net profit
+// figure in the note, so the one open question this table doesn't answer
+// itself ("does any of this actually apply yet") at least sits next to the
+// one real number that would start to answer it, without this page
+// pretending to answer it for real.
+function renderEstimatedTaxTracker(sales, expenses) {
+  const body = document.getElementById('estimatedTaxBody');
+  const note = document.getElementById('estimatedTaxNote');
+  const yearEl = document.getElementById('estimatedTaxYear');
+  if (!body) return;
+  const year = new Date().getFullYear();
+  if (yearEl) yearEl.textContent = String(year);
+  const today = todayDateStr();
+
+  body.innerHTML = ESTIMATED_TAX_DUE_DATES.map(q => {
+    const days = daysUntil(q.due, today);
+    let statusClass = 'cell-muted';
+    let statusText = '';
+    if (days == null) {
+      statusText = 'Unknown';
+    } else if (days < 0) {
+      statusText = 'Past, ' + Math.abs(days) + ' day' + (Math.abs(days) === 1 ? '' : 's') + ' ago';
+    } else if (days === 0) {
+      statusClass = 'tax-status-met';
+      statusText = 'Due today';
+    } else if (days <= ESTIMATED_TAX_DUE_SOON_DAYS) {
+      statusClass = 'tax-status-met';
+      statusText = 'Due in ' + days + ' day' + (days === 1 ? '' : 's');
+    } else {
+      statusText = 'In ' + days + ' days';
+    }
+    return `
+    <tr>
+      <td>${escapeHtml(q.period)}</td>
+      <td class="cell-value">${escapeHtml(q.due)}</td>
+      <td class="${statusClass}">${escapeHtml(statusText)}</td>
+    </tr>`;
+  }).join('');
+
+  const year2026NetProfit = computeYtdNetProfit(sales, expenses, 2026).netProfit;
+  note.hidden = false;
+  note.textContent = `This dashboard's own logged net profit for 2026 (Net profit / Schedule C snapshot above) is ${formatUsd(year2026NetProfit)}. Whether an estimated payment is actually owed depends on your full tax picture, not just that figure, this note does not decide that for you.`;
 }
 
 function renderDisputes(disputes) {
@@ -6633,6 +6716,7 @@ renderScamPatternsFreshness();
 renderSellerStandardsFreshness();
 renderSalesTaxFreshness();
 renderTaxTrackerFreshness();
+renderEstimatedTaxFreshness();
 renderElectronicsRulesFreshness();
 renderPackagingRulesFreshness();
 renderAuthenticationRulesFreshness();
