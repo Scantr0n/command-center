@@ -70,6 +70,26 @@
     return { totalCost, expectedGain, grossGain, netGradedValue, verdict };
   }
 
+  // The inverse of computeGradingMath's own "worth-grading" threshold: given
+  // the two real numbers a candidate usually already has before anyone has
+  // gone looking for a graded comp (rawValue, estimatedGradingCost, and
+  // optionally shippingCost), what gross expectedGradedValue would actually
+  // clear the 2x-margin rule? Lets a candidate that's stuck at "needs more
+  // data" for lack of a real graded-value comp show a concrete research
+  // target ("would need to grade at $X+") instead of a dead end, without
+  // guessing at expectedGradedValue itself -- this is the breakeven threshold
+  // computeGradingMath would need to see to return 'worth-grading', derived
+  // from the same real published 2x-margin rule and eBay fee rate above, not
+  // a new or different one. Null whenever rawValue or estimatedGradingCost
+  // isn't logged yet, same never-guess-at-a-missing-input rule as
+  // computeGradingMath.
+  function breakEvenGradedValue(c) {
+    if (c.rawValue == null || c.estimatedGradingCost == null) return null;
+    const totalCost = c.estimatedGradingCost + (c.shippingCost || 0);
+    const netGradedValueNeeded = c.rawValue + totalCost * GRADING_RISK_MULTIPLE;
+    return netGradedValueNeeded / (1 - TYPICAL_MARKETPLACE_FEE_RATE);
+  }
+
   // Collectibles get a different federal capital-gains treatment than stocks:
   // the IRS treats trading cards as "collectibles" under IRC 408(m), and 26
   // U.S.C. 1(h)(5) caps the long-term rate (held more than one year) at 28%
@@ -330,7 +350,7 @@
   }
 
   return {
-    computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
+    computeGradingMath, breakEvenGradedValue, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
     classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
     COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
     isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,

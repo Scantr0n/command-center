@@ -1371,7 +1371,7 @@ function isExampleCandidate(c) {
 // loading the rest of this DOM-touching file. Pulled into bare identifiers
 // here so every existing call site below keeps working unchanged.
 const {
-  computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
+  computeGradingMath, breakEvenGradedValue, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
   estimateCardCollectiblesTax, lastPriceHistoryEntry, computeValueTrend,
   buildPortfolioValueTimeline: buildPortfolioValueTimelineCore, cardsForSubmission,
@@ -1538,12 +1538,21 @@ function renderCandidates() {
     // PSA's Value-tier pause since it isn't going to be submitted at all.
     const targetsPausedTier = (c.decision == null || c.decision === 'submit') && isPausedTier(c.targetGradingCompany, c.targetServiceLevel);
     const stale = !isExampleCandidate(c) && isCandidateStale(c);
+    // Only shown once a real graded-value comp is the single missing piece
+    // (rawValue and estimatedGradingCost are both already logged): tells
+    // "needs more data" apart from a dead end by naming the real gross
+    // graded-value research target that would actually clear the 2x-margin
+    // rule above, derived from the same real numbers already on this row via
+    // breakEvenGradedValue, never a guess at what the card would actually
+    // grade for.
+    const breakEven = (!math && c.expectedGradedValue == null) ? breakEvenGradedValue(c) : null;
     const metaParts = [
       c.sport,
       c.targetGradingCompany,
       c.rawValue != null ? 'raw ' + formatUsd(c.rawValue) : null,
       c.expectedGradedValue != null ? 'est. graded ' + formatUsd(c.expectedGradedValue) + (c.expectedGrade ? ' (' + c.expectedGrade + ')' : '') : null,
-      math ? 'costs ' + formatUsd(math.totalCost) : null
+      math ? 'costs ' + formatUsd(math.totalCost) : null,
+      breakEven != null ? 'needs a ' + formatUsd(breakEven) + '+ graded comp to clear 2x margin' : null
     ].filter(Boolean);
     // No aria-label here on purpose (a real fix, not an omission): this row's
     // own visible content already carries the real expected gain, verdict,
@@ -1605,6 +1614,18 @@ function openCandidateModal(id) {
   let body = '';
   body += candidateEditFormHtml(c);
   body += `<div class="field-row"><span class="badge ${verdictMeta.cls}">${escapeHtml(verdictMeta.label)}</span></div>`;
+  // Only shown once rawValue and estimatedGradingCost are both already real
+  // (breakEvenGradedValue itself returns null otherwise) and the one thing
+  // actually missing is a real graded-value comp, so "needs more data" has a
+  // concrete research target attached instead of leaving it at a dead end.
+  if (verdictKey === 'needs-data' && c.expectedGradedValue == null) {
+    const breakEven = breakEvenGradedValue(c);
+    if (breakEven != null) {
+      body += `<div class="field-row">
+        <div class="field-note">Would need a real ${escapeHtml(c.targetGradingCompany || 'graded')} comp of ${escapeHtml(formatUsd(breakEven))} or more (net of eBay's Sports Trading Cards fee) to clear the 2x-margin rule above and read as "Worth grading" once <code class="inline-code">expectedGradedValue</code> is actually filled in.</div>
+      </div>`;
+    }
+  }
   if ((c.decision == null || c.decision === 'submit') && isPsaPausedValueTier(c.targetGradingCompany, c.targetServiceLevel)) {
     body += `<div class="field-row">
       <span class="badge badge-paused">tier paused</span>
@@ -4416,6 +4437,14 @@ const CANDIDATES_CSV_COLUMNS = [
   [c => computeGradingMath(c)?.netGradedValue ?? null, 'Expected graded value, net of marketplace fee'],
   [c => computeGradingMath(c)?.expectedGain ?? null, 'Expected gain'],
   [c => CANDIDATE_VERDICT_META[computeGradingMath(c)?.verdict || 'needs-data'].label, 'Verdict'],
+  // Same real research-bottleneck fix as the three comp-search-link columns
+  // above, aimed at the specific number this one needs: with expectedGrade
+  // and expectedGradedValue both still blank on every real candidate, the
+  // "needs more data" verdict column above says nothing about what the comp
+  // search just linked would actually need to turn up. This is the one real
+  // number from breakEvenGradedValue (rawValue/estimatedGradingCost/
+  // shippingCost, already columns above), not a new or guessed figure.
+  [c => c.expectedGradedValue == null ? breakEvenGradedValue(c) : null, 'Graded comp needed to clear 2x margin'],
   [c => c.datePriced, 'Date priced'], [c => c.decision, 'Decision'], [c => c.decisionNote, 'Decision note'],
   [c => c.notes, 'Notes']
 ];

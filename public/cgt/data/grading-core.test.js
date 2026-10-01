@@ -12,7 +12,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  computeGradingMath, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
+  computeGradingMath, breakEvenGradedValue, GRADING_RISK_MULTIPLE, TYPICAL_MARKETPLACE_FEE_RATE,
   classifyHoldingPeriod, isLongTermHolding, estimateCollectiblesTax,
   COLLECTIBLES_LONG_TERM_MAX_RATE, TOP_ORDINARY_INCOME_RATE,
   isSold, isListed, costPerCard, computeGainLoss, computeRealizedGainLoss,
@@ -92,6 +92,40 @@ test('the real candidates.json never crashes computeGradingMath on any row', () 
   const data = require('./candidates.json');
   for (const c of data.candidates || []) {
     assert.doesNotThrow(() => computeGradingMath(c), `candidate ${c.id} should not throw`);
+  }
+});
+
+test('breakEvenGradedValue returns null when rawValue or estimatedGradingCost is missing, never a guess', () => {
+  assert.equal(breakEvenGradedValue({ rawValue: null, estimatedGradingCost: 10 }), null);
+  assert.equal(breakEvenGradedValue({ rawValue: 5, estimatedGradingCost: null }), null);
+  assert.equal(breakEvenGradedValue({}), null);
+});
+
+test('breakEvenGradedValue finds the exact gross graded value that makes computeGradingMath call it worth-grading', () => {
+  const c = { rawValue: 5, estimatedGradingCost: 10, shippingCost: 3 };
+  const threshold = breakEvenGradedValue(c);
+  const atThreshold = computeGradingMath({ ...c, expectedGradedValue: threshold });
+  assert.equal(atThreshold.verdict, 'worth-grading');
+  const justUnder = computeGradingMath({ ...c, expectedGradedValue: threshold - 1 });
+  assert.notEqual(justUnder.verdict, 'worth-grading');
+});
+
+test('breakEvenGradedValue treats a null/omitted shippingCost as zero, same as computeGradingMath', () => {
+  const withNullShipping = breakEvenGradedValue({ rawValue: 5, estimatedGradingCost: 10, shippingCost: null });
+  const omittedShipping = breakEvenGradedValue({ rawValue: 5, estimatedGradingCost: 10 });
+  assert.equal(withNullShipping, omittedShipping);
+});
+
+test('breakEvenGradedValue rises with shippingCost, same cost base computeGradingMath uses', () => {
+  const withoutShipping = breakEvenGradedValue({ rawValue: 5, estimatedGradingCost: 10, shippingCost: null });
+  const withShipping = breakEvenGradedValue({ rawValue: 5, estimatedGradingCost: 10, shippingCost: 20 });
+  assert.ok(withShipping > withoutShipping);
+});
+
+test('the real candidates.json never crashes breakEvenGradedValue on any row', () => {
+  const data = require('./candidates.json');
+  for (const c of data.candidates || []) {
+    assert.doesNotThrow(() => breakEvenGradedValue(c), `candidate ${c.id} should not throw`);
   }
 });
 
