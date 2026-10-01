@@ -1203,6 +1203,31 @@ function savePaceRate(rate) {
   }
 }
 
+// Same freshness-badge pattern as the reference tables elsewhere on this
+// page (best time to post, markdown guidance, etc). This callout's claim
+// (Depop's ranking leans on a listing's first 48 hours, so a real 48-item
+// backlog like this one's is better drip-listed over roughly two weeks at
+// a steady daily rate than dumped in one sitting) is current seller-tooling
+// guidance, not computed from anything logged here, so it can go stale the
+// same way the other platform-mechanic tables can. Verified 2026-10-01
+// against current reseller-community coverage of Depop's 2026 ranking
+// behavior and typical drip-listing cadence advice (commonly cited in the
+// 5-15 items/day range).
+const PACE_GUIDANCE_REVIEWED_ON = '2026-10-01';
+const PACE_GUIDANCE_STALE_AFTER_DAYS = 45;
+
+function renderPaceGuidanceFreshness() {
+  const el = document.getElementById('paceGuidanceFreshness');
+  if (!el) return;
+  const age = daysSincePublished(PACE_GUIDANCE_REVIEWED_ON);
+  const stale = age != null && age > PACE_GUIDANCE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against current reseller-community posting-cadence/algorithm research on ' + PACE_GUIDANCE_REVIEWED_ON + '.';
+}
+
 // Turns the real "ready-to-post" count from pipeline.json into a projected
 // clear date at a seller-entered daily rate. Plain calendar days, not
 // business days, since posting isn't tied to a work week here. Never
@@ -6663,6 +6688,7 @@ initPhotoAudit();
 renderSeasonalCalendarHighlight();
 renderFeeScheduleFreshness();
 renderBestTimeFreshness();
+renderPaceGuidanceFreshness();
 renderPoshmarkShareFreshness();
 renderSeasonalGuideFreshness();
 renderSearchDiscoveryFreshness();

@@ -237,7 +237,9 @@
   </section>
 
   <section id="paceSection">
-    <h2 class="section-title">Posting pace planner</h2>
+    <h2 class="section-title">Posting pace planner
+      <span class="reference-freshness" id="paceGuidanceFreshness"></span>
+    </h2>
     <div class="callout">
       Real cross-listing tooling guidance (Vendoo, Crosslist, and others): dumping a whole backlog onto a
       platform in one day reads as spam to that platform's own search-ranking algorithm and risks a review
@@ -247,6 +249,10 @@
       it's never saved anywhere but this browser and never checked against what actually happened. The real actual
       pace comes from <code>pipeline.json</code>'s own <code>postingLog</code> instead, logged below once something
       actually gets posted.
+      Specifically for the real 48-item Depop backlog this is sized for: Depop's own ranking weighs a listing's
+      first 48 hours most heavily, favoring the likes/saves/messages a fresh post earns in that window, so
+      current seller guidance favors drip-listing a batch like this over roughly two weeks at a steady daily
+      rate (commonly cited in the 5-15/day range) rather than posting all 48 in one sitting.
     </div>
     <div class="calc-row">
       <div class="calc-price-input-wrap">
