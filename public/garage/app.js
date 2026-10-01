@@ -1856,50 +1856,11 @@ function buildDisputeReminders(disputesList) {
   }).filter(Boolean);
 }
 
-function icsEscapeText(text) {
-  return String(text).replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
-}
-
-// RFC 5545 requires folding any content line over 75 octets onto a
-// continuation line starting with a single space, applied here since the
-// description text can run past that on a multi-platform item.
-function icsFoldLine(line) {
-  if (line.length <= 75) return line;
-  let out = line.slice(0, 75);
-  let rest = line.slice(75);
-  while (rest.length) {
-    out += '\r\n ' + rest.slice(0, 74);
-    rest = rest.slice(74);
-  }
-  return out;
-}
-
-function icsDateStamp(date) {
-  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-}
-
-// One all-day VEVENT per reminder, each with a DISPLAY alarm at 9am on the
-// day so it actually shows up rather than sitting silent on an all-day row.
-function buildIcsCalendar(reminders) {
-  const stamp = icsDateStamp(new Date());
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Command Center//Garage Reminders//EN', 'CALSCALE:GREGORIAN'];
-  reminders.forEach(r => {
-    lines.push('BEGIN:VEVENT');
-    lines.push(`UID:garage-${r.id}-${r.date}@command-center.local`);
-    lines.push(`DTSTAMP:${stamp}`);
-    lines.push(`DTSTART;VALUE=DATE:${r.date.replace(/-/g, '')}`);
-    lines.push(icsFoldLine(`SUMMARY:${icsEscapeText(r.summary)}`));
-    lines.push(icsFoldLine(`DESCRIPTION:${icsEscapeText(r.description)}`));
-    lines.push('BEGIN:VALARM');
-    lines.push('ACTION:DISPLAY');
-    lines.push(icsFoldLine(`DESCRIPTION:${icsEscapeText(r.summary)}`));
-    lines.push('TRIGGER:PT9H');
-    lines.push('END:VALARM');
-    lines.push('END:VEVENT');
-  });
-  lines.push('END:VCALENDAR');
-  return lines.join('\r\n') + '\r\n';
-}
+// Shared, unit-tested .ics calendar builder (export-core.js): see that
+// file's header for why icsFoldLine in particular moved out of here, it had
+// the exact UTF-16-vs-UTF-8 fold bug CSM's own csm-core.js already found
+// and fixed for the identical RFC 5545 requirement.
+const { buildIcsCalendar } = GarageExportCore;
 
 // listingUrls is optional and only honored here (the modal detail view),
 // not in the table/coverage rows, since those rows are themselves clickable
