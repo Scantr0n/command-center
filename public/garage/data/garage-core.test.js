@@ -26,7 +26,8 @@ const {
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
   DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
   isSupplyLowStock,
-  sortEngagementSnapshots, annotateEngagementTrend, hasNewDueId
+  sortEngagementSnapshots, annotateEngagementTrend, hasNewDueId,
+  daysToSell, avgDaysToSell, sellThroughRate
 } = require('./garage-core.js');
 
 test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
@@ -774,4 +775,56 @@ test('actualPostingPace returns a null rate rather than a negative span when eve
   assert.equal(result.postedCount, 3);
   assert.equal(result.daysActive, 0);
   assert.equal(result.postedPerDay, null);
+});
+
+test('daysToSell: real gap between a listing\'s datePublished and the matching sale\'s saleDate', () => {
+  const listings = [{ id: 'black-boots', datePublished: '2026-09-01' }];
+  const sale = { listingId: 'black-boots', saleDate: '2026-09-11' };
+  assert.equal(daysToSell(listings, sale), 10);
+});
+
+test('daysToSell: null when the sale has no listingId, the listingId resolves to nothing, or either date is missing', () => {
+  const listings = [{ id: 'black-boots', datePublished: '2026-09-01' }];
+  assert.equal(daysToSell(listings, { saleDate: '2026-09-11' }), null, 'no listingId logged on the sale');
+  assert.equal(daysToSell(listings, { listingId: 'white-boots', saleDate: '2026-09-11' }), null, 'listingId does not match any real listing');
+  assert.equal(daysToSell(listings, { listingId: 'black-boots', saleDate: null }), null, 'no saleDate logged');
+  assert.equal(daysToSell([{ id: 'black-boots', datePublished: null }], { listingId: 'black-boots', saleDate: '2026-09-11' }), null, 'no datePublished logged on the listing');
+});
+
+test('avgDaysToSell: averages only the sales that actually resolve to both real dates, dropping the rest rather than treating them as 0', () => {
+  const listings = [
+    { id: 'black-boots', datePublished: '2026-09-01' },
+    { id: 'white-boots', datePublished: '2026-09-01' }
+  ];
+  const sales = [
+    { listingId: 'black-boots', saleDate: '2026-09-11' },
+    { listingId: 'white-boots', saleDate: '2026-09-21' },
+    { listingId: 'unknown-item', saleDate: '2026-09-11' },
+    { listingId: 'black-boots', saleDate: null }
+  ];
+  assert.equal(avgDaysToSell(listings, sales), 15);
+});
+
+test('avgDaysToSell: null when there are no sales, or none resolve to a usable pair of dates', () => {
+  assert.equal(avgDaysToSell([], []), null);
+  assert.equal(avgDaysToSell([{ id: 'black-boots', datePublished: null }], [{ listingId: 'black-boots', saleDate: '2026-09-11' }]), null);
+});
+
+test('sellThroughRate: item-level, not per-platform-instance, draft/ready-to-post never count either way', () => {
+  const listings = [
+    { id: 'a', status: 'sold' },
+    { id: 'b', status: 'live' },
+    { id: 'c', status: 'live' },
+    { id: 'd', status: 'draft' },
+    { id: 'e', status: 'ready-to-post' }
+  ];
+  const result = sellThroughRate(listings);
+  assert.equal(result.sold, 1);
+  assert.equal(result.total, 3, 'only live+sold count as ever actually published, draft and ready-to-post are excluded');
+  assert.ok(Math.abs(result.rate - 1 / 3) < 1e-9);
+});
+
+test('sellThroughRate: null rather than a divide-by-zero rate when nothing has ever actually been published', () => {
+  assert.equal(sellThroughRate([]), null);
+  assert.equal(sellThroughRate([{ id: 'a', status: 'draft' }]), null);
 });

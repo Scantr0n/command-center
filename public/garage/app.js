@@ -122,7 +122,7 @@ const {
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
   isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace,
-  expectedBalanceDate
+  expectedBalanceDate, avgDaysToSell, sellThroughRate
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -1133,6 +1133,8 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions, 
   const coverageGapCount = live.filter(l => missingPlatforms(l).length > 0).length;
   const knownAgeCount = live.filter(l => l.datePublished).length;
   const dueForRelistCount = live.filter(l => isDueForRelist(l, daysSincePublished(l.datePublished))).length;
+  const sellThrough = sellThroughRate(listings);
+  const avgSellDays = avgDaysToSell(listings, sales);
   const realizedRevenue = sales.reduce((s, sale) => s + (sale.salePrice || 0), 0);
   // Same computeSaleProfit used by renderSales' own table and the sales CSV
   // export below, so this stat tile can never again disagree with what
@@ -1171,6 +1173,8 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions, 
     { value: atRiskCount, label: 'Needs delisting elsewhere', sub: atRiskCount ? 'Sold on one platform, still live on others' : null, warn: atRiskCount > 0 },
     { value: coverageGapCount, label: 'Items with cross-post gaps', sub: coverageGapCount ? 'Not yet on all 4 platforms' : 'Fully cross-listed' },
     { value: dueForRelistCount, label: 'Due for a relist', sub: knownAgeCount ? 'Live 30+ days on at least one platform' : 'No publish dates logged yet', warn: dueForRelistCount > 0 },
+    { value: sellThrough ? Math.round(sellThrough.rate * 100) + '%' : 'not enough data yet', label: 'Sell-through rate', sub: sellThrough ? `${sellThrough.sold}/${sellThrough.total} unique item(s) ever listed have sold` : 'No item has gone live yet' },
+    { value: avgSellDays != null ? Math.round(avgSellDays) + 'd' : 'not tracked yet', label: 'Avg. days to sell', sub: avgSellDays != null ? 'Publish date to sale date, real sales with both logged' : 'Needs a sale whose listingId resolves to a listing with a real datePublished' },
     { value: dueDisputeCount, label: 'Disputes needing a response', sub: openDisputeCount ? `${dueDisputeCount}/${openDisputeCount} open case(s) at or past their response window` : 'No open disputes logged', warn: dueDisputeCount > 0 },
     { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
     { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },

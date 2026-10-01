@@ -499,6 +499,41 @@
     return days < 0 ? null : days;
   }
 
+  // Real "time to sell" and "sell-through rate" are the two inventory-velocity
+  // numbers every cross-listing tool's own marketing leads with (Vendoo: sellers
+  // active on 3+ marketplaces see sell-through 180% higher than single-platform
+  // sellers, and regularly delisting/relisting stale inventory drives real
+  // sales), and this page tracked neither despite already logging every date
+  // needed. Both read straight from fields already on listings.json/sales.json,
+  // no new field required. A sale with no listingId, an unresolved listingId, or
+  // either date missing honestly drops that one sale from the average rather
+  // than guessing one of the two dates.
+  function daysToSell(listings, sale) {
+    if (!sale || !sale.listingId) return null;
+    const listing = (listings || []).find(l => l.id === sale.listingId);
+    if (!listing) return null;
+    return daysBetweenDates(listing.datePublished, sale.saleDate);
+  }
+
+  function avgDaysToSell(listings, sales) {
+    const days = (sales || []).map(s => daysToSell(listings, s)).filter(d => d != null);
+    if (!days.length) return null;
+    return days.reduce((sum, d) => sum + d, 0) / days.length;
+  }
+
+  // Item-level, not per-platform-instance: a 4-platform item that sells on
+  // just one of them counts once here, same unit the Pipeline stage note
+  // already uses ("9 instances, 3 unique items"). "Ever actually published"
+  // means status is now live or sold, draft/ready-to-post were never
+  // actually offered for sale so they can't count against the rate either
+  // way.
+  function sellThroughRate(listings) {
+    const everPublished = (listings || []).filter(l => l.status === 'live' || l.status === 'sold');
+    if (!everPublished.length) return null;
+    const sold = everPublished.filter(l => l.status === 'sold');
+    return { rate: sold.length / everPublished.length, sold: sold.length, total: everPublished.length };
+  }
+
   // Turns pipeline.json's own real postingLog (one entry per real day items
   // actually got posted from the "ready-to-post" backlog, see the Posting
   // pace planner's quick-log form in app.js) into an actual pace, kept
@@ -794,6 +829,7 @@
     ebayTrsProgress, depopTopSellerProgress,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend,
-    hasNewDueId
+    hasNewDueId,
+    daysToSell, avgDaysToSell, sellThroughRate
   };
 });
