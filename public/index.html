@@ -22,6 +22,7 @@
 <script src="/data/html-core.js"></script>
 <script src="/data/search-core.js"></script>
 <script src="/data/compare-core.js"></script>
+<script src="/data/chat-format-core.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -112,6 +113,18 @@
   }
   #chatMessages::-webkit-scrollbar { width: 6px; }
   #chatMessages::-webkit-scrollbar-thumb { background: #23262b; border-radius: 3px; }
+
+  /* formatChatReply (chat-format-core.js) renders a reply's real markdown as
+     plain <p>/<ul>/<ol>/<li>/<strong>/<em>/<code>, with none of Tailwind's
+     own classes. Tailwind's preflight strips every one of those tags' own
+     default margin/list-style, so without this they render with no spacing
+     between paragraphs/list items and no visible bullets/numbers at all. */
+  .chat-bubble p + p, .chat-bubble ul + p, .chat-bubble ol + p, .chat-bubble p + ul, .chat-bubble p + ol { margin-top: 0.5em; }
+  .chat-bubble ul { list-style: disc; padding-left: 1.25em; }
+  .chat-bubble ol { list-style: decimal; padding-left: 1.25em; }
+  .chat-bubble li + li { margin-top: 0.15em; }
+  .chat-bubble strong { font-weight: 600; }
+  .chat-bubble code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.85em; background: rgba(255,255,255,0.08); padding: 0.1em 0.35em; border-radius: 4px; }
 
   /* Graph */
   #graphSvg { aspect-ratio: 1 / 1; }
@@ -1010,7 +1023,8 @@
 const CORE_SCRIPTS = [
   ['DashboardCore', 'dashboard-core.js'],
   ['GraphCore', 'graph-core.js'],
-  ['HtmlCore', 'html-core.js']
+  ['HtmlCore', 'html-core.js'],
+  ['ChatFormatCore', 'chat-format-core.js']
 ];
 const missingCoreScript = CORE_SCRIPTS.find(([globalName]) => typeof window[globalName] === 'undefined');
 if (missingCoreScript) {
@@ -1037,6 +1051,7 @@ const {
   computeRelationBulge
 } = window.GraphCore;
 const { escapeHtml, highlightMatch } = window.HtmlCore;
+const { formatChatReply } = window.ChatFormatCore;
 
 let clusters = [];
 let activeCluster = null;
@@ -3677,13 +3692,23 @@ function appendMessage(role, text) {
   const div = document.createElement('div');
   div.className = role === 'user' ? 'text-right' : 'text-left';
   const span = document.createElement('span');
-  span.className = 'inline-block px-3 py-2 rounded-lg max-w-[85%]';
-  // Without this, a reply with real paragraph breaks or a numbered list
-  // (the model's own natural formatting for anything longer than one
-  // sentence) collapses into a single run-on line: textContent keeps the
-  // literal \n characters, but plain inline-block text ignores them.
-  span.style.cssText = (role === 'user' ? 'background: var(--ink); color: var(--void);' : 'background: var(--panelLight); color: var(--ink);') + ' white-space: pre-wrap;';
-  span.textContent = text;
+  span.className = 'inline-block px-3 py-2 rounded-lg max-w-[85%] chat-bubble';
+  span.style.cssText = role === 'user' ? 'background: var(--ink); color: var(--void); white-space: pre-wrap;' : 'background: var(--panelLight); color: var(--ink);';
+  if (role === 'user') {
+    // Jack's own typed text, never interpreted as markdown: pre-wrap keeps
+    // his real paragraph breaks since plain inline-block text otherwise
+    // collapses a literal \n into nothing.
+    span.textContent = text;
+  } else {
+    // The model's replies routinely come back with real **bold**, a `code`
+    // span, or a "- " list (ChatFormatCore's own comment has the full case
+    // for why), so this renders that real markdown as real HTML instead of
+    // the literal asterisks/backticks plain textContent used to show.
+    // formatChatReply HTML-escapes the raw text itself before wrapping any
+    // of it in a tag, so this innerHTML can never carry live markup in from
+    // the reply.
+    span.innerHTML = formatChatReply(text);
+  }
   div.appendChild(span);
   document.getElementById('chatMessages').appendChild(div);
   document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
