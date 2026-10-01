@@ -241,8 +241,13 @@
   // Same "N days ago" phrasing the download freshness badge already uses,
   // applied to any other real logged date so recency reads consistently
   // across the page instead of leaving a reader to do the date math.
+  // isValidDateStr guard added alongside launchWindowHtml's (see
+  // release-core.js's computeLaunchWindow comment): this had the identical
+  // gap, a malformed date would make daysBetween return NaN and render
+  // "NaN days ago" on a release card or the header's last-updated line
+  // instead of silently omitting the relative label.
   function relativeDaysLabel(iso) {
-    if (!iso) return null;
+    if (!iso || !isValidDateStr(iso)) return null;
     const age = daysBetween(iso, todayIso());
     if (age < 0) return null;
     if (age === 0) return 'today';
