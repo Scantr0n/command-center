@@ -299,6 +299,27 @@
     return '<span class="badge badge-unknown">' + escapeHtml(channel.type).toUpperCase() + '</span>';
   }
 
+  // contactChannel.detail is free text (an email, a WeChat ID, an @handle, a
+  // bio URL) since the real contact mechanics differ per platform (see
+  // PLATFORM_TIPS below). Only linkify the two shapes that are actually safe
+  // and useful to click through on: a real email (opens the user's own mail
+  // client to compose, the same one-click-from-sending gap every mailto:
+  // link on the web already has, not a send button of this app's own) and a
+  // real http(s) URL (a listed business-cooperation link, a bio page).
+  // Anything else (a bare handle, a WeChat ID with no profile URL) stays
+  // plain text rather than guessing a platform URL that could be wrong.
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function channelDetailHtml(detail) {
+    const text = detail.trim();
+    if (EMAIL_RE.test(text)) {
+      return '<a href="mailto:' + escapeHtml(text) + '">' + escapeHtml(text) + '</a>';
+    }
+    if (/^https?:\/\//i.test(text)) {
+      return '<a href="' + escapeHtml(text) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(text) + '</a>';
+    }
+    return escapeHtml(text);
+  }
+
   // Lets the "Stalled in stage" and "Needs backfill" rows jump straight to the
   // flagged prospect's own detail modal, same click-to-view behavior as a
   // board card, instead of only flagging the problem and leaving the user to
@@ -2809,7 +2830,7 @@
     rows.push(fieldRow('Category', p.category ? escapeHtml(p.category) : 'Not logged yet', !p.category));
     rows.push(fieldRow('Verified hook', p.verifiedHook ? escapeHtml(p.verifiedHook) : 'Not logged yet', !p.verifiedHook));
     rows.push(fieldRow('Contact channel', channelBadge(p.contactChannel) +
-      (p.contactChannel && p.contactChannel.detail ? '<div style="margin-top:6px">' + escapeHtml(p.contactChannel.detail) + '</div>' : ''), false));
+      (p.contactChannel && p.contactChannel.detail ? '<div style="margin-top:6px">' + channelDetailHtml(p.contactChannel.detail) + '</div>' : ''), false));
     rows.push(fieldRow('Reply status', p.replyStatus ? escapeHtml(p.replyStatus) : 'Not logged yet', !p.replyStatus));
     rows.push(fieldRow('Send date', p.sendDate ? fmtDate(p.sendDate) : 'Not logged yet', !p.sendDate));
     const outreachLogHtml = renderOutreachLog(p);

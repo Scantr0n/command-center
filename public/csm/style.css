@@ -1316,6 +1316,11 @@ header.page-head .sub {
   line-height: 1.5;
 }
 .field-value.empty { color: var(--dim); font-style: italic; }
+/* a inherits color globally (see "a { color: inherit; }" above), so a real
+   mailto:/http(s) link in a field value (channelDetailHtml's output) reads
+   as plain text with no sign it's clickable without this. */
+.field-value a { text-decoration: underline; text-underline-offset: 2px; }
+.field-value a:hover { color: var(--sub); }
 
 .ideas-list {
   list-style: none;
