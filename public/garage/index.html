@@ -1341,6 +1341,11 @@
     </div>
   </section>
 
+  <section id="needsEngagementCheckSection" hidden>
+    <h2 class="section-title">Needs engagement check</h2>
+    <div class="data-quality-list" id="needsEngagementCheckList"></div>
+  </section>
+
   <section id="engagementSection">
     <div class="board-toolbar">
       <h2 class="section-title" style="margin:0">Listing engagement log</h2>
@@ -1354,7 +1359,10 @@
       one snapshot alone, it's the trend between two real logged snapshots of the <em>same</em> listing on the
       <em>same</em> platform: a listing with rising views is worth leaving alone, one that's gone flat for weeks
       is a real signal to <a href="#relistSection">relist</a>, <a href="#markdownSection">drop the price</a>, or
-      check <a href="#compsSection">whether a comp moved</a>. "Saves" covers whichever term a platform actually
+      check <a href="#compsSection">whether a comp moved</a>. A trend needs an actual recent snapshot to exist in
+      the first place, so a live listing+platform pair with none logged yet, or none in the last 14 days, shows up
+      above under "Needs engagement check" instead of staying silently invisible here. "Saves" covers whichever
+      term a platform actually
       uses for it, eBay's watchers, Poshmark's and Depop's likes, Vinted's favorites, all the same real signal
       under one field. Nothing here is estimated, an item with no snapshot logged yet is an honest gap, not a
       placeholder. "Re-check" links straight to that listing's real <code>listingUrls</code> entry for the exact

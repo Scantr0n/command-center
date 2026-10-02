@@ -27,7 +27,8 @@ const {
   DEPOP_TOP_SELLER_SHIP_WITHIN_DAYS, DEPOP_TOP_SELLER_ON_TIME_SHIP_RATE_TARGET,
   isSupplyLowStock,
   sortEngagementSnapshots, annotateEngagementTrend, hasNewDueId,
-  daysToSell, avgDaysToSell, sellThroughRate
+  daysToSell, avgDaysToSell, sellThroughRate,
+  buildEngagementCheckFlags
 } = require('./garage-core.js');
 
 test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
@@ -840,4 +841,46 @@ test('sellThroughRate: item-level, not per-platform-instance, draft/ready-to-pos
 test('sellThroughRate: null rather than a divide-by-zero rate when nothing has ever actually been published', () => {
   assert.equal(sellThroughRate([]), null);
   assert.equal(sellThroughRate([{ id: 'a', status: 'draft' }]), null);
+});
+
+test('buildEngagementCheckFlags: flags a live listing+platform with zero snapshots ever logged', () => {
+  const listings = [{ id: 'black-boots', status: 'live', platforms: ['ebay'] }];
+  const flags = buildEngagementCheckFlags(listings, [], '2026-09-20', 14);
+  assert.equal(flags.length, 1);
+  assert.deepEqual(flags[0], { listingId: 'black-boots', platform: 'ebay', lastDate: null, daysSince: null });
+});
+
+test('buildEngagementCheckFlags: a recent snapshot clears the flag, a stale one past dueDays re-raises it', () => {
+  const listings = [{ id: 'black-boots', status: 'live', platforms: ['ebay'] }];
+  const recent = buildEngagementCheckFlags(listings, [
+    { listingId: 'black-boots', platform: 'ebay', date: '2026-09-10' }
+  ], '2026-09-20', 14);
+  assert.equal(recent.length, 0, '10 days ago is inside the 14-day window, not due yet');
+
+  const stale = buildEngagementCheckFlags(listings, [
+    { listingId: 'black-boots', platform: 'ebay', date: '2026-08-20' }
+  ], '2026-09-20', 14);
+  assert.equal(stale.length, 1);
+  assert.equal(stale[0].lastDate, '2026-08-20');
+  assert.equal(stale[0].daysSince, 31);
+});
+
+test('buildEngagementCheckFlags: each platform a listing is live on is checked separately, and picks that platform\'s own latest snapshot', () => {
+  const listings = [{ id: 'black-boots', status: 'live', platforms: ['ebay', 'vinted'] }];
+  const flags = buildEngagementCheckFlags(listings, [
+    { listingId: 'black-boots', platform: 'ebay', date: '2026-09-01' },
+    { listingId: 'black-boots', platform: 'ebay', date: '2026-09-18' },
+    { listingId: 'black-boots', platform: 'vinted', date: '2026-08-01' }
+  ], '2026-09-20', 14);
+  assert.equal(flags.length, 1, 'ebay has a snapshot from 2 days ago (the latest of its two), vinted is stale');
+  assert.equal(flags[0].platform, 'vinted');
+});
+
+test('buildEngagementCheckFlags: never flags a draft, ready-to-post, or sold listing, only live ones', () => {
+  const listings = [
+    { id: 'a', status: 'draft', platforms: ['ebay'] },
+    { id: 'b', status: 'ready-to-post', platforms: ['ebay'] },
+    { id: 'c', status: 'sold', platforms: ['ebay'] }
+  ];
+  assert.deepEqual(buildEngagementCheckFlags(listings, [], '2026-09-20', 14), []);
 });

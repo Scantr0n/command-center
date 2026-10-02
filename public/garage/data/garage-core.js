@@ -803,6 +803,43 @@
     });
   }
 
+  // How long a live listing's engagement can go unchecked before that's a
+  // real gap, not a snapshot cadence choice: half of RELIST_FRESH_DAYS, so
+  // there's always at least one real views/watchers reading partway through
+  // the relist window to actually judge "gone flat" against before the
+  // relist decision itself comes due.
+  const ENGAGEMENT_CHECK_DUE_DAYS = 14;
+
+  // Every live listing is live on one or more platforms, and each of those
+  // platform instances is a real, separate thing to check (a listing can be
+  // flat on eBay and still climbing on Depop). The engagement log only ever
+  // shows rows for snapshots someone actually logged, so a listing+platform
+  // pair with zero snapshots, or one gone stale past dueDays, is invisible
+  // on the page today, not flagged anywhere. This is the same "real gap,
+  // not a placeholder" flag buildDataQualityFlags/buildAtRiskListings
+  // already give other silent gaps, just for this one. lastDate null means
+  // never checked at all; daysSince null (a future-dated snapshot) is
+  // treated as not due, same as daysBetweenDates' own "unknown, don't
+  // guess" convention everywhere else in this file.
+  function buildEngagementCheckFlags(listings, snapshots, todayStr, dueDays) {
+    const latestByKey = new Map();
+    sortEngagementSnapshots(snapshots).forEach(s => {
+      if (!s.listingId || !s.platform || !s.date) return;
+      latestByKey.set(s.listingId + '|' + s.platform, s.date);
+    });
+    const flags = [];
+    (listings || []).filter(l => l.status === 'live').forEach(l => {
+      (l.platforms || []).forEach(platform => {
+        const lastDate = latestByKey.get(l.id + '|' + platform) || null;
+        const daysSince = lastDate ? daysBetweenDates(lastDate, todayStr) : null;
+        if (lastDate == null || (daysSince != null && daysSince >= dueDays)) {
+          flags.push({ listingId: l.id, platform, lastDate, daysSince });
+        }
+      });
+    });
+    return flags;
+  }
+
   // The on-page dispute/relist notify checks used to fire only when the due
   // count went up (currentCount > previousCount), which misses a real
   // transition: one due item resolving in the same poll window a different
@@ -841,6 +878,7 @@
     ebayTrsProgress, depopTopSellerProgress,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend,
+    ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,
     hasNewDueId,
     daysToSell, avgDaysToSell, sellThroughRate
   };

@@ -123,7 +123,8 @@ const {
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
   isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace,
-  expectedBalanceDate, avgDaysToSell, sellThroughRate
+  expectedBalanceDate, avgDaysToSell, sellThroughRate,
+  ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -1116,6 +1117,10 @@ async function loadData() {
   // for the selected item. Re-run now that compsLog reflects what actually
   // loaded, same fix any two out-of-order loadData sections would need.
   renderOfferGuide();
+  // Needs both listings (set in the block above) and engagementLog (set
+  // just above this), same out-of-order-sections reason renderOfferGuide
+  // re-runs here instead of inside either individual block.
+  renderEngagementCheckList(listings, engagementLog);
 
   renderSellerStandardsProgress(sales, disputes, listings);
   initTableScrollShadows();
@@ -1562,6 +1567,41 @@ function renderDelistList(listings) {
   });
 }
 
+// Same "flag the real gap instead of leaving it invisible" pattern as
+// renderDelistList/buildDataQualityFlags, for a gap the engagement log
+// itself can't show: it only ever renders rows for snapshots someone
+// actually logged, so a live listing+platform pair with zero snapshots, or
+// one gone stale past ENGAGEMENT_CHECK_DUE_DAYS, has nothing on the page
+// saying so. Hidden entirely when nothing's flagged, same as every other
+// data-quality-style panel here.
+function renderEngagementCheckList(currentListings, snapshots) {
+  const section = document.getElementById('needsEngagementCheckSection');
+  const list = document.getElementById('needsEngagementCheckList');
+  const flags = buildEngagementCheckFlags(currentListings, snapshots, todayDateStr(), ENGAGEMENT_CHECK_DUE_DAYS);
+
+  if (!flags.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flags.map(f => {
+    const listing = currentListings.find(l => l.id === f.listingId);
+    const platformLabel = (PLATFORM_LABELS[f.platform] || f.platform).toUpperCase();
+    const why = f.lastDate == null
+      ? 'NEVER CHECKED ON ' + platformLabel
+      : f.daysSince + ' DAYS SINCE LAST ' + platformLabel + ' CHECK';
+    return `
+    <button type="button" class="data-quality-row" data-listing-id="${escapeHtml(f.listingId)}">
+      <span class="dq-name">${escapeHtml((listing && listing.title) || f.listingId)}</span>
+      <span class="dq-why">${escapeHtml(why)}</span>
+    </button>
+  `;
+  }).join('');
+  list.querySelectorAll('[data-listing-id]').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.listingId));
+  });
+}
+
 // Flags real listings missing an optional-but-load-bearing field: a live
 // item with no datePublished can never get real relist guidance (see
 // relistGuidanceParts above, which requires it), and a live item with no
@@ -1706,6 +1746,7 @@ function renderAttentionBar() {
   const relistDueCount = buildRelistReminders(listings).filter(r => r.date <= today).length;
   const disputeDueCount = buildDisputeReminders(disputesLog).filter(r => r.date <= today).length;
   const lowStockCount = suppliesLog.filter(isSupplyLowStock).length;
+  const engagementCheckDueCount = buildEngagementCheckFlags(listings, engagementLog, today, ENGAGEMENT_CHECK_DUE_DAYS).length;
   // Same "flagged lower on a long page can go unnoticed for weeks" risk as
   // the other panels below, for a real deadline with an actual IRS penalty
   // behind it: the quarterly tax tracker already computes this exact
@@ -1754,6 +1795,16 @@ function renderAttentionBar() {
   }
   if (lowStockCount) {
     items.push({ n: lowStockCount, tone: 'warn', target: 'suppliesSection', label: lowStockCount === 1 ? 'shipping supply is at or below its reorder point' : 'shipping supplies are at or below their reorder point' });
+  }
+  if (engagementCheckDueCount) {
+    items.push({
+      n: engagementCheckDueCount,
+      tone: 'warn',
+      target: 'needsEngagementCheckSection',
+      label: engagementCheckDueCount === 1
+        ? 'live listing needs an engagement check (views/watchers never logged or stale)'
+        : 'live listings need an engagement check (views/watchers never logged or stale)'
+    });
   }
   if (taxDueSoonCount) {
     items.push({ n: taxDueSoonCount, tone: 'warn', target: 'estimatedTaxSection', label: taxDueSoonCount === 1 ? 'quarterly estimated tax payment is due soon' : 'quarterly estimated tax payments are due soon' });
