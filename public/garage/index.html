@@ -2539,6 +2539,36 @@
     <p class="tax-tracker-note" id="netProfitNote" hidden></p>
   </section>
 
+  <section id="homeOfficeSection">
+    <h2 class="section-title">Home office deduction (simplified method)
+      <span class="reference-freshness" id="homeOfficeFreshness"></span>
+    </h2>
+    <div class="callout">
+      <strong>Not tax advice.</strong> The IRS's simplified option for the home office deduction (Rev. Proc.
+      2013-13) allows $5 per square foot of space used regularly and exclusively for business, capped at 300
+      square feet, a $1,500/year max, unchanged since the method was introduced for tax years beginning
+      2013-01-01. Enter the real square footage of the space actually used this way, a storage shelf or desk
+      corner doesn't qualify on its own, it has to be space used regularly and exclusively for the business and
+      nothing else. A scratch calculation, nothing here gets saved, this app has no real square footage logged
+      anywhere to compute from automatically.
+    </div>
+    <div class="calc-row">
+      <div class="calc-price-input-wrap">
+        <label for="homeOfficeSqftInput" class="calc-price-prefix font-mono">sq ft</label>
+        <input
+          type="number"
+          id="homeOfficeSqftInput"
+          class="calc-price-input font-mono"
+          min="0"
+          step="1"
+          inputmode="decimal"
+          placeholder="0"
+          aria-label="Real square footage used regularly and exclusively for the business">
+      </div>
+    </div>
+    <div class="pace-result" id="homeOfficeResult" aria-live="polite"></div>
+  </section>
+
   <section id="estimatedTaxSection">
     <h2 class="section-title">Quarterly estimated tax deadlines
       <span class="reference-freshness" id="estimatedTaxFreshness"></span>

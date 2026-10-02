@@ -118,6 +118,7 @@ const {
   PLATFORM_LABELS, DEPOP_BOOST_FEE_PCT, RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS,
   estimateNetPayout, computeSaleProfit, computeSaleMarginPct, minListingPriceForNet,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
+  homeOfficeDeduction, HOME_OFFICE_MAX_SQFT,
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
@@ -428,6 +429,61 @@ function renderEstimatedTaxFreshness() {
     : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
   el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
   el.title = 'Last hand-verified against real IRS Form 1040-ES due-date rules on ' + ESTIMATED_TAX_REVIEWED_ON + '.';
+}
+
+// Same freshness-badge pattern as the tax trackers above, for the home
+// office deduction calculator below.
+const HOME_OFFICE_REVIEWED_ON = '2026-10-02';
+const HOME_OFFICE_STALE_AFTER_DAYS = 45;
+
+function renderHomeOfficeFreshness() {
+  const el = document.getElementById('homeOfficeFreshness');
+  if (!el) return;
+  const age = daysSincePublished(HOME_OFFICE_REVIEWED_ON);
+  const stale = age != null && age > HOME_OFFICE_STALE_AFTER_DAYS;
+  el.textContent = age == null
+    ? 'Review date unknown'
+    : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
+  el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
+  el.title = 'Last hand-verified against the IRS\'s own published Rev. Proc. 2013-13 simplified home office rate on ' + HOME_OFFICE_REVIEWED_ON + '.';
+}
+
+// Home office deduction (simplified method): $5/sqft of real, regularly-
+// and-exclusively-business-use space, capped at 300 sqft (homeOfficeDeduction,
+// GarageCore). A scratch calculator, same shape as the break-even/bundle
+// calculators above, this app has no real square footage logged anywhere
+// to pull from automatically.
+function renderHomeOfficeCalc() {
+  const result = document.getElementById('homeOfficeResult');
+  const input = document.getElementById('homeOfficeSqftInput');
+  const raw = input.value.trim();
+
+  if (raw === '') {
+    result.innerHTML = '<p class="pace-result-note">Enter the real square footage of space used regularly and ' +
+      'exclusively for the business to see the deduction.</p>';
+    return;
+  }
+  const sqft = Number(raw);
+  const deduction = homeOfficeDeduction(sqft);
+  if (deduction == null) {
+    result.innerHTML = '<p class="pace-result-note">Enter a real square footage greater than 0.</p>';
+    return;
+  }
+
+  const capNote = deduction.cappedBy > 0
+    ? ` (capped at ${HOME_OFFICE_MAX_SQFT} sq ft, ${deduction.cappedBy} sq ft over the cap doesn't count)`
+    : '';
+  result.innerHTML = `
+    <p class="pace-result-note">
+      <span class="pace-result-figure">${deduction.countedSqft} sq ft</span>${capNote} at
+      <span class="pace-result-figure">$5/sq ft</span> deducts
+      <span class="pace-result-figure">${formatUsd(deduction.deduction)}</span> for the year.
+    </p>`;
+}
+
+function wireHomeOfficeCalc() {
+  document.getElementById('homeOfficeSqftInput').addEventListener('input', renderHomeOfficeCalc);
+  renderHomeOfficeCalc();
 }
 
 // Same freshness-badge pattern as the tables above. Found a real error while
@@ -7047,6 +7103,7 @@ wireBreakEven();
 wireBundle();
 wirePoshWeightCheck();
 wirePromotedCalc();
+wireHomeOfficeCalc();
 wireOfferGuide();
 wireMessageTemplates();
 wireChecklist();
@@ -7090,6 +7147,7 @@ renderShippingCostFreshness();
 renderShippingPeakStatus();
 renderPoshWeightFreshness();
 renderPromotedFreshness();
+renderHomeOfficeFreshness();
 
 // This device's own network path (navigator.onLine plus the real
 // online/offline events), a different question from whether the last fetch

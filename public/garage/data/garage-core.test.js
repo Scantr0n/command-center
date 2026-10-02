@@ -20,6 +20,7 @@ const {
   remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
+  homeOfficeDeduction, HOME_OFFICE_RATE_PER_SQFT, HOME_OFFICE_MAX_SQFT,
   computePoshmarkShareStreak, offerTier, offerCounterAmount,
   ebayTrsProgress, depopTopSellerProgress, daysBetweenDates, actualPostingPace,
   shipDeadline, isLateShipment, ebayLateShipmentRate, expectedBalanceDate,
@@ -330,6 +331,31 @@ test('mileageRateGapReason: only fires for an uncomputed mileage expense with re
   // Dated before 2026 (or any other gap inside the table's span): the general message.
   const before = mileageRateGapReason({ category: 'mileage', miles: 100, date: '2025-06-01' });
   assert.match(before, /No IRS rate known for 2025-06-01/);
+});
+
+test('homeOfficeDeduction: $5/sqft, capped at 300 sqft, null for no real square footage logged', () => {
+  assert.equal(homeOfficeDeduction(null), null);
+  assert.equal(homeOfficeDeduction(undefined), null);
+  assert.equal(homeOfficeDeduction(0), null);
+  assert.equal(homeOfficeDeduction(-50), null);
+  assert.equal(homeOfficeDeduction(NaN), null);
+
+  const under = homeOfficeDeduction(120);
+  assert.equal(under.countedSqft, 120);
+  assert.equal(under.cappedBy, 0);
+  assert.equal(under.deduction, 600);
+
+  const atCap = homeOfficeDeduction(HOME_OFFICE_MAX_SQFT);
+  assert.equal(atCap.countedSqft, 300);
+  assert.equal(atCap.cappedBy, 0);
+  assert.equal(atCap.deduction, 1500);
+
+  const over = homeOfficeDeduction(400);
+  assert.equal(over.countedSqft, 300);
+  assert.equal(over.cappedBy, 100);
+  assert.equal(over.deduction, 1500);
+
+  assert.equal(HOME_OFFICE_RATE_PER_SQFT, 5);
 });
 
 test('computePoshmarkShareStreak: counts consecutive logged days walking back from today', () => {

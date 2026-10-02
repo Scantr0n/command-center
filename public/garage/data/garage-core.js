@@ -226,6 +226,26 @@
     return null;
   }
 
+  // Real IRS-published simplified home office deduction (Rev. Proc.
+  // 2013-13, "Simplified option for home office deduction", irs.gov):
+  // $5 per square foot of space used regularly and exclusively for
+  // business, capped at 300 square feet (a $1,500/year max), unchanged
+  // since the method was introduced for tax years beginning 2013-01-01.
+  // A scratch calculation only, same as the break-even/bundle calculators
+  // above, it never writes a square footage number anywhere, the real
+  // figure for an actual home office isn't something this app can know.
+  const HOME_OFFICE_RATE_PER_SQFT = 5;
+  const HOME_OFFICE_MAX_SQFT = 300;
+  function homeOfficeDeduction(squareFeet) {
+    if (squareFeet == null || !Number.isFinite(squareFeet) || squareFeet <= 0) return null;
+    const countedSqft = Math.min(squareFeet, HOME_OFFICE_MAX_SQFT);
+    return {
+      countedSqft,
+      cappedBy: squareFeet > HOME_OFFICE_MAX_SQFT ? squareFeet - HOME_OFFICE_MAX_SQFT : 0,
+      deduction: countedSqft * HOME_OFFICE_RATE_PER_SQFT
+    };
+  }
+
   // Ties the sales log's own per-sale profit math (real cost basis and
   // shipping cost, see renderSales in app.js) to the business expenses
   // log's own total (computeExpenseAmount above) into the one number
@@ -922,6 +942,7 @@
     estimateNetPayout, computeSaleProfit, computeSaleMarginPct, ebayFinalValueRate,
     ebayMinPriceForNet, depopMinPriceForNet, poshmarkMinPriceForNet, minListingPriceForNet,
     MILEAGE_RATES_2026, irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount,
+    HOME_OFFICE_RATE_PER_SQFT, HOME_OFFICE_MAX_SQFT, homeOfficeDeduction,
     computeYtdNetProfit,
     addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
     remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
