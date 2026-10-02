@@ -1506,6 +1506,93 @@ footer.page-foot {
 }
 .jump-nav-link:hover, .jump-nav-link:focus-visible { background: var(--panelLight); color: var(--ink); border-color: var(--hairline); }
 
+/* Funnel: same funnel-row/track/fill visual language as CSM's pipeline
+   funnel (public/csm/style.css), reused here so a reader who already knows
+   that pattern recognizes it, but each stage gets its own fixed color class
+   (funnel-fill-<id>/funnel-dot-<id>) instead of CSM's inline per-stage
+   background, since these four stages are a fixed sequence defined in
+   funnel-core.js, not a variable list of real pipeline stages read from
+   stages.json. */
+.funnel-list {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px 20px;
+  margin-bottom: 36px;
+  background: var(--panel);
+}
+.funnel-empty {
+  font-size: 0.85rem;
+  color: var(--dim);
+  padding: 12px 0;
+}
+.funnel-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--hairline);
+}
+.funnel-row:first-child { border-top: none; }
+.funnel-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+.funnel-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+.funnel-dot-downloads { background: var(--accent); }
+.funnel-dot-leads { background: #3DDC84; }
+.funnel-dot-drafted { background: #E0A030; }
+.funnel-dot-sent { background: var(--dim); }
+.funnel-label { flex: 1; font-weight: 500; }
+.funnel-count { color: var(--sub); font-size: 0.78rem; }
+.funnel-track {
+  height: 6px;
+  border-radius: 4px;
+  background: var(--panelLight);
+  overflow: hidden;
+}
+.funnel-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+.funnel-fill-downloads { background: var(--accent); }
+.funnel-fill-leads { background: #3DDC84; }
+.funnel-fill-drafted { background: #E0A030; }
+.funnel-fill-sent { background: var(--dim); }
+.funnel-conversion {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+
+/* Same real forced-colors gap as .goal-progress-fill/.launch-window-fill
+   below and CSM's own .funnel-track/.funnel-fill fix: background-color
+   strips to the system Canvas color under forced-colors, so an explicit
+   CanvasText border keeps the track visible at all, plus a border-style
+   per stage on the dot (solid/dashed/dotted/double, same technique as
+   CSM's stage-dot/velocity-dot and Alpha's history-tick) so the four fixed
+   stages stay distinguishable from each other once every fill/dot computes
+   to the same background. */
+@media (forced-colors: active) {
+  .funnel-track {
+    border: 1px solid CanvasText;
+  }
+  .funnel-fill {
+    border-right: 2px solid CanvasText;
+  }
+  .funnel-dot { border-width: 2px; }
+  .funnel-dot-downloads { border-style: solid; }
+  .funnel-dot-leads { border-style: dashed; }
+  .funnel-dot-drafted { border-style: dotted; }
+  .funnel-dot-sent { border-style: double; border-width: 3px; }
+}
+
 /* Same precedent as CSM's style.css: every hover/focus transition on this
    page, even without a real keyframe animation behind it, still triggers
    vestibular discomfort for someone who has set this preference, so cut
@@ -1615,6 +1702,13 @@ footer.page-foot {
   .launch-window-fill { background: #888; }
   .launch-window-label, .launch-window-marks { color: #555; }
   .goal-progress-pct { color: #111; }
+  .funnel-list { background: none; border-color: #bbb; }
+  .funnel-row { border-color: #ddd; }
+  .funnel-count { color: #444; }
+  .funnel-conversion { color: #666; }
+  .funnel-track { background: #eee; border: 1px solid #ccc; }
+  .funnel-fill-downloads, .funnel-fill-leads, .funnel-fill-drafted, .funnel-fill-sent,
+  .funnel-dot-downloads, .funnel-dot-leads, .funnel-dot-drafted, .funnel-dot-sent { background: #888; }
 
   .empty-state { border-color: #ccc; color: #555; }
   footer.page-foot { border-color: #ccc; color: #555; }

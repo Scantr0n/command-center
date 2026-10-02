@@ -291,6 +291,16 @@
       line; regenerate it here after each fresh download check to keep it from going stale.</p>
   </section>
 
+  <section id="funnelSection">
+    <h2 class="section-title">Funnel</h2>
+    <p class="section-note">Real counts already logged elsewhere on this page, connected into one sequence: the
+      latest download check, how many of those turned into a logged lead, how many of those have a drafted
+      outreach message, and how many have actually been sent. Nothing here is a new fact or an estimate, it is
+      the same numbers the Traction and Engagement queue sections already show, just lined up stage by stage so
+      the drop-off between them is visible at a glance.</p>
+    <div id="funnelListEl" class="funnel-list"></div>
+  </section>
+
   <section id="downloadCountNormsSection">
     <details class="schema-help">
       <summary>What a GitHub release download count actually measures (general guidance, not Sondrik data)
@@ -566,7 +576,9 @@
     guards the text-width layout math and the escaping on the label/value baked into the exported SVG. Run
     <code>node --test public/sondrik/data/milestones-core.test.js</code> after changing the download-milestone
     or trend-confidence math, it guards which round numbers the Timeline/Traction cards flag as crossed and
-    when the "too early to call this a trend" caveat shows.
+    when the "too early to call this a trend" caveat shows. Run
+    <code>node --test public/sondrik/data/funnel-core.test.js</code> after changing the Funnel section's stage
+    math, it guards that a 0-of-0 stage never shows a fabricated conversion rate.
   </footer>
 </div>
 
@@ -612,6 +624,7 @@
 <script src="/sondrik/data/badge-core.js"></script>
 <script src="/sondrik/data/milestones-core.js"></script>
 <script src="/sondrik/data/posts-core.js"></script>
+<script src="/sondrik/data/funnel-core.js"></script>
 <script src="/sondrik/app.js"></script>
 <script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>

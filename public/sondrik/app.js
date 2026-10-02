@@ -81,6 +81,13 @@
   // Traction rate line and the Goals projection line all read from here.
   const { nextMilestone, milestonesCrossed, trendCaveatText } = window.SondrikMilestonesCore;
 
+  // Shared, unit-tested funnel stage math (funnel-core.js), same
+  // shared-core pattern as the destructures above: the Funnel section
+  // below only counts facts already required real by the other sections
+  // (the Traction card's latest download check, leads.json, each lead's
+  // outreach.draftStatus/outreach.sent), it adds no new data file.
+  const { computeFunnel } = window.SondrikFunnelCore;
+
   printBtn.addEventListener('click', () => window.print());
 
   // A record-level deep link (?lead=<id>, ?channel=<id>, ?release=<version>,
@@ -1326,6 +1333,42 @@
     }).join('');
   }
 
+  // Same funnel-row/track/fill visual language as CSM's pipeline funnel
+  // (renderFunnel in public/csm/app.js), so a reader who's already used
+  // that hub recognizes the pattern here. Unlike CSM's, this funnel spans
+  // two different data files (downloads.json, leads.json) rather than one
+  // prospect's single current stage, so computeFunnel (funnel-core.js)
+  // reads each stage from wherever that real count already lives instead
+  // of inferring it from a position field.
+  function renderFunnel(downloadsData, leadsData) {
+    const results = computeFunnel(downloadsData, leadsData);
+    const total = results.length ? results[0].reached : 0;
+    const funnelListEl = document.getElementById('funnelListEl');
+    if (total === 0) {
+      funnelListEl.innerHTML = '<p class="funnel-empty">No downloads logged yet, the funnel fills in once the ' +
+        'first real download check is recorded.</p>';
+      return;
+    }
+    funnelListEl.innerHTML = results.map(r => {
+      // Same bar-visibility floor as CSM's renderFunnel/renderCategoryEffectiveness:
+      // widthPct is the real rate floored to a visible 2% sliver, the printed
+      // reached/conversionFromPrev numbers next to it are never floored.
+      const widthPct = r.reached > 0 ? Math.max(2, Math.round((r.reached / total) * 100)) : 0;
+      const conversionHtml = r.conversionFromPrev == null ? '' :
+        '<span class="funnel-conversion font-mono">' + r.conversionFromPrev + '% reached this stage from the ' +
+        'previous one</span>';
+      return '<div class="funnel-row">' +
+        '<div class="funnel-row-head">' +
+        '<span class="funnel-dot funnel-dot-' + escapeHtml(r.stage.id) + '"></span>' +
+        '<span class="funnel-label">' + escapeHtml(r.stage.label) + '</span>' +
+        '<span class="funnel-count font-mono">' + r.reached + ' of ' + total + '</span>' +
+        '</div>' +
+        '<div class="funnel-track"><div class="funnel-fill funnel-fill-' + escapeHtml(r.stage.id) + '" style="width:' + widthPct + '%"></div></div>' +
+        conversionHtml +
+        '</div>';
+    }).join('');
+  }
+
   // Renders changelog.json, a file no one hand-edits: it's regenerated from
   // this repo's real git history by public/sondrik/data/changelog.js, so
   // every hash, author, and date here is independently checkable against
@@ -2251,6 +2294,13 @@
       leadsSection.innerHTML = '<div class="empty-state" role="alert">Failed to load engagement queue data: ' +
         escapeHtml(leadsResult.reason.message) + '</div>';
       leadsCsvBtn.disabled = true;
+    }
+
+    if (downloadsData || leadsData) {
+      renderFunnel(downloadsData || {}, leadsData || {});
+    } else {
+      document.getElementById('funnelListEl').innerHTML =
+        '<div class="empty-state" role="alert">Could not compute the funnel, downloads and leads data both failed to load.</div>';
     }
 
     // Unlike the other files, a missing changelog.json means it just hasn't
