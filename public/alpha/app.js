@@ -2499,7 +2499,7 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latenc
       debateActivationRecorded
         ? 'This browser has observed the debate panel go active at least once (see Summary above).'
         : 'The debate panel has not been observed active by this browser yet.'),
-    diagnosticRow('Data Saver', !navigator.connection ? 'info' : (isDataSaverOn() ? 'blocked' : 'ok'),
+    diagnosticRow('Data Saver', !navigator.connection ? 'info' : (isDataSaverOn() ? 'info' : 'ok'),
       !navigator.connection ? 'N/A' : (isDataSaverOn() ? 'ON' : 'OFF'),
       !navigator.connection
         ? 'Not supported in this browser; auto-refresh always runs every ' + (REFRESH_INTERVAL_MS / 1000) + 's.'
