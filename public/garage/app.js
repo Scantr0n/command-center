@@ -3812,10 +3812,21 @@ function renderEngagement(snapshots, currentListings) {
     const savesHtml = s.saves != null
       ? escapeHtml(String(s.saves)) + formatEngagementDelta(s.savesDelta)
       : '<span class="cell-value empty">not logged</span>';
+    // Not nested inside the Item cell's own <button> (see platformBadges'
+    // comment above on why a link can't live inside that clickable cell),
+    // this is its own cell, a real listingUrls[s.platform] link straight to
+    // the exact platform this snapshot is about, so re-checking the current
+    // view/watcher count is one click instead of opening the modal and
+    // finding the right platform badge in it.
+    const recheckUrl = listing && listing.listingUrls ? listing.listingUrls[s.platform] : null;
+    const recheckHtml = recheckUrl
+      ? `<a class="badge badge-link" href="${escapeHtml(recheckUrl)}" target="_blank" rel="noopener noreferrer" title="Open the real ${escapeHtml(PLATFORM_LABELS[s.platform] || s.platform)} listing to re-check its current views/watchers">Re-check <span aria-hidden="true">&#8599;</span></a>`
+      : '<span class="cell-value empty">no link logged</span>';
     return `
     <tr id="${s.id ? 'engagement-row-' + escapeHtml(s.id) : ''}">
       <td>${itemHtml}</td>
       <td><span class="badge badge-${escapeHtml(s.platform)}">${escapeHtml(PLATFORM_LABELS[s.platform] || s.platform)}</span></td>
+      <td>${recheckHtml}</td>
       <td class="cell-muted">${dateHtml}</td>
       <td class="cell-value">${viewsHtml}</td>
       <td class="cell-value">${savesHtml}</td>
