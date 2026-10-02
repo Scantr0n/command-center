@@ -477,6 +477,29 @@
     return computeStateRuns(withReading, 'paused', true);
   }
 
+  // The Kill switch history list (built from computeKillSwitchEpisodes
+  // above) had no summary stat at all, unlike the real Incidents list right
+  // above it on the page, which leads with a streak, an average recovery
+  // time, and (see computeLongestIncident above) its own worst case. A
+  // real-money kill switch tripping is exactly the kind of event that
+  // deserves the same "how often, how long on average, how long at worst"
+  // answer at a glance, not a bare unsummarized list. Built from the same
+  // completed-episode definition computeKillSwitchEpisodes already uses
+  // (ongoing: false), the same honest-empty-state rule as MTTR: no
+  // completed engagement, nothing to report yet.
+  function computeKillSwitchEngagementStats(history) {
+    const completed = computeKillSwitchEpisodes(history).filter(e => !e.ongoing);
+    if (!completed.length) return null;
+    let totalMs = 0;
+    let longestMs = 0;
+    for (const episode of completed) {
+      const ms = new Date(episode.end).getTime() - new Date(episode.start).getTime();
+      totalMs += ms;
+      if (ms > longestMs) longestMs = ms;
+    }
+    return { avgMs: totalMs / completed.length, longestMs, count: completed.length };
+  }
+
   function dayKeyLocal(iso) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
@@ -567,6 +590,7 @@
     computeLongestIncident,
     computeMTBF,
     computeKillSwitchEpisodes,
+    computeKillSwitchEngagementStats,
     dayKeyLocal,
     computeDailyUptimeBuckets,
     dailyUptimeClass,

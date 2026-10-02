@@ -62,6 +62,7 @@ const {
   computeLongestIncident,
   computeMTBF,
   computeKillSwitchEpisodes,
+  computeKillSwitchEngagementStats,
   dayKeyLocal,
   computeDailyUptimeBuckets,
   dailyUptimeClass,
@@ -1176,6 +1177,33 @@ function renderKillSwitchHistory(data, clientHistory) {
   }
   const recent = [...episodes].reverse().slice(0, INCIDENT_LIST_LIMIT);
   list.innerHTML = recent.map(killSwitchEpisodeItem).join('');
+}
+
+// The summary badge the Kill switch history list was missing: unlike the
+// real Incidents list right above it (streak, MTTR, MTBF badges), this list
+// was a bare unsummarized list with no "how often, how long on average, how
+// long at worst" answer at a glance. Built from computeKillSwitchEngagementStats
+// (dates-core.js), which already derives this from the same completed
+// kill-switch episodes the list above renders; this only formats it, never
+// recomputes it. Hidden until there is at least one completed engagement,
+// same honest-empty-state rule as the incident badges.
+function renderKillSwitchEngagementStats(data, clientHistory) {
+  const el = document.getElementById('killSwitchEngagementStats');
+  if (!el) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  const stats = computeKillSwitchEngagementStats(history);
+  if (!stats) {
+    el.hidden = true;
+    el.textContent = '';
+    el.title = '';
+    return;
+  }
+  el.hidden = false;
+  const avgText = formatDuration(stats.avgMs) || 'under 1m';
+  const longestText = formatDuration(stats.longestMs) || 'under 1m';
+  el.textContent = 'avg engaged ' + avgText + ' (' + stats.count + ' engagement' + (stats.count === 1 ? '' : 's') +
+    (stats.longestMs > stats.avgMs ? ', longest ' + longestText : '') + ')';
+  el.title = 'Longest single engagement: ' + longestText + '.';
 }
 
 // Statuspage/UptimeRobot-style daily uptime bars: the tick strip above
@@ -2759,6 +2787,7 @@ async function loadStatus() {
     renderIncidentMttr(data, clientConnHistory);
     renderIncidentMtbf(data, clientConnHistory);
     renderKillSwitchHistory(data, clientConnHistory);
+    renderKillSwitchEngagementStats(data, clientConnHistory);
     renderRegimeHistory(clientRegimeHistory, lastKnown && lastKnown.asOf);
     // Kill switch engaged outranks plain connection freshness for the one
     // glance a background tab gives Jack, same priority it gets everywhere
@@ -2834,6 +2863,7 @@ window.addEventListener('storage', (e) => {
   renderIncidentMttr(lastRawData, connHistory);
   renderIncidentMtbf(lastRawData, connHistory);
   renderKillSwitchHistory(lastRawData, connHistory);
+  renderKillSwitchEngagementStats(lastRawData, connHistory);
   // Same last-known/frozen distinction loadStatus applies via `lastKnown`:
   // lastStatusIsLastKnown and lastStatusData are the same two values this
   // tab's own last loadStatus() call already computed, so a sibling tab's

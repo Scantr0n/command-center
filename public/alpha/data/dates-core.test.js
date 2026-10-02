@@ -28,6 +28,7 @@ const {
   computeLongestIncident,
   computeMTBF,
   computeKillSwitchEpisodes,
+  computeKillSwitchEngagementStats,
   dayKeyLocal,
   computeDailyUptimeBuckets,
   dailyUptimeClass,
@@ -420,6 +421,39 @@ test('computeKillSwitchEpisodes is empty when never engaged, for an all-null-pau
   assert.deepEqual(computeKillSwitchEpisodes([]), []);
   assert.deepEqual(computeKillSwitchEpisodes([{ at: 'x', connected: true, paused: false }]), []);
   assert.deepEqual(computeKillSwitchEpisodes([{ at: 'x', connected: false, paused: null }]), []);
+});
+
+test('computeKillSwitchEngagementStats averages and finds the longest completed engagement', () => {
+  const history = [
+    { at: '2026-09-15T10:00:00Z', connected: true, paused: false },
+    { at: '2026-09-15T10:05:00Z', connected: true, paused: true },
+    { at: '2026-09-15T10:15:00Z', connected: true, paused: false }, // engagement 1: 10m
+    { at: '2026-09-16T10:00:00Z', connected: true, paused: true },
+    { at: '2026-09-16T10:40:00Z', connected: true, paused: false } // engagement 2: 40m, longest
+  ];
+  const stats = computeKillSwitchEngagementStats(history);
+  assert.deepEqual(stats, { avgMs: 25 * 60000, longestMs: 40 * 60000, count: 2 });
+});
+
+test('computeKillSwitchEngagementStats excludes a still-engaged episode from both the average and the longest', () => {
+  const history = [
+    { at: '2026-09-15T10:00:00Z', connected: true, paused: false },
+    { at: '2026-09-15T10:05:00Z', connected: true, paused: true },
+    { at: '2026-09-15T10:15:00Z', connected: true, paused: false }, // engagement 1: 10m, completed
+    { at: '2026-09-16T10:00:00Z', connected: true, paused: true } // engagement 2: still engaged
+  ];
+  const stats = computeKillSwitchEngagementStats(history);
+  assert.deepEqual(stats, { avgMs: 10 * 60000, longestMs: 10 * 60000, count: 1 });
+});
+
+test('computeKillSwitchEngagementStats is null with no completed engagements, or no history', () => {
+  assert.equal(computeKillSwitchEngagementStats([]), null);
+  assert.equal(computeKillSwitchEngagementStats(undefined), null);
+  assert.equal(computeKillSwitchEngagementStats([{ at: 'x', connected: true, paused: false }]), null);
+  assert.equal(computeKillSwitchEngagementStats([
+    { at: '2026-09-15T10:00:00Z', connected: true, paused: false },
+    { at: '2026-09-15T10:05:00Z', connected: true, paused: true }
+  ]), null);
 });
 
 test('dayKeyLocal formats a zero-padded local calendar day, null for a bad timestamp', () => {
