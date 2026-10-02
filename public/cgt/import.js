@@ -52,6 +52,8 @@ const DATASETS = {
       { key: 'subgradeEdges', label: 'BGS edges subgrade (BGS only)', aliases: ['subgradeedges', 'edges', 'bgsedges'], type: 'number' },
       { key: 'subgradeSurface', label: 'BGS surface subgrade (BGS only)', aliases: ['subgradesurface', 'surface', 'bgssurface'], type: 'number' },
       { key: 'certNumber', label: 'Cert number', aliases: ['certnumber', 'cert', 'certno', 'serial', 'serialnumber'] },
+      { key: 'setName', label: 'Set/manufacturer name', aliases: ['setname', 'set', 'manufacturer', 'brand'] },
+      { key: 'cardNumber', label: 'Card number within the set', aliases: ['cardnumber', 'cardno', 'number', '#'] },
       { key: 'storageLocation', label: 'Storage location', aliases: ['storagelocation', 'location', 'storage', 'box', 'binder', 'safe'] },
       { key: 'submissionId', label: 'From submission id (must match a real id in submissions.json)', aliases: ['submissionid', 'submission', 'batchid'] },
       { key: 'estimatedValue', label: 'Estimated value', aliases: ['estimatedvalue', 'value', 'price', 'estvalue', 'estimate'], type: 'number' },
