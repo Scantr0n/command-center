@@ -639,7 +639,7 @@ function renderRegimeHistory(clientRegimeHistory, frozenAsOf) {
   if (!list) return;
   const segments = computeRegimeSegments(clientRegimeHistory, frozenAsOf);
   lastRegimeHistorySnapshot = segments;
-  renderRegimeDistribution(segments);
+  renderDistributionBreakdown(segments, { wrap: 'regimeDistWrap', bar: 'regimeDistBar', legend: 'regimeDistLegend' });
   if (csvBtn) {
     csvBtn.disabled = !segments.length;
     csvBtn.title = segments.length ? '' : 'No regime changes recorded yet.';
@@ -657,10 +657,18 @@ function renderRegimeHistory(clientRegimeHistory, frozenAsOf) {
 // above), so the color-assignment and distribution-aggregation math can be
 // unit-tested outside the browser too.
 
-function renderRegimeDistribution(segments) {
-  const wrap = document.getElementById('regimeDistWrap');
-  const bar = document.getElementById('regimeDistBar');
-  const legend = document.getElementById('regimeDistLegend');
+// Shared by Regime history's own distribution block and the Sizing mode
+// history one added alongside it below: both build a segment list with
+// computeRegimeSegments (a segment's `regime` field just holds whichever
+// string this call site is actually tracking, regime label or sizing-mode
+// name) and want the identical "time in each distinct value" breakdown bar,
+// so the element ids are the only thing that differs between the two call
+// sites rather than keeping two copies of this same rendering in sync by
+// hand.
+function renderDistributionBreakdown(segments, ids) {
+  const wrap = document.getElementById(ids.wrap);
+  const bar = document.getElementById(ids.bar);
+  const legend = document.getElementById(ids.legend);
   if (!wrap || !bar || !legend) return;
   const { totalMs, rows } = computeRegimeDistribution(segments);
   // Needs at least two distinct regimes to say anything a single stat tile
@@ -729,6 +737,7 @@ function renderSizingModeHistory(clientSizingModeHistory, frozenAsOf) {
     frozenAsOf
   );
   lastSizingModeHistorySnapshot = segments;
+  renderDistributionBreakdown(segments, { wrap: 'sizingModeDistWrap', bar: 'sizingModeDistBar', legend: 'sizingModeDistLegend' });
   if (csvBtn) {
     csvBtn.disabled = !segments.length;
     csvBtn.title = segments.length ? '' : 'No sizing mode changes recorded yet.';
