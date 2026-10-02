@@ -26,6 +26,12 @@ const CATEGORIES = [
 ];
 const STATUSES = ['active', 'done', 'stalled', 'broken', 'unknown'];
 const PRIORITIES = ['top', 'normal', 'low'];
+// Kept in sync with the literal checks in reliabilityBarHtml/openModal in
+// public/index.html: 'failed' and 'paused' are the only two non-default
+// states those read off reliability.lastRunStatus, 'succeeded' is the real
+// healthy value every other string (including a typo) is indistinguishable
+// from once rendered.
+const RELIABILITY_STATUSES = ['succeeded', 'failed', 'paused'];
 
 // The shape regex alone accepts any two digits for month/day, including
 // "2026-13-45" or a real-looking but impossible "2026-02-30", so this
@@ -142,6 +148,36 @@ function main() {
         errors.push(where + ': duplicate toggleId "' + c.toggleId + '", flipping one of these two clusters\' automation switch would silently flip the other\'s too');
       } else {
         seenToggleIds.add(c.toggleId);
+      }
+    }
+
+    if (c.reliability !== undefined) {
+      const r = c.reliability;
+      if (typeof r !== 'object' || r === null || Array.isArray(r)) {
+        errors.push(where + ': "reliability" must be an object');
+      } else {
+        // The only two states public/index.html's renderReliability/modal
+        // code actually recognizes (see RELIABILITY_STATUSES below); anything
+        // else, including a typo like "succeeeded", silently renders as the
+        // same neutral/healthy default as a real "succeeded", with nothing
+        // to flag the typo before it reads as good news that isn't real.
+        if (r.lastRunStatus !== undefined && !RELIABILITY_STATUSES.includes(r.lastRunStatus)) {
+          warnings.push(where + ': reliability.lastRunStatus "' + r.lastRunStatus + '" is not one of ' +
+            RELIABILITY_STATUSES.join(', ') + ', will silently render as the healthy/default state');
+        }
+        if (!isDateOrNull(r.lastRunAt)) {
+          errors.push(where + ': reliability.lastRunAt is not a YYYY-MM-DD date or null: ' + JSON.stringify(r.lastRunAt));
+        } else if (isFutureDate(r.lastRunAt)) {
+          warnings.push(where + ': reliability.lastRunAt (' + r.lastRunAt + ') is in the future, check for a typo\'d year');
+        }
+        // reliabilityPct() in public/data/dashboard-core.js only ever finds
+        // a percentage in a real "N/M" shape; anything else (a hand-typed
+        // sentence, a missing slash) makes the bar silently disappear on
+        // both Grid and the modal, leaving only the raw text behind with no
+        // signal that the bar was supposed to be there.
+        if (r.recentSuccessRate !== undefined && r.recentSuccessRate !== null && !/\d+\s*\/\s*\d+/.test(r.recentSuccessRate)) {
+          warnings.push(where + ': reliability.recentSuccessRate "' + r.recentSuccessRate + '" has no real "N/M" count, the reliability bar will silently not render');
+        }
       }
     }
 
