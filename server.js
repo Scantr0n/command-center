@@ -66,6 +66,20 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
+// public/vendor/** (self-hosted fonts, the D3 bundle) is the one static
+// subtree that isn't a hand-edited hub file: both are written only by
+// scripts/build-vendor-fonts.js and scripts/build-vendor-d3.js, run
+// deliberately and committed, never touched by the edit-a-hub-then-reload
+// loop the rest of public/ goes through. The blanket static handler below
+// still sends max-age=0 for everything, so every page load refetches these
+// over the network even though they're byte-identical to the last fetch.
+// Short revalidated cache here (not the usual 1y/immutable pattern) because
+// these filenames carry no content hash, so a stale copy past a version
+// bump would need a hard refresh to clear; a day bounds that risk while
+// still skipping the network round trip for the rest of a session.
+app.use('/vendor', express.static(path.join(__dirname, 'public', 'vendor'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate'),
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
