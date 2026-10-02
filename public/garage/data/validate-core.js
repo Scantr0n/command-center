@@ -47,7 +47,11 @@
   function findDuplicateListings(listings) {
     const byKey = new Map();
     (listings || []).forEach(l => {
-      if (l.status !== 'live' || !l.title || l.price == null) return;
+      // The typeof check matters as much as the truthiness one: a truthy
+      // non-string title would otherwise reach .trim() below and throw, and
+      // both validate.js and app.js's own duplicate-listings panel call this
+      // function unconditionally on every run.
+      if (l.status !== 'live' || !l.title || typeof l.title !== 'string' || l.price == null) return;
       const key = l.title.trim().toLowerCase() + '|' + l.price;
       if (!byKey.has(key)) byKey.set(key, []);
       byKey.get(key).push(l);

@@ -163,7 +163,19 @@ function main() {
     else if (seenIds.has(l.id)) errors.push(where + ': duplicate id "' + l.id + '"');
     else seenIds.add(l.id);
 
-    if (!l.title) errors.push(where + ': missing "title"');
+    if (!l.title) {
+      errors.push(where + ': missing "title"');
+    } else if (typeof l.title !== 'string') {
+      // findDuplicateListings' own `!l.title` guard only catches a falsy
+      // value, so a truthy non-string reaches its unguarded
+      // `.trim().toLowerCase()` and throws, and that function runs
+      // unconditionally from both this file and app.js's own panel.
+      errors.push(where + ': "title" must be a string, got ' + typeof l.title);
+    }
+
+    if (l.notes !== null && l.notes !== undefined && typeof l.notes !== 'string') {
+      errors.push(where + ': "notes" must be a string or null, got ' + typeof l.notes);
+    }
 
     if (l.price !== null && l.price !== undefined) {
       if (typeof l.price !== 'number' || l.price < 0) {
@@ -312,7 +324,7 @@ function main() {
       });
     }
 
-    emDashFields(l, ['title', 'location']).forEach(f =>
+    emDashFields(l, ['title', 'location', 'notes']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
     emDashFields(l.itemSpecifics, ITEM_SPECIFIC_KEYS).forEach(f =>
       warnings.push(where + ': itemSpecifics.' + f + ' contains an em dash, this tracker never uses one, check for a paste-in'));

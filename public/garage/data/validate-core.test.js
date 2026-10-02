@@ -69,6 +69,14 @@ test('findDuplicateListings skips listings with no title or no price rather than
   assert.deepEqual(findDuplicateListings(listings), []);
 });
 
+test('findDuplicateListings skips a truthy non-string title instead of throwing on .trim()', () => {
+  const listings = [
+    { id: 'a', title: 85, price: 85, status: 'live' },
+    { id: 'b', title: 85, price: 85, status: 'live' }
+  ];
+  assert.doesNotThrow(() => findDuplicateListings(listings));
+});
+
 test('isSuspiciousEbayReturnPolicy flags a policy meant for auto parts', () => {
   assert.equal(
     isSuspiciousEbayReturnPolicy('30-Day Seller-Paid Returns (Parts & Accessories)'),
