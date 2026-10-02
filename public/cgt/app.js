@@ -2776,6 +2776,8 @@ function matchesSearchTerm(c, term) {
   return !term
     || (c.cardName || '').toLowerCase().includes(term)
     || (c.certNumber || '').toLowerCase().includes(term)
+    || (c.setName || '').toLowerCase().includes(term)
+    || (c.cardNumber || '').toLowerCase().includes(term)
     || (c.storageLocation || '').toLowerCase().includes(term)
     || String(c.year ?? '').includes(term)
     || (c.notes || '').toLowerCase().includes(term)
