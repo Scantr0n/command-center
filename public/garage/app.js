@@ -6,6 +6,7 @@ let suppliesLog = [];
 let acquisitionsLog = [];
 let compsLog = [];
 let engagementLog = [];
+let activityLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
 // Set once from a real ?listing=<id> URL param and consumed once, right
@@ -1006,9 +1007,11 @@ async function loadData() {
   }
 
   if (activityData) {
-    renderActivity(activityData.events || []);
+    activityLog = activityData.events || [];
+    renderActivity(activityLog);
     if (initialActivityId) flashElementOnce(document.getElementById('activity-item-' + initialActivityId));
   } else {
+    activityLog = [];
     document.getElementById('activityList').innerHTML =
       '<div class="activity-item" role="alert"><div class="activity-item-detail">Failed to load activity data: ' +
       escapeHtml(activityResult.reason.message) + '</div></div>';
@@ -5277,6 +5280,33 @@ document.getElementById('expensesCsvBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'garage-expenses-' + todayDateStr() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const ACTIVITY_CSV_COLUMNS = [
+  ['title', 'Event'], ['type', 'Type'], ['platform', 'Platform'], ['date', 'Date'],
+  ['itemsReviewed', 'Items reviewed'], ['issuesFound', 'Issues found'], ['detail', 'Detail']
+];
+
+// Exports every real logged quality-audit/bug-fix event, same column shape
+// as every other log's own CSV export on this page.
+document.getElementById('activityCsvBtn').addEventListener('click', () => {
+  const rows = activityLog.map(e => ({
+    ...e,
+    type: EVENT_TYPE_LABELS[e.type] || e.type || '',
+    platform: PLATFORM_LABELS[e.platform] || e.platform || ''
+  }));
+  const header = ACTIVITY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(e => ACTIVITY_CSV_COLUMNS.map(([key]) => csvField(e[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'garage-activity-' + todayDateStr() + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
