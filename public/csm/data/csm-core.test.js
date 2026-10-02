@@ -30,7 +30,7 @@ const {
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
   stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
-  hasReplyBeforeFirstOutboundTouch, hasImplausibleEngagementRate,
+  hasReplyBeforeFirstOutboundTouch, hasImplausibleEngagementRate, hasMultipleInitialSendEntries,
   emDashFields, emDashHits, compareWithBackup, hasNewDueId
 } = require('./csm-core.js');
 
@@ -1738,6 +1738,32 @@ test('computeDataQualityFlags flags an implausible engagementRate over 100', () 
   const flagged = computeDataQualityFlags([], [p]);
   assert.equal(flagged.length, 1);
   assert.ok(flagged[0].reasons.some(r => r.includes('ENGAGEMENT RATE OVER 100')));
+});
+
+test('hasMultipleInitialSendEntries is false with zero or one initial-send entry', () => {
+  assert.equal(hasMultipleInitialSendEntries({}), false);
+  assert.equal(hasMultipleInitialSendEntries({
+    outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-08', type: 'nudge' }]
+  }), false);
+});
+
+test('hasMultipleInitialSendEntries fires when more than one initial-send entry is logged', () => {
+  assert.equal(hasMultipleInitialSendEntries({
+    outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-08', type: 'initial-send' }]
+  }), true);
+});
+
+test('computeDataQualityFlags flags more than one initial-send entry in the outreach log', () => {
+  const p = {
+    stage: 'outreach-sent',
+    name: 'double-send',
+    verifiedHook: 'x',
+    contactChannel: { type: 'named-decision-maker', detail: 'x' },
+    outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-08', type: 'initial-send' }]
+  };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.equal(flagged.length, 1);
+  assert.ok(flagged[0].reasons.some(r => r.includes('MORE THAN ONE "INITIAL-SEND" ENTRY')));
 });
 
 function backupFile(prospects, stages, exportedAt) {

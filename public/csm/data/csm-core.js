@@ -829,6 +829,14 @@
     return (p.socialSnapshots || []).some(snap => snap && typeof snap.engagementRate === 'number' && snap.engagementRate > 100);
   }
 
+  // Same real sanity check validate.js already runs: there should only
+  // ever be one "initial-send" touch per prospect (the real first-touch
+  // event), later touches logged as "nudge" instead. More than one usually
+  // means a second real send got logged with the wrong type.
+  function hasMultipleInitialSendEntries(p) {
+    return (p.outreachLog || []).filter(e => e && e.type === 'initial-send').length > 1;
+  }
+
   // Per-prospect data-quality check: every real gap the board can actually
   // detect from a prospect's own fields, not just the stall/cold-signal/
   // duplicate checks that already get their own panels. Reasons are plain
@@ -882,6 +890,9 @@
         }
         if (hasImplausibleEngagementRate(p)) {
           reasons.push('ENGAGEMENT RATE OVER 100%, DOUBLE CHECK IT WAS NOT PULLED AS A RAW FRACTION OR FOLLOWER COUNT');
+        }
+        if (hasMultipleInitialSendEntries(p)) {
+          reasons.push('OUTREACH LOG HAS MORE THAN ONE "INITIAL-SEND" ENTRY, LATER TOUCHES SHOULD BE LOGGED AS "NUDGE"');
         }
         return { p, reasons };
       })
@@ -1304,7 +1315,7 @@
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
     stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
-    hasReplyBeforeFirstOutboundTouch, hasImplausibleEngagementRate,
+    hasReplyBeforeFirstOutboundTouch, hasImplausibleEngagementRate, hasMultipleInitialSendEntries,
     emDashFields, emDashHits, compareWithBackup, hasNewDueId
   };
 
