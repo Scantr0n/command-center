@@ -210,11 +210,13 @@
     <summary>This browser's status</summary>
     <div class="schema-help-body">
       <p>This page leans on a few browser features to work fully: <code>localStorage</code> for the connectivity,
-        regime-history, and last-known-state caches described above, the Notification API for critical alerts, and
-        a service worker for offline app-shell caching. Any one of these can be silently blocked (private
-        browsing, a locked-down profile, revoked permissions) without the rest of the page failing, which just as
-        silently mutes the feature that depended on it. This table is a real, live check of this browser, right
-        now, on this device, so that silence is never mistaken for "nothing to report".</p>
+        regime-history, and last-known-state caches described above, the Notification API for critical alerts, a
+        service worker for offline app-shell caching, and the Network Information API's <code>saveData</code> flag
+        to back the 30-second auto-refresh off to every 2 minutes while this browser's own Data Saver mode is on.
+        Any one of these can be silently blocked or simply unsupported (private browsing, a locked-down profile,
+        revoked permissions, a browser that doesn't implement Network Information) without the rest of the page
+        failing, which just as silently mutes the feature that depended on it. This table is a real, live check of
+        this browser, right now, on this device, so that silence is never mistaken for "nothing to report".</p>
       <div class="schema-table-wrap">
         <table class="schema-table" id="browserDiagnosticsTable">
           <tbody id="browserDiagnosticsBody"></tbody>

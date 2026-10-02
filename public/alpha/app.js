@@ -2498,7 +2498,14 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latenc
     diagnosticRow('Debate panel activation recorded', storageOk ? 'ok' : 'blocked', debateActivationRecorded ? 'YES' : 'NOT YET',
       debateActivationRecorded
         ? 'This browser has observed the debate panel go active at least once (see Summary above).'
-        : 'The debate panel has not been observed active by this browser yet.')
+        : 'The debate panel has not been observed active by this browser yet.'),
+    diagnosticRow('Data Saver', !navigator.connection ? 'info' : (isDataSaverOn() ? 'blocked' : 'ok'),
+      !navigator.connection ? 'N/A' : (isDataSaverOn() ? 'ON' : 'OFF'),
+      !navigator.connection
+        ? 'Not supported in this browser; auto-refresh always runs every ' + (REFRESH_INTERVAL_MS / 1000) + 's.'
+        : (isDataSaverOn()
+          ? 'This browser is asking sites to reduce background traffic, so auto-refresh is backed off to every ' + (SAVE_DATA_REFRESH_INTERVAL_MS / 1000) + 's.'
+          : 'Auto-refresh runs every ' + (REFRESH_INTERVAL_MS / 1000) + 's.'))
   ];
   body.innerHTML = rows.join('');
 }
@@ -3662,17 +3669,38 @@ document.addEventListener('keydown', (e) => {
 // manual reload. Purely a re-fetch of the same read-only file, paused
 // while the tab is hidden so it never runs pointlessly in the background.
 const REFRESH_INTERVAL_MS = 30000;
-let nextAutoRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
-setInterval(() => {
-  if (document.visibilityState === 'visible') {
-    loadStatus();
-    // Market open/closed never comes from the /api/alpha/live fetch above
-    // (see computeMarketStatus's own comment), so it needs its own tick on
-    // the same cadence rather than piggybacking on loadStatus succeeding.
-    renderMarketStatus();
-  }
-  nextAutoRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
-}, REFRESH_INTERVAL_MS);
+// A phone on a metered connection with the browser's own Data Saver mode on
+// (navigator.connection.saveData, Network Information API) is telling every
+// site to go easy on background traffic; a 30s poll of the same endpoint
+// ignores that signal entirely. Backing off to every 2 minutes while it's on
+// is the same real pattern sites already use for background sync/prefetch,
+// not a change to what's fetched, just how often, and it reverts the instant
+// saveData reads false again (laptop, wifi, Data Saver turned back off).
+const SAVE_DATA_REFRESH_INTERVAL_MS = 120000;
+function isDataSaverOn() {
+  return !!(navigator.connection && navigator.connection.saveData);
+}
+function currentRefreshIntervalMs() {
+  return isDataSaverOn() ? SAVE_DATA_REFRESH_INTERVAL_MS : REFRESH_INTERVAL_MS;
+}
+let nextAutoRefreshAt = Date.now() + currentRefreshIntervalMs();
+// setTimeout, not setInterval, so each cycle re-reads isDataSaverOn() rather
+// than locking in whichever cadence was true when the page first loaded.
+function scheduleAutoRefresh() {
+  const ms = currentRefreshIntervalMs();
+  nextAutoRefreshAt = Date.now() + ms;
+  setTimeout(() => {
+    if (document.visibilityState === 'visible') {
+      loadStatus();
+      // Market open/closed never comes from the /api/alpha/live fetch above
+      // (see computeMarketStatus's own comment), so it needs its own tick on
+      // the same cadence rather than piggybacking on loadStatus succeeding.
+      renderMarketStatus();
+    }
+    scheduleAutoRefresh();
+  }, ms);
+}
+scheduleAutoRefresh();
 
 // Visible companion to the auto-refresh above: without it, the 30s poll is
 // invisible until a value happens to change, and there's no way to tell "the
@@ -3690,7 +3718,7 @@ function renderNextRefreshCountdown() {
     return;
   }
   const secs = Math.max(0, Math.ceil((nextAutoRefreshAt - Date.now()) / 1000));
-  nextRefreshEl.textContent = 'Next check in ' + secs + 's';
+  nextRefreshEl.textContent = 'Next check in ' + secs + 's' + (isDataSaverOn() ? ' (Data Saver)' : '');
 }
 setInterval(renderNextRefreshCountdown, 1000);
 renderNextRefreshCountdown();
