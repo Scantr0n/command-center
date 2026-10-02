@@ -141,6 +141,17 @@ function main() {
       warnings.push(where + ': has a "link" but no "linkLabel", the modal will fall back to a plain "Open"');
     }
 
+    // sessionTitle has never had a type check: public/index.html's own
+    // search filter reads it as `(c.sessionTitle || '').toLowerCase()`,
+    // which only guards a falsy value. A truthy non-string (a number, a
+    // bare true) sails through the `||` and throws on `.toLowerCase()`
+    // inside the search loop every cluster runs through on every keystroke,
+    // breaking the whole dashboard's search, not just this one card's.
+    if (c.sessionTitle !== undefined && c.sessionTitle !== null && typeof c.sessionTitle !== 'string') {
+      errors.push(where + ': "sessionTitle" must be a string or null, got ' + typeof c.sessionTitle +
+        ', this throws when the search box runs against it');
+    }
+
     if (c.toggleable && !c.toggleId) {
       errors.push(where + ': "toggleable" is true but "toggleId" is missing, the automation toggle has nothing to key on');
     } else if (c.toggleId) {
@@ -194,7 +205,7 @@ function main() {
       errors.push(where + ': "relationReasons" must be an object keyed by cluster id');
     }
 
-    emDashFields(c, ['name', 'summary', 'linkLabel']).forEach(f =>
+    emDashFields(c, ['name', 'summary', 'linkLabel', 'sessionTitle']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this dashboard never uses one, check for a paste-in'));
   });
 
