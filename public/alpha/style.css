@@ -1636,7 +1636,18 @@ body.has-sticky-critical { padding-top: 40px; }
   right: 20px;
   bottom: 20px;
   z-index: 40;
-  background: var(--panel);
+  /* Verified in a real mobile/tablet screenshot: a real stat tile (Garage's
+     Summary grid) and the tail of a page's intro callout both sit directly
+     under this fixed-position button at ordinary scroll positions, not
+     just at the end of the page, since "right/bottom: 20px" tracks the
+     viewport, not the document. A solid --panel fill fully hid whatever
+     was there; backdrop-filter softens the same occlusion the overlay
+     modals already use (see index.html's own backdrop-blur-sm), so real
+     content stays at least partially legible through the button instead
+     of being flatly replaced by it. */
+  background: rgba(16, 18, 21, 0.82);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   color: var(--sub);
   border: 1px solid var(--hairlineHover);
   border-radius: 999px;
