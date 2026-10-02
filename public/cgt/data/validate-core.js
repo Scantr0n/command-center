@@ -94,7 +94,12 @@
   function findDuplicateGroups(cards) {
     const byCombo = new Map();
     (cards || []).forEach(c => {
-      if (!c.cardName || !c.gradingCompany || c.grade == null) return;
+      // The `typeof` check matters as much as the truthiness one: a truthy
+      // non-string cardName (a number pasted into the name field) would
+      // otherwise reach `.trim()` below and throw, and validateCards calls
+      // this function unconditionally on every validate run, not just the
+      // dashboard's own Data Quality panel.
+      if (!c.cardName || typeof c.cardName !== 'string' || !c.gradingCompany || c.grade == null) return;
       const key = c.cardName.trim().toLowerCase() + '|' + (c.year ?? '') + '|' + c.gradingCompany + '|' + c.grade;
       if (!byCombo.has(key)) byCombo.set(key, []);
       byCombo.get(key).push(c);
@@ -137,7 +142,10 @@
   function findDuplicateCandidateGroups(candidates) {
     const byCombo = new Map();
     (candidates || []).forEach(c => {
-      if (!c.cardName || !c.sport) return;
+      // Same real gap as findDuplicateGroups' own guard above: a truthy
+      // non-string cardName would otherwise reach `.trim()` and throw, and
+      // validateCandidates calls this function unconditionally.
+      if (!c.cardName || typeof c.cardName !== 'string' || !c.sport) return;
       const key = c.cardName.trim().toLowerCase() + '|' + (c.year ?? '') + '|' + c.sport;
       if (!byCombo.has(key)) byCombo.set(key, []);
       byCombo.get(key).push(c);
@@ -173,7 +181,18 @@
         }
       }
 
-      if (!c.cardName) errors.push(where + ': missing "cardName"');
+      if (!c.cardName) {
+        errors.push(where + ': missing "cardName"');
+      } else if (typeof c.cardName !== 'string') {
+        // findDuplicateGroups below (and the inventory search box in
+        // app.js) both call `.trim().toLowerCase()` straight on cardName
+        // with no type guard, only a truthiness check. A truthy non-string
+        // (a card number pasted into the name field, say) sails past that
+        // check and throws the moment either path reaches it, and
+        // findDuplicateGroups runs unconditionally on every page load for
+        // the Data Quality panel, not just on a search.
+        errors.push(where + ': "cardName" must be a string, got ' + typeof c.cardName);
+      }
 
       if (!isValidYearOrNull(c.year)) {
         errors.push(where + ': "year" must be a whole number between 1860 and ' + (new Date().getFullYear() + 1) +
@@ -776,7 +795,15 @@
       else if (seenIds.has(c.id)) errors.push(where + ': duplicate id "' + c.id + '"');
       else seenIds.add(c.id);
 
-      if (!c.cardName) errors.push(where + ': missing "cardName"');
+      if (!c.cardName) {
+        errors.push(where + ': missing "cardName"');
+      } else if (typeof c.cardName !== 'string') {
+        // Same real gap as validateCards' own cardName check above:
+        // findDuplicateCandidateGroups calls `.trim().toLowerCase()` on
+        // this field with only a truthiness guard, and runs on every page
+        // load for the Data Quality panel.
+        errors.push(where + ': "cardName" must be a string, got ' + typeof c.cardName);
+      }
 
       if (!isValidYearOrNull(c.year)) {
         errors.push(where + ': "year" must be a whole number between 1860 and ' + (new Date().getFullYear() + 1) +

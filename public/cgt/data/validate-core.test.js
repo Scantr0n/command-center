@@ -434,6 +434,21 @@ test('validateCards accepts a string submissionId or null, rejects other types',
   assert.ok(bad.errors.some(e => e.includes('submissionId')));
 });
 
+test('validateCards rejects a non-string cardName and does not throw', () => {
+  // validateCards calls findDuplicateGroups on the raw array unconditionally,
+  // so a truthy non-string cardName (a number pasted into the name field)
+  // must not throw there, in addition to being reported as its own error.
+  const bad = validateCards([{ id: 'a', cardName: 12345, sport: 'hockey' }]);
+  assert.ok(bad.errors.some(e => e.includes('cardName') && e.includes('string')));
+});
+
+test('findDuplicateGroups skips a truthy non-string cardName instead of throwing on .trim()', () => {
+  assert.doesNotThrow(() => findDuplicateGroups([
+    { id: 'a', cardName: 12345, gradingCompany: 'PSA', grade: '9' },
+    { id: 'b', cardName: 12345, gradingCompany: 'PSA', grade: '9' }
+  ]));
+});
+
 test('validateCards accepts real BGS subgrades in half-point steps, rejects out-of-range or off-step values', () => {
   const clean = validateCards([
     { id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'BGS', grade: '9.5',
@@ -499,6 +514,18 @@ test('validateCandidates requires a labeled basis on rawValue and expectedGraded
     { id: 'a', cardName: 'X', sport: 'hockey', expectedGradedValue: 50, gradedValueBasis: null }
   ]);
   assert.ok(gradedOnly.errors.some(e => e.includes('gradedValueBasis')));
+});
+
+test('validateCandidates rejects a non-string cardName and does not throw', () => {
+  const bad = validateCandidates([{ id: 'a', cardName: 12345, sport: 'hockey' }]);
+  assert.ok(bad.errors.some(e => e.includes('cardName') && e.includes('string')));
+});
+
+test('findDuplicateCandidateGroups skips a truthy non-string cardName instead of throwing on .trim()', () => {
+  assert.doesNotThrow(() => findDuplicateCandidateGroups([
+    { id: 'a', cardName: 12345, sport: 'hockey' },
+    { id: 'b', cardName: 12345, sport: 'hockey' }
+  ]));
 });
 
 test('validateCandidates warns on a possible duplicate candidate (same card name/year/sport on two rows)', () => {
