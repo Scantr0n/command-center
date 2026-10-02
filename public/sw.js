@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v72';
+const CACHE_VERSION = 'v73';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -67,11 +67,18 @@ function isDataRequest(url) {
 // fetch appends a cache-busting "?t=<timestamp>" query so every 30s poll is
 // a distinct URL, and caching by full URL would grow the runtime cache by
 // one entry per poll forever instead of keeping one live snapshot per file.
+//
+// Same timeout convention server.js already uses on every proxied fetch
+// (2s Alpha proxy, 25s chat, 120s draft-listing): a flaky-but-not-fully-
+// offline connection (captive portal, weak wifi, cellular handoff) can
+// leave this fetch hanging well past the point a real offline response
+// would already be back, stalling the 30s dashboard poll on a stuck
+// "loading" state instead of this function's own honest cache fallback.
 async function networkFirst(request) {
   const url = new URL(request.url);
   const cacheKey = url.origin + url.pathname;
   try {
-    const fresh = await fetch(request);
+    const fresh = await fetch(request, { signal: AbortSignal.timeout(5000) });
     if (fresh.ok) {
       const cache = await caches.open(RUNTIME_CACHE);
       cache.put(cacheKey, fresh.clone());
