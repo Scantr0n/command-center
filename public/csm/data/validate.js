@@ -76,6 +76,19 @@ function main() {
     else seenIds.add(p.id);
 
     if (!p.name) errors.push(where + ': missing "name"');
+    else if (typeof p.name !== 'string') errors.push(where + ': "name" must be a string, got ' + typeof p.name);
+
+    // None of these free-text fields ever had a type check, only the
+    // em-dash scan below (which already guards its own typeof). app.js's
+    // matchesSearchTerm reads every one of them as `(p.field || '').toLowerCase()`,
+    // and findDuplicateProspects/findCasingDrift above call .trim() on name/
+    // company/category directly, so a truthy non-string here throws inside
+    // the search box or the Data Quality badge, not just a cosmetic miss.
+    ['company', 'category', 'replyStatus', 'notes', 'verifiedHook', 'nextAction'].forEach(f => {
+      if (p[f] !== undefined && p[f] !== null && typeof p[f] !== 'string') {
+        errors.push(where + ': "' + f + '" must be a string or null, got ' + typeof p[f]);
+      }
+    });
 
     if (!p.stage) {
       errors.push(where + ': missing "stage"');

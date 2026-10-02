@@ -52,6 +52,13 @@ test('findDuplicateProspects treats a missing company the same as any other matc
   assert.deepEqual(groups[0].map(p => p.id).sort(), ['a', 'b']);
 });
 
+test('findDuplicateProspects skips a truthy non-string name or company instead of throwing on .trim()', () => {
+  assert.doesNotThrow(() => findDuplicateProspects([
+    { id: 'a', name: 42, company: 'City Bound' },
+    { id: 'b', name: 'David Fraga', company: 42 }
+  ]));
+});
+
 test('findCasingDrift flags a single-valued field spelled two different ways', () => {
   const prospects = [
     { id: 'a', category: 'Fitness Influencer' },
@@ -79,6 +86,10 @@ test('findCasingDrift ignores null/empty values rather than grouping them as a v
     { id: 'c', category: 'Tech Reviewer' }
   ];
   assert.deepEqual(findCasingDrift(prospects, p => [p.category]), []);
+});
+
+test('findCasingDrift skips a truthy non-string value instead of throwing on .trim()', () => {
+  assert.doesNotThrow(() => findCasingDrift([{ id: 'a', category: 42 }, { id: 'b', category: 42 }], p => [p.category]));
 });
 
 test('findCasingDrift counts a multi-valued field once per prospect, not once per raw value', () => {

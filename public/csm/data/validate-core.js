@@ -25,7 +25,12 @@
   function findDuplicateProspects(prospects) {
     const byKey = new Map();
     (prospects || []).forEach(p => {
-      if (!p.name) return;
+      // The typeof checks matter as much as the truthiness ones: a truthy
+      // non-string name or company (either pasted in wrong) would otherwise
+      // reach .trim() below and throw, and both validate.js and app.js's own
+      // Data Quality badge call this function unconditionally on every run.
+      if (!p.name || typeof p.name !== 'string') return;
+      if (p.company !== undefined && p.company !== null && typeof p.company !== 'string') return;
       const key = p.name.trim().toLowerCase() + '|' + (p.company || '').trim().toLowerCase();
       if (!byKey.has(key)) byKey.set(key, []);
       byKey.get(key).push(p);
@@ -58,7 +63,11 @@
       // most one raw value there.
       const addedForThisProspect = new Set();
       getValues(p).forEach(raw => {
-        if (!raw) return;
+        // A truthy non-string raw value (category or platform typed as
+        // something other than a string) would otherwise reach .trim()
+        // below and throw; this runs unconditionally from both validate.js
+        // and app.js's Data Quality badge.
+        if (!raw || typeof raw !== 'string') return;
         const norm = raw.trim().toLowerCase();
         if (!byNorm.has(norm)) byNorm.set(norm, { variants: new Map(), prospects: [] });
         const entry = byNorm.get(norm);
