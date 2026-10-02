@@ -203,8 +203,23 @@ function writeToggles(toggles) {
   fs.renameSync(tmpFile, TOGGLES_FILE);
 }
 
+// readClusters() re-reads every local cluster JSON file fresh on every call
+// (readLocalClusters), the same real per-request disk-read cost /api/search
+// below already got a limiter for, and this route has no local caching of
+// its own to fall back on, only the already-cached Drive piece. The server
+// binds to all interfaces (see the header comment above), so this generous
+// a limit only ever blocks a genuine hammering loop, not a real client: the
+// hub page itself polls it once every 30s, plus once per hub page load from
+// sidebar.js's own nav fetch.
+const CLUSTERS_RATE_LIMIT = 60;
+const CLUSTERS_RATE_WINDOW_MS = 60 * 1000;
+const isClustersRateLimited = createRateLimiter(CLUSTERS_RATE_LIMIT, CLUSTERS_RATE_WINDOW_MS);
+
 app.get('/api/clusters', async (req, res) => {
   try {
+    if (isClustersRateLimited(req.ip)) {
+      return res.status(429).json({ error: `Too many requests, try again in a minute (limit is ${CLUSTERS_RATE_LIMIT} per ${CLUSTERS_RATE_WINDOW_MS / 1000}s).` });
+    }
     const { clusters, brokenFiles, driveStatus } = await readClusters();
     const toggles = readToggles();
     const withToggleState = clusters.map(c => {
@@ -860,7 +875,22 @@ app.get('/api/job-search/data-quality', dataQualityHandler('job-search'));
 // was itself the same drift risk it existed to catch.
 const { SEARCH_SOURCES, SEARCH_RESULT_CAP, SEARCH_PER_SOURCE_CAP } = require('./data/search-sources-core.js');
 
+// A synchronous fs.readFileSync across every one of SEARCH_SOURCES' real
+// data files, per request, same real per-request disk-read cost as
+// /api/clusters above, and this route had never had a limiter at all. The
+// server binds to all interfaces (see the header comment above), so a
+// generous limit here still bounds a genuine hammering loop without
+// touching a real typing session: the palette's own 180ms debounce
+// (fetchPaletteRecordResults, index.html) already keeps a real client's
+// request rate well under this.
+const SEARCH_RATE_LIMIT = 60;
+const SEARCH_RATE_WINDOW_MS = 60 * 1000;
+const isSearchRateLimited = createRateLimiter(SEARCH_RATE_LIMIT, SEARCH_RATE_WINDOW_MS);
+
 app.get('/api/search', (req, res) => {
+  if (isSearchRateLimited(req.ip)) {
+    return res.status(429).json({ error: `Too many search requests, try again in a minute (limit is ${SEARCH_RATE_LIMIT} per ${SEARCH_RATE_WINDOW_MS / 1000}s).` });
+  }
   const term = String(req.query.q || '').trim().toLowerCase();
   if (term.length < 2) { res.json({ results: [] }); return; }
   const results = [];
