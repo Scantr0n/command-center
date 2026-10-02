@@ -633,16 +633,25 @@
   }
 
   // The inverse of findOrphanSubmissionRefs above: a submission marked
-  // "returned" (the grading company actually shipped it back) with no card
-  // in cards.json pointing back at it via submissionId means the graded
-  // cards from that real batch never got logged, not that the batch came
-  // back with zero cards (submissions.json's own cardCount would say that,
-  // and a batch is never submitted with zero cards). Worth a warning, not
-  // an error, same reasoning as findOrphanSubmissionRefs: it never breaks
-  // anything rendered, it just means a real batch is sitting un-backfilled.
+  // "returned" (the grading company actually shipped it back) with fewer
+  // linked cards in cards.json than its own cardCount means the graded
+  // cards from that real batch never got fully logged, not that the batch
+  // came back with that few cards (submissions.json's own cardCount already
+  // says how many to expect). This also catches a batch backfilled one
+  // card at a time, the common real case: logging the first few graded
+  // cards from a 12-card batch used to clear this check entirely the
+  // moment any single card linked back, leaving the other 8-9 silently
+  // unflagged. When cardCount itself is not logged there is nothing to
+  // compare against, so this falls back to the original zero-linked check.
+  // Worth a warning, not an error, same reasoning as findOrphanSubmissionRefs:
+  // it never breaks anything rendered, it just means a real batch is
+  // sitting partly or fully un-backfilled.
   function findReturnedSubmissionsMissingCards(submissions, cards) {
-    const linkedIds = new Set((cards || []).filter(c => c.submissionId != null).map(c => c.submissionId));
-    return (submissions || []).filter(s => s.status === 'returned' && !linkedIds.has(s.id));
+    return (submissions || []).filter(s => {
+      if (s.status !== 'returned') return false;
+      const linkedCount = (cards || []).filter(c => c.submissionId === s.id).length;
+      return s.cardCount != null ? linkedCount < s.cardCount : linkedCount === 0;
+    });
   }
 
   // Validates the separate "cards sent off and not back yet" log

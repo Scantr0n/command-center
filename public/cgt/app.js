@@ -1971,6 +1971,11 @@ function renderReturnedSubmissionsHtml(returned) {
     ? new Set(CGTValidateCore.findReturnedSubmissionsMissingCards(returned, cards).map(s => s.id))
     : new Set();
   const rows = returned.map(s => {
+    const linkedCount = missingCardIds.has(s.id) ? cardsForSubmission(cards, s.id).length : 0;
+    const missingBadge = !missingCardIds.has(s.id) ? '' :
+      linkedCount === 0
+        ? '<span class="badge badge-late" title="This batch is marked returned, but no card in cards.json has this submission’s id set as its submissionId yet.">no cards logged yet</span>'
+        : `<span class="badge badge-late" title="This batch is marked returned with a cardCount of ${s.cardCount}, but only ${linkedCount} card(s) in cards.json have this submission’s id set as their submissionId so far.">${linkedCount} of ${s.cardCount} cards logged</span>`;
     const metaParts = [
       s.gradingCompany,
       s.serviceLevel,
@@ -1984,7 +1989,7 @@ function renderReturnedSubmissionsHtml(returned) {
           <span class="badge badge-status-returned">Returned</span>
           <span class="submission-who">${escapeHtml(s.description || 'Untitled submission')}${isExampleSubmission(s) ? ' <span class="badge badge-example">example</span>' : ''}</span>
           <span class="submission-meta">${escapeHtml(metaParts.join(' · '))}</span>
-          ${missingCardIds.has(s.id) ? '<span class="badge badge-late" title="This batch is marked returned, but no card in cards.json has this submission’s id set as its submissionId yet.">no cards logged yet</span>' : ''}
+          ${missingBadge}
         </div>
       </div>
     `;
@@ -2450,8 +2455,8 @@ function renderAttentionBar() {
       tone: 'warn',
       target: 'submissionsSection',
       label: returnedMissingCardsCount === 1
-        ? 'returned submission has no cards logged from it yet'
-        : 'returned submissions have no cards logged from them yet'
+        ? 'returned submission is missing cards in cards.json'
+        : 'returned submissions are missing cards in cards.json'
     });
   }
   if (overdueSubmissionsCount) {

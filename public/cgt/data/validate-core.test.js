@@ -418,11 +418,42 @@ test('findReturnedSubmissionsMissingCards flags a returned submission with no ca
   assert.equal(flags[0].id, 'batch-2');
 });
 
-test('findReturnedSubmissionsMissingCards does not flag a returned submission once any card links to it, and ignores non-returned submissions with no cards', () => {
+test('findReturnedSubmissionsMissingCards does not flag a returned submission once any card links to it when cardCount is not logged, and ignores non-returned submissions with no cards', () => {
   const submissions = [{ id: 'batch-1', status: 'returned' }, { id: 'batch-2', status: 'in-queue' }];
   const cards = [{ id: 'a', submissionId: 'batch-1' }];
   assert.deepEqual(findReturnedSubmissionsMissingCards(submissions, cards), []);
   assert.deepEqual(findReturnedSubmissionsMissingCards(submissions, []).map(s => s.id), ['batch-1']);
+});
+
+test('findReturnedSubmissionsMissingCards still flags a returned submission backfilled with only some of its cardCount', () => {
+  const submissions = [{ id: 'batch-1', status: 'returned', cardCount: 12 }];
+  const cards = [
+    { id: 'a', submissionId: 'batch-1' },
+    { id: 'b', submissionId: 'batch-1' },
+    { id: 'c', submissionId: 'batch-1' }
+  ];
+  const flags = findReturnedSubmissionsMissingCards(submissions, cards);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].id, 'batch-1');
+});
+
+test('findReturnedSubmissionsMissingCards does not flag a returned submission once every one of its cardCount is linked', () => {
+  const submissions = [{ id: 'batch-1', status: 'returned', cardCount: 2 }];
+  const cards = [
+    { id: 'a', submissionId: 'batch-1' },
+    { id: 'b', submissionId: 'batch-1' }
+  ];
+  assert.deepEqual(findReturnedSubmissionsMissingCards(submissions, cards), []);
+});
+
+test('findReturnedSubmissionsMissingCards does not under-flag when more cards link than cardCount says', () => {
+  const submissions = [{ id: 'batch-1', status: 'returned', cardCount: 2 }];
+  const cards = [
+    { id: 'a', submissionId: 'batch-1' },
+    { id: 'b', submissionId: 'batch-1' },
+    { id: 'c', submissionId: 'batch-1' }
+  ];
+  assert.deepEqual(findReturnedSubmissionsMissingCards(submissions, cards), []);
 });
 
 test('validateCards accepts a string submissionId or null, rejects other types', () => {

@@ -107,12 +107,18 @@ function main() {
   }
 
   // Same cross-file reasoning as orphanRefs just above, the other direction:
-  // a submission marked returned that no card in cards.json links back to
-  // means that real batch's graded cards never got entered.
+  // a submission marked returned with fewer cards linked back to it than
+  // its own cardCount means that real batch's graded cards never got fully
+  // entered, whether none of them were logged yet or the backfill is only
+  // partway done.
   const returnedMissingCards = findReturnedSubmissionsMissingCards(submissionsData.submissions || [], cardsData.cards || []);
   if (returnedMissingCards.length) {
-    console.warn('\n' + returnedMissingCards.length + ' submission(s) in submissions.json are marked "returned" but no card in cards.json links back to them:');
-    returnedMissingCards.forEach(s => console.warn('  - ' + (s.id || '(missing id)') + ': ' + (s.description || 'untitled')));
+    console.warn('\n' + returnedMissingCards.length + ' submission(s) in submissions.json are marked "returned" but are missing cards in cards.json:');
+    returnedMissingCards.forEach(s => {
+      const linkedCount = (cardsData.cards || []).filter(c => c.submissionId === s.id).length;
+      const countNote = s.cardCount != null ? linkedCount + ' of ' + s.cardCount + ' linked' : 'none linked';
+      console.warn('  - ' + (s.id || '(missing id)') + ': ' + (s.description || 'untitled') + ' (' + countNote + ')');
+    });
   }
 
   checkChangelogFreshness();
