@@ -1703,6 +1703,19 @@ function renderAttentionBar() {
   const relistDueCount = buildRelistReminders(listings).filter(r => r.date <= today).length;
   const disputeDueCount = buildDisputeReminders(disputesLog).filter(r => r.date <= today).length;
   const lowStockCount = suppliesLog.filter(isSupplyLowStock).length;
+  // Same "flagged lower on a long page can go unnoticed for weeks" risk as
+  // the other panels below, for a real deadline with an actual IRS penalty
+  // behind it: the quarterly tax tracker already computes this exact
+  // due-today-or-within-ESTIMATED_TAX_DUE_SOON_DAYS window per row (see
+  // renderEstimatedTaxTracker's own 'tax-status-met' status), this just
+  // surfaces it up top too instead of only inside that table. Deliberately
+  // excludes an already-passed due date: this page has no "paid" flag to
+  // tell an actually-missed payment apart from one handled elsewhere, so
+  // nagging forever past the date would be a false alarm, not a real one.
+  const taxDueSoonCount = ESTIMATED_TAX_DUE_DATES.filter(q => {
+    const days = daysUntil(q.due, today);
+    return days != null && days >= 0 && days <= ESTIMATED_TAX_DUE_SOON_DAYS;
+  }).length;
 
   const items = [];
   // A drifted changelog is misinformation already live on the page (a real
@@ -1738,6 +1751,9 @@ function renderAttentionBar() {
   }
   if (lowStockCount) {
     items.push({ n: lowStockCount, tone: 'warn', target: 'suppliesSection', label: lowStockCount === 1 ? 'shipping supply is at or below its reorder point' : 'shipping supplies are at or below their reorder point' });
+  }
+  if (taxDueSoonCount) {
+    items.push({ n: taxDueSoonCount, tone: 'warn', target: 'estimatedTaxSection', label: taxDueSoonCount === 1 ? 'quarterly estimated tax payment is due soon' : 'quarterly estimated tax payments are due soon' });
   }
 
   if (!items.length) {
