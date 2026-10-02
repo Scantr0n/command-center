@@ -59,6 +59,7 @@ const {
   computeIncidents,
   computeIncidentFreeStreak,
   computeMTTR,
+  computeLongestIncident,
   computeMTBF,
   computeKillSwitchEpisodes,
   dayKeyLocal,
@@ -1064,6 +1065,12 @@ function renderIncidentStreak(data, clientHistory) {
 // only formats it, never recomputes it. Hidden until there is at least one
 // completed incident to average, same honest-empty-state rule as the streak
 // badge beside it.
+//
+// The parenthetical also carries the single longest completed incident
+// (computeLongestIncident, dates-core.js), the same mean-plus-tail pairing
+// already used for fetch latency's average/p95 beside the connection strip:
+// an average can look fine while one real outage that dragged on hides
+// inside it, and this is the figure that catches that.
 function renderIncidentMttr(data, clientHistory) {
   const el = document.getElementById('incidentMttr');
   if (!el) return;
@@ -1072,11 +1079,18 @@ function renderIncidentMttr(data, clientHistory) {
   if (!mttr) {
     el.hidden = true;
     el.textContent = '';
+    el.title = '';
     return;
   }
   el.hidden = false;
   const durationText = formatDuration(mttr.ms) || 'under 1m';
-  el.textContent = 'avg recovery ' + durationText + ' (' + mttr.count + ' incident' + (mttr.count === 1 ? '' : 's') + ')';
+  const longest = computeLongestIncident(history);
+  const longestText = longest ? formatDuration(longest.ms) || 'under 1m' : null;
+  el.textContent = 'avg recovery ' + durationText + ' (' + mttr.count + ' incident' + (mttr.count === 1 ? '' : 's') +
+    (longestText ? ', longest ' + longestText : '') + ')';
+  el.title = longestText
+    ? 'Longest single incident: ' + longestText + '. The average can look fine while one real outage that dragged on hides inside it; this is the one that catches that.'
+    : '';
 }
 
 // Statuspage/Datadog-style mean-time-between-failures, completing the same

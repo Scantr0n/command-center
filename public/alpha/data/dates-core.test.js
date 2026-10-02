@@ -25,6 +25,7 @@ const {
   computeIncidents,
   computeIncidentFreeStreak,
   computeMTTR,
+  computeLongestIncident,
   computeMTBF,
   computeKillSwitchEpisodes,
   dayKeyLocal,
@@ -305,6 +306,39 @@ test('computeMTTR is null with no completed incidents, or no history', () => {
   assert.equal(computeMTTR(undefined), null);
   assert.equal(computeMTTR([{ at: 'x', connected: true }]), null);
   assert.equal(computeMTTR([
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false }
+  ]), null);
+});
+
+test('computeLongestIncident picks the longest completed incident, not the most recent', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:15:00Z', connected: true }, // incident 1: 10m
+    { at: '2026-09-12T10:00:00Z', connected: false },
+    { at: '2026-09-12T10:30:00Z', connected: true } // incident 2: 30m, longest
+  ];
+  const longest = computeLongestIncident(history);
+  assert.deepEqual(longest, { ms: 30 * 60000, start: '2026-09-12T10:00:00Z', end: '2026-09-12T10:30:00Z' });
+});
+
+test('computeLongestIncident excludes a still-ongoing incident even if it is already the longest elapsed', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:15:00Z', connected: true }, // incident 1: 10m, completed
+    { at: '2026-09-12T10:00:00Z', connected: false } // incident 2: still ongoing
+  ];
+  const longest = computeLongestIncident(history);
+  assert.deepEqual(longest, { ms: 10 * 60000, start: '2026-09-10T10:05:00Z', end: '2026-09-10T10:15:00Z' });
+});
+
+test('computeLongestIncident is null with no completed incidents, or no history', () => {
+  assert.equal(computeLongestIncident([]), null);
+  assert.equal(computeLongestIncident(undefined), null);
+  assert.equal(computeLongestIncident([{ at: 'x', connected: true }]), null);
+  assert.equal(computeLongestIncident([
     { at: '2026-09-10T10:00:00Z', connected: true },
     { at: '2026-09-10T10:05:00Z', connected: false }
   ]), null);

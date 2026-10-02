@@ -391,6 +391,26 @@
     return { ms: totalMs / completed.length, count: completed.length };
   }
 
+  // Same tail-reading convention this page already pairs a mean with
+  // elsewhere (see p95 fetch latency beside its own average, in app.js):
+  // MTTR says how long a real incident takes to recover from on average,
+  // this says how long the single worst one actually took, so a run of
+  // quick recoveries can't quietly hide one real outage that dragged on.
+  // Built from the same completed-incidents list MTTR already derives from
+  // computeIncidents, so the two can never disagree about which incidents
+  // counted. Returns null under the identical honest-empty-state rule as
+  // MTTR: no completed incident, nothing to report yet.
+  function computeLongestIncident(history) {
+    const completed = computeIncidents(history).filter(i => !i.ongoing);
+    if (!completed.length) return null;
+    let longest = null;
+    for (const incident of completed) {
+      const ms = new Date(incident.end).getTime() - new Date(incident.start).getTime();
+      if (!longest || ms > longest.ms) longest = { ms, start: incident.start, end: incident.end };
+    }
+    return longest;
+  }
+
   // Reliability-engineering "mean time between failures", the other half of
   // the uptime/MTTR/MTBF trio real monitoring tools (Statuspage, Datadog)
   // report together: uptime says how often it broke, MTTR says how long it
@@ -544,6 +564,7 @@
     computeIncidents,
     computeIncidentFreeStreak,
     computeMTTR,
+    computeLongestIncident,
     computeMTBF,
     computeKillSwitchEpisodes,
     dayKeyLocal,
