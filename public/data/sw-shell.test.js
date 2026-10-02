@@ -42,11 +42,11 @@ function shellUrlToFile(url) {
 
 const HUBS = ['', 'alpha', 'cgt', 'csm', 'garage', 'sondrik', 'job-search'];
 
-function hubScriptSrcs(hub) {
+function hubLocalAssetRefs(hub) {
   const html = fs.readFileSync(path.join(PUBLIC_DIR, hub, 'index.html'), 'utf8');
-  return [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)]
-    .map(m => m[1])
-    .filter(src => !src.startsWith('http')); // same-origin only, no CDN scripts
+  const scriptSrcs = [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map(m => m[1]);
+  const stylesheetHrefs = [...html.matchAll(/<link[^>]*rel="stylesheet"[^>]*\shref="([^"]+)"/g)].map(m => m[1]);
+  return [...scriptSrcs, ...stylesheetHrefs].filter(ref => !ref.startsWith('http')); // same-origin only, no CDN refs
 }
 
 const SHELL_URLS = parseShellUrls(SW_SOURCE);
@@ -58,12 +58,12 @@ test('every SHELL_URLS entry resolves to a real file that still exists', () => {
   });
 });
 
-test('every hub index.html\'s own local <script src> is cached in SHELL_URLS', () => {
+test('every hub index.html\'s own local <script src>/<link stylesheet> is cached in SHELL_URLS', () => {
   HUBS.forEach(hub => {
-    hubScriptSrcs(hub).forEach(src => {
+    hubLocalAssetRefs(hub).forEach(ref => {
       assert.ok(
-        SHELL_URLS.includes(src),
-        `${hub || 'root'} index.html loads "${src}" but SHELL_URLS does not list it, offline mode for this hub would silently miss it`
+        SHELL_URLS.includes(ref),
+        `${hub || 'root'} index.html loads "${ref}" but SHELL_URLS does not list it, offline mode for this hub would silently miss it`
       );
     });
   });

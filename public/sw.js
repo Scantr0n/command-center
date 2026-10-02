@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v73';
+const CACHE_VERSION = 'v74';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -15,6 +15,9 @@ const SHELL_URLS = [
   '/favicon.svg', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png',
   '/vendor/d3-force-selection-zoom.min.js', '/sidebar.js', '/sidebar-core.js', '/data/dashboard-core.js', '/data/graph-core.js',
   '/data/html-core.js', '/data/search-core.js', '/data/compare-core.js', '/data/chat-format-core.js',
+  '/vendor/fonts/fonts.css', '/vendor/fonts/inter-400.woff2', '/vendor/fonts/inter-500.woff2', '/vendor/fonts/inter-600.woff2',
+  '/vendor/fonts/manrope-600.woff2', '/vendor/fonts/manrope-700.woff2', '/vendor/fonts/manrope-800.woff2',
+  '/vendor/fonts/jetbrains-mono-400.woff2', '/vendor/fonts/jetbrains-mono-500.woff2',
   '/alpha/', '/alpha/index.html', '/alpha/app.js', '/alpha/style.css',
   '/alpha/data/account-core.js', '/alpha/data/dates-core.js', '/alpha/data/regime-core.js',
   '/alpha/data/sparkline-core.js', '/alpha/data/export-core.js', '/alpha/data/compare-core.js',
