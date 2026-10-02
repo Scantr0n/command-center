@@ -98,7 +98,9 @@
           <tr><th scope="row">gradingCompany</th><td><code>PSA</code>, <code>BGS</code>, <code>SGC</code>, <code>CGC</code>, <code>HGA</code>, or <code>KSA</code></td></tr>
           <tr><th scope="row">grade</th><td>The grade as shown on the slab label, e.g. <code>"10"</code> or <code>"9.5"</code></td></tr>
           <tr><th scope="row" class="wrap">subgradeCentering, subgradeCorners, subgradeEdges, subgradeSurface</th><td>Optional, <strong>BGS only</strong>: BGS's own four real subgrades, each a number from 1 to 10 in half-point steps, independent of the overall <code>grade</code> shown on the slab. Leave all four <code>null</code> for a non-BGS card or when not bothered logging them. All four at exactly <code>10</code> is BGS's real "Black Label", shown as its own badge in the table and detail view.</td></tr>
-          <tr><th scope="row">certNumber</th><td>The grading company's cert / serial number, for looking the card back up later</td></tr>
+          <tr><th scope="row">certNumber</th><td>The grading company's cert / serial number, for looking the card back up later. A graded card with no cert number logged shows up under "Needs backfill" on the dashboard.</td></tr>
+          <tr><th scope="row">setName</th><td>The real set/manufacturer name, e.g. <code>"1982-83 O-Pee-Chee"</code> or <code>"2021 Topps Chrome"</code>. A real eBay buyer search filter on the trading-card category page; once <code>listedPrice</code> is set, leaving this blank shows up under "Listing specifics check".</td></tr>
+          <tr><th scope="row">cardNumber</th><td>The set's own card number, as printed on the card, e.g. <code>"164"</code> or <code>"P-100"</code>. Not the same as <code>id</code> (this tracker's own slug) or <code>certNumber</code> (the grading company's number). Another real eBay buyer search filter; once <code>listedPrice</code> is set, leaving this blank shows up under "Listing specifics check".</td></tr>
           <tr><th scope="row">storageLocation</th><td>Optional plain-text note on where the physical card actually is, e.g. <code>"Home safe"</code> or <code>"Safe deposit box #4"</code>. Not required, but the insurance/appraisal print view shows it per card since a real appraisal document is far more useful when it also says where each item is kept.</td></tr>
           <tr><th scope="row">submissionId</th><td>Optional, the <code>id</code> of the real <code>submissions.json</code> batch this card was actually graded in, e.g. <code>"2026-08-psa-priority-batch-1"</code>. Leave <code>null</code> when not known, when the card wasn't graded through a batch logged here, or for a raw/ungraded card. When set, the card's detail view links to that submission and, once returned, that submission's own detail view lists every card that came back from it. <code>node public/cgt/data/validate.js</code> warns if it doesn't match any real submission id (a typo, or a submission never logged), never an error since it never breaks anything rendered.</td></tr>
           <tr><th scope="row">estimatedValue</th><td>USD number. Leave <code>null</code> until it has actually been researched, never estimate in bulk.</td></tr>
@@ -132,6 +134,8 @@
   "subgradeEdges": null,
   "subgradeSurface": null,
   "certNumber": null,
+  "setName": null,
+  "cardNumber": null,
   "storageLocation": null,
   "submissionId": null,
   "estimatedValue": null,
@@ -209,6 +213,10 @@
           <input class="quick-log-input" type="number" id="ncSubgradeSurface" min="1" max="10" step="0.5">
           <label class="quick-log-label" for="ncCertNumber">Cert number (optional)</label>
           <input class="quick-log-input" type="text" id="ncCertNumber">
+          <label class="quick-log-label" for="ncSetName">Set/manufacturer name (optional, e.g. "1982-83 O-Pee-Chee")</label>
+          <input class="quick-log-input" type="text" id="ncSetName">
+          <label class="quick-log-label" for="ncCardNumber">Card number within the set (optional, e.g. "164" or "P-100")</label>
+          <input class="quick-log-input" type="text" id="ncCardNumber">
           <label class="quick-log-label" for="ncStorageLocation">Storage location (optional)</label>
           <input class="quick-log-input" type="text" id="ncStorageLocation" placeholder="e.g. Home safe">
           <label class="quick-log-label" for="ncSubmissionId">From submission id (optional, must match a real id in submissions.json)</label>
@@ -880,6 +888,17 @@
       ask is routinely 10-20% over book, but a full 1.5x or 0.5x gap is more often a forgotten re-list or a stale
       estimate than a deliberate price.</p>
     <div class="data-quality-list" id="listingPriceList"></div>
+  </section>
+
+  <section id="listingSpecificsSection" hidden>
+    <h2 class="section-title">Listing specifics check</h2>
+    <p class="section-subtitle">A currently-listed card missing <code class="inline-code">setName</code> or
+      <code class="inline-code">cardNumber</code>. eBay buyers filter trading-card search results by these exact
+      fields; per eBay's own seller-center documentation, a listing missing one drops out of the filtered results
+      entirely, it does not just rank lower. Not an error, just a real gap worth closing before the next relist. A
+      missing <code class="inline-code">certNumber</code> on a graded card is a separate, broader gap already
+      flagged under "Needs backfill" regardless of whether the card is listed.</p>
+    <div class="data-quality-list" id="listingSpecificsList"></div>
   </section>
 
   <section id="staleListingSection" hidden>

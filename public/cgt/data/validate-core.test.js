@@ -18,7 +18,7 @@ const assert = require('node:assert/strict');
 const {
   isDateOrNull, findDuplicateGroups, findDuplicateCertGroups, findDuplicateCandidateGroups, findGradeLadderInversions,
   findListingPriceMismatches, findOrphanSubmissionRefs, findReturnedSubmissionsMissingCards, validateCards,
-  validateSubmissions, validateCandidates,
+  validateSubmissions, validateCandidates, findMissingListingSpecifics, missingListingSpecifics,
   LISTING_PRICE_MISMATCH_RATIO_HIGH, LISTING_PRICE_MISMATCH_RATIO_LOW, listingPriceMismatchPct
 } = require('./validate-core.js');
 
@@ -338,6 +338,58 @@ test('listingPriceMismatchPct and the exported thresholds match what findListing
   const cards = [{ id: 'a', cardName: 'X', estimatedValue: 50, listedPrice: 100, listedDate: '2026-08-08' }];
   const [flag] = findListingPriceMismatches(cards);
   assert.equal(listingPriceMismatchPct(flag.ratio), 100, 'matches the real ratio findListingPriceMismatches itself computed');
+});
+
+test('missingListingSpecifics flags a listed card missing setName and cardNumber', () => {
+  const missing = missingListingSpecifics({
+    id: 'a', cardName: 'X', gradingCompany: 'PSA', grade: '9', listedPrice: 100, listedDate: '2026-08-08'
+  });
+  assert.deepEqual(missing, ['setName', 'cardNumber']);
+});
+
+test('missingListingSpecifics does not flag certNumber, that gap is already covered by the dashboard-wide data-quality check', () => {
+  const missing = missingListingSpecifics({
+    id: 'a', cardName: 'X', gradingCompany: 'PSA', grade: '9', setName: '1982-83 O-Pee-Chee', cardNumber: '164',
+    listedPrice: 100, listedDate: '2026-08-08'
+  });
+  assert.deepEqual(missing, []);
+});
+
+test('missingListingSpecifics is clean once setName/cardNumber are both logged', () => {
+  const missing = missingListingSpecifics({
+    id: 'a', cardName: 'X', gradingCompany: 'PSA', grade: '9',
+    setName: '1982-83 O-Pee-Chee', cardNumber: '164', listedPrice: 100, listedDate: '2026-08-08'
+  });
+  assert.deepEqual(missing, []);
+});
+
+test('missingListingSpecifics skips a card that is not listed, or already sold', () => {
+  assert.deepEqual(missingListingSpecifics({ id: 'a', cardName: 'X', gradingCompany: 'PSA', grade: '9' }), []);
+  assert.deepEqual(missingListingSpecifics({
+    id: 'a', cardName: 'X', gradingCompany: 'PSA', grade: '9', listedPrice: 100, listedDate: '2026-08-08',
+    soldDate: '2026-08-09', soldPrice: 95
+  }), []);
+});
+
+test('findMissingListingSpecifics only returns the cards that actually have a gap', () => {
+  const cards = [
+    { id: 'clean', cardName: 'X', setName: 'Set', cardNumber: '1', listedPrice: 10, listedDate: '2026-08-08' },
+    { id: 'gap', cardName: 'Y', listedPrice: 10, listedDate: '2026-08-08' }
+  ];
+  const flags = findMissingListingSpecifics(cards);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].card.id, 'gap');
+  assert.deepEqual(flags[0].missing, ['setName', 'cardNumber']);
+});
+
+test('validateCards warns, but does not error, when a listed card is missing real listing specifics', () => {
+  const { errors, warnings } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'PSA', grade: '9',
+    estimatedValue: 50, valuationBasis: 'recent-sale', datePriced: '2026-08-01',
+    listedPrice: 100, listedDate: '2026-08-08'
+  }]);
+  assert.deepEqual(errors, []);
+  assert.equal(warnings.some(w => w.includes('missing set/manufacturer, card number')), true);
 });
 
 test('findOrphanSubmissionRefs flags a card whose submissionId does not match any real submission', () => {

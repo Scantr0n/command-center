@@ -462,6 +462,14 @@
         'checking the ask is still what was meant.');
     });
 
+    findMissingListingSpecifics(cards).forEach(({ card, missing }) => {
+      const labels = missing.map(f => LISTING_SPECIFIC_LABELS[f]).join(', ');
+      warnings.push('listed card is missing ' + labels + ': "' + (card.cardName || card.id) + '" (' +
+        (card.id || '(missing id)') + ') is up for sale at $' + card.listedPrice + ' with no ' + labels +
+        ' logged. eBay buyers filter trading-card search results by these fields, a listing missing one drops ' +
+        'out of the filtered results entirely, it does not just rank lower.');
+    });
+
     return { errors, warnings };
   }
 
@@ -549,6 +557,39 @@
       else if (ratio <= LISTING_PRICE_MISMATCH_RATIO_LOW) flags.push({ card: c, ratio, direction: 'below' });
     });
     return flags;
+  }
+
+  // eBay's own seller-center documentation for its trading-card categories
+  // states plainly that Cassini (eBay's search engine) drops a listing out
+  // of a buyer's filtered results entirely once a specifics filter is
+  // applied and that field is missing, it doesn't just rank the listing
+  // lower, same real behavior Garage's own missingItemSpecifics already
+  // documents for shoes/electronics. "Set" (the real manufacturer/set name,
+  // e.g. "1982-83 O-Pee-Chee") and "Card Number" (the set's own number,
+  // e.g. "#164") are both real buyer search filters on that category page;
+  // this tracker only grew setName/cardNumber fields once this rule existed
+  // to need them structured, so a card described before that stayed
+  // informally buried in free-text notes instead. certNumber is left out of
+  // this check on purpose: a graded card missing it is already flagged
+  // dashboard-wide by buildDataQualityFlags's "NO CERT NUMBER LOGGED"
+  // (public/cgt/app.js) regardless of whether it's listed, so repeating it
+  // here would just double-flag the exact same real gap under a second
+  // name. Scoped to cards actually up for sale (listedPrice set, not yet
+  // sold) since an unlisted or already-sold card has nothing live on eBay
+  // for a missing specific to bury.
+  const LISTING_SPECIFIC_LABELS = { setName: 'set/manufacturer', cardNumber: 'card number' };
+  function missingListingSpecifics(c) {
+    if (!c || c.listedPrice == null) return [];
+    if (c.soldPrice != null && c.soldDate != null) return [];
+    const missing = [];
+    if (!c.setName) missing.push('setName');
+    if (!c.cardNumber) missing.push('cardNumber');
+    return missing;
+  }
+  function findMissingListingSpecifics(cards) {
+    return (cards || [])
+      .map(c => ({ card: c, missing: missingListingSpecifics(c) }))
+      .filter(x => x.missing.length > 0);
   }
 
   // A card's optional submissionId is meant to point at a real row in
@@ -796,8 +837,9 @@
   return {
     validateCards, validateSubmissions, validateCandidates, findDuplicateGroups, findDuplicateCertGroups,
     findDuplicateCandidateGroups, findGradeLadderInversions, findListingPriceMismatches, findOrphanSubmissionRefs,
-    findReturnedSubmissionsMissingCards,
+    findReturnedSubmissionsMissingCards, findMissingListingSpecifics, missingListingSpecifics,
     LISTING_PRICE_MISMATCH_RATIO_HIGH, LISTING_PRICE_MISMATCH_RATIO_LOW, listingPriceMismatchPct,
+    LISTING_SPECIFIC_LABELS,
     isDateOrNull, isValidSubgradeOrNull, emDashFields, DATE_RE, SPORTS, GRADING_COMPANIES, VALUATION_BASES,
     SUBMISSION_STATUSES, CANDIDATE_DECISIONS, SUBGRADE_FIELDS
   };

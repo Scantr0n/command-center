@@ -52,7 +52,7 @@
   const CARD_FIELDS = [
     'cardName', 'year', 'sport', 'gradingCompany', 'grade',
     'subgradeCentering', 'subgradeCorners', 'subgradeEdges', 'subgradeSurface',
-    'certNumber', 'storageLocation', 'imageUrl',
+    'certNumber', 'setName', 'cardNumber', 'storageLocation', 'imageUrl',
     'submissionId', 'estimatedValue', 'valuationBasis', 'compNote', 'sourceNote',
     'acquisitionDate', 'costBasis', 'datePriced', 'soldDate', 'soldPrice', 'sellingFees',
     'listedDate', 'listedPrice', 'listingUrl', 'backlogBatch', 'priceHistory', 'notes'

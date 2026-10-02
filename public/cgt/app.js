@@ -619,6 +619,7 @@ async function loadCards() {
     renderDuplicateCandidates();
     renderGradeLadderFlags();
     renderListingPriceFlags();
+    renderListingSpecificsFlags();
     renderStaleListing();
     renderAttentionBar();
     checkSubmissionAlerts();
@@ -2281,6 +2282,36 @@ function renderListingPriceFlags() {
   });
 }
 
+// Same clickable-panel shape as renderListingPriceFlags above, reusing
+// CGTValidateCore.findMissingListingSpecifics: a currently-listed card
+// missing setName/cardNumber/certNumber, the real fields eBay buyers filter
+// trading-card search results by.
+function renderListingSpecificsFlags() {
+  const section = document.getElementById('listingSpecificsSection');
+  const list = document.getElementById('listingSpecificsList');
+  if (!window.CGTValidateCore) {
+    section.hidden = true;
+    return;
+  }
+  const flags = CGTValidateCore.findMissingListingSpecifics(cards.filter(c => !isExample(c)));
+
+  if (!flags.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = flags.map(({ card: c, missing }) => `
+    <button type="button" class="data-quality-row" data-id="${escapeHtml(c.id)}">
+      <span class="dq-name">${escapeHtml(c.cardName || 'Untitled card')}${c.year ? ' (' + escapeHtml(String(c.year)) + ')' : ''}</span>
+      <span class="dq-meta">Listed ${escapeHtml(formatUsd(c.listedPrice))}</span>
+      <span class="dq-why">MISSING ${escapeHtml(missing.map(f => CGTValidateCore.LISTING_SPECIFIC_LABELS[f]).join(', ').toUpperCase())}</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.data-quality-row').forEach(row => {
+    row.addEventListener('click', () => openModal(row.dataset.id));
+  });
+}
+
 // Same clickable-panel shape as renderListingPriceFlags above, flagging a
 // different real signal: not a mispriced ask, but one that's been sitting
 // live for LISTING_STALE_AFTER_DAYS with no sale at all (see that constant's
@@ -2327,6 +2358,7 @@ function renderAttentionBar() {
   const duplicateCandidateCount = window.CGTValidateCore ? CGTValidateCore.findDuplicateCandidateGroups(realCandidatesForDupes).length : 0;
   const gradeLadderCount = window.CGTValidateCore ? CGTValidateCore.findGradeLadderInversions(realCards).length : 0;
   const listingPriceCount = window.CGTValidateCore ? CGTValidateCore.findListingPriceMismatches(realCards).length : 0;
+  const listingSpecificsCount = window.CGTValidateCore ? CGTValidateCore.findMissingListingSpecifics(realCards).length : 0;
   const staleListingCount = buildStaleListingFlags().length;
   const orphanSubmissionCount = window.CGTValidateCore ? CGTValidateCore.findOrphanSubmissionRefs(realCards, submissions).length : 0;
   const returnedMissingCardsCount = window.CGTValidateCore
@@ -2402,6 +2434,9 @@ function renderAttentionBar() {
   }
   if (listingPriceCount) {
     items.push({ n: listingPriceCount, tone: 'warn', target: 'listingPriceSection', label: listingPriceCount === 1 ? 'listing is 50%+ off its own researched estimate' : 'listings are 50%+ off their own researched estimate' });
+  }
+  if (listingSpecificsCount) {
+    items.push({ n: listingSpecificsCount, tone: 'warn', target: 'listingSpecificsSection', label: listingSpecificsCount === 1 ? 'listing is missing a real eBay search specific' : 'listings are missing a real eBay search specific' });
   }
   if (staleListingCount) {
     items.push({ n: staleListingCount, tone: 'warn', target: 'staleListingSection', label: staleListingCount === 1 ? 'listing has sat 90+ days with no sale' : 'listings have sat 90+ days with no sale' });
@@ -4228,6 +4263,7 @@ const csvField = CgtExportCore.csvField;
 const CSV_COLUMNS = [
   [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'], [c => c.gradingCompany, 'Grading company'],
   [c => c.grade, 'Grade'],
+  [c => c.setName, 'Set/manufacturer'], [c => c.cardNumber, 'Card number'],
   [c => c.subgradeCentering, 'BGS centering'], [c => c.subgradeCorners, 'BGS corners'],
   [c => c.subgradeEdges, 'BGS edges'], [c => c.subgradeSurface, 'BGS surface'],
   [c => isBgsBlackLabel(c) ? 'yes' : '', 'Black Label'],
@@ -4736,6 +4772,8 @@ function initQuickLogTool() {
       grade: document.getElementById('ncGrade').value.trim() || null
     }, subgrades, {
       certNumber: document.getElementById('ncCertNumber').value.trim() || null,
+      setName: document.getElementById('ncSetName').value.trim() || null,
+      cardNumber: document.getElementById('ncCardNumber').value.trim() || null,
       storageLocation: document.getElementById('ncStorageLocation').value.trim() || null,
       submissionId: document.getElementById('ncSubmissionId').value.trim() || null,
       estimatedValue: estimatedValueRaw === '' ? null : Number(estimatedValueRaw),
