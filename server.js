@@ -608,7 +608,23 @@ const {
   mapAnomalies
 } = require('./public/alpha/data/live-core.js');
 
+// Alpha is a real, live-money trading daemon (see ALPHA_DAEMON_BASE's own
+// comment above), and this route fans out to five real requests against it
+// per call, the most expensive read in this file, yet it was the one GET
+// route left with no limiter at all after /api/clusters and /api/search got
+// theirs. The server binds to all interfaces, so a hammering loop here
+// doesn't just waste this server's own time, it repeatedly hits the actual
+// trading daemon too. Same generous 60/min as the other two: Alpha's own
+// page polls this once every 30s (REFRESH_INTERVAL_MS, app.js), nowhere
+// close to the limit for a real client.
+const ALPHA_LIVE_RATE_LIMIT = 60;
+const ALPHA_LIVE_RATE_WINDOW_MS = 60 * 1000;
+const isAlphaLiveRateLimited = createRateLimiter(ALPHA_LIVE_RATE_LIMIT, ALPHA_LIVE_RATE_WINDOW_MS);
+
 app.get('/api/alpha/live', async (req, res) => {
+  if (isAlphaLiveRateLimited(req.ip)) {
+    return res.status(429).json({ error: `Too many requests, try again in a minute (limit is ${ALPHA_LIVE_RATE_LIMIT} per ${ALPHA_LIVE_RATE_WINDOW_MS / 1000}s).` });
+  }
   // Same skip-and-log guard as readLocalClusters/readToggles above: this read
   // sat outside the try block below, so a missing or malformed status.json
   // (a killed process mid-save, a stray hand-edit) threw an unhandled error
