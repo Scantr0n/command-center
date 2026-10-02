@@ -304,4 +304,101 @@
   } else {
     init();
   }
+
+  // Service worker update notification -------------------------------
+  // sw.js calls self.skipWaiting() + clients.claim() on every install, so a
+  // new version silently takes control of an already-open tab with zero
+  // signal, the tab just keeps running whatever JS it loaded at page-load
+  // time until some unrelated hard refresh happens to pick up the new
+  // version. Registration used to be a bare `navigator.serviceWorker.
+  // register('/sw.js')` hand-copied into seven separate inline <script>
+  // tags (index + six hubs); it now lives here instead, the one script
+  // already shared and injected on every page, including the home page
+  // that init() above returns early on (isHomePage()), which is why this
+  // runs unconditionally rather than inside init().
+  const UPDATE_STYLE = `
+    #ccUpdateToast {
+      position: fixed; right: 16px; bottom: 16px; z-index: 60;
+      display: flex; align-items: center; gap: 12px;
+      max-width: calc(100vw - 32px);
+      padding: 12px 14px;
+      background: #0D0E10;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.78rem;
+      color: #D7D9DC;
+    }
+    #ccUpdateReload {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      background: #F5F6F7; color: #0D0E10;
+      border: none; border-radius: 6px;
+      font-family: inherit; font-size: 0.72rem; font-weight: 700;
+      cursor: pointer;
+    }
+    #ccUpdateReload:hover, #ccUpdateReload:focus-visible { background: #fff; outline: none; }
+    @media (prefers-reduced-motion: reduce) {
+      #ccUpdateToast { transition: none !important; }
+    }
+  `;
+
+  function showUpdateToast() {
+    if (document.getElementById('ccUpdateToast')) return;
+    const styleEl = document.createElement('style');
+    styleEl.textContent = UPDATE_STYLE;
+    document.head.appendChild(styleEl);
+
+    const toast = document.createElement('div');
+    toast.id = 'ccUpdateToast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.innerHTML = `
+      <span>A new version is ready.</span>
+      <button type="button" id="ccUpdateReload">Reload</button>
+    `;
+    document.body.appendChild(toast);
+    document.getElementById('ccUpdateReload').addEventListener('click', () => location.reload());
+  }
+
+  function watchForUpdate(reg) {
+    // No existing controller means this is the very first install on this
+    // device (or a hard refresh that already bypassed the old worker), not
+    // an update over something already running, there is nothing to
+    // reload into.
+    if (!navigator.serviceWorker.controller) return;
+    // A worker that finished installing and is already waiting, from
+    // before this page even loaded (it updated while the tab sat in the
+    // background), means the update is ready right now, there is no
+    // future updatefound event left to catch it on.
+    if (reg.waiting) { showUpdateToast(); return; }
+    reg.addEventListener('updatefound', () => {
+      const installing = reg.installing;
+      if (!installing) return;
+      installing.addEventListener('statechange', () => {
+        if (installing.state === 'activated') showUpdateToast();
+      });
+    });
+  }
+
+  function initServiceWorkerUpdates() {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        watchForUpdate(reg);
+        // Browsers only check for a new sw.js on navigation, and these are
+        // dashboards meant to stay open in a pinned tab for hours (the
+        // 30s data poll on the home page already assumes that). A
+        // periodic explicit check, plus one on tab refocus, closes that
+        // gap instead of waiting on a navigation that may never happen.
+        setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) reg.update().catch(() => {});
+        });
+      }).catch(() => {});
+    });
+  }
+
+  initServiceWorkerUpdates();
 })();

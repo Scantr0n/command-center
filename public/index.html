@@ -3944,9 +3944,10 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
-}
+// Service worker registration moved to sidebar.js, the one shared script
+// injected on this page too, so there is a single place that owns it
+// (and the update-available toast) instead of seven hand-copied inline
+// register() calls across index + every hub.
 </script>
 <script src="/sidebar-core.js"></script>
 <script src="/sidebar.js"></script>
