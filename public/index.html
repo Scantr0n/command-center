@@ -563,6 +563,24 @@
     }
   }
 
+  /* The four full-screen overlays below (#modalOverlay, #paletteOverlay,
+     #shortcutsOverlay, #compareBackupOverlay) all use Tailwind's
+     backdrop-blur-sm to soften the graph/grid behind them. A real system
+     preference exists for people this blurs text for (vestibular disorders,
+     attention/reading difficulties): macOS/iOS/Windows all expose a
+     "reduce transparency" setting, and CSS Media Queries 5 surfaces it as
+     prefers-reduced-transparency. Chrome/Edge 118+ support it today; other
+     browsers just ignore the block, same as any other unsupported media
+     feature. Dropping the blur alone would leave bg-black/70 as the only
+     separation from the content behind it, so the overlay's own opacity is
+     raised here to keep the dialog legible without leaning on blur for it. */
+  @media (prefers-reduced-transparency: reduce) {
+    #modalOverlay, #paletteOverlay, #shortcutsOverlay, #compareBackupOverlay {
+      backdrop-filter: none;
+      background-color: rgba(0, 0, 0, 0.92);
+    }
+  }
+
   /* Below ~768px, shrinking the 900x900 viewBox to fit the screen makes node
      labels a few px tall and unreadable. Keep the graph at a legible fixed
      size instead and let #graphScroll (not #graphView, so the hint below
