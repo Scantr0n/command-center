@@ -895,9 +895,12 @@
   <div id="modalOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
     <div class="corner-notch rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border hairline" style="background: var(--panel)" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="flex items-center justify-between px-6 py-4 border-b hairline">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 min-w-0">
           <div id="modalDot" class="w-3 h-3 rounded-full status-dot"></div>
-          <h2 id="modalTitle" class="font-display font-bold text-lg"></h2>
+          <div class="min-w-0">
+            <h2 id="modalTitle" class="font-display font-bold text-lg"></h2>
+            <p id="modalSessionTitle" class="text-xs font-mono hidden" style="color: var(--faint)"></p>
+          </div>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
           <button id="copyLinkBtn" type="button" class="text-[10px] font-mono px-2.5 py-1 rounded border hairline" style="color: var(--sub)" aria-live="polite">Copy link</button>
@@ -2548,7 +2551,7 @@ function applyFilters() {
   document.querySelectorAll('.spoke-line').forEach(el => {
     const c = clusters.find(x => x.id === el.dataset.id);
     if (!c) return;
-    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
+    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.sessionTitle || '').toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
     const matchesCategory = !activeCategory || c.category === activeCategory;
     el.classList.toggle('dimmed', anyFilterActive && !(matchesSearch && matchesCategory));
   });
@@ -2562,7 +2565,7 @@ function applyFilters() {
     const id = el.dataset.id;
     const c = clusters.find(x => x.id === id);
     if (!c) return;
-    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
+    const matchesSearch = !term || c.name.toLowerCase().includes(term) || (c.sessionTitle || '').toLowerCase().includes(term) || (c.category || '').toLowerCase().includes(term) || (c.summary || '').toLowerCase().includes(term) || (c.status || '').toLowerCase().includes(term);
     const matchesCategory = !activeCategory || c.category === activeCategory;
     const matches = matchesSearch && matchesCategory;
     const isDimmed = anyFilterActive && !matches;
@@ -2927,6 +2930,20 @@ function openModal(id, opts = {}) {
   document.getElementById('modalDot').style.color = statusColor(activeCluster.status);
   document.getElementById('modalTitle').textContent = activeCluster.name;
   document.getElementById('modalTitle').style.color = color;
+  // sessionTitle is the real title Jack's own coding session for this
+  // project uses, logged on 19 of 22 clusters, often a genuinely different
+  // alt-name (csm.json's is "Chinese Social Media", travel-tracker.json's
+  // is "The Traveler") rather than just a recase of "name". Only worth a
+  // line when it actually says something "name" doesn't, so a handful of
+  // clusters where it's just a casing variant of the same name stay quiet.
+  const modalSessionTitleEl = document.getElementById('modalSessionTitle');
+  const sessionTitle = activeCluster.sessionTitle;
+  if (sessionTitle && sessionTitle.trim().toLowerCase() !== activeCluster.name.trim().toLowerCase()) {
+    modalSessionTitleEl.textContent = `aka "${sessionTitle}"`;
+    modalSessionTitleEl.classList.remove('hidden');
+  } else {
+    modalSessionTitleEl.classList.add('hidden');
+  }
   document.getElementById('modalStatusPill').textContent = activeCluster.status;
   document.getElementById('modalStatusPill').className = 'tag-chip';
   document.getElementById('modalStatusPill').setAttribute('style', pillStyle(activeCluster.status));
@@ -3207,8 +3224,13 @@ function paletteScore(c, term) {
   const name = c.name.toLowerCase();
   if (name.startsWith(term)) return 0;
   if (name.includes(term)) return 1;
-  if ((c.category || '').toLowerCase().includes(term)) return 2;
-  if ((c.summary || '').toLowerCase().includes(term)) return 3;
+  // sessionTitle is often a genuinely different alt-name for the same
+  // project (csm.json's is "Chinese Social Media", not just a recase of
+  // "CSM / JT Ops Hub"), so a term that only matches it still needs to
+  // surface this project, same precedence as a category/summary hit.
+  if ((c.sessionTitle || '').toLowerCase().includes(term)) return 2;
+  if ((c.category || '').toLowerCase().includes(term)) return 3;
+  if ((c.summary || '').toLowerCase().includes(term)) return 4;
   return -1;
 }
 
