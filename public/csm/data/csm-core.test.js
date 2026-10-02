@@ -30,6 +30,7 @@ const {
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
   stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
+  hasReplyBeforeFirstOutboundTouch,
   emDashFields, emDashHits, compareWithBackup, hasNewDueId
 } = require('./csm-core.js');
 
@@ -1681,6 +1682,38 @@ test('computeDataQualityFlags surfaces a stageHistory/stage mismatch, sendDate/o
   assert.ok(reasons.some(r => r.includes('LAST STAGE HISTORY ENTRY')));
   assert.ok(reasons.some(r => r.includes('DOES NOT MATCH THE "INITIAL-SEND" DATE')));
   assert.ok(reasons.some(r => r.includes('DUPLICATE SOCIAL SNAPSHOT PLATFORM')));
+});
+
+test('hasReplyBeforeFirstOutboundTouch is false with no reply logged, or a reply dated after the first outbound touch', () => {
+  assert.equal(hasReplyBeforeFirstOutboundTouch({}), false);
+  assert.equal(hasReplyBeforeFirstOutboundTouch({
+    outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-08', type: 'reply' }]
+  }), false);
+});
+
+test('hasReplyBeforeFirstOutboundTouch fires on a reply with no outbound touch at all', () => {
+  assert.equal(hasReplyBeforeFirstOutboundTouch({
+    outreachLog: [{ date: '2026-09-08', type: 'reply' }]
+  }), true);
+});
+
+test('hasReplyBeforeFirstOutboundTouch fires on a reply dated before the earliest outbound touch', () => {
+  assert.equal(hasReplyBeforeFirstOutboundTouch({
+    outreachLog: [{ date: '2026-09-08', type: 'initial-send' }, { date: '2026-09-01', type: 'reply' }]
+  }), true);
+});
+
+test('computeDataQualityFlags flags a reply logged before the first outbound touch', () => {
+  const p = {
+    stage: 'silent-replied',
+    name: 'early-reply',
+    verifiedHook: 'x',
+    contactChannel: { type: 'named-decision-maker', detail: 'x' },
+    outreachLog: [{ date: '2026-09-08', type: 'initial-send' }, { date: '2026-09-01', type: 'reply' }]
+  };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.equal(flagged.length, 1);
+  assert.ok(flagged[0].reasons.some(r => r.includes('CANNOT COME BEFORE THE OUTREACH')));
 });
 
 function backupFile(prospects, stages, exportedAt) {

@@ -807,6 +807,20 @@
     return false;
   }
 
+  // Same real gap validate.js's own outreachLog loop already catches (a
+  // "reply" touch logged with no outbound touch to have prompted it, or
+  // dated before the earliest one): daysToFirstReply above already returns
+  // null for both cases rather than a fabricated or negative response time,
+  // so this makes that same silent-null case a visible backfill item on
+  // the live Data Quality panel instead of it just going blank on the
+  // Reply Latency panel with no explanation.
+  function hasReplyBeforeFirstOutboundTouch(p) {
+    const log = (p.outreachLog || []).filter(e => e && isValidDateStr(e.date));
+    const outboundDates = log.filter(e => e.type === 'initial-send' || e.type === 'nudge').map(e => e.date);
+    const firstOutbound = outboundDates.length ? outboundDates.reduce((min, d) => (d < min ? d : min)) : null;
+    return log.some(e => e.type === 'reply' && (!firstOutbound || e.date < firstOutbound));
+  }
+
   // Per-prospect data-quality check: every real gap the board can actually
   // detect from a prospect's own fields, not just the stall/cold-signal/
   // duplicate checks that already get their own panels. Reasons are plain
@@ -854,6 +868,9 @@
         }
         if (hasDuplicateSocialSnapshotPlatform(p)) {
           reasons.push('DUPLICATE SOCIAL SNAPSHOT PLATFORM LOGGED, ADD A NEW SNAPSHOT FOR A REFRESH INSTEAD OF A SECOND ONE FOR THE SAME PLATFORM');
+        }
+        if (hasReplyBeforeFirstOutboundTouch(p)) {
+          reasons.push('A "REPLY" TOUCH IS LOGGED WITH NO OUTBOUND TOUCH BEFORE IT, A REPLY CANNOT COME BEFORE THE OUTREACH THAT PROMPTED IT, CHECK THE DATE');
         }
         return { p, reasons };
       })
@@ -1276,6 +1293,7 @@
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
     stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
+    hasReplyBeforeFirstOutboundTouch,
     emDashFields, emDashHits, compareWithBackup, hasNewDueId
   };
 
