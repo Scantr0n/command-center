@@ -751,9 +751,25 @@ app.get('/api/alpha/live', async (req, res) => {
 // that genuinely can't run in the browser, so it's exposed here as a small,
 // read-only, best-effort API per hub instead: a real drift becomes a real
 // page warning, not something only the CLI ever surfaces.
+// Shared across both this factory and dataQualityHandler below: every route
+// built from either one spawns a real subprocess per request (git here, a
+// whole second Node process running validate.js there), the most expensive
+// work in this file, run on six hubs apiece with no limiter at all. Each
+// hub's own page only ever calls its own one changelog-status and
+// one data-quality route once per page load (loadChangelog/loadDataQuality,
+// never on a poll), so one shared, generous budget across all twelve routes
+// comfortably covers a real user loading several hubs back to back while
+// still bounding a loop that would otherwise fork a new process per request.
+const STATUS_CHECK_RATE_LIMIT = 20;
+const STATUS_CHECK_RATE_WINDOW_MS = 60 * 1000;
+const isStatusCheckRateLimited = createRateLimiter(STATUS_CHECK_RATE_LIMIT, STATUS_CHECK_RATE_WINDOW_MS);
+
 function changelogStatusHandler(hub, trackedFiles) {
   const dataDir = path.join(__dirname, 'public', hub, 'data');
   return (req, res) => {
+    if (isStatusCheckRateLimited(req.ip)) {
+      return res.status(429).json({ error: `Too many requests, try again in a minute (limit is ${STATUS_CHECK_RATE_LIMIT} per ${STATUS_CHECK_RATE_WINDOW_MS / 1000}s).` });
+    }
     try {
       // A shallow clone's `git log` for these files only ever sees the
       // commits fetched, not the real full history, which would report
@@ -806,6 +822,11 @@ app.get('/api/job-search/changelog-status', changelogStatusHandler('job-search',
 const RECENT_COMMITS_LIMIT = 12;
 const RECENT_COMMITS_FIELD_SEP = '\x1f';
 app.get('/api/recent-commits', (req, res) => {
+  // Same shared budget as changelogStatusHandler/dataQualityHandler below:
+  // this spawns a real git subprocess per request too.
+  if (isStatusCheckRateLimited(req.ip)) {
+    return res.status(429).json({ error: `Too many requests, try again in a minute (limit is ${STATUS_CHECK_RATE_LIMIT} per ${STATUS_CHECK_RATE_WINDOW_MS / 1000}s).` });
+  }
   try {
     if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: __dirname, encoding: 'utf8', timeout: GIT_EXEC_TIMEOUT_MS }).trim() === 'true') {
       throw new Error('shallow clone');
@@ -829,6 +850,9 @@ app.get('/api/recent-commits', (req, res) => {
 function dataQualityHandler(hub) {
   const validateScript = path.join(__dirname, 'public', hub, 'data', 'validate.js');
   return (req, res) => {
+    if (isStatusCheckRateLimited(req.ip)) {
+      return res.status(429).json({ error: `Too many requests, try again in a minute (limit is ${STATUS_CHECK_RATE_LIMIT} per ${STATUS_CHECK_RATE_WINDOW_MS / 1000}s).` });
+    }
     // spawnSync (not execFileSync) on purpose: validate.js exits 1 when it
     // finds real errors, and execFileSync throws on a nonzero exit, discarding
     // the real stdout/stderr the moment that happens unless it's fished back
