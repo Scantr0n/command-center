@@ -1,7 +1,29 @@
 {
-  "generatedAt": "2026-09-30T09:33:39.303Z",
+  "generatedAt": "2026-10-02T13:33:43.375Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "b6a8d80",
+      "fullHash": "b6a8d80ed92818f7b7538dd30b1ee26c6fa52482",
+      "date": "2026-10-02",
+      "author": "Claude",
+      "subject": "CGT: add setName/cardNumber fields and a listing specifics check",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
+    {
+      "hash": "685ba5e",
+      "fullHash": "685ba5e408e384c292350962a9c03db7efaf2fb7",
+      "date": "2026-10-01",
+      "author": "Claude",
+      "subject": "CGT: add listingUrl, a direct link to a card's real live listing",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
     {
       "hash": "6dce740",
       "fullHash": "6dce7407c4b75fade9b9b1ec13ee779373a87229",
