@@ -816,6 +816,16 @@ function main() {
     if ((s.views === null || s.views === undefined) && (s.saves === null || s.saves === undefined)) {
       errors.push(where + ': at least one of "views"/"saves" must be a real non-negative number, a snapshot logging neither has nothing to show');
     }
+    // Watching/favoriting/liking a listing on eBay, Vinted, and Depop all
+    // require opening the listing first (Poshmark doesn't expose a public
+    // view count at all, so this never fires there), so saves outnumbering
+    // views on the same snapshot usually means the two fields got typed in
+    // the wrong boxes rather than a real result, worth a second look before
+    // trusting either number.
+    if (typeof s.views === 'number' && typeof s.saves === 'number' && s.saves > s.views) {
+      warnings.push(where + ': "saves" (' + s.saves + ') is higher than "views" (' + s.views +
+        '), watching/favoriting/liking normally requires viewing the listing first on this platform, double check these weren\'t typed in swapped');
+    }
 
     emDashFields(s, ['notes']).forEach(f =>
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));

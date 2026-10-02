@@ -6465,6 +6465,10 @@ function wireQuickLogEngagementTool() {
     if (views === null && saves === null) {
       blockers.push('Log at least one of views/saves, a snapshot logging neither has nothing to show.');
     }
+    if (typeof views === 'number' && typeof saves === 'number' && saves > views) {
+      advisory.push('"saves" (' + saves + ') is higher than "views" (' + views + '), watching/favoriting/liking ' +
+        'normally requires viewing the listing first on this platform, double check these weren\'t typed in swapped.');
+    }
 
     if (blockers.length) {
       warningsBox.textContent = blockers.join(' ');
