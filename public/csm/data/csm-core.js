@@ -762,6 +762,51 @@
     return p != null && typeof p === 'object' && Object.prototype.hasOwnProperty.call(p, 'socialSnapshot');
   }
 
+  // Used to live only in validate.js's own copy (the CLI-only check that a
+  // stage move actually got logged), checked solely from the command line.
+  // Moved here so the same drift the CLI catches also surfaces on the live
+  // board: p.stage is what every panel reads, stageHistory is the real
+  // move-by-move record behind it, and the two can go out of sync the same
+  // way sendDate/outreachLog can below.
+  function stageHistoryStageMismatch(p) {
+    const history = p.stageHistory || [];
+    return history.length > 0 && !!p.stage && history[history.length - 1].stage !== p.stage;
+  }
+
+  // sendDate and outreachLog's "initial-send" entry are two separate records
+  // of the same real first-touch event (sendDate is what the modal/CSV show
+  // directly, outreachLog is the touch-by-touch log), so they can silently
+  // drift apart the same way stageHistory can drift from stage above. Same
+  // three real gaps validate.js already checks from the command line,
+  // ported here so they also surface on the live Data Quality panel instead
+  // of staying invisible until someone runs the CLI validator by hand.
+  function sendDateOutreachLogDrift(p) {
+    const initialSendEntry = (p.outreachLog || []).find(e => e && e.type === 'initial-send');
+    if (initialSendEntry && initialSendEntry.date && p.sendDate && initialSendEntry.date !== p.sendDate) {
+      return 'mismatch';
+    }
+    if (initialSendEntry && initialSendEntry.date && !p.sendDate) return 'missing-send-date';
+    if (p.sendDate && !initialSendEntry) return 'missing-log-entry';
+    return null;
+  }
+
+  // Same real gap validate.js's own socialSnapshots loop already catches
+  // (a refreshed snapshot logged as a new entry instead of replacing the
+  // stale one for that platform), ported here so it also surfaces on the
+  // live Data Quality panel. Case-insensitive, whitespace-trimmed, same
+  // normalization socialSnapshot platform casing-drift checks elsewhere in
+  // this app already use.
+  function hasDuplicateSocialSnapshotPlatform(p) {
+    const seen = new Set();
+    for (const snap of (p.socialSnapshots || [])) {
+      if (!snap || !snap.platform) continue;
+      const norm = String(snap.platform).trim().toLowerCase();
+      if (seen.has(norm)) return true;
+      seen.add(norm);
+    }
+    return false;
+  }
+
   // Per-prospect data-quality check: every real gap the board can actually
   // detect from a prospect's own fields, not just the stall/cold-signal/
   // duplicate checks that already get their own panels. Reasons are plain
@@ -795,6 +840,20 @@
         if (emDashHitFields.length) reasons.push('EM DASH IN ' + emDashHitFields.join(', ').toUpperCase() + ', CHECK FOR A PASTE-IN');
         if (hasLegacySocialSnapshotField(p)) {
           reasons.push('LEGACY "SOCIALSNAPSHOT" (SINGULAR) FIELD PRESENT, THIS SCHEMA USES "SOCIALSNAPSHOTS" (PLURAL ARRAY), NOTHING IN THAT FIELD IS SHOWN ANYWHERE ON THIS PAGE');
+        }
+        if (stageHistoryStageMismatch(p)) {
+          reasons.push('LAST STAGE HISTORY ENTRY DOES NOT MATCH THE CURRENT STAGE, ADD THE MISSING MOVE OR FIX THE MISMATCH');
+        }
+        const sendDrift = sendDateOutreachLogDrift(p);
+        if (sendDrift === 'mismatch') {
+          reasons.push('SEND DATE DOES NOT MATCH THE "INITIAL-SEND" DATE LOGGED IN OUTREACH LOG, KEEP THEM IN SYNC');
+        } else if (sendDrift === 'missing-send-date') {
+          reasons.push('OUTREACH LOG HAS AN "INITIAL-SEND" ENTRY BUT SEND DATE IS NOT SET, BACKFILL IT TO MATCH');
+        } else if (sendDrift === 'missing-log-entry') {
+          reasons.push('SEND DATE IS SET BUT OUTREACH LOG HAS NO "INITIAL-SEND" ENTRY, BACKFILL IT OR TOUCH COUNTS UNDERCOUNT');
+        }
+        if (hasDuplicateSocialSnapshotPlatform(p)) {
+          reasons.push('DUPLICATE SOCIAL SNAPSHOT PLATFORM LOGGED, ADD A NEW SNAPSHOT FOR A REFRESH INSTEAD OF A SECOND ONE FOR THE SAME PLATFORM');
         }
         return { p, reasons };
       })
@@ -1216,6 +1275,7 @@
     findContactDetailReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
+    stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
     emDashFields, emDashHits, compareWithBackup, hasNewDueId
   };
 

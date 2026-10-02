@@ -29,6 +29,7 @@ const {
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch, findContactDetailReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
+  stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
   emDashFields, emDashHits, compareWithBackup, hasNewDueId
 } = require('./csm-core.js');
 
@@ -1607,6 +1608,79 @@ test('computeDataQualityFlags flags a prospect with a leftover legacy socialSnap
   const flagged = computeDataQualityFlags([], [legacy]);
   assert.equal(flagged.length, 1);
   assert.ok(flagged[0].reasons.some(r => r.includes('LEGACY "SOCIALSNAPSHOT"')));
+});
+
+test('stageHistoryStageMismatch is false with no stageHistory, or when the last entry matches the current stage', () => {
+  assert.equal(stageHistoryStageMismatch({ stage: 'outreach-sent' }), false);
+  assert.equal(stageHistoryStageMismatch({ stage: 'outreach-sent', stageHistory: [] }), false);
+  assert.equal(stageHistoryStageMismatch({
+    stage: 'outreach-sent',
+    stageHistory: [{ date: '2026-09-01', stage: 'researched' }, { date: '2026-09-05', stage: 'outreach-sent' }]
+  }), false);
+});
+
+test('stageHistoryStageMismatch fires when the last logged move does not match the prospect\'s current stage', () => {
+  assert.equal(stageHistoryStageMismatch({
+    stage: 'in-exploration',
+    stageHistory: [{ date: '2026-09-01', stage: 'researched' }, { date: '2026-09-05', stage: 'outreach-sent' }]
+  }), true);
+});
+
+test('sendDateOutreachLogDrift is null when sendDate and the initial-send log entry agree, or neither is set', () => {
+  assert.equal(sendDateOutreachLogDrift({}), null);
+  assert.equal(sendDateOutreachLogDrift({
+    sendDate: '2026-09-01',
+    outreachLog: [{ date: '2026-09-01', type: 'initial-send' }]
+  }), null);
+});
+
+test('sendDateOutreachLogDrift catches sendDate and the initial-send log entry disagreeing on the date', () => {
+  assert.equal(sendDateOutreachLogDrift({
+    sendDate: '2026-09-01',
+    outreachLog: [{ date: '2026-09-03', type: 'initial-send' }]
+  }), 'mismatch');
+});
+
+test('sendDateOutreachLogDrift catches an initial-send log entry with no sendDate backfilled', () => {
+  assert.equal(sendDateOutreachLogDrift({
+    outreachLog: [{ date: '2026-09-03', type: 'initial-send' }]
+  }), 'missing-send-date');
+});
+
+test('sendDateOutreachLogDrift catches a sendDate with no initial-send entry logged', () => {
+  assert.equal(sendDateOutreachLogDrift({ sendDate: '2026-09-01', outreachLog: [] }), 'missing-log-entry');
+});
+
+test('hasDuplicateSocialSnapshotPlatform is false with no snapshots, or distinct platforms', () => {
+  assert.equal(hasDuplicateSocialSnapshotPlatform({}), false);
+  assert.equal(hasDuplicateSocialSnapshotPlatform({
+    socialSnapshots: [{ platform: 'Douyin' }, { platform: 'Weibo' }]
+  }), false);
+});
+
+test('hasDuplicateSocialSnapshotPlatform fires on the same platform logged twice, case/whitespace-insensitive', () => {
+  assert.equal(hasDuplicateSocialSnapshotPlatform({
+    socialSnapshots: [{ platform: 'Douyin' }, { platform: ' douyin ' }]
+  }), true);
+});
+
+test('computeDataQualityFlags surfaces a stageHistory/stage mismatch, sendDate/outreachLog drift, and a duplicate platform snapshot', () => {
+  const p = {
+    stage: 'outreach-sent',
+    name: 'drifted',
+    verifiedHook: 'x',
+    contactChannel: { type: 'named-decision-maker', detail: 'x' },
+    stageHistory: [{ date: '2026-09-01', stage: 'researched' }],
+    sendDate: '2026-09-05',
+    outreachLog: [{ date: '2026-09-06', type: 'initial-send' }],
+    socialSnapshots: [{ platform: 'Weibo' }, { platform: 'Weibo' }]
+  };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.equal(flagged.length, 1);
+  const reasons = flagged[0].reasons;
+  assert.ok(reasons.some(r => r.includes('LAST STAGE HISTORY ENTRY')));
+  assert.ok(reasons.some(r => r.includes('DOES NOT MATCH THE "INITIAL-SEND" DATE')));
+  assert.ok(reasons.some(r => r.includes('DUPLICATE SOCIAL SNAPSHOT PLATFORM')));
 });
 
 function backupFile(prospects, stages, exportedAt) {
