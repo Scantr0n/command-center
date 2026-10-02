@@ -69,6 +69,7 @@ const DATASETS = {
       { key: 'sellingFees', label: 'Selling fees, USD (real fee actually charged, sold cards only)', aliases: ['sellingfees', 'fees', 'sellingfee', 'platformfee'], type: 'number' },
       { key: 'listedDate', label: 'Currently listed date (blank if not for sale)', aliases: ['listeddate', 'datelisted'] },
       { key: 'listedPrice', label: 'Currently listed price (real asking price)', aliases: ['listedprice', 'askingprice', 'listprice'], type: 'number' },
+      { key: 'listingUrl', label: 'Listing URL (real live listing, only meaningful with listedPrice set)', aliases: ['listingurl', 'listing', 'listinglink', 'url'] },
       { key: 'backlogBatch', label: 'Backlog batch', aliases: ['backlogbatch', 'batch'] },
       { key: 'notes', label: 'Notes', aliases: ['notes', 'note'] }
     ]
