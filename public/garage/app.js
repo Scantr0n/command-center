@@ -1048,7 +1048,7 @@ async function loadData() {
 
   if (disputesData) {
     disputesLog = disputes;
-    renderDisputes(disputes);
+    renderDisputes(disputes, listings);
   } else {
     disputesLog = [];
     document.getElementById('disputesTableBody').innerHTML = '';
@@ -3505,7 +3505,7 @@ function renderEstimatedTaxTracker(sales, expenses) {
   note.textContent = `This dashboard's own logged net profit for 2026 (Net profit / Schedule C snapshot above) is ${formatUsd(year2026NetProfit)}. Whether an estimated payment is actually owed depends on your full tax picture, not just that figure, this note does not decide that for you.`;
 }
 
-function renderDisputes(disputes) {
+function renderDisputes(disputes, currentListings) {
   const tbody = document.getElementById('disputesTableBody');
   const empty = document.getElementById('disputesTableEmpty');
   const totalsEl = document.getElementById('disputesTotals');
@@ -3528,18 +3528,36 @@ function renderDisputes(disputes) {
 
   tbody.innerHTML = sorted.map(d => {
     const respondInfo = disputeResponseInfo(d);
+    // Same real gap already closed on Comps/Acquisitions: the quick-log
+    // tool collects a real listingId and notes on every dispute, but this
+    // table used to drop both on the floor, same linked-listing badge
+    // pattern as renderComps above.
+    const listing = d.listingId ? (currentListings || []).find(l => l.id === d.listingId) : null;
+    const linkedHtml = d.listingId
+      ? (listing
+          ? `<button type="button" class="badge badge-link badge-button" data-listing-id="${escapeHtml(d.listingId)}">${escapeHtml(listing.title)}</button>`
+          : `<span class="cell-muted">${escapeHtml(d.listingId)} (not itemized yet)</span>`)
+      : '<span class="cell-value empty">not linked</span>';
     return `
     <tr>
       <td><div class="cell-card-name">${escapeHtml(d.title || 'Untitled item')}</div></td>
+      <td>${linkedHtml}</td>
       <td>${d.platform ? `<span class="badge badge-${escapeHtml(d.platform)}">${escapeHtml(PLATFORM_LABELS[d.platform] || d.platform)}</span>` : ''}</td>
       <td class="cell-muted">${d.type ? escapeHtml(DISPUTE_TYPE_LABELS[d.type] || d.type) : ''}</td>
       <td class="cell-muted">${d.status ? escapeHtml(DISPUTE_STATUS_LABELS[d.status] || d.status) : ''}</td>
       <td class="cell-muted">${d.openedDate ? escapeHtml(d.openedDate) : '<span class="cell-value empty">not logged</span>'}</td>
       <td>${respondInfo ? `<span class="badge ${respondInfo.badgeClass}">${escapeHtml(respondInfo.text)}</span>` : '<span class="cell-value empty">-</span>'}</td>
       <td class="cell-muted">${d.outcome ? escapeHtml(d.outcome) : '<span class="cell-value empty">not logged</span>'}</td>
+      <td class="cell-muted">${d.notes ? escapeHtml(d.notes) : ''}</td>
     </tr>
   `;
   }).join('');
+
+  tbody.querySelectorAll('[data-listing-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if ((currentListings || []).some(l => l.id === btn.dataset.listingId)) openModal(btn.dataset.listingId);
+    });
+  });
 
   const open = disputes.filter(d => d.status === 'open');
   const overdue = open.filter(d => {
@@ -5266,8 +5284,8 @@ document.getElementById('expensesCsvBtn').addEventListener('click', () => {
 });
 
 const DISPUTES_CSV_COLUMNS = [
-  ['title', 'Item'], ['platform', 'Platform'], ['type', 'Type'], ['status', 'Status'],
-  ['openedDate', 'Opened'], ['respondBy', 'Respond by'], ['resolvedDate', 'Resolved'], ['outcome', 'Outcome']
+  ['title', 'Item'], ['listingId', 'Linked listing'], ['platform', 'Platform'], ['type', 'Type'], ['status', 'Status'],
+  ['openedDate', 'Opened'], ['respondBy', 'Respond by'], ['resolvedDate', 'Resolved'], ['outcome', 'Outcome'], ['notes', 'Notes']
 ];
 
 // Exports every real logged return/dispute, with the same computed
