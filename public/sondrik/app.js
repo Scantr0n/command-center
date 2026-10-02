@@ -163,7 +163,7 @@
   // of sources already linked under each table (platform help pages, real
   // founder threads); no correction needed this pass, both tables still
   // hold up against current sources.
-  const CHANNEL_NORMS_REVIEWED_ON = '2026-09-25';
+  const CHANNEL_NORMS_REVIEWED_ON = '2026-10-02';
   const LEAD_NORMS_REVIEWED_ON = '2026-09-25';
   const DOWNLOAD_COUNT_NORMS_REVIEWED_ON = '2026-09-26';
   const GOAL_NORMS_REVIEWED_ON = '2026-10-01';

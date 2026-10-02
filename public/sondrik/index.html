@@ -408,6 +408,17 @@
         <div class="schema-table-wrap">
         <table class="schema-table">
           <tbody>
+            <tr><th>GitHub Releases</th><td>A release page has no feed of its own that puts it in front of
+              someone who doesn't already know the repo exists: guidance on this is consistent that GitHub
+              Releases works as a package format and a changelog, not a discovery channel, so it mostly reaches
+              people already watching the repo or arriving from a link posted somewhere else. That matches how
+              Sondrik's one real lead and its download counts to date have actually come in, through a link
+              posted on Reddit, not through GitHub surfacing the release on its own. Guides on writing release
+              notes converge on a few repeated rules: write for the person reading them rather than the engineer
+              who shipped the change, group entries by type (added, fixed, changed) so they can be scanned in a
+              few seconds, and lead with what changed for the user before any implementation detail. One real
+              built-in distribution GitHub Releases does have without Jack building anything: a repo's watchers
+              can opt into a notification on each new release.</td></tr>
             <tr><th>Hacker News<br>(Show HN)</th><td>Title must start with "Show HN:", and the guideline is
               explicit that it has to be something you personally built that others can actually try, run, or
               inspect, not a blog post, landing page, or signup-gated page. Best known as a place to post
@@ -454,6 +465,8 @@
         </div>
         <p class="schema-help-body" style="margin-top:.75rem; padding:0;">
           Sources:
+          <a href="https://simonwillison.net/2022/Jan/31/release-notes/" target="_blank" rel="noopener noreferrer">Simon Willison, writing better release notes</a>,
+          <a href="https://release-notes.dev/learn/release-notes-best-practices" target="_blank" rel="noopener noreferrer">release-notes.dev, release notes best practices</a>,
           <a href="https://www.indiehackers.com/post/tips-for-making-successful-posts-on-indie-hackers-b04454a57a" target="_blank" rel="noopener noreferrer">Indie Hackers, tips for successful posts</a>,
           <a href="https://www.indiehackers.com/product/indie-hackers/launched-milestones-leaderboard--LgdNT4wjZTVaPmsIgJ8" target="_blank" rel="noopener noreferrer">Indie Hackers Milestones leaderboard</a>,
           <a href="https://www.growreddit.com/blog/reddit-self-promotion-rules-sideproject" target="_blank" rel="noopener noreferrer">r/SideProject self-promotion rules summary</a>,
