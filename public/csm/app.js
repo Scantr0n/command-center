@@ -2057,12 +2057,31 @@
     if (channel.type === 'generic-inbox') {
       lines.push('  Generic inbox has historically been this project\'s lowest real reply rate, a named decision-maker is worth another look before sending.');
     }
+    lines.push('');
     const tips = new Set();
     (p.socialSnapshots || []).forEach(snap => {
       const tip = platformTip(snap.platform);
       if (tip) tips.add((snap.platform.trim()) + ': ' + tip);
     });
     tips.forEach(t => lines.push('  ' + t));
+    lines.push('');
+
+    // The brief is built to draft a real follow-up elsewhere, and the single
+    // most common way a follow-up reads as generic is not knowing what was
+    // already sent: outreachLog is the real touch-by-touch record (shown
+    // oldest first, same order as the modal's own "Outreach touch log"
+    // field), so pull it in here too instead of leaving the brief to only
+    // state a count via NEXT ACTION/NUDGE SCHEDULE below.
+    lines.push('OUTREACH TOUCHES (oldest first):');
+    const touches = (p.outreachLog || []).filter(e => e && e.date).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (touches.length) {
+      touches.forEach(entry => {
+        const label = OUTREACH_TYPE_LABEL[entry.type] || entry.type || 'Touch';
+        lines.push('  - ' + fmtDate(entry.date) + ': ' + label + (entry.note ? ' - ' + entry.note : ''));
+      });
+    } else {
+      lines.push('  None logged yet.');
+    }
     lines.push('');
 
     lines.push('SOCIAL SNAPSHOTS (one-time manual research, never live):');
