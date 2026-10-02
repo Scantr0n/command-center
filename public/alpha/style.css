@@ -725,6 +725,19 @@ header.page-head .sub {
   .meter-fill {
     border-right: 2px solid CanvasText;
   }
+  /* Same real gap, a third component: forced-colors overrides SVG `stroke`
+     too, not just background-color, so .equity-curve-line's own
+     up/down green/red is forced to the same system color either way and a
+     rising equity curve and a falling one trace an identical line. The real
+     direction is already in the aria-label/<title> text for screen readers,
+     but a sighted forced-colors user reading the line shape gets nothing.
+     stroke-dasharray survives forced-colors untouched (it is a geometry
+     property, not a color one), so it carries the distinction here, same
+     solid-vs-not pairing already used for .history-tick/.daily-uptime-bar
+     above. */
+  .equity-curve-down .equity-curve-line {
+    stroke-dasharray: 5 3;
+  }
 }
 
 /* Both strips above are built as real <button> elements, not plain <span>s
