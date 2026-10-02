@@ -3222,6 +3222,10 @@ function cardEditFormHtml(c) {
     ceInputInner('ceStorageLocation', 'Storage location', c.storageLocation) +
     '</div>' +
     '<div class="form-row-split">' +
+    ceInputInner('ceSetName', 'Set/manufacturer name', c.setName) +
+    ceInputInner('ceCardNumber', 'Card number within the set', c.cardNumber) +
+    '</div>' +
+    '<div class="form-row-split">' +
     ceInputInner('ceEstimatedValue', 'Estimated value, USD', c.estimatedValue, 'number') +
     ceSelectRow('ceValuationBasis', 'Valuation basis', c.valuationBasis, [['', 'Select one...'], ['recent-sale', 'Recent sale'], ['comp-estimate', 'Comp estimate']]) +
     '</div>' +
@@ -3549,6 +3553,8 @@ function wireCardEditForm(c) {
       gradingCompany: document.getElementById('ceGradingCompany').value || null,
       grade: ceVal('ceGrade'),
       certNumber: ceVal('ceCertNumber'),
+      setName: ceVal('ceSetName'),
+      cardNumber: ceVal('ceCardNumber'),
       storageLocation: ceVal('ceStorageLocation'),
       estimatedValue: estimatedValueRaw === '' ? null : Number(estimatedValueRaw),
       valuationBasis: document.getElementById('ceValuationBasis').value || null,
@@ -3668,6 +3674,8 @@ function openModal(id) {
     const parts = SUBGRADE_LABELS.map(([f, label]) => label + ' ' + (activeCard[f] != null ? activeCard[f] : '?'));
     body += field('BGS subgrades', parts.join(' · ') + (isBgsBlackLabel(activeCard) ? ' -- Black Label (all four perfect 10s)' : ''), false);
   }
+  body += field('Set/manufacturer', activeCard.setName, !activeCard.setName);
+  body += field('Card number', activeCard.cardNumber, !activeCard.cardNumber);
   body += field('Cert number', activeCard.certNumber, !activeCard.certNumber);
   const lookup = certLookupLink(activeCard);
   if (lookup) {
