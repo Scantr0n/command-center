@@ -527,6 +527,16 @@
     .graph-node, .cluster-card, .attn-card, .view-toggle-btn, .search-input, #linkRow, .node-glow {
       transition: none !important;
     }
+    /* Same gap as the group above, three more real motion sources that
+       never got added to it: .venture-card shares its box-shadow transition
+       with .cluster-card/.attn-card right above (same declaration at line
+       96) but was left out, and #paletteBtn/#backupBtn/#compareBackupBtn/
+       #printBtn/#shortcutsBtn each slide 1px on hover via a transform
+       transition of their own (line ~165) that #searchInput's sibling rule
+       there does not share, since .search-input above already covers it. */
+    .venture-card, #paletteBtn, #backupBtn, #compareBackupBtn, #printBtn, #shortcutsBtn {
+      transition: none !important;
+    }
     .spoke-live { animation: none; }
     .spoke-badge, .node-focus-ring, .node-full-label { transition: none !important; }
     .status-pulse { animation: none; opacity: 1; }
