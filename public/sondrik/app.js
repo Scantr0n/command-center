@@ -1356,7 +1356,8 @@
       const widthPct = r.reached > 0 ? Math.max(2, Math.round((r.reached / total) * 100)) : 0;
       const conversionHtml = r.conversionFromPrev == null ? '' :
         '<span class="funnel-conversion font-mono">' + r.conversionFromPrev + '% reached this stage from the ' +
-        'previous one</span>';
+        'previous one</span>' +
+        (r.conversionCaveat ? '<div class="trend-caveat font-mono">' + escapeHtml(r.conversionCaveat.toUpperCase()) + '</div>' : '');
       return '<div class="funnel-row">' +
         '<div class="funnel-row-head">' +
         '<span class="funnel-dot funnel-dot-' + escapeHtml(r.stage.id) + '"></span>' +

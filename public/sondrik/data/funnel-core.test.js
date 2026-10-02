@@ -8,7 +8,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { FUNNEL_STAGES, latestDownloadCount, computeFunnel } = require('./funnel-core.js');
+const { FUNNEL_STAGES, latestDownloadCount, computeFunnel, MIN_SAMPLE_FOR_RATE, sampleCaveatText } = require('./funnel-core.js');
 
 test('FUNNEL_STAGES is the real fixed four-stage sequence the rest of this file assumes', () => {
   assert.deepEqual(FUNNEL_STAGES.map(s => s.id), ['downloads', 'leads', 'drafted', 'sent']);
@@ -89,4 +89,40 @@ test('computeFunnel rounds conversionFromPrev to the nearest whole percent, same
 test('computeFunnel tolerates a missing downloadsData/leadsData entirely', () => {
   const results = computeFunnel(null, null);
   assert.deepEqual(results.map(r => r.reached), [0, 0, 0, 0]);
+});
+
+test('sampleCaveatText is null once the denominator reaches MIN_SAMPLE_FOR_RATE', () => {
+  assert.equal(sampleCaveatText(MIN_SAMPLE_FOR_RATE), null);
+  assert.equal(sampleCaveatText(MIN_SAMPLE_FOR_RATE + 5), null);
+});
+
+test('sampleCaveatText singles out the n=1 case in its own wording, same pattern as trendCaveatText', () => {
+  assert.equal(sampleCaveatText(1), 'based on 1 case, too small a sample for this percent to mean much');
+  assert.equal(sampleCaveatText(3), 'based on only 3 cases, too small a sample for this percent to mean much');
+});
+
+test('computeFunnel attaches a real conversionCaveat to Sondrik\'s own thin-sample shape: 1 of 15 reads as a true 7%, not a trustworthy rate', () => {
+  const downloadsData = { metric: { checks: [{ date: '2026-09-20', count: 15 }] } };
+  const leadsData = { leads: [{ id: 'a', outreach: { draftStatus: 'drafted', sent: false } }] };
+  const results = computeFunnel(downloadsData, leadsData);
+  // leads reached from downloads (prevReached = 15, already at/over the floor): a real 7%, no caveat needed.
+  assert.equal(results[1].conversionFromPrev, 7);
+  assert.equal(results[1].conversionCaveat, null);
+  // drafted reached from leads (prevReached = 1): a real 100%, too thin a sample to read as proven.
+  assert.equal(results[2].conversionFromPrev, 100);
+  assert.equal(results[2].conversionCaveat, 'based on 1 case, too small a sample for this percent to mean much');
+});
+
+test('computeFunnel never attaches a conversionCaveat where there is no conversionFromPrev to caveat', () => {
+  const downloadsData = { metric: { checks: [] } };
+  const results = computeFunnel(downloadsData, { leads: [] });
+  results.forEach(r => assert.equal(r.conversionCaveat, null));
+});
+
+test('computeFunnel drops the conversionCaveat once a stage\'s real denominator reaches MIN_SAMPLE_FOR_RATE', () => {
+  const downloadsData = { metric: { checks: [{ date: '2026-09-20', count: 20 }] } };
+  const leadsData = { leads: Array.from({ length: 12 }, (_, i) => ({ id: 'l' + i, outreach: {} })) };
+  const results = computeFunnel(downloadsData, leadsData);
+  assert.equal(results[1].reached, 12);
+  assert.equal(results[1].conversionCaveat, null, 'prevReached (20) is already at the floor, no caveat needed');
 });

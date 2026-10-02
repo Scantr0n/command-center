@@ -578,7 +578,8 @@
     or trend-confidence math, it guards which round numbers the Timeline/Traction cards flag as crossed and
     when the "too early to call this a trend" caveat shows. Run
     <code>node --test public/sondrik/data/funnel-core.test.js</code> after changing the Funnel section's stage
-    math, it guards that a 0-of-0 stage never shows a fabricated conversion rate.
+    math, it guards that a 0-of-0 stage never shows a fabricated conversion rate and that a real percent computed
+    from a thin denominator (Sondrik's own leads count is 1) still carries its small-sample caveat.
   </footer>
 </div>
 
