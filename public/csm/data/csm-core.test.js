@@ -30,7 +30,7 @@ const {
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
   missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
   stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
-  hasReplyBeforeFirstOutboundTouch,
+  hasReplyBeforeFirstOutboundTouch, hasImplausibleEngagementRate,
   emDashFields, emDashHits, compareWithBackup, hasNewDueId
 } = require('./csm-core.js');
 
@@ -1714,6 +1714,30 @@ test('computeDataQualityFlags flags a reply logged before the first outbound tou
   const flagged = computeDataQualityFlags([], [p]);
   assert.equal(flagged.length, 1);
   assert.ok(flagged[0].reasons.some(r => r.includes('CANNOT COME BEFORE THE OUTREACH')));
+});
+
+test('hasImplausibleEngagementRate is false with no snapshots, or a real percent under 100', () => {
+  assert.equal(hasImplausibleEngagementRate({}), false);
+  assert.equal(hasImplausibleEngagementRate({ socialSnapshots: [{ platform: 'Douyin', engagementRate: 4.2 }] }), false);
+});
+
+test('hasImplausibleEngagementRate fires when a snapshot logs an engagementRate over 100', () => {
+  assert.equal(hasImplausibleEngagementRate({
+    socialSnapshots: [{ platform: 'Douyin', engagementRate: 420 }]
+  }), true);
+});
+
+test('computeDataQualityFlags flags an implausible engagementRate over 100', () => {
+  const p = {
+    stage: 'client',
+    name: 'bad-rate',
+    verifiedHook: 'x',
+    contactChannel: { type: 'named-decision-maker', detail: 'x' },
+    socialSnapshots: [{ platform: 'Weibo', engagementRate: 12000, asOfDate: '2026-09-01' }]
+  };
+  const flagged = computeDataQualityFlags([], [p]);
+  assert.equal(flagged.length, 1);
+  assert.ok(flagged[0].reasons.some(r => r.includes('ENGAGEMENT RATE OVER 100')));
 });
 
 function backupFile(prospects, stages, exportedAt) {

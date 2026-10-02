@@ -821,6 +821,14 @@
     return log.some(e => e.type === 'reply' && (!firstOutbound || e.date < firstOutbound));
   }
 
+  // Same real sanity check validate.js's own socialSnapshots loop already
+  // runs: engagementRate is logged as a percent (e.g. 4.2 for 4.2%), so a
+  // value over 100 almost always means a raw fraction or a follower count
+  // was pasted into the wrong field rather than a real engagement rate.
+  function hasImplausibleEngagementRate(p) {
+    return (p.socialSnapshots || []).some(snap => snap && typeof snap.engagementRate === 'number' && snap.engagementRate > 100);
+  }
+
   // Per-prospect data-quality check: every real gap the board can actually
   // detect from a prospect's own fields, not just the stall/cold-signal/
   // duplicate checks that already get their own panels. Reasons are plain
@@ -871,6 +879,9 @@
         }
         if (hasReplyBeforeFirstOutboundTouch(p)) {
           reasons.push('A "REPLY" TOUCH IS LOGGED WITH NO OUTBOUND TOUCH BEFORE IT, A REPLY CANNOT COME BEFORE THE OUTREACH THAT PROMPTED IT, CHECK THE DATE');
+        }
+        if (hasImplausibleEngagementRate(p)) {
+          reasons.push('ENGAGEMENT RATE OVER 100%, DOUBLE CHECK IT WAS NOT PULLED AS A RAW FRACTION OR FOLLOWER COUNT');
         }
         return { p, reasons };
       })
@@ -1293,7 +1304,7 @@
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
     missingNextAction, hasStaleNudgePlanAfterReply, hasLegacySocialSnapshotField,
     stageHistoryStageMismatch, sendDateOutreachLogDrift, hasDuplicateSocialSnapshotPlatform,
-    hasReplyBeforeFirstOutboundTouch,
+    hasReplyBeforeFirstOutboundTouch, hasImplausibleEngagementRate,
     emDashFields, emDashHits, compareWithBackup, hasNewDueId
   };
 
