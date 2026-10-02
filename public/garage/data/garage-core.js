@@ -622,6 +622,66 @@
     return sale.shipDate > deadline;
   }
 
+  // Real, PRC-approved (Sept 9, 2026) temporary peak-season surcharge on
+  // top of USPS's July 12, 2026 retail rates, covering Priority Mail
+  // Express, Priority Mail, Ground Advantage, and Parcel Select, 12am CT
+  // Oct 4, 2026 through 12am CT Jan 17, 2027. This used to live only as
+  // static prose on the "Shipping cost reference" section (no actual check
+  // against today's real date), so a visit on Oct 5 and a visit on Sept 5
+  // rendered identically even though the surcharge had already started.
+  const USPS_PEAK_SURCHARGE_START = '2026-10-04';
+  const USPS_PEAK_SURCHARGE_END = '2027-01-17';
+
+  // Returns null with no real today to judge from. Otherwise one of three
+  // states: 'upcoming' (not started yet, daysUntilStart > 0), 'active' (at
+  // or after the start, at or before the end, daysUntilEnd >= 0), or 'past'
+  // (already ended). daysUntil's own signed-day convention (negative once
+  // passed) does the real comparison work here, this just names the three
+  // real states a reader of the page actually cares about.
+  function uspsPeakSurchargeStatus(todayStr) {
+    const daysUntilStart = daysUntil(USPS_PEAK_SURCHARGE_START, todayStr);
+    const daysUntilEnd = daysUntil(USPS_PEAK_SURCHARGE_END, todayStr);
+    if (daysUntilStart == null || daysUntilEnd == null) return null;
+    if (daysUntilStart > 0) return { state: 'upcoming', daysUntilStart };
+    if (daysUntilEnd >= 0) return { state: 'active', daysUntilEnd };
+    return { state: 'past' };
+  }
+
+  // USPS's own Sept 22, 2026 recommended last-acceptance dates for
+  // delivery by Dec 25. The two regions genuinely differ on the
+  // ground/first-class services, not the air ones (both land on the same
+  // Dec 18/19 Priority/Priority Express dates either way).
+  const HOLIDAY_SHIP_BY_DATES = {
+    contiguous: [
+      { service: 'USPS Ground Advantage', date: '2026-12-17' },
+      { service: 'First-Class Mail', date: '2026-12-17' },
+      { service: 'Priority Mail', date: '2026-12-18' },
+      { service: 'Priority Mail Express', date: '2026-12-19' }
+    ],
+    territories: [
+      { service: 'USPS Ground Advantage', date: '2026-12-16' },
+      { service: 'First-Class Mail', date: '2026-12-17' },
+      { service: 'Priority Mail', date: '2026-12-18' },
+      { service: 'Priority Mail Express', date: '2026-12-19' }
+    ]
+  };
+
+  // Same "compute the real status instead of leaving it as static prose"
+  // treatment as the surcharge above, for the actual ship-by deadline a
+  // late package would miss (a separate real date from the surcharge
+  // window, see this file's own comment history on garage-core.js's
+  // app.js caller). region defaults to 'contiguous', the common case;
+  // 'territories' covers Alaska/Hawaii/Puerto Rico/other US territories.
+  // Each row's daysUntil is null only when the service/region pair isn't
+  // real data (it always is here), negative once that date's passed.
+  function holidayShipByStatus(todayStr, region) {
+    const rows = HOLIDAY_SHIP_BY_DATES[region] || HOLIDAY_SHIP_BY_DATES.contiguous;
+    return rows.map(row => {
+      const days = daysUntil(row.date, todayStr);
+      return { service: row.service, date: row.date, daysUntil: days, passed: days != null && days < 0 };
+    });
+  }
+
   // Real per-platform timing for the first of the two real steps between a
   // sale and money actually sitting in Jack's bank account: funds landing in
   // that platform's own in-app balance (eBay's Seller Hub balance, the
@@ -876,6 +936,8 @@
     daysBetweenDates, actualPostingPace, onTimeShipRate, avgDaysToShip,
     shipDeadline, isLateShipment, ebayLateShipmentRate, expectedBalanceDate,
     ebayTrsProgress, depopTopSellerProgress,
+    USPS_PEAK_SURCHARGE_START, USPS_PEAK_SURCHARGE_END, uspsPeakSurchargeStatus,
+    HOLIDAY_SHIP_BY_DATES, holidayShipByStatus,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend,
     ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,

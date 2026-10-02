@@ -28,7 +28,9 @@ const {
   isSupplyLowStock,
   sortEngagementSnapshots, annotateEngagementTrend, hasNewDueId,
   daysToSell, avgDaysToSell, sellThroughRate,
-  buildEngagementCheckFlags
+  buildEngagementCheckFlags,
+  USPS_PEAK_SURCHARGE_START, USPS_PEAK_SURCHARGE_END, uspsPeakSurchargeStatus,
+  HOLIDAY_SHIP_BY_DATES, holidayShipByStatus
 } = require('./garage-core.js');
 
 test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
@@ -883,4 +885,65 @@ test('buildEngagementCheckFlags: never flags a draft, ready-to-post, or sold lis
     { id: 'c', status: 'sold', platforms: ['ebay'] }
   ];
   assert.deepEqual(buildEngagementCheckFlags(listings, [], '2026-09-20', 14), []);
+});
+
+test('uspsPeakSurchargeStatus: "upcoming" before the real Oct 4, 2026 start date, with a real day count', () => {
+  const status = uspsPeakSurchargeStatus('2026-10-02');
+  assert.equal(status.state, 'upcoming');
+  assert.equal(status.daysUntilStart, 2);
+});
+
+test('uspsPeakSurchargeStatus: "active" on the start date itself, on the end date itself, and in between', () => {
+  assert.equal(uspsPeakSurchargeStatus(USPS_PEAK_SURCHARGE_START).state, 'active');
+  assert.equal(uspsPeakSurchargeStatus(USPS_PEAK_SURCHARGE_END).state, 'active');
+  const mid = uspsPeakSurchargeStatus('2026-12-01');
+  assert.equal(mid.state, 'active');
+  assert.equal(mid.daysUntilEnd, 47);
+});
+
+test('uspsPeakSurchargeStatus: "past" the day after the real Jan 17, 2027 end date', () => {
+  assert.equal(uspsPeakSurchargeStatus('2027-01-18').state, 'past');
+});
+
+test('uspsPeakSurchargeStatus: null with no real today to judge from', () => {
+  assert.equal(uspsPeakSurchargeStatus(null), null);
+  assert.equal(uspsPeakSurchargeStatus(undefined), null);
+});
+
+test('holidayShipByStatus: contiguous US region gives the real Dec 17/17/18/19 dates, with a signed day count', () => {
+  const rows = holidayShipByStatus('2026-12-10', 'contiguous');
+  assert.deepEqual(rows.map(r => r.service), ['USPS Ground Advantage', 'First-Class Mail', 'Priority Mail', 'Priority Mail Express']);
+  assert.deepEqual(rows.map(r => r.date), ['2026-12-17', '2026-12-17', '2026-12-18', '2026-12-19']);
+  assert.deepEqual(rows.map(r => r.daysUntil), [7, 7, 8, 9]);
+  assert.deepEqual(rows.map(r => r.passed), [false, false, false, false]);
+});
+
+test('holidayShipByStatus: territories region ships Ground Advantage a day earlier (Dec 16), the rest match contiguous', () => {
+  const rows = holidayShipByStatus('2026-12-10', 'territories');
+  const ground = rows.find(r => r.service === 'USPS Ground Advantage');
+  assert.equal(ground.date, '2026-12-16');
+  const express = rows.find(r => r.service === 'Priority Mail Express');
+  assert.equal(express.date, '2026-12-19');
+});
+
+test('holidayShipByStatus: a date already passed reads as passed with a negative daysUntil, not silently dropped', () => {
+  const rows = holidayShipByStatus('2026-12-20', 'contiguous');
+  assert.ok(rows.every(r => r.passed === true));
+  assert.ok(rows.every(r => r.daysUntil < 0));
+});
+
+test('holidayShipByStatus: an unknown region falls back to contiguous rather than throwing', () => {
+  const rows = holidayShipByStatus('2026-12-10', 'nowhere');
+  assert.deepEqual(rows, holidayShipByStatus('2026-12-10', 'contiguous'));
+});
+
+test('HOLIDAY_SHIP_BY_DATES: both regions land on the same Priority Mail / Priority Mail Express dates', () => {
+  assert.equal(
+    HOLIDAY_SHIP_BY_DATES.contiguous.find(r => r.service === 'Priority Mail').date,
+    HOLIDAY_SHIP_BY_DATES.territories.find(r => r.service === 'Priority Mail').date
+  );
+  assert.equal(
+    HOLIDAY_SHIP_BY_DATES.contiguous.find(r => r.service === 'Priority Mail Express').date,
+    HOLIDAY_SHIP_BY_DATES.territories.find(r => r.service === 'Priority Mail Express').date
+  );
 });

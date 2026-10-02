@@ -124,7 +124,8 @@ const {
   offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
   isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace,
   expectedBalanceDate, avgDaysToSell, sellThroughRate,
-  ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags
+  ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,
+  uspsPeakSurchargeStatus, holidayShipByStatus
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -539,6 +540,58 @@ function renderShippingCostFreshness() {
     : 'Reviewed ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' + (stale ? ' -- re-verify before relying on this' : '');
   el.className = 'reference-freshness' + (stale ? ' reference-freshness-stale' : '');
   el.title = 'Last hand-verified against USPS\'s own published retail rate schedule on ' + SHIPPING_COST_REVIEWED_ON + '.';
+}
+
+// Same "due soon" convention as ESTIMATED_TAX_DUE_SOON_DAYS: a real deadline
+// stops being merely background reference and starts being worth flagging
+// up top once it's within this many days.
+const PEAK_SURCHARGE_DUE_SOON_DAYS = 7;
+const HOLIDAY_SHIP_BY_DUE_SOON_DAYS = 14;
+
+// The two real USPS windows in the callouts above (the Oct 4, 2026 - Jan
+// 17, 2027 peak-season surcharge and the Dec 2026 holiday ship-by dates)
+// used to be static prose with an "as of September 2026" claim and nothing
+// actually checking it against today's real date, so a visit before Oct 4
+// and a visit after it rendered identically. This renders the real,
+// computed status instead, the same way the freshness badges above check a
+// review date rather than just asserting one.
+function renderShippingPeakStatus() {
+  const surchargeEl = document.getElementById('peakSurchargeStatus');
+  const shipByEl = document.getElementById('holidayShipByStatus');
+  if (!surchargeEl && !shipByEl) return;
+  const today = todayDateStr();
+
+  if (surchargeEl) {
+    const status = uspsPeakSurchargeStatus(today);
+    let text = 'Status unknown';
+    let tone = 'cell-muted';
+    if (status) {
+      if (status.state === 'upcoming') {
+        text = 'Starts in ' + status.daysUntilStart + ' day' + (status.daysUntilStart === 1 ? '' : 's') + ' (Oct 4, 2026)';
+        tone = status.daysUntilStart <= PEAK_SURCHARGE_DUE_SOON_DAYS ? 'tax-status-met' : 'cell-muted';
+      } else if (status.state === 'active') {
+        text = 'In effect now, ends in ' + status.daysUntilEnd + ' day' + (status.daysUntilEnd === 1 ? '' : 's') + ' (Jan 17, 2027)';
+        tone = 'tax-status-met';
+      } else {
+        text = 'Ended (was Oct 4, 2026 - Jan 17, 2027)';
+      }
+    }
+    surchargeEl.textContent = text;
+    surchargeEl.className = tone;
+  }
+
+  if (shipByEl) {
+    const rows = holidayShipByStatus(today, 'contiguous');
+    const next = rows.find(r => !r.passed);
+    if (!next) {
+      shipByEl.textContent = 'All contiguous-US holiday ship-by dates have passed.';
+      shipByEl.className = 'cell-muted';
+    } else {
+      const dueSoon = next.daysUntil <= HOLIDAY_SHIP_BY_DUE_SOON_DAYS;
+      shipByEl.textContent = next.daysUntil + ' day' + (next.daysUntil === 1 ? '' : 's') + ' until the ' + next.service + ' ship-by cutoff (' + next.date + ', contiguous US)';
+      shipByEl.className = dueSoon ? 'tax-status-met' : 'cell-muted';
+    }
+  }
 }
 
 // Same freshness-badge pattern as the tables above. The "Best time to post"
@@ -1760,6 +1813,18 @@ function renderAttentionBar() {
     const days = daysUntil(q.due, today);
     return days != null && days >= 0 && days <= ESTIMATED_TAX_DUE_SOON_DAYS;
   }).length;
+  // Same up-top surfacing as the tax due date above, for the other real,
+  // dated deadline on this page a long scroll could otherwise bury: the
+  // USPS peak-season surcharge (only worth a flag once it's imminent or
+  // already live, not months out) and the nearest contiguous-US holiday
+  // ship-by cutoff.
+  const peakSurchargeStatus = uspsPeakSurchargeStatus(today);
+  const peakSurchargeDueSoon = !!(peakSurchargeStatus && (
+    peakSurchargeStatus.state === 'active' ||
+    (peakSurchargeStatus.state === 'upcoming' && peakSurchargeStatus.daysUntilStart <= PEAK_SURCHARGE_DUE_SOON_DAYS)
+  ));
+  const nextShipByRow = holidayShipByStatus(today, 'contiguous').find(r => !r.passed);
+  const shipByDueSoon = !!(nextShipByRow && nextShipByRow.daysUntil <= HOLIDAY_SHIP_BY_DUE_SOON_DAYS);
 
   const items = [];
   // A drifted changelog is misinformation already live on the page (a real
@@ -1808,6 +1873,24 @@ function renderAttentionBar() {
   }
   if (taxDueSoonCount) {
     items.push({ n: taxDueSoonCount, tone: 'warn', target: 'estimatedTaxSection', label: taxDueSoonCount === 1 ? 'quarterly estimated tax payment is due soon' : 'quarterly estimated tax payments are due soon' });
+  }
+  if (peakSurchargeDueSoon) {
+    items.push({
+      n: 1,
+      tone: 'warn',
+      target: 'shippingCostSection',
+      label: peakSurchargeStatus.state === 'active'
+        ? 'USPS peak-season shipping surcharge is in effect, re-check label costs'
+        : 'USPS peak-season shipping surcharge starts soon, re-check label costs'
+    });
+  }
+  if (shipByDueSoon) {
+    items.push({
+      n: 1,
+      tone: 'warn',
+      target: 'shippingCostSection',
+      label: 'a holiday ship-by cutoff is coming up (' + nextShipByRow.service + ', ' + nextShipByRow.date + ')'
+    });
   }
 
   if (!items.length) {
@@ -7004,6 +7087,7 @@ renderElectronicsRulesFreshness();
 renderPackagingRulesFreshness();
 renderAuthenticationRulesFreshness();
 renderShippingCostFreshness();
+renderShippingPeakStatus();
 renderPoshWeightFreshness();
 renderPromotedFreshness();
 
