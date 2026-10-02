@@ -188,11 +188,24 @@ function main() {
         const snapWhere = where + '.socialSnapshots[' + snapIdx + ']';
         if (typeof snap !== 'object' || snap === null || Array.isArray(snap)) {
           errors.push(snapWhere + ': must be an object like { "platform": "...", "followers": 0, ' +
-            '"engagementRate": 0, "asOfDate": "YYYY-MM-DD" }, not ' + JSON.stringify(snap));
+            '"engagementRate": 0, "asOfDate": "YYYY-MM-DD", "profileUrl": null }, not ' + JSON.stringify(snap));
           return;
         }
         if (!isDateOrNull(snap.asOfDate)) {
           errors.push(snapWhere + ': "asOfDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(snap.asOfDate));
+        }
+        // Same real gap listingUrl closed for CGT: a followers/engagementRate
+        // count with no link back to the actual profile means re-checking it
+        // later means redoing the whole search from scratch. Optional since
+        // most real research so far predates this field, but once present it
+        // has to actually be a usable string, not a blank one masquerading
+        // as "logged".
+        if (snap.profileUrl !== null && snap.profileUrl !== undefined) {
+          if (typeof snap.profileUrl !== 'string') {
+            errors.push(snapWhere + ': "profileUrl" must be a string or null, got ' + JSON.stringify(snap.profileUrl));
+          } else if (!snap.profileUrl.trim()) {
+            errors.push(snapWhere + ': "profileUrl" is an empty string, use null instead of a blank string');
+          }
         }
         // app.js sums these with Number(snap.followers) when building Social Reach
         // totals. A hand-typed "12,000" or "12K" is not an error there, it is a

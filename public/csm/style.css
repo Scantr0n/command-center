@@ -1594,6 +1594,21 @@ textarea.np-input { resize: vertical; }
 .snapshot-growth-up { color: #3DDC84; }
 .snapshot-growth-down { color: #E5484D; }
 .snapshot-growth-flat { color: var(--dim); }
+.snapshot-link {
+  /* var(--sub) (#9A9FA6 on #16181C) is only 3.3:1 at this size, under the
+     4.5:1 WCAG AA text minimum: fine for a passive label like .snapshot-tag
+     above, not for an actual link someone needs to read and click.
+     var(--ink) clears 4.5:1; the underline is a second, non-color cue. */
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--ink);
+  margin-top: 4px;
+  display: block;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  width: fit-content;
+}
+.snapshot-link:hover { color: var(--sub); }
 
 footer.page-foot {
   margin-top: 40px;

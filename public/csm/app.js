@@ -1910,7 +1910,8 @@
         .map(snap => (snap.platform || 'Platform not logged') +
           (snap.followers != null ? ': ' + snap.followers + ' followers' : '') +
           (snap.engagementRate != null ? ', ' + snap.engagementRate + '% engagement' : '') +
-          (snap.asOfDate ? ' (as of ' + snap.asOfDate + ')' : ' (no as-of date)'))
+          (snap.asOfDate ? ' (as of ' + snap.asOfDate + ')' : ' (no as-of date)') +
+          (snap.profileUrl ? ' [' + snap.profileUrl + ']' : ''))
         .join('; '),
       outreachLog: (p.outreachLog || [])
         .map(entry => (entry.date ? entry.date + ': ' : '') + (OUTREACH_TYPE_LABEL[entry.type] || entry.type) +
@@ -2068,7 +2069,8 @@
           }
         }
         lines.push('  - ' + parts.join(', ') + ' (' + asOf + ')' +
-          (growthParts.length ? ', ' + growthParts.join(', ') + ' since ' + fmtDate(growth.previousAsOfDate) : ''));
+          (growthParts.length ? ', ' + growthParts.join(', ') + ' since ' + fmtDate(growth.previousAsOfDate) : '') +
+          (snap.profileUrl ? ' - ' + snap.profileUrl : ''));
       });
     } else {
       lines.push('  None logged yet.');
@@ -2854,6 +2856,9 @@
             (snapStale ? ' &middot; ' + snapStale.days + 'D OLD, DUE FOR REFRESH' : '') +
             '</span>' +
             (growth ? '<span class="snapshot-tag ' + growth.cls + '">' + growth.html + '</span>' : '') +
+            (snap.profileUrl
+              ? '<a class="snapshot-link" href="' + escapeHtml(snap.profileUrl) + '" target="_blank" rel="noopener noreferrer">View profile, re-check here &rarr;</a>'
+              : '') +
             '</li>';
         }).join('') + '</ul>'
       : 'Not logged yet';
@@ -3174,6 +3179,10 @@
       '<input type="number" min="0" step="0.1" id="modalSnapEngagement" class="np-input inline-gen-date" placeholder="Engagement %">' +
       '</div>' +
       '<div class="inline-gen-row inline-gen-row-idea">' +
+      '<label class="sr-only" for="modalSnapProfileUrl">Profile URL (optional, so a refresh does not mean redoing the search)</label>' +
+      '<input type="url" id="modalSnapProfileUrl" class="np-input" placeholder="Profile URL, optional">' +
+      '</div>' +
+      '<div class="inline-gen-row inline-gen-row-idea">' +
       '<label class="sr-only" for="modalSnapDate">As-of date (when actually pulled)</label>' +
       '<input type="date" id="modalSnapDate" class="np-input inline-gen-date">' +
       '<button type="button" id="modalSnapGenerate" class="print-btn font-mono">+ Log social snapshot</button>' +
@@ -3192,6 +3201,7 @@
     const platformInput = document.getElementById('modalSnapPlatform');
     const followersInput = document.getElementById('modalSnapFollowers');
     const engagementInput = document.getElementById('modalSnapEngagement');
+    const profileUrlInput = document.getElementById('modalSnapProfileUrl');
     const dateInput = document.getElementById('modalSnapDate');
     dateInput.value = todayIso();
     const resultEl = document.getElementById('modalSnapResult');
@@ -3201,6 +3211,7 @@
       const platform = platformInput.value.trim();
       const followers = followersInput.value.trim();
       const engagementRate = engagementInput.value.trim();
+      const profileUrl = profileUrlInput.value.trim();
       const asOfDate = dateInput.value;
       if (!platform) {
         warnEl.hidden = false;
@@ -3229,7 +3240,8 @@
         platform,
         followers: followers ? Number(followers) : null,
         engagementRate: engagementRate ? Number(engagementRate) : null,
-        asOfDate: asOfDate || null
+        asOfDate: asOfDate || null,
+        profileUrl: profileUrl || null
       };
       outputEl.textContent = JSON.stringify(entry, null, 2) + ',';
       resultEl.hidden = false;
