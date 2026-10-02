@@ -691,6 +691,11 @@ function renderDistributionBreakdown(segments, ids) {
       title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" data-tick-detail="${escapeHtml(title)}"></button>`;
   }).join('');
   wireTickTooltips(bar);
+  // Same [data-tick-detail] button pattern the connectivity/daily-uptime
+  // strips use, so it gets the same roving-tabindex fix: without it, a
+  // keyboard user tabbing past this bar stops on every distinct
+  // regime/mode segment instead of just one.
+  wireRovingTabindex(bar);
   legend.innerHTML = rows.map(r => {
     const pctText = r.pct >= 10 ? Math.round(r.pct) + '%' : (r.pct >= 1 ? r.pct.toFixed(1) + '%' : '<1%');
     return `
