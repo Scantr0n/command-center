@@ -93,3 +93,11 @@ test('findDuplicateApplications returns nothing for an all-unique list', () => {
   ];
   assert.deepEqual(findDuplicateApplications(apps), []);
 });
+
+test('findDuplicateApplications skips a truthy non-string company or role instead of throwing on .trim()', () => {
+  const apps = [
+    { num: 1, company: 42, role: 'Growth Intern' },
+    { num: 2, company: 'Acme', role: 42 }
+  ];
+  assert.doesNotThrow(() => findDuplicateApplications(apps));
+});

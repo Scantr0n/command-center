@@ -71,6 +71,12 @@
   function findDuplicateApplications(applications) {
     const byKey = new Map();
     (applications || []).forEach(a => {
+      // `(a.company || '')` only guards a falsy value: a truthy non-string
+      // (company or role logged as something other than a string) sails
+      // past it and throws on the .trim() right after, so both are checked
+      // before either is touched.
+      if ((a.company !== undefined && a.company !== null && typeof a.company !== 'string') ||
+        (a.role !== undefined && a.role !== null && typeof a.role !== 'string')) return;
       const company = (a.company || '').trim().toLowerCase();
       const role = (a.role || '').trim().toLowerCase();
       if (!company || !role) return;

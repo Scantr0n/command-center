@@ -68,7 +68,15 @@ function main() {
     else if (seenNums.has(a.num)) errors.push(where + ': duplicate "num" ' + a.num);
     else seenNums.add(a.num);
     ['role', 'company', 'location', 'pay'].forEach(f => {
-      if (!a[f]) errors.push(where + ': missing "' + f + '"');
+      if (!a[f]) {
+        errors.push(where + ': missing "' + f + '"');
+      } else if (typeof a[f] !== 'string') {
+        // findDuplicateApplications' own `(a.company || '').trim()` only
+        // guards a falsy value; a truthy non-string for company or role
+        // reaches that .trim() unguarded and throws, and the function runs
+        // unconditionally from both this file and app.js.
+        errors.push(where + ': "' + f + '" must be a string, got ' + typeof a[f]);
+      }
     });
     if (!isDateOrNull(a.appliedDate)) errors.push(where + ': "appliedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(a.appliedDate));
     else if (!a.appliedDate) warnings.push(where + ': no appliedDate logged, an application row with no real date reads as unconfirmed');

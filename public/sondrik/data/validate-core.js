@@ -23,7 +23,14 @@
   // empty key, two unset fields matching each other isn't a real signal.
   function findDuplicateLeads(leads) {
     const byKey = new Map();
+    const isStringOrNullish = v => v === undefined || v === null || typeof v === 'string';
     (leads || []).forEach(l => {
+      // `(l.field || '')` only guards a falsy value: a truthy non-string
+      // (any of these four logged as something other than a string) sails
+      // past it and throws on the .trim() right after, so every field is
+      // checked before any of them is touched.
+      if (!isStringOrNullish(l.channelId) || !isStringOrNullish(l.sourceDetail) ||
+        !isStringOrNullish(l.source) || !isStringOrNullish(l.summary)) return;
       const channel = (l.channelId || '').trim().toLowerCase();
       const detail = (l.sourceDetail || '').trim().toLowerCase();
       const source = (l.source || '').trim().toLowerCase();

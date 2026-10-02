@@ -182,7 +182,15 @@ function main() {
     if (!l.id) errors.push(where + ': missing "id"');
     else if (seenLeadIds.has(l.id)) errors.push(where + ': duplicate id "' + l.id + '"');
     else seenLeadIds.add(l.id);
-    if (!l.summary) errors.push(where + ': missing "summary"');
+    if (!l.summary) {
+      errors.push(where + ': missing "summary"');
+    } else if (typeof l.summary !== 'string') {
+      // findDuplicateLeads' own `(l.summary || '')` only guards a falsy
+      // value; a truthy non-string reaches its unguarded `.trim()` and
+      // throws, and that function runs unconditionally from this file and
+      // from app.js's own leads feed.
+      errors.push(where + ': "summary" must be a string, got ' + typeof l.summary);
+    }
     if (!isDateOrNull(l.loggedDate)) errors.push(where + ': "loggedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(l.loggedDate));
     else if (isFutureDate(l.loggedDate)) warnings.push(where + ': "loggedDate" (' + l.loggedDate + ') is in the future, a lead should be logged on the day it actually came in, check for a typo');
     // channelId attributes this lead to a channel card's count (see
@@ -192,6 +200,11 @@ function main() {
     if (l.channelId !== undefined && l.channelId !== null && !seenChannelIds.has(l.channelId)) {
       errors.push(where + ': "channelId" references unknown channel id "' + l.channelId + '"');
     }
+    ['sourceDetail', 'source', 'type'].forEach(f => {
+      if (l[f] !== undefined && l[f] !== null && typeof l[f] !== 'string') {
+        errors.push(where + ': "' + f + '" must be a string or null, got ' + typeof l[f]);
+      }
+    });
 
     const o = l.outreach || {};
     if (o.sent === true && o.approvalStatus !== 'approved') {

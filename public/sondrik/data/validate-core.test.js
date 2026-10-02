@@ -74,6 +74,13 @@ test('the real leads.json on disk has no duplicate lead logged twice', () => {
   assert.deepEqual(findDuplicateLeads(leadsData.leads || []), []);
 });
 
+test('findDuplicateLeads skips a truthy non-string channelId/sourceDetail/source/summary instead of throwing on .trim()', () => {
+  assert.doesNotThrow(() => findDuplicateLeads([
+    { id: 'a', channelId: 42, sourceDetail: 'Same commenter' },
+    { id: 'b', summary: 42, source: 42 }
+  ]));
+});
+
 test('emDashFields flags only the fields that actually contain an em dash', () => {
   const lead = { summary: 'Offered to test the product ' + String.fromCharCode(8212) + ' interested', source: 'Reddit' };
   assert.deepEqual(emDashFields(lead, ['summary', 'source']), ['summary']);
