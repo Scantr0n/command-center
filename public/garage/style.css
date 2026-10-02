@@ -1272,6 +1272,21 @@ footer.page-foot {
 .jump-nav-fab:hover, .jump-nav-fab:focus-visible { color: var(--ink); border-color: var(--accent); }
 .jump-nav-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Real system "reduce transparency" preference (macOS/iOS/Windows, exposed
+   in CSS via prefers-reduced-transparency, Chrome/Edge 118+): the blur
+   above is explicitly a legibility compromise (see the comment on
+   .jump-nav-fab itself), not something to force on someone whose OS setting
+   says to cut transparency effects. Drops the blur and raises the fill to
+   near-opaque instead of leaving a half-see-through button with nothing
+   softening it. */
+@media (prefers-reduced-transparency: reduce) {
+  .jump-nav-fab {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(16, 18, 21, 0.97);
+  }
+}
+
 .jump-nav-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 60vh; overflow-y: auto; }
 .jump-nav-link {
   display: block;
