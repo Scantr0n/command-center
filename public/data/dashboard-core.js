@@ -115,6 +115,20 @@
     return Math.round((parseInt(m[1], 10) / parseInt(m[2], 10)) * 100);
   }
 
+  // Same real transition check every per-project hub's own notify toggle
+  // already uses (CSM's hasNewDueId, Sondrik's own copy in next-steps-core.js):
+  // comparing the actual set of flagged cluster ids, not just a count, so one
+  // broken project recovering the same poll window a different one newly
+  // breaks still counts as something genuinely new, instead of a flat or
+  // falling count masking it. previousIds null means this is the first check
+  // ever (page just loaded with clusters already broken is not a new
+  // transition to alert on).
+  function hasNewFlaggedId(currentIds, previousIds) {
+    if (!previousIds) return false;
+    const prev = new Set(previousIds);
+    return currentIds.some(id => !prev.has(id));
+  }
+
   return {
     daysAgoLocal,
     shortRelativeTime,
@@ -122,6 +136,7 @@
     isStale,
     STATUS_SEVERITY,
     sortForGrid,
-    reliabilityPct
+    reliabilityPct,
+    hasNewFlaggedId
   };
 });

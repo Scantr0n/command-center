@@ -17,7 +17,8 @@ const {
   isStale,
   STATUS_SEVERITY,
   sortForGrid,
-  reliabilityPct
+  reliabilityPct,
+  hasNewFlaggedId
 } = require('./dashboard-core.js');
 
 const NOW = new Date(2026, 8, 24, 15, 0, 0); // local midday, 2026-09-24
@@ -119,4 +120,23 @@ test('reliabilityPct returns null, never a guessed percentage, for anything that
   assert.equal(reliabilityPct(''), null);
   assert.equal(reliabilityPct('no runs yet'), null, 'text with no N/M shape at all');
   assert.equal(reliabilityPct('5/0 succeeded'), null, 'a real M of 0 would divide by zero');
+});
+
+test('hasNewFlaggedId returns false on the first check, previousIds null', () => {
+  assert.equal(hasNewFlaggedId(['a', 'b'], null), false);
+});
+
+test('hasNewFlaggedId returns false when the same clusters just stay flagged', () => {
+  assert.equal(hasNewFlaggedId(['a', 'b'], ['a', 'b']), false);
+});
+
+test('hasNewFlaggedId returns true when a new cluster breaks even if the count also fell', () => {
+  // One project recovering the same poll window a different one newly
+  // breaks must still count as a real transition, a count-only compare
+  // (2 -> 2) would miss it.
+  assert.equal(hasNewFlaggedId(['a', 'c'], ['a', 'b']), true);
+});
+
+test('hasNewFlaggedId returns false when a cluster recovers and nothing new breaks', () => {
+  assert.equal(hasNewFlaggedId(['a'], ['a', 'b']), false);
 });

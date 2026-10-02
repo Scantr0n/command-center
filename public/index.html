@@ -151,6 +151,10 @@
      than just inverted. */
   .view-toggle-btn.active { background: linear-gradient(135deg, #5A82FF, #3D5AC0); color: #fff; box-shadow: 0 0 12px -2px rgba(90,130,255,0.5); }
   .view-toggle-btn:not(.active) { background: transparent; color: var(--sub); }
+  /* Same blue accent as the active view toggle above, so "alerts are
+     armed" reads as the one other "lit up" state in this header instead
+     of inventing a second accent color for it. */
+  #notifyBtn.notify-on { background: linear-gradient(135deg, #5A82FF, #3D5AC0) !important; color: #fff !important; border-color: transparent !important; }
   /* Same "glass panel" depth (inset top-highlight) as every other panel
      surface this pass touched, plus a real hover-lift so these read as
      tactile controls, not flat labels - box-shadow/transform only, never
@@ -778,6 +782,12 @@
         <button id="printBtn" type="button" aria-label="Print a project status report"
           class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
           style="color: var(--sub); background: var(--panelLight)">Print</button>
+        <button id="notifyBtn" type="button" aria-live="polite" aria-pressed="false"
+          class="hidden items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
+          style="color: var(--sub); background: var(--panelLight)"></button>
+        <button id="testAlertBtn" type="button"
+          class="hidden items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 rounded-lg border hairline"
+          style="color: var(--sub); background: var(--panelLight)">Send test alert</button>
         <button id="shortcutsBtn" type="button" aria-label="Keyboard shortcuts"
           class="hidden sm:flex items-center justify-center w-[30px] h-[30px] rounded-lg border hairline text-xs font-mono"
           style="color: var(--sub); background: var(--panelLight)">?</button>
@@ -1042,7 +1052,8 @@ const {
   relativeTime,
   isStale,
   sortForGrid: sortForGridCore,
-  reliabilityPct
+  reliabilityPct,
+  hasNewFlaggedId
 } = window.DashboardCore;
 const {
   groupByCategory,
@@ -1510,6 +1521,7 @@ function renderAttention() {
   const compact = document.getElementById('attnCompact');
   const cards = document.getElementById('attnCards');
   updateGlanceIndicator(flagged);
+  checkFlaggedAlerts(flagged);
 
   if (!flagged.length) {
     compact.classList.add('hidden'); compact.classList.remove('flex'); compact.innerHTML = '';
@@ -1546,6 +1558,138 @@ function renderAttention() {
   cards.querySelectorAll('.attn-card').forEach(makeCardClickable);
 
   updateAttentionVisibility();
+}
+
+// Native OS-level alert, opt-in, for the one real gap the title/favicon
+// glance dot above can't cover: this is the one page Jack leaves open in a
+// background tab all day (dashboard-core.js's own header comment calls it
+// out by name), so a project crossing into broken/stalled while that tab
+// sits unfocused gets nothing pulling his eye back to it until he happens
+// to glance at it. Every per-project hub (Alpha, CSM, Garage, CGT, Sondrik,
+// Job Search) already ships this exact pattern for its own "something needs
+// you" condition; the hub itself, the one page most likely to be the one
+// left open, was the one missing it. Built only from cluster status data
+// already rendered on this page, opt-in, one-shot per real transition,
+// never sent anywhere.
+const NOTIFY_PREF_KEY = 'cc:notifyEnabled';
+const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+
+function loadNotifyPref() {
+  try { return localStorage.getItem(NOTIFY_PREF_KEY) === 'true'; } catch (e) { return false; }
+}
+function saveNotifyPref(enabled) {
+  try { localStorage.setItem(NOTIFY_PREF_KEY, enabled ? 'true' : 'false'); } catch (e) { /* private browsing: works this load only */ }
+}
+
+function renderNotifyBtn() {
+  const notifyBtn = document.getElementById('notifyBtn');
+  const testAlertBtn = document.getElementById('testAlertBtn');
+  if (!notifyBtn) return;
+  if (!notifySupported) {
+    notifyBtn.classList.add('hidden'); notifyBtn.classList.remove('flex');
+    return;
+  }
+  const permission = Notification.permission;
+  if (permission === 'denied') {
+    notifyBtn.classList.remove('hidden'); notifyBtn.classList.add('flex');
+    notifyBtn.disabled = true;
+    notifyBtn.classList.remove('notify-on');
+    notifyBtn.textContent = 'Alerts blocked';
+    notifyBtn.title = 'Notifications are blocked for this page in your browser settings.';
+    notifyBtn.removeAttribute('aria-pressed');
+    if (testAlertBtn) { testAlertBtn.classList.add('hidden'); testAlertBtn.classList.remove('flex'); }
+    return;
+  }
+  const enabled = permission === 'granted' && loadNotifyPref();
+  notifyBtn.classList.remove('hidden'); notifyBtn.classList.add('flex');
+  notifyBtn.disabled = false;
+  notifyBtn.classList.toggle('notify-on', enabled);
+  notifyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  notifyBtn.textContent = enabled ? 'Alerts on' : 'Enable alerts';
+  notifyBtn.title = enabled
+    ? 'A native notification fires when a project crosses into broken/stalled while this tab is unfocused. Click to turn off.'
+    : 'Get a native notification when a project crosses into broken/stalled while this tab is unfocused.';
+  // A granted browser permission doesn't guarantee the OS actually surfaces
+  // it (Do Not Disturb, a muted notification center entry for this
+  // browser), so once armed, offer a way to check that end-to-end instead
+  // of finding out only during a real broken/stalled transition.
+  if (testAlertBtn) {
+    if (enabled) { testAlertBtn.classList.remove('hidden'); testAlertBtn.classList.add('flex'); }
+    else { testAlertBtn.classList.add('hidden'); testAlertBtn.classList.remove('flex'); }
+  }
+}
+
+document.getElementById('testAlertBtn').addEventListener('click', () => {
+  if (!notifySupported || Notification.permission !== 'granted') return;
+  const testAlertBtn = document.getElementById('testAlertBtn');
+  const original = testAlertBtn.textContent;
+  try {
+    new Notification('Command Center (test)', {
+      body: 'Test alert, no real status change. A real broken/stalled alert looks just like this.',
+      icon: '/icon-192.png',
+      tag: 'cc-attention-test'
+    });
+    testAlertBtn.textContent = 'Test alert sent';
+  } catch (e) {
+    testAlertBtn.textContent = "Couldn't send";
+  }
+  setTimeout(() => { testAlertBtn.textContent = original; }, 1800);
+});
+
+if (notifySupported) {
+  document.getElementById('notifyBtn').addEventListener('click', async () => {
+    if (Notification.permission === 'denied') return;
+    if (Notification.permission === 'default') {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') saveNotifyPref(true);
+      renderNotifyBtn();
+      return;
+    }
+    // Already granted: this button just toggles Jack's own preference,
+    // never re-prompts, since the browser permission itself already
+    // covers that question.
+    saveNotifyPref(!loadNotifyPref());
+    renderNotifyBtn();
+  });
+}
+renderNotifyBtn();
+
+// One-shot per real transition (never re-fires on the next 30s poll while
+// the same projects just stay broken/stalled), and only while this tab
+// genuinely isn't the one Jack is looking at right now, so enabling this
+// can never double up with the on-page attention bar/favicon dot while the
+// tab is actually visible. Tracks the actual set of flagged cluster ids
+// (hasNewFlaggedId, DashboardCore) rather than just a count, so one project
+// recovering the same poll window a different one newly breaks still
+// counts as something genuinely new. previousFlaggedIds starts null so the
+// very first check after page load only sets a baseline; opening the page
+// with projects already broken is not itself a new transition.
+let previousFlaggedIds = null;
+function checkFlaggedAlerts(flagged) {
+  if (!notifySupported) return;
+  const flaggedIds = flagged.map(c => c.id);
+  const isFirstCheck = previousFlaggedIds === null;
+  const grewWorse = hasNewFlaggedId(flaggedIds, previousFlaggedIds);
+  previousFlaggedIds = flaggedIds;
+  if (isFirstCheck || !grewWorse) return;
+  if (Notification.permission !== 'granted' || !loadNotifyPref()) return;
+  if (document.visibilityState === 'visible' && document.hasFocus()) return;
+  try {
+    const body = flagged.length === 1
+      ? flagged[0].name + ' is now ' + flagged[0].status + '.'
+      : flagged.length + ' projects now need attention.';
+    const notification = new Notification('Command Center', { body, icon: '/icon-192.png', tag: 'cc-attention' });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+      const btn = document.getElementById('attnStatBtn');
+      if (btn) btn.click();
+    };
+  } catch (e) {
+    // A granted permission can still throw post-revoke (e.g. a
+    // since-revoked OS-level permission); fail silently, the on-page
+    // attention bar/favicon dot already carries this state.
+  }
 }
 
 // Real cross-venture snapshot, built from each venture's own real data
