@@ -562,6 +562,24 @@ header.page-head .sub {
   .stage-dot-in-exploration, .velocity-dot-in-exploration { border-style: double; border-width: 3px; }
   .stage-dot-client, .velocity-dot-client { border-style: groove; border-width: 3px; }
 }
+/* Same real gap, two more components: .funnel-track/.funnel-fill (pipeline
+   funnel) and .channel-eff-track/.channel-eff-fill (channel + category
+   effectiveness) have no border of their own either, so forced-colors
+   strips both the track's background and the fill's background to the
+   same Canvas color and the whole bar disappears rather than just losing
+   its fill, same gap already fixed on CGT's breakdown/1099-K bars, Alpha's
+   .meter-fill, and Sondrik's goal/launch-window/compare bars. An explicit
+   CanvasText border on the track keeps it visible at all, plus a border on
+   the fill's own leading edge so a 10% bar and a 90% bar don't render
+   identically. */
+@media (forced-colors: active) {
+  .funnel-track, .channel-eff-track {
+    border: 1px solid CanvasText;
+  }
+  .funnel-fill, .channel-eff-fill {
+    border-right: 2px solid CanvasText;
+  }
+}
 .velocity-label { flex: 1; font-weight: 500; }
 .velocity-value { color: var(--sub); font-size: 0.78rem; }
 .velocity-value-empty { color: var(--dim); font-style: italic; }
