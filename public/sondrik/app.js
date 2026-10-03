@@ -1575,7 +1575,7 @@
     const header = ['Date', 'Count', 'Metric', 'Source', 'Note'].map(csvField).join(',');
     const lines = checks.map(c => [c.date, c.count, metric.label, metric.source, c.note].map(csvField).join(','));
     const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1596,7 +1596,7 @@
     const header = ['Version', 'Date', 'Type', 'Summary', 'Notes'].map(csvField).join(',');
     const lines = releases.map(r => [r.version, r.date, r.type, r.summary, r.notes].map(csvField).join(','));
     const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1615,7 +1615,7 @@
       return [l.id, l.source, l.sourceDetail, l.type, l.summary, l.loggedDate, o.draftStatus, o.approvalStatus, o.sent ? 'yes' : 'no', o.draftText].map(csvField).join(',');
     });
     const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1652,7 +1652,7 @@
     const lines = channels.map(c =>
       [c.id, c.name, c.status, c.linkedMetric, linkedValue(c), c.note].map(csvField).join(','));
     const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1678,7 +1678,7 @@
       return [g.id, g.label, g.metric, g.target, currentCount, pct, g.setDate, g.targetDate, g.note].map(csvField).join(',');
     });
     const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

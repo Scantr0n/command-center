@@ -4315,7 +4315,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(c => CSV_COLUMNS.map(([accessor]) => csvField(accessor(c))).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -4534,7 +4534,7 @@ document.getElementById('candidatesCsvBtn').addEventListener('click', () => {
   const header = CANDIDATES_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(c => CANDIDATES_CSV_COLUMNS.map(([accessor]) => csvField(accessor(c))).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -4661,7 +4661,7 @@ document.getElementById('submissionsCsvBtn').addEventListener('click', () => {
   const header = SUBMISSIONS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(s => SUBMISSIONS_CSV_COLUMNS.map(([accessor]) => csvField(accessor(s))).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

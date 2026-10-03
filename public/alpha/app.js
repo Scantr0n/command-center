@@ -3203,7 +3203,7 @@ document.getElementById('positionsCsvBtn').addEventListener('click', () => {
       : p[key]
   )).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -3234,7 +3234,7 @@ document.getElementById('eventLogCsvBtn').addEventListener('click', () => {
   const header = EVENT_LOG_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = lastEventLogSnapshot.map(evt => EVENT_LOG_CSV_COLUMNS.map(([key]) => csvField(evt[key])).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -3273,7 +3273,7 @@ document.getElementById('incidentsCsvBtn').addEventListener('click', () => {
   const header = INCIDENTS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(r => INCIDENTS_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -3308,7 +3308,7 @@ document.getElementById('killSwitchHistoryCsvBtn').addEventListener('click', () 
   const header = KILL_SWITCH_HISTORY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(r => KILL_SWITCH_HISTORY_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -3347,7 +3347,7 @@ document.getElementById('regimeHistoryCsvBtn').addEventListener('click', () => {
   const header = REGIME_HISTORY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(r => REGIME_HISTORY_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -3382,7 +3382,7 @@ document.getElementById('sizingModeHistoryCsvBtn').addEventListener('click', () 
   const header = SIZING_MODE_HISTORY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = rows.map(r => SIZING_MODE_HISTORY_CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -3406,7 +3406,7 @@ document.getElementById('genealogyCsvBtn').addEventListener('click', () => {
   const header = GENEALOGY_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
   const lines = lastLineagesSnapshot.map(l => GENEALOGY_CSV_COLUMNS.map(([key]) => csvField(l[key])).join(','));
   const csv = [header, ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

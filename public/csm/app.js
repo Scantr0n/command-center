@@ -1947,7 +1947,7 @@
     const header = CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
     const lines = rows.map(r => CSV_COLUMNS.map(([key]) => csvField(r[key])).join(','));
     const csv = [header, ...lines].join('\n');
-    downloadFile(csv, 'csm-pipeline-' + todayIso() + '.csv', 'text/csv;charset=utf-8;');
+    downloadFile('﻿' + csv, 'csm-pipeline-' + todayIso() + '.csv', 'text/csv;charset=utf-8;');
   });
 
   // Same real, documented per-platform contact mechanics as the "Platform

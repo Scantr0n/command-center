@@ -222,7 +222,7 @@
       [a.num, a.role, a.company, a.location, a.pay, fmtDate(a.appliedDate) || 'undated', statusText(a)].map(csvField).join(',')
     );
     const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
