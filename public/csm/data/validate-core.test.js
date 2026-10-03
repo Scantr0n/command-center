@@ -14,7 +14,10 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { findDuplicateProspects, findCasingDrift, findDuplicateHooks, findReusedContactDetail } = require('./validate-core.js');
+const { findDuplicateProspects, findCasingDrift, findDuplicateHooks, findReusedContactDetail, isDateOrNull, validateProspects } = require('./validate-core.js');
+const { emDashFields, hasLegacySocialSnapshotField } = require('./csm-core.js');
+const REAL_HELPERS = { emDashFields, hasLegacySocialSnapshotField };
+const STAGES = require('./stages.json').stages;
 
 test('findDuplicateProspects flags the same name/company logged under two ids', () => {
   const prospects = [
@@ -201,4 +204,72 @@ test('the real prospects.json on disk has no duplicate prospects, casing drift, 
   );
   assert.deepEqual(findDuplicateHooks(prospects), []);
   assert.deepEqual(findReusedContactDetail(prospects), []);
+});
+
+test('isDateOrNull accepts null/undefined, a real YYYY-MM-DD date, rejects a rolled-over impossible date', () => {
+  assert.equal(isDateOrNull(null), true);
+  assert.equal(isDateOrNull(undefined), true);
+  assert.equal(isDateOrNull('2026-09-05'), true);
+  assert.equal(isDateOrNull('2026-02-30'), false);
+  assert.equal(isDateOrNull('not-a-date'), false);
+});
+
+test('validateProspects flags a minimal valid prospect with no errors', () => {
+  const prospects = [{
+    id: 'a', name: 'Real Name', stage: 'researched',
+    contactChannel: { type: null, detail: null }, nudgeSchedule: {},
+    socialSnapshots: [], contentIdeas: [], stageHistory: [], outreachLog: []
+  }];
+  const { errors } = validateProspects(prospects, STAGES, REAL_HELPERS);
+  assert.deepEqual(errors, []);
+});
+
+test('validateProspects errors on a stage id that does not match any real stage (the silent-vanish bug)', () => {
+  const prospects = [{ id: 'a', name: 'Real Name', stage: 'not-a-real-stage' }];
+  const { errors } = validateProspects(prospects, STAGES, REAL_HELPERS);
+  assert.ok(errors.some(e => e.includes('does not match any id in stages.json')));
+});
+
+test('validateProspects errors on a missing id or name', () => {
+  const { errors } = validateProspects([{ name: 'Real Name', stage: 'researched' }, { id: 'a', stage: 'researched' }], STAGES, REAL_HELPERS);
+  assert.ok(errors.some(e => e.includes('missing "id"')));
+  assert.ok(errors.some(e => e.includes('missing "name"')));
+});
+
+test('validateProspects errors on a duplicate id across two prospects', () => {
+  const { errors } = validateProspects([
+    { id: 'a', name: 'First', stage: 'researched' },
+    { id: 'a', name: 'Second', stage: 'researched' }
+  ], STAGES, REAL_HELPERS);
+  assert.ok(errors.some(e => e.includes('duplicate id "a"')));
+});
+
+test('validateProspects warns when outreach-sent has no verifiedHook or contactChannel.type logged', () => {
+  const { warnings } = validateProspects([{ id: 'a', name: 'Real Name', stage: 'outreach-sent' }], STAGES, REAL_HELPERS);
+  assert.ok(warnings.some(w => w.includes('contactChannel.type is not logged')));
+  assert.ok(warnings.some(w => w.includes('verifiedHook is not logged')));
+});
+
+test('validateProspects errors on an out-of-order nudgeSchedule (doNotNudgeBefore after nudgePoint)', () => {
+  const { errors } = validateProspects([{
+    id: 'a', name: 'Real Name', stage: 'outreach-sent',
+    nudgeSchedule: { doNotNudgeBefore: '2026-10-10', nudgePoint: '2026-10-01' }
+  }], STAGES, REAL_HELPERS);
+  assert.ok(errors.some(e => e.includes('doNotNudgeBefore is after')));
+});
+
+test('validateProspects runs the em-dash and legacy-field checks only when helpers are passed in', () => {
+  const prospects = [{ id: 'a', name: 'Real Name' + String.fromCharCode(8212) + 'Inc', stage: 'researched', socialSnapshot: { platform: 'Douyin' } }];
+  const withHelpers = validateProspects(prospects, STAGES, REAL_HELPERS);
+  assert.ok(withHelpers.warnings.some(w => w.includes('em dash')));
+  assert.ok(withHelpers.errors.some(e => e.includes('legacy "socialSnapshot"')));
+  const withoutHelpers = validateProspects(prospects, STAGES);
+  assert.ok(!withoutHelpers.warnings.some(w => w.includes('em dash')));
+  assert.ok(!withoutHelpers.errors.some(e => e.includes('legacy "socialSnapshot"')));
+});
+
+test('validateProspects on the real prospects.json/stages.json on disk matches the CLI validator: no errors', () => {
+  const prospects = require('./prospects.json').prospects || [];
+  const { errors } = validateProspects(prospects, STAGES, REAL_HELPERS);
+  assert.deepEqual(errors, []);
 });
