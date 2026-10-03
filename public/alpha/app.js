@@ -2918,6 +2918,11 @@ async function loadStatus() {
     document.getElementById('connLabel').textContent = "Couldn't load status.json";
     document.getElementById('connSub').textContent = e.message;
     updateGlanceIndicators('error');
+    // renderStats() never runs on this path, so #statRow's own static
+    // skeleton placeholder (see index.html) would otherwise keep pulsing
+    // forever, misreading as "still loading" when the page has actually
+    // given up and shown this error instead.
+    document.getElementById('statRow').innerHTML = '';
   }
 }
 

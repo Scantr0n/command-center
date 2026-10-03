@@ -400,6 +400,22 @@ section { margin-bottom: 36px; }
 }
 .stat-tile-warn .stat-tile-value { color: #E0A030; }
 
+/* Static placeholder tiles shown in #statRow's own initial markup, replaced
+   the moment the first real render sets its innerHTML (every load path,
+   success or failure, already does this unconditionally). Without these,
+   a slow connection or a cold cache shows a blank gap where the page's own
+   primary numbers belong until the fetch resolves. Same skeletonPulse
+   timing as Command Center's own hub-page grid skeleton; the generic
+   prefers-reduced-motion reset elsewhere in this file already flattens the
+   animation to a single near-instant frame. */
+.skeleton-bar {
+  display: block;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+}
+.skeleton-pulse { animation: skeletonPulse 1.4s ease-in-out infinite; }
+@keyframes skeletonPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+
 /* Seasonal calendar current-month row */
 #seasonalGuideTable tbody tr.is-current-month {
   background: rgba(224,160,48,0.06);

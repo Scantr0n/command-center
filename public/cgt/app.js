@@ -638,6 +638,11 @@ async function loadCards() {
     cards = [];
     rawCardsData = null;
     document.getElementById('cardTableBody').innerHTML = '';
+    // renderStats() never runs on this path, so #statRow's own static
+    // skeleton placeholder (see index.html) would otherwise keep pulsing
+    // forever, misreading as "still loading" when the load has actually
+    // failed and the error box below is about to show instead.
+    document.getElementById('statRow').innerHTML = '';
     errBox.hidden = false;
     errBox.setAttribute('role', 'alert');
     errBox.textContent = "Couldn't load cards.json: " + e.message;

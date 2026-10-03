@@ -254,6 +254,22 @@ header.page-head .sub {
   line-height: 1.5;
 }
 
+/* Static placeholder chips shown in #snapshotStrip's own initial markup,
+   replaced the moment the first real render sets its innerHTML (every
+   load path, success or failure, already does this unconditionally). Without
+   these, a slow connection or a cold cache shows a blank gap where the
+   page's own headline numbers belong until the fetch resolves. Same
+   skeletonPulse timing as Command Center's own hub-page grid skeleton; the
+   generic prefers-reduced-motion reset elsewhere in this file already
+   flattens the animation to a single near-instant frame. */
+.skeleton-bar {
+  display: block;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+}
+.skeleton-pulse { animation: skeletonPulse 1.4s ease-in-out infinite; }
+@keyframes skeletonPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+
 /* Real "you clicked through, here's where you landed" confirmation for the
    snapshot cards, same pattern as Sondrik's: a silent scrollIntoView gave
    no feedback that the click did anything. Reduced-motion is covered by
