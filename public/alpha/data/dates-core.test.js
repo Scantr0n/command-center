@@ -24,6 +24,7 @@ const {
   currentStateStartedAt,
   computeIncidents,
   computeIncidentFreeStreak,
+  computeLongestStreak,
   computeMTTR,
   computeLongestIncident,
   computeMTBF,
@@ -384,6 +385,69 @@ test('computeMTBF is null with fewer than 2 observed incidents, or no history', 
 test('computeIncidentFreeStreak is null with no recorded history', () => {
   assert.equal(computeIncidentFreeStreak([], Date.now()), null);
   assert.equal(computeIncidentFreeStreak(undefined, Date.now()), null);
+});
+
+test('computeLongestStreak picks the current streak when it is already the longest', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-10T10:05:00Z', connected: false },
+    { at: '2026-09-10T10:15:00Z', connected: true }, // 10m gap before this incident
+    { at: '2026-09-15T10:00:00Z', connected: true } // current streak: 2026-09-10T10:15 -> now, ~5d
+  ];
+  const now = new Date('2026-09-15T10:00:00Z').getTime();
+  const longest = computeLongestStreak(history, now);
+  assert.equal(longest.ongoing, true);
+  assert.equal(longest.start, '2026-09-10T10:15:00Z');
+  assert.equal(longest.end, null);
+  assert.equal(longest.ms, now - new Date('2026-09-10T10:15:00Z').getTime());
+});
+
+test('computeLongestStreak picks an earlier, longer-finished span over a short current streak', () => {
+  const history = [
+    { at: '2026-09-01T10:00:00Z', connected: true }, // long early span: 5 days before the first incident
+    { at: '2026-09-06T10:00:00Z', connected: false },
+    { at: '2026-09-06T10:30:00Z', connected: true }, // short current streak since here
+    { at: '2026-09-06T10:45:00Z', connected: true }
+  ];
+  const now = new Date('2026-09-06T10:45:00Z').getTime();
+  const longest = computeLongestStreak(history, now);
+  assert.deepEqual(longest, {
+    start: '2026-09-01T10:00:00Z',
+    end: '2026-09-06T10:00:00Z',
+    ms: 5 * 86400000,
+    ongoing: false
+  });
+});
+
+test('computeLongestStreak reports the longest finished span while currently down, never the ongoing outage', () => {
+  const history = [
+    { at: '2026-09-01T10:00:00Z', connected: true },
+    { at: '2026-09-01T10:30:00Z', connected: false },
+    { at: '2026-09-01T10:40:00Z', connected: true }, // short 30m span before this incident
+    { at: '2026-09-10T10:00:00Z', connected: false } // currently down since here, after a long 9d span
+  ];
+  const longest = computeLongestStreak(history, Date.now());
+  assert.equal(longest.ongoing, false);
+  assert.equal(longest.start, '2026-09-01T10:40:00Z');
+  assert.equal(longest.end, '2026-09-10T10:00:00Z');
+});
+
+test('computeLongestStreak falls back to the first recorded check with no incident ever observed', () => {
+  const history = [
+    { at: '2026-09-10T10:00:00Z', connected: true },
+    { at: '2026-09-15T10:00:00Z', connected: true }
+  ];
+  const now = new Date('2026-09-15T10:00:00Z').getTime();
+  const longest = computeLongestStreak(history, now);
+  assert.equal(longest.start, '2026-09-10T10:00:00Z');
+  assert.equal(longest.end, null);
+  assert.equal(longest.ongoing, true);
+  assert.equal(longest.ms, now - new Date('2026-09-10T10:00:00Z').getTime());
+});
+
+test('computeLongestStreak is null with no recorded history', () => {
+  assert.equal(computeLongestStreak([], Date.now()), null);
+  assert.equal(computeLongestStreak(undefined, Date.now()), null);
 });
 
 test('computeKillSwitchEpisodes groups consecutive engaged runs and leaves a trailing one ongoing', () => {

@@ -58,6 +58,7 @@ const {
   currentStateStartedAt,
   computeIncidents,
   computeIncidentFreeStreak,
+  computeLongestStreak,
   computeMTTR,
   computeLongestIncident,
   computeMTBF,
@@ -1070,6 +1071,40 @@ function renderIncidentStreak(data, clientHistory) {
   el.textContent = streak.everIncident
     ? durationText + ' without an incident'
     : durationText + ' without an incident (since monitoring began)';
+}
+
+// Companion to the streak badge just above: that one says how long it's
+// been up right now, this says the single longest real up-period this
+// browser has ever recorded, current streak included, same "pair a current
+// reading with its own best/worst so far" rule the longest-incident figure
+// beside MTTR below already applies the other direction. Built from
+// computeLongestStreak (dates-core.js); this only formats it. Hidden under
+// the same no-history-yet rule as the streak badge. When the current streak
+// is itself the record (the common case), says so inline rather than
+// repeating the exact same duration as its own separate "earlier" claim;
+// otherwise names the real window an earlier streak ran in, in the hover
+// title, same pattern the MTTR badge already uses for its own longest-
+// incident aside.
+function renderIncidentLongestStreak(data, clientHistory) {
+  const el = document.getElementById('incidentLongestStreak');
+  if (!el) return;
+  const history = effectiveConnHistory(data, clientHistory);
+  const longest = computeLongestStreak(history);
+  if (!longest) {
+    el.hidden = true;
+    el.textContent = '';
+    el.title = '';
+    return;
+  }
+  el.hidden = false;
+  const durationText = formatDuration(longest.ms) || 'under 1m';
+  if (longest.ongoing) {
+    el.textContent = 'longest streak ' + durationText + ' (current)';
+    el.title = '';
+  } else {
+    el.textContent = 'longest streak ' + durationText;
+    el.title = 'Ran from ' + formatAbsolute(longest.start) + ' to ' + formatAbsolute(longest.end) + ', before the current streak above.';
+  }
 }
 
 // Statuspage/incident.io-style mean-time-to-recovery, the pairing stat next
@@ -2877,6 +2912,7 @@ async function loadStatus() {
     renderDailyUptime(data, clientConnHistory);
     renderIncidents(data, clientConnHistory);
     renderIncidentStreak(data, clientConnHistory);
+    renderIncidentLongestStreak(data, clientConnHistory);
     renderIncidentMttr(data, clientConnHistory);
     renderIncidentMtbf(data, clientConnHistory);
     renderKillSwitchHistory(data, clientConnHistory);
@@ -2958,6 +2994,7 @@ window.addEventListener('storage', (e) => {
   renderDailyUptime(lastRawData, connHistory);
   renderIncidents(lastRawData, connHistory);
   renderIncidentStreak(lastRawData, connHistory);
+  renderIncidentLongestStreak(lastRawData, connHistory);
   renderIncidentMttr(lastRawData, connHistory);
   renderIncidentMtbf(lastRawData, connHistory);
   renderKillSwitchHistory(lastRawData, connHistory);

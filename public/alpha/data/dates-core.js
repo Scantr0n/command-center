@@ -459,6 +459,45 @@
     return { active: true, since, everIncident: !!last, ms: Math.max(0, nowMs - sinceMs) };
   }
 
+  // Statuspage-style "longest streak on record", the companion stat to
+  // computeIncidentFreeStreak above: that one says how long it's been up
+  // right now, this says the single longest real up-period this browser has
+  // ever observed, current one included, same "pair a current reading with
+  // its own best/worst so far" rule computeLongestIncident already applies
+  // to MTTR. Walks the same real computeIncidents gaps as the current-streak
+  // calculation: the span before the first incident, each span between one
+  // incident's real end and the next incident's real start, and, only while
+  // not currently down, the trailing span from the last incident's end to
+  // `now` (that trailing span is the exact same figure
+  // computeIncidentFreeStreak already returns as "active", just compared
+  // here against every earlier span instead of assumed to be the longest).
+  // While currently down, that trailing span doesn't exist yet, so the
+  // longest finished span is reported instead, with `ongoing: false`; a
+  // caller can tell current-streak-is-the-record apart from an-earlier-
+  // streak-was-longer by comparing the returned `end` against null. Returns
+  // null under the same no-history-yet rule as computeIncidentFreeStreak.
+  function computeLongestStreak(history, now) {
+    if (!Array.isArray(history) || !history.length) return null;
+    const incidents = computeIncidents(history);
+    const nowMs = now == null ? Date.now() : now;
+    const spans = [];
+    let cursor = history[0].at;
+    for (const incident of incidents) {
+      const ms = Math.max(0, new Date(incident.start).getTime() - new Date(cursor).getTime());
+      spans.push({ start: cursor, end: incident.start, ms, ongoing: false });
+      if (incident.ongoing) { cursor = null; break; }
+      cursor = incident.end;
+    }
+    if (cursor) {
+      spans.push({ start: cursor, end: null, ms: Math.max(0, nowMs - new Date(cursor).getTime()), ongoing: true });
+    }
+    let longest = spans[0];
+    for (const span of spans) {
+      if (span.ms > longest.ms) longest = span;
+    }
+    return longest;
+  }
+
   // Kill-switch trigger history: real engaged windows (paused === true),
   // grouped the same start/end/ongoing way computeIncidents groups downtime,
   // built from the same connection.history entries. paused is null whenever
@@ -586,6 +625,7 @@
     currentStateStartedAt,
     computeIncidents,
     computeIncidentFreeStreak,
+    computeLongestStreak,
     computeMTTR,
     computeLongestIncident,
     computeMTBF,
