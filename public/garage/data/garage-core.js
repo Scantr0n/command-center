@@ -474,6 +474,24 @@
     return null;
   }
 
+  // Real negotiation pattern across every logged offers.json entry: "decided"
+  // is every offer whose response is actually known ("pending" has no outcome
+  // yet, excluded the same way an undecided dispute wouldn't count toward a
+  // resolution rate), "accepted" is the subset decided as a straight accept.
+  // A "countered" offer that later turns into a real sale is logged as its
+  // own separate sales.json row (same "a count-as-you-go number, not a
+  // guess" rule as every other stat on this page), so it is never folded back
+  // into "accepted" here, it stays counted only as "countered". Returns
+  // acceptedPct: null (not 0) when nothing is decided yet, the same
+  // "not enough data yet" convention sellThroughRate above already uses
+  // rather than a misleading 0%.
+  function offerStats(offers) {
+    const decided = (offers || []).filter(o => o && o.response && o.response !== 'pending');
+    if (!decided.length) return { decided: 0, accepted: 0, acceptedPct: null };
+    const accepted = decided.filter(o => o.response === 'accepted');
+    return { decided: decided.length, accepted: accepted.length, acceptedPct: accepted.length / decided.length };
+  }
+
   // Real, published, count-based requirements toward eBay's Top Rated Seller
   // tier and Depop's Top Seller tier (see the "Seller status & standards, by
   // platform" reference table on the page), the only two platforms whose
@@ -972,7 +990,7 @@
     poshmarkWeightTier, bundleNetComparison,
     computePoshmarkShareStreak,
     OFFER_TIER_ACCEPT_PCT, OFFER_TIER_COUNTER_PCT, OFFER_TIER_BORDERLINE_PCT,
-    offerTier, offerCounterAmount,
+    offerTier, offerCounterAmount, offerStats,
     EBAY_TRS_WINDOW_DAYS, EBAY_TRS_TRANSACTIONS_TARGET, EBAY_TRS_GROSS_SALES_TARGET,
     EBAY_LATE_SHIPMENT_RATE_TARGET,
     DEPOP_TOP_SELLER_WINDOW_DAYS, DEPOP_TOP_SELLER_GROSS_SALES_TARGET,

@@ -6,6 +6,7 @@ let suppliesLog = [];
 let acquisitionsLog = [];
 let compsLog = [];
 let engagementLog = [];
+let offersLog = [];
 let activityLog = [];
 let searchTerm = '';
 let activePlatform = 'all';
@@ -23,6 +24,7 @@ let initialListingId = null;
 // snapshots have a dedicated detail view to open.
 let initialActivityId = null;
 let initialEngagementId = null;
+let initialOfferId = null;
 let sortKey = null;
 let sortDir = 'asc';
 let currentStages = [];
@@ -37,6 +39,7 @@ let rawSuppliesData = null;
 let rawAcquisitionsData = null;
 let rawCompsData = null;
 let rawEngagementData = null;
+let rawOffersData = null;
 let garageChangelogDriftStatus = null;
 
 // Filters, search, and sort are mirrored into the URL query string so a
@@ -56,6 +59,7 @@ function restoreStateFromUrl() {
   const listing = params.get('listing');
   const activity = params.get('activity');
   const engagement = params.get('engagement');
+  const offer = params.get('offer');
   if (q) searchTerm = q;
   if (platform && VALID_PLATFORMS.includes(platform)) activePlatform = platform;
   if (sort) sortKey = sort;
@@ -63,6 +67,7 @@ function restoreStateFromUrl() {
   if (listing) initialListingId = listing;
   if (activity) initialActivityId = activity;
   if (engagement) initialEngagementId = engagement;
+  if (offer) initialOfferId = offer;
 }
 
 function setInitialChipState(containerId, dataAttr, value) {
@@ -122,7 +127,7 @@ const {
   addDaysToDateStr, addBusinessDays, disputeResponseDeadline, openDisputesDueForResponse,
   remainingPlatforms, daysSincePublished, daysUntil, isDueForRelist, relistGuidanceParts,
   poshmarkWeightTier, bundleNetComparison, computePoshmarkShareStreak,
-  offerTier, offerCounterAmount, ebayTrsProgress, depopTopSellerProgress,
+  offerTier, offerCounterAmount, offerStats, ebayTrsProgress, depopTopSellerProgress,
   isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace,
   expectedBalanceDate, avgDaysToSell, sellThroughRate,
   ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,
@@ -1044,7 +1049,7 @@ function renderChangelog(data, driftStatus) {
 async function loadData() {
   const errBox = document.getElementById('tableEmpty');
   loadChangelog();
-  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult, engagementResult] = await Promise.allSettled([
+  const [listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult, engagementResult, offersResult] = await Promise.allSettled([
     fetchJson('/garage/data/listings.json'),
     fetchJson('/garage/data/pipeline.json'),
     fetchJson('/garage/data/activity.json'),
@@ -1054,7 +1059,8 @@ async function loadData() {
     fetchJson('/garage/data/supplies.json'),
     fetchJson('/garage/data/acquisitions.json'),
     fetchJson('/garage/data/comps.json'),
-    fetchJson('/garage/data/engagement.json')
+    fetchJson('/garage/data/engagement.json'),
+    fetchJson('/garage/data/offers.json')
   ]);
   const listingsData = listingsResult.status === 'fulfilled' ? listingsResult.value.data : null;
   const pipelineData = pipelineResult.status === 'fulfilled' ? pipelineResult.value.data : null;
@@ -1066,6 +1072,7 @@ async function loadData() {
   const acquisitionsData = acquisitionsResult.status === 'fulfilled' ? acquisitionsResult.value.data : null;
   const compsData = compsResult.status === 'fulfilled' ? compsResult.value.data : null;
   const engagementData = engagementResult.status === 'fulfilled' ? engagementResult.value.data : null;
+  const offersData = offersResult.status === 'fulfilled' ? offersResult.value.data : null;
   rawListingsData = listingsData;
   rawPipelineData = pipelineData;
   rawActivityData = activityData;
@@ -1076,11 +1083,12 @@ async function loadData() {
   rawAcquisitionsData = acquisitionsData;
   rawCompsData = compsData;
   rawEngagementData = engagementData;
+  rawOffersData = offersData;
   const backupBtn = document.getElementById('backupBtn');
-  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData);
+  backupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData || offersData);
   backupBtn.title = backupBtn.disabled ? "Can't back up, all data files failed to load (see below)" : '';
   const compareBackupBtn = document.getElementById('compareBackupBtn');
-  compareBackupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData);
+  compareBackupBtn.disabled = !(listingsData || pipelineData || activityData || salesData || expensesData || disputesData || suppliesData || acquisitionsData || compsData || engagementData || offersData);
   compareBackupBtn.title = compareBackupBtn.disabled ? "Can't compare, all data files failed to load (see below)" : '';
   const stages = (pipelineData && pipelineData.stages) || [];
   const postingLogEntries = (pipelineData && pipelineData.postingLog) || [];
@@ -1091,14 +1099,15 @@ async function loadData() {
   const acquisitions = (acquisitionsData && acquisitionsData.acquisitions) || [];
   const comps = (compsData && compsData.comps) || [];
   const engagementSnapshots = (engagementData && engagementData.snapshots) || [];
+  const offers = (offersData && offersData.offers) || [];
 
-  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult, engagementResult]
+  renderDataFreshness([listingsResult, pipelineResult, activityResult, salesResult, expensesResult, disputesResult, suppliesResult, acquisitionsResult, compsResult, engagementResult, offersResult]
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value.lastModified));
 
   if (listingsData) {
     listings = listingsData.listings || [];
-    renderStats(listings, stages, sales, expenses, supplies, acquisitions, disputes);
+    renderStats(listings, stages, sales, expenses, supplies, acquisitions, disputes, offers);
     renderDelistList(listings);
     renderDataQuality(listings, acquisitions);
     renderDuplicates(listings);
@@ -1254,10 +1263,24 @@ async function loadData() {
     engagementEmpty.setAttribute('role', 'alert');
     engagementEmpty.textContent = "Couldn't load engagement data: " + engagementResult.reason.message;
   }
+
+  if (offersData) {
+    offersLog = offers;
+    renderOffers(offers, listings);
+    if (initialOfferId) flashRowOnce(document.getElementById('offer-row-' + initialOfferId));
+  } else {
+    offersLog = [];
+    document.getElementById('offersTableBody').innerHTML = '';
+    const offersEmpty = document.getElementById('offersTableEmpty');
+    offersEmpty.hidden = false;
+    offersEmpty.setAttribute('role', 'alert');
+    offersEmpty.textContent = "Couldn't load offers data: " + offersResult.reason.message;
+  }
   // renderOfferItemChips above already ran renderOfferGuide once, but before
-  // compsLog was set here, so its first paint could miss a real logged comp
-  // for the selected item. Re-run now that compsLog reflects what actually
-  // loaded, same fix any two out-of-order loadData sections would need.
+  // compsLog/offersLog were set here, so its first paint could miss a real
+  // logged comp or a real past offer for the selected item. Re-run now that
+  // both reflect what actually loaded, same fix any two out-of-order
+  // loadData sections would need.
   renderOfferGuide();
   // Needs both listings (set in the block above) and engagementLog (set
   // just above this), same out-of-order-sections reason renderOfferGuide
@@ -1310,12 +1333,13 @@ function bestCaseTotalPayout(live) {
   }, 0);
 }
 
-function renderStats(listings, stages, sales, expenses, supplies, acquisitions, disputes) {
+function renderStats(listings, stages, sales, expenses, supplies, acquisitions, disputes, offers) {
   sales = sales || [];
   expenses = expenses || [];
   supplies = supplies || [];
   acquisitions = acquisitions || [];
   disputes = disputes || [];
+  offers = offers || [];
   const live = listings.filter(l => l.status === 'live');
   const totalValue = live.reduce((s, l) => s + (l.price || 0), 0);
   const platformCounts = {};
@@ -1357,6 +1381,7 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions, 
   const totalSourcingSpend = acquisitions.reduce((s, a) => s + (a.pricePaid || 0), 0);
   const openDisputeCount = disputes.filter(d => d.status === 'open').length;
   const dueDisputeCount = openDisputesDueForResponse(disputes, todayDateStr()).length;
+  const offerStatsResult = offerStats(offers);
 
   const tiles = [
     { value: listingInstances, label: 'Live listing instances', sub: live.length + ' unique item(s)' },
@@ -1371,6 +1396,7 @@ function renderStats(listings, stages, sales, expenses, supplies, acquisitions, 
     { value: sellThrough ? Math.round(sellThrough.rate * 100) + '%' : 'not enough data yet', label: 'Sell-through rate', sub: sellThrough ? `${sellThrough.sold}/${sellThrough.total} unique item(s) ever listed have sold` : 'No item has gone live yet' },
     { value: avgSellDays != null ? Math.round(avgSellDays) + 'd' : 'not tracked yet', label: 'Avg. days to sell', sub: avgSellDays != null ? 'Publish date to sale date, real sales with both logged' : 'Needs a sale whose listingId resolves to a listing with a real datePublished' },
     { value: dueDisputeCount, label: 'Disputes needing a response', sub: openDisputeCount ? `${dueDisputeCount}/${openDisputeCount} open case(s) at or past their response window` : 'No open disputes logged', warn: dueDisputeCount > 0 },
+    { value: offerStatsResult.decided ? Math.round(offerStatsResult.acceptedPct * 100) + '%' : 'not enough data yet', label: 'Offer acceptance rate', sub: offerStatsResult.decided ? `${offerStatsResult.accepted}/${offerStatsResult.decided} decided offer(s) accepted, from the offers log below` : (offers.length ? 'No offer has a decided response yet' : 'No offers logged yet') },
     { value: sales.length, label: 'Real sales logged', sub: sales.length ? null : 'None yet' },
     { value: formatUsd(realizedRevenue), label: 'Realized revenue', sub: sales.length ? 'Sum of actual sale prices' : 'No sales logged yet' },
     { value: salesWithCost.length ? formatUsd(realizedProfit) : 'not tracked yet', label: 'Realized profit', sub: salesWithCost.length ? `Net payout minus cost basis and shipping, ${salesWithCost.length}/${sales.length} sale(s) have a price plus at least one cost logged` : 'No sale has both a sale price and a cost basis or shipping cost logged yet' },
@@ -3037,6 +3063,16 @@ function mostRecentCompForListing(comps, listingId) {
   })[0];
 }
 
+// Every real past offer actually logged against this listing, oldest first
+// (same reason as mostRecentCompForListing above: real negotiation history
+// for this exact item beats the tier math alone). Used by the offer guide
+// to show what's already been accepted/declined/countered for this item
+// before suggesting what to do with a new one.
+function pastOffersForListing(offers, listingId) {
+  if (!listingId) return [];
+  return (offers || []).filter(o => o.listingId === listingId);
+}
+
 // A copy-paste reply matching the ladder verdict above, same "Copy" pattern
 // as the buyer message templates below: the guide already computes the
 // right counter number, this is the last step from "what to do" to an
@@ -3115,6 +3151,15 @@ function renderOfferGuide() {
   if (recentComp) {
     rows.push(fieldRow('Recent comp', `${escapeHtml(PLATFORM_LABELS[recentComp.platform] || recentComp.platform)}: "${escapeHtml(recentComp.title)}" sold for ` +
       `${formatUsd(recentComp.soldPrice)}${recentComp.soldDate ? ' on ' + escapeHtml(recentComp.soldDate) : ''}, logged in the sold comps/pricing research log above.`));
+  }
+
+  const pastOffers = l ? pastOffersForListing(offersLog, l.id) : [];
+  if (pastOffers.length) {
+    const stats = offerStats(pastOffers);
+    const summary = stats.decided
+      ? `${pastOffers.length} logged, ${stats.accepted}/${stats.decided} decided offer(s) accepted`
+      : `${pastOffers.length} logged, none decided yet`;
+    rows.push(fieldRow('Past offers on this item', `${summary}, see the offers received log below.`));
   }
 
   const replyText = offerReplyText(tier, l && l.title, offer, counterAmount);
@@ -4025,6 +4070,69 @@ function renderComps(comps, currentListings) {
       <td class="cell-muted">${soldHtml}</td>
       <td>${sourceHtml}</td>
       <td class="cell-muted">${c.notes ? escapeHtml(c.notes) : ''}</td>
+    </tr>
+  `;
+  }).join('');
+
+  tbody.querySelectorAll('[data-listing-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentListings.some(l => l.id === btn.dataset.listingId)) openModal(btn.dataset.listingId);
+    });
+  });
+}
+
+const OFFER_RESPONSE_LABELS = { pending: 'Pending', accepted: 'Accepted', declined: 'Declined', countered: 'Countered', expired: 'Expired' };
+const OFFER_RESPONSE_BADGE_CLASS = { pending: 'badge-hold', accepted: 'badge-fresh', declined: 'badge-decline', countered: 'badge-due', expired: 'badge-decline' };
+
+function renderOffers(offers, currentListings) {
+  const tbody = document.getElementById('offersTableBody');
+  const empty = document.getElementById('offersTableEmpty');
+
+  if (!offers.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No offers logged yet.';
+    return;
+  }
+  empty.hidden = true;
+
+  const sorted = [...offers].sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  });
+
+  tbody.innerHTML = sorted.map(o => {
+    const listing = currentListings.find(l => l.id === o.listingId);
+    const itemHtml = listing
+      ? `<button type="button" class="badge badge-link badge-button" data-listing-id="${escapeHtml(o.listingId)}">${escapeHtml(listing.title)}</button>`
+      : `<span class="cell-muted">${escapeHtml(o.listingId)} (not in listings.json anymore)</span>`;
+    const ageDays = daysSincePublished(o.date);
+    const dateHtml = o.date
+      ? escapeHtml(o.date) + (ageDays != null ? `<div class="cell-muted">${ageDays === 0 ? 'today' : ageDays + 'd ago'}</div>` : '')
+      : '<span class="cell-value empty">not logged</span>';
+    // Falls back to the listing's current asking price when no snapshot was
+    // taken at offer time, same "best available number, labeled as such"
+    // convention the engagement re-check link uses: a real but possibly
+    // stale comparison beats showing nothing at all.
+    const asking = o.askingPriceAtOffer != null ? o.askingPriceAtOffer : (listing ? listing.price : null);
+    const pctHtml = (asking != null && asking > 0)
+      ? Math.round((o.offerAmount / asking) * 100) + '%' + (o.askingPriceAtOffer == null && listing ? '<div class="cell-muted">vs. current asking</div>' : '')
+      : '<span class="cell-value empty">no asking price</span>';
+    const responseLabel = OFFER_RESPONSE_LABELS[o.response] || o.response;
+    const responseClass = OFFER_RESPONSE_BADGE_CLASS[o.response] || 'badge-hold';
+    const responseHtml = `<span class="badge ${responseClass}">${escapeHtml(responseLabel)}</span>` +
+      (o.response === 'countered' && o.counterAmount != null ? `<div class="cell-muted">countered at ${formatUsd(o.counterAmount)}</div>` : '');
+    return `
+    <tr id="${o.id ? 'offer-row-' + escapeHtml(o.id) : ''}">
+      <td>${itemHtml}</td>
+      <td><span class="badge badge-${escapeHtml(o.platform)}">${escapeHtml(PLATFORM_LABELS[o.platform] || o.platform)}</span></td>
+      <td class="cell-muted">${dateHtml}</td>
+      <td class="cell-value">${formatUsd(o.offerAmount)}</td>
+      <td class="cell-value">${pctHtml}</td>
+      <td>${responseHtml}</td>
+      <td class="cell-muted">${o.notes ? escapeHtml(o.notes) : ''}</td>
     </tr>
   `;
   }).join('');
@@ -5293,7 +5401,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // diffed against or restored from a known-good copy. Local download only,
 // nothing is sent anywhere. Same approach as CSM's own backup button.
 document.getElementById('backupBtn').addEventListener('click', () => {
-  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData && !rawCompsData && !rawEngagementData) return;
+  if (!rawListingsData && !rawPipelineData && !rawActivityData && !rawSalesData && !rawExpensesData && !rawDisputesData && !rawSuppliesData && !rawAcquisitionsData && !rawCompsData && !rawEngagementData && !rawOffersData) return;
   const backup = {
     exportedAt: new Date().toISOString(),
     source: 'Command Center Garage (/garage), local download only',
@@ -5306,7 +5414,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
     suppliesJson: rawSuppliesData,
     acquisitionsJson: rawAcquisitionsData,
     compsJson: rawCompsData,
-    engagementJson: rawEngagementData
+    engagementJson: rawEngagementData,
+    offersJson: rawOffersData
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -5325,8 +5434,8 @@ document.getElementById('backupBtn').addEventListener('click', () => {
 // picks and renders the result. Nothing is uploaded anywhere and nothing is
 // written back to listings.json/pipeline.json/activity.json/sales.json/
 // expenses.json/disputes.json/supplies.json/acquisitions.json/comps.json/
-// engagement.json. Same approach as CSM's, Sondrik's, and CGT's own Compare
-// with backup.
+// engagement.json/offers.json. Same approach as CSM's, Sondrik's, and CGT's
+// own Compare with backup.
 let compareBackupOpen = false;
 let compareBackupLastFocusedEl = null;
 
@@ -5383,7 +5492,7 @@ function renderCompareBackupResult(result) {
   const exportedLabel = result.exportedAt
     ? new Date(result.exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : 'unknown export date (an older backup, or a hand-edited file)';
-  const totalDiffs = ['listings', 'pipeline', 'postingLog', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement']
+  const totalDiffs = ['listings', 'pipeline', 'postingLog', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement', 'offers']
     .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
   let html = '<p class="field-note" style="margin:12px 0 6px">Backup taken: <strong>' + escapeHtml(exportedLabel) + '</strong></p>';
   if (totalDiffs === 0) {
@@ -5402,6 +5511,7 @@ function renderCompareBackupResult(result) {
   html += renderCompareSection('Acquisitions (acquisitions.json)', result.acquisitions, a => a.sourceName || a.id, a => a.source);
   html += renderCompareSection('Comps (comps.json)', result.comps, c => c.title || c.id, c => c.platform);
   html += renderCompareSection('Engagement snapshots (engagement.json)', result.engagement, s => s.listingId || s.id, s => s.platform + (s.date ? ', ' + s.date : ''));
+  html += renderCompareSection('Offers (offers.json)', result.offers, o => o.listingId || o.id, o => o.platform + (o.response ? ', ' + o.response : ''));
   document.getElementById('compareBackupResult').innerHTML = html;
 }
 
@@ -5423,7 +5533,7 @@ document.getElementById('compareBackupInput').addEventListener('change', () => {
     }
     try {
       renderCompareBackupResult(window.GarageCompareCore.compareWithBackup(
-        { rawListingsData, rawPipelineData, rawActivityData, rawSalesData, rawExpensesData, rawDisputesData, rawSuppliesData, rawAcquisitionsData, rawCompsData, rawEngagementData },
+        { rawListingsData, rawPipelineData, rawActivityData, rawSalesData, rawExpensesData, rawDisputesData, rawSuppliesData, rawAcquisitionsData, rawCompsData, rawEngagementData, rawOffersData },
         parsed
       ));
     } catch (err) {
@@ -5712,6 +5822,45 @@ document.getElementById('engagementCsvBtn').addEventListener('click', () => {
   document.body.appendChild(a4);
   a4.click();
   document.body.removeChild(a4);
+  URL.revokeObjectURL(url);
+});
+
+const OFFERS_CSV_COLUMNS = [
+  ['listingId', 'Linked listing'], ['itemTitle', 'Item'], ['platform', 'Platform'], ['date', 'Date'],
+  ['offerAmount', 'Offer'], ['askingPriceAtOffer', 'Asking at offer'], ['response', 'Response'],
+  ['counterAmount', 'Counter amount'], ['notes', 'Notes']
+];
+
+// Same real logged data as the on-page table, newest-first, so this always
+// matches what's actually in offers.json rather than a reformatted copy.
+document.getElementById('offersCsvBtn').addEventListener('click', () => {
+  const rows = [...offersLog]
+    .sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.localeCompare(a.date);
+    })
+    .map(o => {
+      const listing = listings.find(l => l.id === o.listingId);
+      return {
+        ...o,
+        itemTitle: listing ? listing.title : '',
+        platform: PLATFORM_LABELS[o.platform] || o.platform || '',
+        response: OFFER_RESPONSE_LABELS[o.response] || o.response || ''
+      };
+    });
+  const header = OFFERS_CSV_COLUMNS.map(([, label]) => csvField(label)).join(',');
+  const lines = rows.map(o => OFFERS_CSV_COLUMNS.map(([key]) => csvField(o[key])).join(','));
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a5 = document.createElement('a');
+  a5.href = url;
+  a5.download = 'garage-offers-' + todayDateStr() + '.csv';
+  document.body.appendChild(a5);
+  a5.click();
+  document.body.removeChild(a5);
   URL.revokeObjectURL(url);
 });
 
@@ -6790,6 +6939,102 @@ function wireQuickLogEngagementTool() {
   });
 }
 
+// Same quick-log convention as the tools above, for offers.json. Unlike a
+// comp, listingId is required here (same reasoning as engagement.json
+// above: an offer with nothing identifying which item it's even about is
+// meaningless), so a blank one is a blocker. counterAmount is only
+// meaningful when response is actually "countered", same mismatch check
+// validate.js's own offers.json rules run.
+function wireQuickLogOfferTool() {
+  const form = document.getElementById('quickOfferForm');
+  if (!form) return;
+  const warningsBox = document.getElementById('nofWarnings');
+  const output = document.getElementById('nofOutput');
+  const copyBtn = document.getElementById('nofCopyBtn');
+  const live = document.getElementById('quickLogOfferLive');
+  const draftGuard = attachDraftGuard(form, 'garage-nof-draft-v1', {
+    bannerId: 'nofDraftBanner', timeId: 'nofDraftBannerTime', discardId: 'nofDiscardDraftBtn',
+    onDiscard: () => { output.hidden = true; copyBtn.hidden = true; warningsBox.textContent = ''; }
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const id = document.getElementById('nofId').value.trim();
+    const listingId = document.getElementById('nofListingId').value.trim();
+    const platform = document.getElementById('nofPlatform').value;
+    const date = document.getElementById('nofDate').value || null;
+    const offerAmount = readOptionalNonNegativeInput(document.getElementById('nofOfferAmount'));
+    const askingPriceAtOffer = readOptionalNonNegativeInput(document.getElementById('nofAskingPrice'));
+    const response = document.getElementById('nofResponse').value;
+    const counterAmount = readOptionalNonNegativeInput(document.getElementById('nofCounterAmount'));
+    const notes = document.getElementById('nofNotes').value.trim() || null;
+
+    const blockers = [];
+    const advisory = [];
+
+    if (!id) blockers.push('An id is required.');
+    else if (offersLog.some(x => x.id === id)) {
+      blockers.push('"' + id + '" is already used by another offer, ids must be unique.');
+    }
+    if (!listingId) blockers.push('A linked listing id is required, an offer must belong to a real listing.');
+    else if (!listings.some(l => l.id === listingId)) {
+      blockers.push('"' + listingId + '" does not match any listing in listings.json.');
+    }
+    if (!platform) blockers.push('Select a platform.');
+    else {
+      const listing = listings.find(l => l.id === listingId);
+      if (listing && !(listing.platforms || []).includes(platform)) {
+        advisory.push('"' + platform + '" is not one of "' + listingId + '"\'s own platforms, double check that\'s not a typo.');
+      }
+    }
+    if (!date) blockers.push('Enter the real date this offer was actually received.');
+    else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (new Date(date + 'T00:00:00') > tomorrow) {
+        blockers.push('Date is in the future, this is a real logged offer, not a projection.');
+      }
+    }
+    if (offerAmount === null) blockers.push('Enter the real offer amount received, $0 or more.');
+    else if (offerAmount === undefined) blockers.push('Enter a valid offer amount of $0 or more.');
+    if (askingPriceAtOffer === undefined) blockers.push('Enter a valid asking price of $0 or more, or leave it blank.');
+    if (!response) blockers.push('Select how this offer was (or will be) responded to.');
+    if (counterAmount === undefined) blockers.push('Enter a valid counter amount of $0 or more, or leave it blank.');
+    if (response === 'countered' && counterAmount === null) {
+      advisory.push('Response is "countered" but no counter amount was entered, add it once you know it.');
+    }
+    if (response && response !== 'countered' && typeof counterAmount === 'number') {
+      advisory.push('A counter amount is set but response isn\'t "countered", double check that\'s the right field.');
+    }
+
+    if (blockers.length) {
+      warningsBox.textContent = blockers.join(' ');
+      output.hidden = true;
+      copyBtn.hidden = true;
+      return;
+    }
+
+    const offer = { id, listingId, platform, date, offerAmount, askingPriceAtOffer, response, counterAmount, notes };
+
+    advisory.push(...emDashAdvisory(offer, ['notes']));
+    warningsBox.textContent = advisory.join(' ');
+    output.value = JSON.stringify(offer, null, 2) + ',';
+    output.hidden = false;
+    copyBtn.hidden = false;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    copyText(output.value).then(() => {
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      live.textContent = 'Offer JSON copied to clipboard.';
+      draftGuard.clearDraft();
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
+    }).catch(() => { live.textContent = 'Could not copy to clipboard.'; });
+  });
+}
+
 // Same quick-log convention as the tools above, for pipeline.json's own
 // postingLog array: a real day items actually got posted from the
 // "ready-to-post" backlog, feeding the Posting pace planner's actual-pace
@@ -7172,6 +7417,7 @@ wireQuickLogSupplyTool();
 wireQuickLogAcquisitionTool();
 wireQuickLogCompTool();
 wireQuickLogEngagementTool();
+wireQuickLogOfferTool();
 wireQuickLogPostingTool();
 wirePhotoDraftTool();
 initPhotoAudit();

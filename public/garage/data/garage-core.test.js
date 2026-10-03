@@ -21,7 +21,7 @@ const {
   poshmarkWeightTier, bundleNetComparison,
   irsMileageRateForDate, mileageRateGapReason, computeExpenseAmount, computeYtdNetProfit,
   homeOfficeDeduction, HOME_OFFICE_RATE_PER_SQFT, HOME_OFFICE_MAX_SQFT,
-  computePoshmarkShareStreak, offerTier, offerCounterAmount,
+  computePoshmarkShareStreak, offerTier, offerCounterAmount, offerStats,
   ebayTrsProgress, depopTopSellerProgress, daysBetweenDates, actualPostingPace,
   shipDeadline, isLateShipment, ebayLateShipmentRate, expectedBalanceDate,
   RELIST_FRESH_DAYS, POSHMARK_HOLD_DAYS, DEPOP_BOOST_FEE_PCT,
@@ -409,6 +409,32 @@ test('offerCounterAmount: borderline tier splits closer to asking while still fr
   // No listing date logged defaults to the same firmer split as a genuinely
   // fresh listing, never the stale-listing split with no real evidence for it.
   assert.equal(offerCounterAmount('borderline', 60, 100, null), 90);
+});
+
+test('offerStats: reports "not enough data yet" (null acceptedPct) with no offers logged, never a misleading 0%', () => {
+  assert.deepEqual(offerStats([]), { decided: 0, accepted: 0, acceptedPct: null });
+  assert.deepEqual(offerStats(undefined), { decided: 0, accepted: 0, acceptedPct: null });
+});
+
+test('offerStats: a still-pending offer counts toward neither decided nor accepted', () => {
+  const stats = offerStats([{ response: 'pending' }]);
+  assert.deepEqual(stats, { decided: 0, accepted: 0, acceptedPct: null });
+});
+
+test('offerStats: computes the real accepted share of decided offers, excluding pending ones from the denominator', () => {
+  const stats = offerStats([
+    { response: 'accepted' }, { response: 'declined' }, { response: 'countered' }, { response: 'pending' }
+  ]);
+  assert.equal(stats.decided, 3);
+  assert.equal(stats.accepted, 1);
+  assert.equal(stats.acceptedPct, 1 / 3);
+});
+
+test('offerStats: a countered offer is never folded into "accepted", even though it may later sell', () => {
+  const stats = offerStats([{ response: 'countered' }, { response: 'countered' }]);
+  assert.equal(stats.decided, 2);
+  assert.equal(stats.accepted, 0);
+  assert.equal(stats.acceptedPct, 0);
 });
 
 test('ebayTrsProgress: counts only real ebay sales within the trailing 365 days, ignores other platforms and out-of-window dates', () => {

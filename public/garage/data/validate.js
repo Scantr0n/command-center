@@ -2,8 +2,8 @@
 /*
  * Validates listings.json, pipeline.json, activity.json, sales.json,
  * expenses.json, disputes.json, supplies.json, acquisitions.json,
- * comps.json, and engagement.json against the field rules documented in
- * public/garage/index.html.
+ * comps.json, engagement.json, and offers.json against the field rules
+ * documented in public/garage/index.html.
  *
  * The rule this exists to enforce: every listing has a real, known set of
  * platforms and a non-negative price, any platform marked sold in "soldOn"
@@ -67,6 +67,22 @@
  * listing's own platforms, "date" is required and can't be in the future,
  * and at least one of "views"/"saves" must be a real non-negative number,
  * a snapshot logging neither has nothing to show.
+ * Every offers.json entry is a real buyer offer received on one real
+ * listing (same no-live-offers-API reason engagement.json is hand-logged):
+ * "listingId" is required and must match a real listing in listings.json,
+ * an offer with nothing identifying which item it's even about is
+ * meaningless the same way an engagement snapshot without one is. "platform"
+ * is required and warned about if it isn't one of that listing's own
+ * platforms, "date" is required and can't be in the future, and "offerAmount"
+ * must be a real non-negative number. "response" is required (pending,
+ * accepted, declined, countered, or expired); "counterAmount" only makes
+ * sense when the response is actually "countered", so it's flagged as a
+ * stray number if logged with a different response, and flagged as missing
+ * if the response is "countered" but no actual counter amount was recorded.
+ * "askingPriceAtOffer", if logged, must be a real non-negative number; left
+ * blank is fine; a separate accepted offer is never cross-checked against
+ * sales.json here, same "not every accepted offer has necessarily shipped
+ * yet" reasoning soldOn's own cross-check doesn't apply retroactively either.
  *
  * Usage: node public/garage/data/validate.js
  * Exit code 0 = clean, 1 = errors found.
@@ -101,6 +117,7 @@ const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved
 const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
 const ITEM_SPECIFIC_KEYS = ['brand', 'size', 'color', 'condition'];
 const ACQUISITION_SOURCES = ['thrift-store', 'estate-sale', 'garage-sale', 'wholesale-lot', 'online-marketplace', 'personal-item', 'other'];
+const OFFER_RESPONSES = ['pending', 'accepted', 'declined', 'countered', 'expired'];
 
 // Mirrors sondrik/data/validate.js's and job-search/data/validate.js's own
 // isFutureDate: "tomorrow" rather than "now" as the cutoff so a real sale
@@ -136,7 +153,7 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData, acquisitionsData, compsData, engagementData;
+  let listingsData, pipelineData, activityData, salesData, expensesData, disputesData, suppliesData, acquisitionsData, compsData, engagementData, offersData;
   try {
     listingsData = loadJson('listings.json');
     pipelineData = loadJson('pipeline.json');
@@ -148,6 +165,7 @@ function main() {
     acquisitionsData = loadJson('acquisitions.json');
     compsData = loadJson('comps.json');
     engagementData = loadJson('engagement.json');
+    offersData = loadJson('offers.json');
   } catch (e) {
     console.error('Failed to read/parse a data file: ' + e.message);
     process.exit(1);
@@ -843,6 +861,74 @@ function main() {
       warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
   });
 
+  const offers = offersData.offers || [];
+  const seenOfferIds = new Set();
+
+  offers.forEach((o, idx) => {
+    const where = 'offers[' + idx + ']' + (o && o.id ? ' (' + o.id + ')' : '');
+
+    if (!o.id) errors.push(where + ': missing "id"');
+    else if (seenOfferIds.has(o.id)) errors.push(where + ': duplicate id "' + o.id + '"');
+    else seenOfferIds.add(o.id);
+
+    // Same reasoning as engagement.json above: an offer with nothing real
+    // identifying which item it's even about is meaningless, so this is
+    // required rather than the comps/disputes/acquisitions "fine if not
+    // itemized yet" allowance.
+    if (!o.listingId) {
+      errors.push(where + ': missing "listingId", an offer must belong to a real listing');
+    } else if (!listingById[o.listingId]) {
+      errors.push(where + ': listingId "' + o.listingId + '" does not match any listing in listings.json');
+    }
+
+    if (!o.platform) {
+      errors.push(where + ': missing "platform"');
+    } else if (!PLATFORMS.includes(o.platform)) {
+      errors.push(where + ': platform "' + o.platform + '" is not one of ' + PLATFORMS.join(', '));
+    } else if (o.listingId && listingById[o.listingId] && !(listingById[o.listingId].platforms || []).includes(o.platform)) {
+      warnings.push(where + ': platform "' + o.platform + '" is not one of listing "' + o.listingId + '"\'s own platforms, check for a typo\'d platform');
+    }
+
+    if (!isDateOrNull(o.date) || !o.date) {
+      errors.push(where + ': "date" must be a real YYYY-MM-DD date: ' + JSON.stringify(o.date));
+    } else if (isFutureDate(o.date)) {
+      errors.push(where + ': "date" (' + o.date + ') is in the future, this is a real logged offer, not a projection');
+    }
+
+    if (typeof o.offerAmount !== 'number' || o.offerAmount < 0) {
+      errors.push(where + ': "offerAmount" must be a non-negative number');
+    }
+
+    if (o.askingPriceAtOffer !== null && o.askingPriceAtOffer !== undefined &&
+      (typeof o.askingPriceAtOffer !== 'number' || o.askingPriceAtOffer < 0)) {
+      errors.push(where + ': "askingPriceAtOffer" must be a non-negative number or null');
+    }
+
+    if (!o.response) {
+      errors.push(where + ': missing "response"');
+    } else if (!OFFER_RESPONSES.includes(o.response)) {
+      errors.push(where + ': response "' + o.response + '" is not one of ' + OFFER_RESPONSES.join(', '));
+    }
+
+    if (o.counterAmount !== null && o.counterAmount !== undefined) {
+      if (typeof o.counterAmount !== 'number' || o.counterAmount < 0) {
+        errors.push(where + ': "counterAmount" must be a non-negative number or null');
+      }
+      if (o.response && o.response !== 'countered') {
+        warnings.push(where + ': "counterAmount" is logged but response is "' + o.response + '", not "countered", check this is actually the right field');
+      }
+    } else if (o.response === 'countered') {
+      warnings.push(where + ': response is "countered" but "counterAmount" is not logged yet');
+    }
+
+    if (o.notes !== null && o.notes !== undefined && typeof o.notes !== 'string') {
+      errors.push(where + ': "notes" must be a string or null');
+    }
+
+    emDashFields(o, ['notes']).forEach(f =>
+      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
+  });
+
   // Every soldOn entry should have a matching sale logged, since a platform
   // only belongs in soldOn once something has actually sold there.
   listings.forEach(l => {
@@ -904,7 +990,8 @@ function main() {
     postingLogEntries.length + ' posting log entr' + (postingLogEntries.length === 1 ? 'y' : 'ies') + ', ' +
     events.length + ' activity event(s), ' + sales.length + ' sale(s), ' + expenses.length + ' expense(s), ' +
     disputes.length + ' dispute(s), ' + supplies.length + ' suppl' + (supplies.length === 1 ? 'y' : 'ies') + ', ' +
-    acquisitions.length + ' acquisition(s), ' + comps.length + ' comp(s), ' + engagementSnapshots.length + ' engagement snapshot(s)).');
+    acquisitions.length + ' acquisition(s), ' + comps.length + ' comp(s), ' + engagementSnapshots.length + ' engagement snapshot(s), ' +
+    offers.length + ' offer(s)).');
   process.exit(0);
 }
 
@@ -928,7 +1015,7 @@ function checkChangelogFreshness(warnings) {
     if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: DATA_DIR, encoding: 'utf8' }).trim() === 'true') return;
     const realHashesRaw = execFileSync('git', [
       'log', '--format=%H', '--',
-      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json', 'comps.json', 'engagement.json'
+      'listings.json', 'pipeline.json', 'activity.json', 'sales.json', 'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json', 'comps.json', 'engagement.json', 'offers.json'
     ], { cwd: DATA_DIR, encoding: 'utf8' }).trim();
     const realHashes = realHashesRaw ? realHashesRaw.split('\n') : [];
     let changelogData = null;

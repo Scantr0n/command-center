@@ -848,7 +848,7 @@ app.get('/api/csm/changelog-status', changelogStatusHandler('csm', ['prospects.j
 app.get('/api/cgt/changelog-status', changelogStatusHandler('cgt', ['cards.json', 'submissions.json', 'candidates.json']));
 app.get('/api/garage/changelog-status', changelogStatusHandler('garage', [
   'listings.json', 'pipeline.json', 'activity.json', 'sales.json',
-  'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json', 'comps.json', 'engagement.json'
+  'expenses.json', 'disputes.json', 'supplies.json', 'acquisitions.json', 'comps.json', 'engagement.json', 'offers.json'
 ]));
 app.get('/api/job-search/changelog-status', changelogStatusHandler('job-search', [
   'applications.json', 'criteria.json', 'next-up.json', 'digest-latest.json'

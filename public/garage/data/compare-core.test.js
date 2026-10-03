@@ -3,7 +3,7 @@
  * Regression tests for compare-core.js, the field-by-field diff behind the
  * page's "Compare with backup..." button. Covers: rejecting a file that
  * isn't a real Garage backup, added/removed/changed detection across all
- * eleven lists (pipeline stages keyed by stage name, everything else keyed
+ * twelve lists (pipeline stages keyed by stage name, everything else keyed
  * by id), the null-vs-omitted-field equality rule, and that an exact match
  * reports no differences.
  *
@@ -26,7 +26,8 @@ function backupFile(overrides) {
     suppliesJson: { supplies: [] },
     acquisitionsJson: { acquisitions: [] },
     compsJson: { comps: [] },
-    engagementJson: { snapshots: [] }
+    engagementJson: { snapshots: [] },
+    offersJson: { offers: [] }
   }, overrides);
 }
 
@@ -87,6 +88,12 @@ test('compareWithBackup rejects a file missing any of the ten expected *Json key
 test('compareWithBackup rejects a real pre-engagement backup missing only engagementJson, rather than silently skipping that list', () => {
   const file = backupFile();
   delete file.engagementJson;
+  assert.throws(() => compareWithBackup({}, file), /does not look like a Garage backup/);
+});
+
+test('compareWithBackup rejects a real pre-offers backup missing only offersJson, rather than silently skipping that list', () => {
+  const file = backupFile();
+  delete file.offersJson;
   assert.throws(() => compareWithBackup({}, file), /does not look like a Garage backup/);
 });
 
@@ -166,6 +173,22 @@ test('compareWithBackup detects a views/saves change on an existing engagement s
   assert.deepEqual(result.engagement.changed[0].fields, ['views']);
 });
 
+test('compareWithBackup detects a new offer logged since the backup', () => {
+  const current = { rawOffersData: { offers: [{ id: 'off1', listingId: 'x', platform: 'ebay', offerAmount: 60, response: 'pending' }] } };
+  const backup = backupFile({ offersJson: { offers: [] } });
+  const result = compareWithBackup(current, backup);
+  assert.equal(result.offers.added.length, 1);
+  assert.equal(result.offers.added[0].id, 'off1');
+});
+
+test('compareWithBackup detects an offer response change (e.g. pending to accepted)', () => {
+  const current = { rawOffersData: { offers: [{ id: 'off1', listingId: 'x', platform: 'ebay', offerAmount: 60, response: 'accepted' }] } };
+  const backup = backupFile({ offersJson: { offers: [{ id: 'off1', listingId: 'x', platform: 'ebay', offerAmount: 60, response: 'pending' }] } });
+  const result = compareWithBackup(current, backup);
+  assert.equal(result.offers.changed.length, 1);
+  assert.deepEqual(result.offers.changed[0].fields, ['response']);
+});
+
 test('compareWithBackup treats a missing key and an explicit null note as equal, not a false change', () => {
   const current = { rawSuppliesData: { supplies: [{ id: 'sup1', name: 'Poly mailers' }] } };
   const backup = backupFile({ suppliesJson: { supplies: [{ id: 'sup1', name: 'Poly mailers', notes: null }] } });
@@ -179,7 +202,7 @@ test('compareWithBackup finds no differences when current data exactly matches t
   const current = { rawListingsData: { listings }, rawCompsData: { comps } };
   const backup = backupFile({ listingsJson: { listings }, compsJson: { comps } });
   const result = compareWithBackup(current, backup);
-  const totalDiffs = ['listings', 'pipeline', 'postingLog', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement']
+  const totalDiffs = ['listings', 'pipeline', 'postingLog', 'activity', 'sales', 'expenses', 'disputes', 'supplies', 'acquisitions', 'comps', 'engagement', 'offers']
     .reduce((n, k) => n + result[k].added.length + result[k].removed.length + result[k].changed.length, 0);
   assert.equal(totalDiffs, 0);
 });

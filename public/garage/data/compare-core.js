@@ -3,21 +3,22 @@
  * previously downloaded "Download backup (.json)" file (see app.js's
  * backupBtn handler for the exact shape that button writes: { exportedAt,
  * source, listingsJson, pipelineJson, activityJson, salesJson, expensesJson,
- * disputesJson, suppliesJson, acquisitionsJson, compsJson, engagementJson }).
- * Every field here is hand-edited JSON, and until this there was no way to
- * tell what a hand-edit actually changed short of eyeballing two files side
- * by side. Same shared-core pattern, and the same field-by-field approach,
- * as CSM's own compareWithBackup (public/csm/data/csm-core.js) and
- * Sondrik's/CGT's (public/sondrik/data/compare-core.js,
- * public/cgt/data/compare-core.js), adapted to Garage's ten lists. Pipeline
- * stages are keyed by stage name (pipeline.json has no id field, one real
- * row per stage, see pipeline.json's own convention), every other list is
- * keyed by id. No Node-only APIs, so the exact same function runs in the
- * browser (app.js's Compare with backup modal) and this file's own test
- * suite. Pure and read-only: this only ever reads the two objects it is
- * given, it never writes anything back to listings.json/pipeline.json/
- * activity.json/sales.json/expenses.json/disputes.json/supplies.json/
- * acquisitions.json/comps.json/engagement.json themselves.
+ * disputesJson, suppliesJson, acquisitionsJson, compsJson, engagementJson,
+ * offersJson }). Every field here is hand-edited JSON, and until this there
+ * was no way to tell what a hand-edit actually changed short of eyeballing
+ * two files side by side. Same shared-core pattern, and the same
+ * field-by-field approach, as CSM's own compareWithBackup
+ * (public/csm/data/csm-core.js) and Sondrik's/CGT's
+ * (public/sondrik/data/compare-core.js, public/cgt/data/compare-core.js),
+ * adapted to Garage's eleven lists. Pipeline stages are keyed by stage name
+ * (pipeline.json has no id field, one real row per stage, see
+ * pipeline.json's own convention), every other list is keyed by id. No
+ * Node-only APIs, so the exact same function runs in the browser (app.js's
+ * Compare with backup modal) and this file's own test suite. Pure and
+ * read-only: this only ever reads the two objects it is given, it never
+ * writes anything back to listings.json/pipeline.json/activity.json/
+ * sales.json/expenses.json/disputes.json/supplies.json/acquisitions.json/
+ * comps.json/engagement.json/offers.json themselves.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -76,6 +77,7 @@
   const ACQUISITION_FIELDS = ['source', 'sourceName', 'date', 'pricePaid', 'itemCount', 'listingIds', 'notes'];
   const COMP_FIELDS = ['listingId', 'platform', 'title', 'soldPrice', 'soldDate', 'url', 'notes'];
   const ENGAGEMENT_FIELDS = ['listingId', 'platform', 'date', 'views', 'saves', 'notes'];
+  const OFFER_FIELDS = ['listingId', 'platform', 'date', 'offerAmount', 'askingPriceAtOffer', 'response', 'counterAmount', 'notes'];
 
   // current is the same { rawListingsData, rawPipelineData, rawActivityData,
   // rawSalesData, rawExpensesData, rawDisputesData, rawSuppliesData,
@@ -89,10 +91,10 @@
       !backupFile.listingsJson || !backupFile.pipelineJson || !backupFile.activityJson ||
       !backupFile.salesJson || !backupFile.expensesJson || !backupFile.disputesJson ||
       !backupFile.suppliesJson || !backupFile.acquisitionsJson || !backupFile.compsJson ||
-      !backupFile.engagementJson) {
+      !backupFile.engagementJson || !backupFile.offersJson) {
       throw new Error('That file does not look like a Garage backup (expected listingsJson/pipelineJson/' +
         'activityJson/salesJson/expensesJson/disputesJson/suppliesJson/acquisitionsJson/compsJson/' +
-        'engagementJson keys). Use a file downloaded from this page’s "Download backup (.json)" button.');
+        'engagementJson/offersJson keys). Use a file downloaded from this page’s "Download backup (.json)" button.');
     }
     const currentListings = (current.rawListingsData && current.rawListingsData.listings) || [];
     const backupListings = (backupFile.listingsJson && backupFile.listingsJson.listings) || [];
@@ -116,6 +118,8 @@
     const backupComps = (backupFile.compsJson && backupFile.compsJson.comps) || [];
     const currentEngagement = (current.rawEngagementData && current.rawEngagementData.snapshots) || [];
     const backupEngagement = (backupFile.engagementJson && backupFile.engagementJson.snapshots) || [];
+    const currentOffers = (current.rawOffersData && current.rawOffersData.offers) || [];
+    const backupOffers = (backupFile.offersJson && backupFile.offersJson.offers) || [];
 
     return {
       exportedAt: backupFile.exportedAt || null,
@@ -129,7 +133,8 @@
       supplies: diffByKey(currentSupplies, backupSupplies, s => s.id, SUPPLY_FIELDS),
       acquisitions: diffByKey(currentAcquisitions, backupAcquisitions, a => a.id, ACQUISITION_FIELDS),
       comps: diffByKey(currentComps, backupComps, c => c.id, COMP_FIELDS),
-      engagement: diffByKey(currentEngagement, backupEngagement, s => s.id, ENGAGEMENT_FIELDS)
+      engagement: diffByKey(currentEngagement, backupEngagement, s => s.id, ENGAGEMENT_FIELDS),
+      offers: diffByKey(currentOffers, backupOffers, o => o.id, OFFER_FIELDS)
     };
   }
 
