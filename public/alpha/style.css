@@ -620,9 +620,18 @@ header.page-head .sub {
   gap: 3px;
   flex-wrap: wrap;
 }
+/* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a real <button> (see
+   app.js's history-tick template, wired through wireTickTooltips) needs a
+   24x24 CSS px target. Height-only fix, same box-sizing:border-box pattern
+   as the already-fixed .card-move/.kanban-card-move: height here is a fixed
+   stylistic choice with no data behind it, so raising it is free. Width
+   stays 7px on purpose - up to HISTORY_TICK_LIMIT (60) of these render in
+   one row, and 24px each would blow the "see the whole recent history at a
+   glance" sparkline out past any reasonable panel width. */
 .history-tick {
   width: 7px;
-  height: 18px;
+  height: 24px;
+  box-sizing: border-box;
   border-radius: 2px;
   flex-shrink: 0;
   border: 1px solid var(--hairline);
@@ -695,9 +704,14 @@ header.page-head .sub {
   gap: 2px;
   flex-wrap: wrap;
 }
+/* WCAG 2.2 SC 2.5.8, same reasoning and same height-only fix as
+   .history-tick above: a real <button> per calendar day (dailyUptimeBarItem
+   in app.js), width kept at 5px so a long date range still fits as one
+   glanceable strip instead of wrapping into a wall of 24px blocks. */
 .daily-uptime-bar {
   width: 5px;
-  height: 20px;
+  height: 24px;
+  box-sizing: border-box;
   border-radius: 1px;
   flex-shrink: 0;
   border: 1px solid var(--hairline);
@@ -899,10 +913,17 @@ header.page-head .sub {
 .regime-dist-wrap {
   margin-bottom: 22px;
 }
+/* WCAG 2.2 SC 2.5.8: bar raised from 22px to 24px tall, same height-only
+   fix as .history-tick/.daily-uptime-bar above. Segment width stays
+   data-proportional (r.pct%, as low as the 2px min-width below) since width
+   here is the actual information being shown, not a layout choice; the
+   legend above restates every regime's exact share in permanent text
+   either way, so the segment itself is a convenience, not the only way to
+   read a given regime's share. */
 .regime-dist-bar {
   display: flex;
   width: 100%;
-  height: 22px;
+  height: 24px;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--hairline);
