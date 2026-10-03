@@ -670,7 +670,13 @@
   // USPS's own Sept 22, 2026 recommended last-acceptance dates for
   // delivery by Dec 25. The two regions genuinely differ on the
   // ground/first-class services, not the air ones (both land on the same
-  // Dec 18/19 Priority/Priority Express dates either way).
+  // Dec 18/19 Priority/Priority Express dates either way). Real USPS
+  // last-acceptance dates are only ever published for one season at a
+  // time (no 2027 schedule exists yet as of this writing), so this table
+  // has no year parameter, only this one real, dated season; see
+  // HOLIDAY_SHIP_BY_SEASON_YEAR and isHolidayShipBySeasonStale below for
+  // what flags it once a later season has started without a refresh.
+  const HOLIDAY_SHIP_BY_SEASON_YEAR = 2026;
   const HOLIDAY_SHIP_BY_DATES = {
     contiguous: [
       { service: 'USPS Ground Advantage', date: '2026-12-17' },
@@ -694,6 +700,23 @@
   // 'territories' covers Alaska/Hawaii/Puerto Rico/other US territories.
   // Each row's daysUntil is null only when the service/region pair isn't
   // real data (it always is here), negative once that date's passed.
+  // True once every row in HOLIDAY_SHIP_BY_DATES has not just passed, but
+  // passed because a whole later real calendar year has started with no
+  // refreshed table to replace it, the actual silent-failure mode a plain
+  // "every row passed" check can't tell apart from the first honest, non-
+  // stale case: the few weeks right after Dec 19, 2026 itself, still
+  // squarely inside the one real season this table covers. Without this,
+  // "all ship-by dates have passed" would render identically in late Dec
+  // 2026 (true and useful: this season's window just closed) and in, say,
+  // Nov 2027 (misleading: it reads as "nothing to worry about" when the
+  // real cause is just that nobody has published or transcribed a 2027
+  // schedule here yet).
+  function isHolidayShipBySeasonStale(todayStr) {
+    if (!todayStr) return false;
+    const year = Number(todayStr.slice(0, 4));
+    return Number.isInteger(year) && year > HOLIDAY_SHIP_BY_SEASON_YEAR;
+  }
+
   function holidayShipByStatus(todayStr, region) {
     const rows = HOLIDAY_SHIP_BY_DATES[region] || HOLIDAY_SHIP_BY_DATES.contiguous;
     return rows.map(row => {
@@ -958,7 +981,7 @@
     shipDeadline, isLateShipment, ebayLateShipmentRate, expectedBalanceDate,
     ebayTrsProgress, depopTopSellerProgress,
     USPS_PEAK_SURCHARGE_START, USPS_PEAK_SURCHARGE_END, uspsPeakSurchargeStatus,
-    HOLIDAY_SHIP_BY_DATES, holidayShipByStatus,
+    HOLIDAY_SHIP_BY_DATES, HOLIDAY_SHIP_BY_SEASON_YEAR, holidayShipByStatus, isHolidayShipBySeasonStale,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend,
     ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,

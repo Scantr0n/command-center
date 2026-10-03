@@ -31,7 +31,7 @@ const {
   daysToSell, avgDaysToSell, sellThroughRate,
   buildEngagementCheckFlags,
   USPS_PEAK_SURCHARGE_START, USPS_PEAK_SURCHARGE_END, uspsPeakSurchargeStatus,
-  HOLIDAY_SHIP_BY_DATES, holidayShipByStatus
+  HOLIDAY_SHIP_BY_DATES, HOLIDAY_SHIP_BY_SEASON_YEAR, holidayShipByStatus, isHolidayShipBySeasonStale
 } = require('./garage-core.js');
 
 test('estimateNetPayout: eBay charges the 13.6% standard rate + the $0.30/$0.40 per-order step for a non-shoes/unset category', () => {
@@ -961,6 +961,34 @@ test('holidayShipByStatus: a date already passed reads as passed with a negative
 test('holidayShipByStatus: an unknown region falls back to contiguous rather than throwing', () => {
   const rows = holidayShipByStatus('2026-12-10', 'nowhere');
   assert.deepEqual(rows, holidayShipByStatus('2026-12-10', 'contiguous'));
+});
+
+test('isHolidayShipBySeasonStale: false all through the real 2026 season, including right after every date has passed', () => {
+  assert.equal(isHolidayShipBySeasonStale('2026-09-22'), false);
+  assert.equal(isHolidayShipBySeasonStale('2026-12-10'), false);
+  // Every real row has already passed by here (see the "already passed"
+  // test above), but it's still the same 2026 season this table covers,
+  // the one honest non-stale case this function has to tell apart from a
+  // real later year with no refreshed table.
+  assert.equal(isHolidayShipBySeasonStale('2026-12-20'), false);
+  assert.equal(isHolidayShipBySeasonStale('2026-12-31'), false);
+});
+
+test('isHolidayShipBySeasonStale: true once a real later calendar year has started', () => {
+  assert.equal(isHolidayShipBySeasonStale('2027-01-01'), true);
+  assert.equal(isHolidayShipBySeasonStale('2027-11-01'), true);
+  assert.equal(isHolidayShipBySeasonStale('2030-06-15'), true);
+});
+
+test('isHolidayShipBySeasonStale: false with no real today to judge from', () => {
+  assert.equal(isHolidayShipBySeasonStale(null), false);
+  assert.equal(isHolidayShipBySeasonStale(undefined), false);
+  assert.equal(isHolidayShipBySeasonStale(''), false);
+});
+
+test('HOLIDAY_SHIP_BY_SEASON_YEAR matches the real year every HOLIDAY_SHIP_BY_DATES entry is dated to', () => {
+  const allDates = [...HOLIDAY_SHIP_BY_DATES.contiguous, ...HOLIDAY_SHIP_BY_DATES.territories].map(r => r.date.slice(0, 4));
+  assert.ok(allDates.every(y => Number(y) === HOLIDAY_SHIP_BY_SEASON_YEAR));
 });
 
 test('HOLIDAY_SHIP_BY_DATES: both regions land on the same Priority Mail / Priority Mail Express dates', () => {

@@ -126,7 +126,7 @@ const {
   isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace,
   expectedBalanceDate, avgDaysToSell, sellThroughRate,
   ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,
-  uspsPeakSurchargeStatus, holidayShipByStatus
+  uspsPeakSurchargeStatus, holidayShipByStatus, HOLIDAY_SHIP_BY_SEASON_YEAR, isHolidayShipBySeasonStale
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -639,7 +639,18 @@ function renderShippingPeakStatus() {
   if (shipByEl) {
     const rows = holidayShipByStatus(today, 'contiguous');
     const next = rows.find(r => !r.passed);
-    if (!next) {
+    if (!next && isHolidayShipBySeasonStale(today)) {
+      // Distinguishes "the one real season this table covers just closed"
+      // (the honest, non-stale case right after Dec 19, 2026) from "a whole
+      // later year has started and nobody has transcribed that season's
+      // real USPS dates here yet", which would otherwise render as the
+      // exact same "all passed" text forever, every year, with nothing
+      // ever flagging that the table itself needs a refresh.
+      shipByEl.textContent = 'These are the ' + HOLIDAY_SHIP_BY_SEASON_YEAR + ' holiday ship-by dates. A later ' +
+        'season has started and USPS\'s real current cutoff dates have not been added here yet -- check usps.com ' +
+        'before relying on this.';
+      shipByEl.className = 'reference-freshness-stale';
+    } else if (!next) {
       shipByEl.textContent = 'All contiguous-US holiday ship-by dates have passed.';
       shipByEl.className = 'cell-muted';
     } else {
