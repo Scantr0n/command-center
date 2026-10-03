@@ -3272,6 +3272,8 @@ function cardEditFormHtml(c) {
     ceInputInner('ceListedPrice', 'Listed price, USD (real current asking price)', c.listedPrice, 'number') +
     '</div>' +
     ceFieldRow('ceListingUrl', 'Listing URL (real live listing, optional)', c.listingUrl, 'url') +
+    ceSelectRow('cePriceCheckAcknowledged', 'Listing price check', c.priceCheckAcknowledged === true ? 'true' : 'false',
+      [['false', 'Not reviewed, flag if 50%+ off estimate'], ['true', 'Reviewed, the gap is intentional']]) +
     ceFieldRow('ceBacklogBatch', 'Backlog batch', c.backlogBatch) +
     ceFieldRow('ceNotes', 'Notes', c.notes, 'textarea') +
     '</div>' +
@@ -3599,6 +3601,7 @@ function wireCardEditForm(c) {
       listedDate: document.getElementById('ceListedDate').value || null,
       listedPrice: listedPriceRaw === '' ? null : Number(listedPriceRaw),
       listingUrl: ceVal('ceListingUrl'),
+      priceCheckAcknowledged: document.getElementById('cePriceCheckAcknowledged').value === 'true' ? true : null,
       backlogBatch: ceVal('ceBacklogBatch'),
       notes: ceVal('ceNotes')
     });
@@ -3797,7 +3800,14 @@ function openModal(id) {
         const ratio = activeCard.listedPrice / activeCard.estimatedValue;
         if (ratio >= CGTValidateCore.LISTING_PRICE_MISMATCH_RATIO_HIGH || ratio <= CGTValidateCore.LISTING_PRICE_MISMATCH_RATIO_LOW) {
           const pct = CGTValidateCore.listingPriceMismatchPct(ratio);
-          listedPriceDisplay += ' (' + pct + '% ' + (ratio >= CGTValidateCore.LISTING_PRICE_MISMATCH_RATIO_HIGH ? 'above' : 'below') + ' the researched estimate, worth a look)';
+          const direction = ratio >= CGTValidateCore.LISTING_PRICE_MISMATCH_RATIO_HIGH ? 'above' : 'below';
+          // priceCheckAcknowledged means this exact gap was already reviewed
+          // and confirmed intentional (see validate-core.js), so this note
+          // stays informational rather than repeating the same "worth a
+          // look" nudge Data Quality has already stopped flagging for it.
+          listedPriceDisplay += activeCard.priceCheckAcknowledged === true
+            ? ' (' + pct + '% ' + direction + ' the researched estimate, confirmed intentional)'
+            : ' (' + pct + '% ' + direction + ' the researched estimate, worth a look)';
         }
       }
       body += field('Listed price', listedPriceDisplay, activeCard.listedPrice == null);
@@ -4319,6 +4329,7 @@ const CSV_COLUMNS = [
   [c => !isSold(c) && isListed(c) ? c.listedDate : null, 'Listed date'],
   [c => !isSold(c) && isListed(c) ? c.listedPrice : null, 'Listed price'],
   [c => !isSold(c) && isListed(c) ? c.listingUrl : null, 'Listing URL'],
+  [c => !isSold(c) && isListed(c) ? (c.priceCheckAcknowledged === true ? 'yes' : '') : '', 'Listing price gap confirmed intentional'],
   // Realized once a card is sold (soldPrice vs costBasis), unrealized otherwise
   // (estimatedValue vs costBasis), same branch the detail modal already uses;
   // the label column says which one a given row is so the two never get
@@ -4831,6 +4842,7 @@ function initQuickLogTool() {
         return raw === '' ? null : Number(raw);
       })(),
       listingUrl: document.getElementById('ncListingUrl').value.trim() || null,
+      priceCheckAcknowledged: null,
       backlogBatch: document.getElementById('ncBacklogBatch').value.trim() || null,
       priceHistory: [],
       notes: document.getElementById('ncNotes').value.trim() || null

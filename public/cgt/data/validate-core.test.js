@@ -324,6 +324,46 @@ test('findListingPriceMismatches does not flag a listing that is only modestly a
   assert.deepEqual(findListingPriceMismatches(cards), []);
 });
 
+test('findListingPriceMismatches does not flag a card marked priceCheckAcknowledged', () => {
+  const cards = [
+    { id: 'a', cardName: 'X', estimatedValue: 2, listedPrice: 20, listedDate: '2026-07-13', priceCheckAcknowledged: true }
+  ];
+  assert.deepEqual(findListingPriceMismatches(cards), []);
+});
+
+test('findListingPriceMismatches still flags a different card with the same gap and no acknowledgment', () => {
+  const cards = [
+    { id: 'a', cardName: 'X', estimatedValue: 2, listedPrice: 20, listedDate: '2026-07-13', priceCheckAcknowledged: true },
+    { id: 'b', cardName: 'Y', estimatedValue: 55, listedPrice: 100, listedDate: '2026-07-13' }
+  ];
+  const flags = findListingPriceMismatches(cards);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].card.id, 'b');
+});
+
+test('validateCards rejects a non-boolean priceCheckAcknowledged', () => {
+  const { errors } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', priceCheckAcknowledged: 'yes'
+  }]);
+  assert.ok(errors.some(e => e.includes('priceCheckAcknowledged')));
+});
+
+test('validateCards warns on priceCheckAcknowledged true with no real listing/estimate to acknowledge', () => {
+  const { warnings } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', priceCheckAcknowledged: true
+  }]);
+  assert.ok(warnings.some(w => w.includes('priceCheckAcknowledged')));
+});
+
+test('validateCards passes priceCheckAcknowledged true paired with a real listedPrice/estimatedValue gap', () => {
+  const { errors, warnings } = validateCards([{
+    id: 'a', cardName: 'X', sport: 'hockey', estimatedValue: 2, valuationBasis: 'comp-estimate', compNote: 'book value',
+    listedDate: '2026-07-13', listedPrice: 20, priceCheckAcknowledged: true
+  }]);
+  assert.deepEqual(errors, []);
+  assert.ok(!warnings.some(w => w.includes('priceCheckAcknowledged')));
+});
+
 test('listingPriceMismatchPct and the exported thresholds match what findListingPriceMismatches itself flags', () => {
   // The card detail modal (app.js) shows this exact "listed X% above/below
   // estimate" note on its own Listed price field, imported from here rather

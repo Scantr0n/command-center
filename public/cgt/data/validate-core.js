@@ -401,6 +401,25 @@
           errors.push(where + ': has a "listingUrl" but no "listedPrice". A listing link only applies to a card that is actually listed.');
         }
       }
+      // Lets a real, reviewed-and-confirmed-intentional gap between
+      // listedPrice and estimatedValue (see the Neal Broten Rookie card: a
+      // $20 ask against a $2 book value Jack explicitly confirmed as the
+      // real asking price, not a stale estimate or a forgotten re-list) stop
+      // re-flagging under "Listing price check" every single time without
+      // silencing the check for every other card, which would defeat the
+      // whole point of a check meant to catch a genuine mistake. Only
+      // meaningful on a card the check would actually flag in the first
+      // place, same "needs the thing it modifies" rule as listingUrl above:
+      // true on a card with no mismatch, or no listing at all, has nothing
+      // real to acknowledge.
+      if (c.priceCheckAcknowledged !== null && c.priceCheckAcknowledged !== undefined) {
+        if (typeof c.priceCheckAcknowledged !== 'boolean') {
+          errors.push(where + ': "priceCheckAcknowledged" must be true, false, or null');
+        } else if (c.priceCheckAcknowledged && (c.listedPrice == null || c.estimatedValue == null)) {
+          warnings.push(where + ': "priceCheckAcknowledged" is true but this card has no listedPrice/estimatedValue ' +
+            'pair for a mismatch to acknowledge in the first place. Probably a leftover from an old listing.');
+        }
+      }
       // A sold card that still carries listing fields reads as both sold and
       // for sale at once, almost always because the listing was never
       // cleared once the sale went through rather than a real double state.
@@ -585,6 +604,7 @@
     (cards || []).forEach(c => {
       if (c.listedPrice == null || c.estimatedValue == null || c.estimatedValue <= 0) return;
       if (c.soldPrice != null && c.soldDate != null) return;
+      if (c.priceCheckAcknowledged === true) return;
       const ratio = c.listedPrice / c.estimatedValue;
       if (ratio >= LISTING_PRICE_MISMATCH_RATIO_HIGH) flags.push({ card: c, ratio, direction: 'above' });
       else if (ratio <= LISTING_PRICE_MISMATCH_RATIO_LOW) flags.push({ card: c, ratio, direction: 'below' });
