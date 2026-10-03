@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-09-30T20:19:20.737Z",
+  "generatedAt": "2026-10-03T00:18:32.190Z",
   "generatedFrom": "git log over public/sondrik/data/{releases.json,downloads.json,leads.json,channels.json,goals.json}, run node public/sondrik/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "5a2b137",
+      "fullHash": "5a2b1375c40cdcfbe896d13cf6fe8988490f86c9",
+      "date": "2026-10-02",
+      "author": "Claude",
+      "subject": "Sondrik: point Product Hunt's channel note at its own researched norms",
+      "historyReset": false,
+      "files": [
+        "channels.json"
+      ]
+    },
     {
       "hash": "e93f01c",
       "fullHash": "e93f01c18a22969e1015c18eeb95106c879f4722",
