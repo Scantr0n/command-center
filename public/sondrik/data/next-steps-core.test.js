@@ -98,6 +98,30 @@ test('flags multiple undated releases by count', () => {
   assert.ok(infoTexts(steps).some(t => t.startsWith('Log the ship date for 2 releases')));
 });
 
+test('flags a single unsummarized release by version, non-urgent', () => {
+  const steps = computeNextSteps(
+    { releasesData: { releases: [{ version: '0.3.7', date: TODAY }] } },
+    baseDeps()
+  );
+  assert.ok(infoTexts(steps).some(t => t.includes('v0.3.7') && t.includes('no summary is on record')));
+});
+
+test('flags multiple unsummarized releases by count', () => {
+  const steps = computeNextSteps(
+    { releasesData: { releases: [{ version: '0.3.7', date: TODAY }, { version: '0.3.8', date: TODAY }] } },
+    baseDeps()
+  );
+  assert.ok(infoTexts(steps).some(t => t.startsWith('Log a summary for 2 releases')));
+});
+
+test('does not flag a release that already has a summary', () => {
+  const steps = computeNextSteps(
+    { releasesData: { releases: [{ version: '0.3.7', date: TODAY, summary: 'Fixed a real bug.' }] } },
+    baseDeps()
+  );
+  assert.ok(!infoTexts(steps).some(t => t.includes('no summary is on record')));
+});
+
 test('flags a bugfix release past its check-in window as urgent', () => {
   // v0.3.7 shipped 2026-09-07, 17 real days before TODAY: past both the
   // 7-day and 14-day checkpoints (real bugfixCheckinStatus tier "missed").

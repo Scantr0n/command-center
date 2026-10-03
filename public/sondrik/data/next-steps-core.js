@@ -66,6 +66,22 @@
       });
     }
 
+    // Same "validate.js already warns on this, but only from the command
+    // line" gap undatedReleases above closes for a missing date: a release
+    // with no summary renders blank on the Latest release card with nothing
+    // on the page pointing Jack at the fix, same as every other field-level
+    // validate.js warning this function already mirrors onto Next Steps.
+    const unsummarizedReleases = releases.filter(r => !r.summary);
+    if (unsummarizedReleases.length > 0) {
+      steps.push({
+        urgent: false,
+        text: 'Log a summary for ' +
+          (unsummarizedReleases.length === 1 ? 'v' + unsummarizedReleases[0].version : unsummarizedReleases.length + ' releases') +
+          ', no summary is on record.',
+        href: '#releaseSection'
+      });
+    }
+
     const datedReleases = releases.filter(r => r.date).slice().sort((a, b) => b.date.localeCompare(a.date));
     if (datedReleases.length > 0) {
       const checkinStatus = bugfixCheckinStatus(datedReleases[0], todayIsoStr, fmtDate);
