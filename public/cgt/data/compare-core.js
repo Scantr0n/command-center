@@ -59,7 +59,7 @@
   ];
   const SUBMISSION_FIELDS = [
     'gradingCompany', 'serviceLevel', 'description', 'cardCount', 'submittedDate',
-    'trackingNumber', 'status', 'returnedDate', 'cost', 'notes'
+    'trackingNumber', 'status', 'returnTrackingNumber', 'returnedDate', 'cost', 'notes'
   ];
   const CANDIDATE_FIELDS = [
     'cardName', 'year', 'sport', 'rawValue', 'rawValueBasis', 'rawValueNote',

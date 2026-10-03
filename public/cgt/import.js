@@ -92,6 +92,7 @@ const DATASETS = {
       { key: 'submittedDate', label: 'Submitted date', aliases: ['submitteddate', 'submitted', 'dateshipped', 'shippeddate', 'date'] },
       { key: 'trackingNumber', label: 'Tracking number', aliases: ['trackingnumber', 'tracking', 'trackingno'] },
       { key: 'status', label: 'Status', aliases: ['status'], type: 'lower' },
+      { key: 'returnTrackingNumber', label: 'Return tracking number', aliases: ['returntrackingnumber', 'returntracking', 'returntrackingno'] },
       { key: 'returnedDate', label: 'Returned date', aliases: ['returneddate', 'returned', 'datereturned'] },
       { key: 'cost', label: 'Cost (grading fee)', aliases: ['cost', 'fee', 'price', 'totalcost'], type: 'number' },
       { key: 'notes', label: 'Notes', aliases: ['notes', 'note'] }

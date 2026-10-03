@@ -506,6 +506,28 @@ test('validateSubmissions requires returnedDate once status is returned', () => 
   assert.ok(warnings.some(w => w.includes('returnedDate')));
 });
 
+test('validateSubmissions nudges for a missing returnTrackingNumber once shipped-back or returned, not before', () => {
+  const shippedBack = validateSubmissions([
+    { id: 'a', description: 'test batch', gradingCompany: 'PSA', status: 'shipped-back', returnTrackingNumber: null }
+  ]);
+  assert.ok(shippedBack.warnings.some(w => w.includes('returnTrackingNumber')));
+
+  const returned = validateSubmissions([
+    { id: 'b', description: 'test batch', gradingCompany: 'PSA', status: 'returned', returnedDate: '2026-08-01', returnTrackingNumber: null }
+  ]);
+  assert.ok(returned.warnings.some(w => w.includes('returnTrackingNumber')));
+
+  const inQueue = validateSubmissions([
+    { id: 'c', description: 'test batch', gradingCompany: 'PSA', status: 'in-queue', returnTrackingNumber: null }
+  ]);
+  assert.ok(!inQueue.warnings.some(w => w.includes('returnTrackingNumber')));
+
+  const backfilled = validateSubmissions([
+    { id: 'd', description: 'test batch', gradingCompany: 'PSA', status: 'shipped-back', returnTrackingNumber: '1Z999AA10123456784' }
+  ]);
+  assert.ok(!backfilled.warnings.some(w => w.includes('returnTrackingNumber')));
+});
+
 test('validateSubmissions warns when cost/cardCount works out to an implausible per-card price', () => {
   const tooLow = validateSubmissions([
     { id: 'a', description: 'test batch', gradingCompany: 'PSA', status: 'in-queue', cardCount: 10, cost: 50 }

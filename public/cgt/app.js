@@ -1770,6 +1770,15 @@ function openSubmissionModal(id) {
   for (const link of shippingCarrierLinks(s.trackingNumber)) {
     body += `<div class="field-row"><a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(link.text)} &rarr;</a></div>`;
   }
+  // Only shown once the batch is actually on its way back -- before that,
+  // a "return tracking number" field would just be an empty row with
+  // nothing real to say, same reasoning as every other optional field here.
+  if (s.status === 'shipped-back' || s.status === 'returned') {
+    body += field('Return tracking number', s.returnTrackingNumber, !s.returnTrackingNumber);
+    for (const link of shippingCarrierLinks(s.returnTrackingNumber)) {
+      body += `<div class="field-row"><a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="cert-link font-mono">${escapeHtml(link.text)} &rarr;</a></div>`;
+    }
+  }
   body += field('Returned date', s.returnedDate, !s.returnedDate);
   body += field('Cost (grading fee)', s.cost != null ? formatUsd(s.cost) : null, s.cost == null);
   body += field('Cost per card', costPerCard(s) != null ? formatUsd(costPerCard(s)) : null, costPerCard(s) == null);
@@ -3454,6 +3463,9 @@ function submissionEditFormHtml(s) {
     ceSelectRow('sceStatus', 'Status', s.status, [['submitted', 'Submitted'], ['in-queue', 'In queue'], ['grading', 'Grading'], ['shipped-back', 'Shipped back'], ['returned', 'Returned']]) +
     ceInputInner('sceReturnedDate', 'Returned date (required once status is Returned)', s.returnedDate, 'date') +
     '</div>' +
+    '<div class="form-row-split">' +
+    ceInputInner('sceReturnTrackingNumber', 'Return tracking number (usually only known once shipped back)', s.returnTrackingNumber) +
+    '</div>' +
     ceFieldRow('sceNotes', 'Notes', s.notes, 'textarea') +
     '</div>' +
     '<button type="button" id="sceGenerateBtn" class="print-btn font-mono np-generate-btn">Generate updated JSON</button>' +
@@ -3488,6 +3500,7 @@ function wireSubmissionEditForm(s) {
       submittedDate: document.getElementById('sceSubmittedDate').value || null,
       trackingNumber: ceVal('sceTrackingNumber'),
       status: document.getElementById('sceStatus').value || null,
+      returnTrackingNumber: ceVal('sceReturnTrackingNumber'),
       returnedDate: document.getElementById('sceReturnedDate').value || null,
       cost: costRaw === '' ? null : Number(costRaw),
       notes: ceVal('sceNotes')
@@ -4561,7 +4574,8 @@ const SUBMISSIONS_CSV_COLUMNS = [
   [s => s.serviceLevel, 'Service level'],
   [s => (SUBMISSION_STATUS_META[s.status] || {}).label || s.status, 'Status'],
   [s => s.cardCount, 'Card count'], [s => s.submittedDate, 'Submitted date'],
-  [s => s.trackingNumber, 'Tracking number'], [s => s.returnedDate, 'Returned date'],
+  [s => s.trackingNumber, 'Tracking number'], [s => s.returnTrackingNumber, 'Return tracking number'],
+  [s => s.returnedDate, 'Returned date'],
   [s => s.status !== 'returned' ? daysSince(s.submittedDate) : null, 'Days in queue'],
   [s => computeTurnaroundDays(s), 'Actual turnaround (days)'],
   [s => s.cost, 'Cost'], [s => costPerCard(s), 'Cost per card'], [s => s.notes, 'Notes']
@@ -4902,6 +4916,7 @@ function initSubmissionQuickLogTool() {
       submittedDate: document.getElementById('nsSubmittedDate').value || null,
       trackingNumber: document.getElementById('nsTrackingNumber').value.trim() || null,
       status: document.getElementById('nsStatus').value || null,
+      returnTrackingNumber: document.getElementById('nsReturnTrackingNumber').value.trim() || null,
       returnedDate: document.getElementById('nsReturnedDate').value || null,
       cost: costRaw === '' ? null : Number(costRaw),
       notes: document.getElementById('nsNotes').value.trim() || null

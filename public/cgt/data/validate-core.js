@@ -751,6 +751,14 @@
         warnings.push(where + ': has no "submittedDate", so days-in-queue can\'t be shown for it.');
       }
 
+      // The box physically changes hands at "shipped-back", so that's the
+      // real point a return tracking number should exist, same window
+      // the outbound "trackingNumber" is for before that -- a real, separate
+      // shipment, not a leftover copy of the outbound number.
+      if ((s.status === 'shipped-back' || s.status === 'returned') && !s.returnTrackingNumber) {
+        warnings.push(where + ': status is "' + s.status + '" but "returnTrackingNumber" is empty. Backfill when known.');
+      }
+
       emDashFields(s, ['description']).forEach(f =>
         warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
     });

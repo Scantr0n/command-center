@@ -9,6 +9,7 @@
       "submittedDate": "2026-07-01",
       "trackingNumber": null,
       "status": "in-queue",
+      "returnTrackingNumber": null,
       "returnedDate": null,
       "cost": 45,
       "notes": "Placeholder only, exists to verify the submissions list, days-in-queue calc, and grading-fee stat render correctly. Not a real submission. Delete this row once real submission data is logged."
