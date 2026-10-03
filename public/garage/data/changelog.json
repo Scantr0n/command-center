@@ -1,7 +1,29 @@
 {
-  "generatedAt": "2026-09-29T02:55:02.061Z",
+  "generatedAt": "2026-10-03T02:51:42.213Z",
   "generatedFrom": "git log over public/garage/data/{listings.json,pipeline.json,activity.json,sales.json,expenses.json,disputes.json,supplies.json,acquisitions.json,comps.json,engagement.json}, run node public/garage/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "6e7ec4a",
+      "fullHash": "6e7ec4ae280650003ee97ac808a97bbf0842b71d",
+      "date": "2026-09-30",
+      "author": "Claude",
+      "subject": "Garage: track real posting days, actual vs planned pace for the 48-draft backlog",
+      "historyReset": false,
+      "files": [
+        "pipeline.json"
+      ]
+    },
+    {
+      "hash": "1022683",
+      "fullHash": "1022683502951acc6435ee51e9897c24f105decc",
+      "date": "2026-09-30",
+      "author": "Claude",
+      "subject": "Garage: track per-listing eBay handling time, judge the real late-shipment-rate requirement pass/fail",
+      "historyReset": false,
+      "files": [
+        "listings.json"
+      ]
+    },
     {
       "hash": "b554aca",
       "fullHash": "b554aca244cbe30c733c958262e37b3b65f7c8b1",
