@@ -31,15 +31,43 @@ const app = express();
 // dashboard from being framed by another site for clickjacking, and the
 // referrer policy keeps full URLs, which can carry a cluster id or query
 // string, from leaking to an external site's server logs on outbound links).
-// No Content-Security-Policy here: every hub inlines scripts and pulls
-// Google Fonts plus the D3 CDN, so a real CSP needs to be worked out against
-// every page's actual sources rather than guessed at and risking a silent
-// breakage across all 7 hubs.
+// A Content-Security-Policy used to be skipped here on the grounds that
+// every hub pulled Google Fonts and the D3 CDN, which would have needed
+// real cross-origin allowances to not silently break. That's no longer true
+// (see "Cache vendor fonts/D3 bundle" in git history): fonts.css, the D3
+// bundle, and every hub's own script/style are all same-origin now, and a
+// repo-wide grep found zero remaining <script src="http...">, external
+// stylesheet, external fetch(), <iframe>, or inline event-handler attribute
+// (onclick=, etc., all wired via addEventListener instead), so script-src/
+// style-src only need to cover this app's own inline <script>/<style>
+// blocks and connect-src only ever needs 'self' (every client-side fetch
+// here is relative; the Anthropic calls are proxied through this server's
+// own /api routes, never called from the browser directly).
+// img-src stays deliberately wide open (data:/blob: for the Garage photo
+// drafter's canvas/object-URL previews, plus any https: host) because CGT's
+// real imageUrl field is a free-text field for wherever Jack actually hosts
+// a card photo (validate-core.js deliberately never restricts it to a
+// domain allowlist) - locking that down would silently blank out a real
+// photo the moment he fills one in, the exact class of silent breakage this
+// header used to be skipped over entirely to avoid.
 app.disable('x-powered-by');
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'"
+].join('; ');
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', CSP);
   next();
 });
 // Every hub's app.js/style.css is hand-written, uncompressed text (up to
