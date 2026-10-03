@@ -4102,13 +4102,37 @@ window.addEventListener('online', () => {
 // doesn't wait for a later 'offline' event that will never fire.
 updateOfflineBanner();
 
+// A phone on a metered connection with the browser's own Data Saver mode on
+// (navigator.connection.saveData, Network Information API) is telling every
+// site to go easy on background traffic; a 30s poll of /api/clusters
+// (~12KB/request, so roughly 1.4MB/hour left running) ignored that signal
+// entirely. Backing off to every 2 minutes while it's on is the same real
+// pattern Alpha's own status.json poll already uses, not a change to what's
+// fetched, just how often, and it reverts the instant saveData reads false
+// again (laptop, wifi, Data Saver turned back off).
+const CLUSTERS_REFRESH_INTERVAL_MS = 30000;
+const CLUSTERS_SAVE_DATA_REFRESH_INTERVAL_MS = 120000;
+function isDataSaverOn() {
+  return !!(navigator.connection && navigator.connection.saveData);
+}
+function currentClustersRefreshIntervalMs() {
+  return isDataSaverOn() ? CLUSTERS_SAVE_DATA_REFRESH_INTERVAL_MS : CLUSTERS_REFRESH_INTERVAL_MS;
+}
+
 loadClusters();
 let lastLoadAt = Date.now();
-setInterval(() => {
-  if (document.hidden) return;
-  lastLoadAt = Date.now();
-  loadClusters();
-}, 30000);
+// setTimeout, not setInterval, so each cycle re-reads currentClustersRefreshIntervalMs()
+// rather than locking in whichever cadence was true when the page first loaded.
+function scheduleClustersRefresh() {
+  setTimeout(() => {
+    if (!document.hidden) {
+      lastLoadAt = Date.now();
+      loadClusters();
+    }
+    scheduleClustersRefresh();
+  }, currentClustersRefreshIntervalMs());
+}
+scheduleClustersRefresh();
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - lastLoadAt > 5000) {
     lastLoadAt = Date.now();
