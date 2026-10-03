@@ -814,12 +814,23 @@ app.get('/api/alpha/live', async (req, res) => {
 // built from either one spawns a real subprocess per request (git here, a
 // whole second Node process running validate.js there), the most expensive
 // work in this file, run on six hubs apiece with no limiter at all. Each
-// hub's own page only ever calls its own one changelog-status and
-// one data-quality route once per page load (loadChangelog/loadDataQuality,
-// never on a poll), so one shared, generous budget across all twelve routes
-// comfortably covers a real user loading several hubs back to back while
-// still bounding a loop that would otherwise fork a new process per request.
-const STATUS_CHECK_RATE_LIMIT = 20;
+// hub's own page only ever calls its own one changelog-status and one
+// data-quality route once per page load (loadChangelog/loadDataQuality,
+// never on a poll), but the main dashboard's own renderDataQuality() (see
+// public/index.html's DATA_QUALITY_HUBS) fires all six hubs' data-quality
+// route in parallel on every single load of "/" to build its cross-hub
+// badge, burning 6 of the budget before a real user has clicked into a
+// single hub. 20 was sized only for the per-hub-page call pattern the
+// comment above describes and didn't get revisited when that dashboard-wide
+// fetch was added: a real session of loading the dashboard once and reading
+// through all six hubs is 6 (dashboard) + 6*2 (each hub's own two calls) =
+// 18, already brushing the old ceiling, and a second dashboard reload or
+// revisiting a hub tips it into real, user-visible 429s and a Data Quality
+// badge that silently stops updating. 60 (matching every other per-page-load
+// limiter in this file: CLUSTERS_RATE_LIMIT, SEARCH_RATE_LIMIT,
+// ALPHA_LIVE_RATE_LIMIT) comfortably covers that same real browsing pattern
+// several times over while still bounding a real abuse loop.
+const STATUS_CHECK_RATE_LIMIT = 60;
 const STATUS_CHECK_RATE_WINDOW_MS = 60 * 1000;
 const isStatusCheckRateLimited = createRateLimiter(STATUS_CHECK_RATE_LIMIT, STATUS_CHECK_RATE_WINDOW_MS);
 
