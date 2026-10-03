@@ -415,9 +415,31 @@ const ESTIMATED_TAX_DUE_DATES = [
   { period: 'Jun 1 - Aug 31, 2026', due: '2026-09-15' },
   { period: 'Sep 1 - Dec 31, 2026', due: '2027-01-15' }
 ];
+// The one real tax year every quarter above actually covers, parsed off the
+// table's own first entry rather than a second hand-typed literal, so the
+// two can never drift apart. Once every row above has passed, the
+// due-soon/attention-bar logic below used to go silent forever (zero due
+// soon, nothing flagged), reading as "nothing to do" in every year after
+// 2026 instead of "this table was never extended past 2026", the same real
+// failure mode HOLIDAY_SHIP_BY_DATES had in garage-core.js before
+// isHolidayShipBySeasonStale. isEstimatedTaxTableStale below is the same
+// fix applied here.
+const ESTIMATED_TAX_TABLE_YEAR = Number(ESTIMATED_TAX_DUE_DATES[0].due.slice(0, 4));
 const ESTIMATED_TAX_REVIEWED_ON = '2026-10-01';
 const ESTIMATED_TAX_STALE_AFTER_DAYS = 45;
 const ESTIMATED_TAX_DUE_SOON_DAYS = 14;
+
+// True once a real later calendar year has started with no quarters added
+// for it, same "which real season is this" distinction as
+// isHolidayShipBySeasonStale: the table stays non-stale through the real
+// Jan 15, 2027 due date for the last 2026 quarter (that's still honest,
+// correctly-tracked coverage, not staleness), only flipping once the
+// calendar has actually moved into a year this table has no quarters for.
+function isEstimatedTaxTableStale(todayStr) {
+  if (!todayStr) return false;
+  const year = Number(todayStr.slice(0, 4));
+  return Number.isInteger(year) && year > ESTIMATED_TAX_TABLE_YEAR;
+}
 
 function renderEstimatedTaxFreshness() {
   const el = document.getElementById('estimatedTaxFreshness');
@@ -1880,6 +1902,11 @@ function renderAttentionBar() {
     const days = daysUntil(q.due, today);
     return days != null && days >= 0 && days <= ESTIMATED_TAX_DUE_SOON_DAYS;
   }).length;
+  // Without this, taxDueSoonCount above silently goes to 0 forever once a
+  // later real year starts with no new quarters added (see
+  // isEstimatedTaxTableStale's own comment), and nothing would ever surface
+  // that up top, only the note buried inside the tax tracker section itself.
+  const estimatedTaxTableStale = isEstimatedTaxTableStale(today);
   // Same up-top surfacing as the tax due date above, for the other real,
   // dated deadline on this page a long scroll could otherwise bury: the
   // USPS peak-season surcharge (only worth a flag once it's imminent or
@@ -1940,6 +1967,14 @@ function renderAttentionBar() {
   }
   if (taxDueSoonCount) {
     items.push({ n: taxDueSoonCount, tone: 'warn', target: 'estimatedTaxSection', label: taxDueSoonCount === 1 ? 'quarterly estimated tax payment is due soon' : 'quarterly estimated tax payments are due soon' });
+  }
+  if (estimatedTaxTableStale) {
+    items.push({
+      n: 1,
+      tone: 'warn',
+      target: 'estimatedTaxSection',
+      label: 'estimated tax due dates are only logged through ' + ESTIMATED_TAX_TABLE_YEAR + ', add the current year\'s real quarters'
+    });
   }
   if (peakSurchargeDueSoon) {
     items.push({
@@ -3675,7 +3710,13 @@ function renderEstimatedTaxTracker(sales, expenses) {
   const note = document.getElementById('estimatedTaxNote');
   const yearEl = document.getElementById('estimatedTaxYear');
   if (!body) return;
-  const year = new Date().getFullYear();
+  // The real year these quarters cover, not new Date().getFullYear(): once
+  // a later real year starts with no new quarters added, showing the real
+  // current year here while every row below is still dated to
+  // ESTIMATED_TAX_TABLE_YEAR would be its own small, separate mislabeling
+  // bug, even with the stale-table note elsewhere on the page catching the
+  // bigger issue.
+  const year = ESTIMATED_TAX_TABLE_YEAR;
   if (yearEl) yearEl.textContent = String(year);
   const today = todayDateStr();
 
@@ -3704,9 +3745,12 @@ function renderEstimatedTaxTracker(sales, expenses) {
     </tr>`;
   }).join('');
 
-  const year2026NetProfit = computeYtdNetProfit(sales, expenses, 2026).netProfit;
+  const tableYearNetProfit = computeYtdNetProfit(sales, expenses, year).netProfit;
   note.hidden = false;
-  note.textContent = `This dashboard's own logged net profit for 2026 (Net profit / Schedule C snapshot above) is ${formatUsd(year2026NetProfit)}. Whether an estimated payment is actually owed depends on your full tax picture, not just that figure, this note does not decide that for you.`;
+  note.textContent = `This dashboard's own logged net profit for ${year} (Net profit / Schedule C snapshot above) is ${formatUsd(tableYearNetProfit)}. Whether an estimated payment is actually owed depends on your full tax picture, not just that figure, this note does not decide that for you.`;
+  if (isEstimatedTaxTableStale(today)) {
+    note.textContent += ` These due dates are for ${year}, a later year has started and its real quarterly due dates have not been added here yet, check irs.gov/forms-pubs/about-form-1040-es for the current schedule before relying on this.`;
+  }
 }
 
 function renderDisputes(disputes, currentListings) {
