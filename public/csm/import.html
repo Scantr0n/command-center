@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#08090A">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Import CSV / CSM Pipeline</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/vendor/fonts/fonts.css">
+<link rel="stylesheet" href="/csm/style.css">
+</head>
+<body>
+<nav aria-label="Skip navigation"><a href="#mainContent" class="skip-link font-mono">Skip to main content</a></nav>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="font-display">IMPORT CSV</h1>
+      <p class="sub font-mono">Turn a research-spreadsheet CSV export into real rows for prospects.json</p>
+    </div>
+    <div class="page-head-actions">
+      <a href="/csm/" class="back-link">&larr; CSM Pipeline</a>
+    </div>
+  </header>
+
+  <main id="mainContent" tabindex="-1">
+  <div class="callout">
+    <strong>This page does not save anything by itself.</strong> Command Center's dashboards are static files
+    with no database, so there is nothing here for this tool to write to directly. It parses a CSV, lets you map
+    its columns to the real prospect schema, runs the exact same checks as
+    <code class="inline-code">node public/csm/data/validate.js</code>, and then gives you a JSON file to download
+    and use to replace <code class="inline-code">public/csm/data/prospects.json</code> by hand. Nothing is
+    invented: a blank cell stays <code class="inline-code">null</code>, never a guess, and every imported row
+    starts at the <code class="inline-code">researched</code> stage unless its own stage column says otherwise.
+  </div>
+
+  <div class="callout callout-warn">
+    <strong>This never sends anything.</strong> Importing a batch only ever adds rows at the
+    <code class="inline-code">researched</code> (or whatever real stage you log) part of the pipeline. There is no
+    button anywhere on this page, or the board it feeds, that contacts a real person. A human still has to
+    actually reach out and then log that touch for real afterward.
+  </div>
+
+  <section class="import-step" id="stepLoadStatus">
+    <h2 class="section-title">1. Existing data</h2>
+    <p class="import-status-line font-mono" id="existingStatus" role="status" aria-live="polite">Checking&hellip;</p>
+  </section>
+
+  <section class="import-step">
+    <h2 class="section-title">2. Paste or choose a CSV file</h2>
+    <p class="import-help">The first row must be a header row. Column names don't need to match the schema
+      exactly, the next step lets you map each one, and any column you don't map is ignored. One row per
+      prospect. There is no column for <code class="inline-code">stageHistory</code>, <code class="inline-code">outreachLog</code>,
+      or <code class="inline-code">contentIdeas</code>; those are real, dated activity logs that only start once a
+      prospect is actually in the pipeline, log them from the board itself as they really happen.</p>
+    <div class="import-input-row">
+      <label class="sr-only" for="csvFile">Choose CSV file</label>
+      <input type="file" id="csvFile" accept=".csv,text/csv" class="import-file-input font-mono">
+      <button type="button" id="downloadTemplateBtn" class="print-btn font-mono">Download blank template CSV</button>
+    </div>
+    <label class="sr-only" for="csvPaste">Paste CSV text</label>
+    <textarea id="csvPaste" class="import-textarea font-mono" rows="6" placeholder="Or paste CSV text here"></textarea>
+    <button type="button" id="parseBtn" class="print-btn font-mono import-primary-btn">Parse CSV</button>
+    <p class="import-error" id="parseError" hidden role="alert"></p>
+  </section>
+
+  <section class="import-step" id="mappingStep" hidden>
+    <h2 class="section-title">3. Map columns</h2>
+    <p class="import-help">Guessed automatically from the header names where possible. Check each one, especially
+      <strong>contact channel type</strong>: whether this is a named decision-maker or a generic inbox is the
+      single biggest driver of real reply rate on this board, worth getting right at import time.</p>
+    <div class="mapping-grid" id="mappingGrid"></div>
+  </section>
+
+  <section class="import-step" id="previewStep" hidden>
+    <h2 class="section-title">4. Preview</h2>
+    <p class="import-help" id="previewSummary" role="status" aria-live="polite"></p>
+    <div class="table-wrap">
+      <table class="schema-table" id="previewTable">
+        <thead><tr id="previewHead"></tr></thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="import-step" id="validateStep" hidden>
+    <h2 class="section-title">5. Validate</h2>
+    <p class="import-help">Runs the same <code class="inline-code">validateProspects</code> rules as
+      <code class="inline-code">validate.js</code>, against your import combined with the existing real prospects
+      already on record. Errors block the download below, warnings don't.</p>
+    <div id="validationResults" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="import-step" id="downloadStep" hidden>
+    <h2 class="section-title">6. Download</h2>
+    <p class="import-help" id="downloadSummary" role="status" aria-live="polite"></p>
+    <button type="button" id="downloadJsonBtn" class="print-btn font-mono import-primary-btn">Download prospects.json</button>
+    <p class="import-help" id="downloadHelp"></p>
+  </section>
+  </main>
+
+  <footer class="page-foot font-mono">
+    Runs entirely in your browser. Nothing you paste or upload here is sent anywhere.
+  </footer>
+</div>
+
+<script src="/csm/data/csm-core.js"></script>
+<script src="/csm/data/validate-core.js"></script>
+<script src="/csm/data/import-core.js"></script>
+<script src="/csm/import.js"></script>
+<script src="/sidebar-core.js"></script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

@@ -26,6 +26,7 @@
     </div>
     <div class="page-head-actions">
       <button type="button" id="newProspectBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">+ Log new prospect</button>
+      <a href="/csm/import.html" class="print-btn font-mono">Import CSV</a>
       <button type="button" id="copyLinkBtn" class="print-btn font-mono" aria-live="polite">Copy link to this view</button>
       <button type="button" id="snapshotBtn" class="print-btn font-mono" disabled title="Loading pipeline data..." aria-live="polite">Copy pipeline snapshot</button>
       <button type="button" id="csvBtn" class="print-btn font-mono" disabled title="Loading pipeline data...">Export CSV</button>
@@ -77,7 +78,11 @@
         already shaped correctly, plus the same backfill warnings <code>validate.js</code> would raise. Paste the
         result into the <code>prospects</code> array below. If you just finished a research pass and have several
         candidates at once, use that same modal&rsquo;s <strong>Quick add</strong> tab instead: name, company,
-        category, and hook only, one row per candidate, all logged at the researched stage in one paste.</p>
+        category, and hook only, one row per candidate, all logged at the researched stage in one paste. If a whole
+        research pass already lives in a spreadsheet with more fields than that (channel type/detail, a social
+        snapshot, nudge dates), use <a href="/csm/import.html">Import CSV</a> in the header instead: it maps your
+        real columns to this schema, validates the merged result against the same rules as
+        <code>validate.js</code>, and hands back a ready-to-save <code>prospects.json</code>.</p>
       <p>Or edit <code>public/csm/data/prospects.json</code> by hand and add an object to the
         <code>prospects</code> array. Leave any field you do not have a real answer for as <code>null</code> or
         <code>[]</code>, do not fill it in with a guess.</p>
