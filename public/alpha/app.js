@@ -520,6 +520,72 @@ function recordClientSizingModeObservation(connected, mode) {
   return next;
 }
 
+// live.anomalies.stuckCount has the same gap live.positionSizing's drawdown
+// and robustness readings had before CLIENT_DRAWDOWN_HISTORY_KEY above:
+// Alpha's live feed sends only the current stuck-agent count, a snapshot
+// that alone can't say whether it just appeared or has been climbing for a
+// while. Same fix, same honesty constraints: this browser keeps its own
+// append-only log of real counts it has actually polled, capped, in
+// localStorage, never backfilled or estimated, feeding the same compact
+// trend sparkline treatment next to the Active anomalies stat tile (see
+// renderAnomalySparkline below). A plain count, not a 0-100 meter, so it
+// gets its own key/functions rather than reusing
+// loadClientMeterHistory/recordClientMeterReading.
+const CLIENT_ANOMALY_HISTORY_KEY = 'alpha:clientAnomalyHistory';
+const CLIENT_ANOMALY_HISTORY_CAP = 200;
+
+function loadClientAnomalyHistory() {
+  try {
+    const raw = localStorage.getItem(CLIENT_ANOMALY_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Only records while genuinely connected with a real numeric count, same
+// guard as recordClientMeterReading above: a last-known/frozen or
+// awaiting-connection value is not a new observation, and recording it
+// would flatten the trend line with repeats of a stale number rather than
+// leaving an honest gap.
+function recordClientAnomalyObservation(connected, stuckCount) {
+  const history = loadClientAnomalyHistory();
+  if (!connected || typeof stuckCount !== 'number' || !Number.isFinite(stuckCount)) return history;
+  const next = [...history, { at: new Date().toISOString(), count: stuckCount }].slice(-CLIENT_ANOMALY_HISTORY_CAP);
+  try {
+    localStorage.setItem(CLIENT_ANOMALY_HISTORY_KEY, JSON.stringify(next));
+  } catch (e) {
+    // Private browsing / storage blocked: same graceful degradation as the
+    // other client-side histories above, the sparkline just stays empty.
+  }
+  return next;
+}
+
+// Same compact trend-line treatment as renderMeterSparkline, for a plain
+// count rather than a 0-100 percentage: no "%" suffix, since a stuck-agent
+// count has no fixed scale to describe one. Returns '' (nothing rendered)
+// with fewer than 2 points in the window, same honest-empty-state rule as
+// every other section on this page.
+function renderAnomalySparkline(history) {
+  const recent = (history || []).slice(-METER_SPARK_WINDOW).filter(e => typeof e.count === 'number' && Number.isFinite(e.count));
+  if (recent.length < 2) return '';
+  const values = recent.map(e => e.count);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const points = computeSparklinePoints(values);
+  const path = points.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const last = points[points.length - 1];
+  const fullTitle = 'Stuck-agent count trend, recorded by this browser only: last ' + recent.length + ' checks, ' + min + ' to ' + max;
+  return `
+    <svg class="meter-spark" width="${SPARK_W}" height="${SPARK_H}" viewBox="0 0 ${SPARK_W} ${SPARK_H}" role="img" aria-label="${escapeHtml(fullTitle)}">
+      <title>${escapeHtml(fullTitle)}</title>
+      <polyline points="${path}" class="latency-spark-line" fill="none" />
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="1.6" class="latency-spark-dot" />
+    </svg>
+  `;
+}
+
 // live.debatePanel.active has the same gap every other live.* field had
 // before its own client-side record above: the moment this real, named
 // architecture feature (see Architecture below) actually goes from pending
@@ -1359,12 +1425,13 @@ function renderUptimeWindows(data, clientHistory) {
   row.innerHTML = computeUptimeWindows(history).map(uptimeWindowBadge).join('');
 }
 
-function statTile(value, label, sub, awaiting, subTitle) {
+function statTile(value, label, sub, awaiting, subTitle, extraHtml) {
   return `
     <div class="stat-tile">
       <div class="stat-tile-value${awaiting ? ' awaiting' : ''}">${value}</div>
       <div class="stat-tile-label">${escapeHtml(label)}</div>
       ${sub ? `<div class="stat-tile-sub"${subTitle ? ` title="${escapeHtml(subTitle)}"` : ''}>${escapeHtml(sub)}</div>` : ''}
+      ${extraHtml ? `<div class="stat-tile-spark">${extraHtml}</div>` : ''}
     </div>
   `;
 }
@@ -1487,7 +1554,7 @@ function renderComponentGrid(data, summaryData, isLastKnown) {
   }
 }
 
-function renderStats(data, clientDebateActivatedAt, clientDebateFirstPendingAt) {
+function renderStats(data, clientDebateActivatedAt, clientDebateFirstPendingAt, clientAnomalyHistory) {
   const sys = data.system;
   const live = data.live;
   const awaiting = '<span class="font-mono">awaiting connection</span>';
@@ -1544,7 +1611,9 @@ function renderStats(data, clientDebateActivatedAt, clientDebateFirstPendingAt) 
     anomaliesKnown ? (stuckCount === 0 ? 'None' : escapeHtml(String(stuckCount))) : awaiting,
     'Active anomalies',
     anomaliesKnown ? (stuckCount > 0 ? 'Stuck agent(s) detected' : 'No stuck agents at last check') : null,
-    !anomaliesKnown
+    !anomaliesKnown,
+    undefined,
+    renderAnomalySparkline(clientAnomalyHistory)
   ));
 
   document.getElementById('statRow').innerHTML = tiles.join('');
@@ -2570,7 +2639,7 @@ function diagnosticRow(label, status, badgeText, detail) {
   return `<tr><th scope="row">${escapeHtml(label)}</th><td><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span> ${escapeHtml(detail)}</td></tr>`;
 }
 
-function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount, sizingModeObservationCount, debateActivationRecorded) {
+function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latencySampleCount, drawdownSampleCount, robustnessSampleCount, sizingModeObservationCount, debateActivationRecorded, anomalySampleCount) {
   const body = document.getElementById('browserDiagnosticsBody');
   if (!body) return;
 
@@ -2602,6 +2671,8 @@ function renderBrowserDiagnostics(connCheckCount, regimeObservationCount, latenc
       'Real position-sizing meter readings this browser has actually polled (see the sparklines under Position sizing above).'),
     diagnosticRow('Sizing mode changes recorded', storageOk ? 'ok' : 'blocked', String(sizingModeObservationCount || 0),
       'Real drawdown-based/robustness-based sizing mode transitions this browser has actually observed (see Sizing mode history under Position sizing above).'),
+    diagnosticRow('Anomaly trend samples recorded', storageOk ? 'ok' : 'blocked', String(anomalySampleCount || 0),
+      'Real stuck-agent counts this browser has actually polled (see the sparkline next to Active anomalies under Summary above).'),
     diagnosticRow('Debate panel activation recorded', storageOk ? 'ok' : 'blocked', debateActivationRecorded ? 'YES' : 'NOT YET',
       debateActivationRecorded
         ? 'This browser has observed the debate panel go active at least once (see Summary above).'
@@ -2886,6 +2957,7 @@ async function loadStatus() {
     const clientSizingModeHistory = recordClientSizingModeObservation(connectedNow, livePs && livePs.activeMode);
     const clientDebateActivatedAt = recordClientDebateActivation(connectedNow, data.live && data.live.debatePanel && data.live.debatePanel.active);
     const clientDebateFirstPendingAt = recordClientDebateFirstPending(connectedNow, data.live && data.live.debatePanel);
+    const clientAnomalyHistory = recordClientAnomalyObservation(connectedNow, data.live && data.live.anomalies && data.live.anomalies.stuckCount);
     // Only the three sections built from the cached fields (stats,
     // position sizing, genealogy) read effectiveData; connection, account
     // and positions always read the real `data` so those never show a
@@ -2932,7 +3004,7 @@ async function loadStatus() {
       : (headline.level === 'caution' && connCls === 'live' ? 'anomaly' : connCls);
     updateGlanceIndicators(glanceCls);
     renderComponentGrid(data, effectiveData, !!lastKnown);
-    renderStats(effectiveData, clientDebateActivatedAt, clientDebateFirstPendingAt);
+    renderStats(effectiveData, clientDebateActivatedAt, clientDebateFirstPendingAt, clientAnomalyHistory);
     renderAccount(data);
     renderPositions(data);
     renderPositionSizing(effectiveData, clientDrawdownHistory, clientRobustnessHistory);
@@ -2940,7 +3012,7 @@ async function loadStatus() {
     renderArchitecture(data);
     renderGenealogy(effectiveData);
     renderEventLog(data);
-    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length, clientDrawdownHistory.length, clientRobustnessHistory.length, clientSizingModeHistory.length, !!clientDebateActivatedAt);
+    renderBrowserDiagnostics(clientConnHistory.length, clientRegimeHistory.length, clientLatencyHistory.length, clientDrawdownHistory.length, clientRobustnessHistory.length, clientSizingModeHistory.length, !!clientDebateActivatedAt, clientAnomalyHistory.length);
   } catch (e) {
     if (requestId !== latestStatusRequestId) return;
     // Distinct from "down" (Alpha has no live feed yet, an expected,
@@ -2978,7 +3050,7 @@ window.addEventListener('storage', (e) => {
   if (![
     CLIENT_CONN_HISTORY_KEY, CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY,
     CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY, CLIENT_SIZING_MODE_HISTORY_KEY,
-    CLIENT_DEBATE_ACTIVATED_KEY, CLIENT_DEBATE_FIRST_PENDING_KEY
+    CLIENT_DEBATE_ACTIVATED_KEY, CLIENT_DEBATE_FIRST_PENDING_KEY, CLIENT_ANOMALY_HISTORY_KEY
   ].includes(e.key)) return;
   const connHistory = loadClientConnHistory();
   const latencyHistory = loadClientLatencyHistory();
@@ -2988,6 +3060,7 @@ window.addEventListener('storage', (e) => {
   const sizingModeHistory = loadClientSizingModeHistory();
   const debateActivatedAt = loadClientDebateActivatedAt();
   const debateFirstPendingAt = loadClientDebateFirstPendingAt();
+  const anomalyHistory = loadClientAnomalyHistory();
   renderConnection(lastRawData, connHistory, latencyHistory);
   renderConnectionHistory(lastRawData, connHistory);
   renderUptimeWindows(lastRawData, connHistory);
@@ -3013,11 +3086,11 @@ window.addEventListener('storage', (e) => {
   // connection" just because a sibling tab wrote a history entry.
   if (lastStatusData) {
     renderPositionSizing(lastStatusData, drawdownHistory, robustnessHistory);
-    renderStats(lastStatusData, debateActivatedAt, debateFirstPendingAt);
+    renderStats(lastStatusData, debateActivatedAt, debateFirstPendingAt, anomalyHistory);
     renderComponentGrid(lastRawData, lastStatusData, lastStatusIsLastKnown);
   }
   renderSizingModeHistory(sizingModeHistory, regimeFrozenAsOf);
-  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length, sizingModeHistory.length, !!debateActivatedAt);
+  renderBrowserDiagnostics(connHistory.length, regimeHistory.length, latencyHistory.length, drawdownHistory.length, robustnessHistory.length, sizingModeHistory.length, !!debateActivatedAt, anomalyHistory.length);
 });
 
 // Status-page UX guidance is consistent that a manual refresh action should
@@ -3125,11 +3198,11 @@ copyStatusBtn.addEventListener('click', async () => {
 
 // Every other hub (CGT/CSM/Garage/Sondrik) has a "Download backup (.json)"
 // button; Alpha had none, even though this browser's own connectivity,
-// fetch-latency, regime-observation, drawdown/robustness-trend, and
-// sizing-mode-observation logs (CLIENT_CONN_HISTORY_KEY,
+// fetch-latency, regime-observation, drawdown/robustness-trend,
+// sizing-mode-observation, and anomaly-trend logs (CLIENT_CONN_HISTORY_KEY,
 // CLIENT_LATENCY_HISTORY_KEY, CLIENT_REGIME_HISTORY_KEY,
 // CLIENT_DRAWDOWN_HISTORY_KEY, CLIENT_ROBUSTNESS_HISTORY_KEY,
-// CLIENT_SIZING_MODE_HISTORY_KEY above) live only in
+// CLIENT_SIZING_MODE_HISTORY_KEY, CLIENT_ANOMALY_HISTORY_KEY above) live only in
 // localStorage, with no export path if site data is ever cleared. Local
 // download only, nothing is sent anywhere, and read-only like everything
 // else on this page: it only ever reads state already recorded, never
@@ -3149,7 +3222,8 @@ backupBtn.addEventListener('click', () => {
     clientRobustnessHistory: loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY),
     clientSizingModeHistory: loadClientSizingModeHistory(),
     clientDebateActivatedAt: loadClientDebateActivatedAt(),
-    clientDebateFirstPendingAt: loadClientDebateFirstPendingAt()
+    clientDebateFirstPendingAt: loadClientDebateFirstPendingAt(),
+    clientAnomalyHistory: loadClientAnomalyHistory()
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -3867,7 +3941,7 @@ updateOfflineBanner();
 // Renders once immediately, independent of the /api/alpha/live fetch below,
 // so this table is accurate even if that fetch itself fails; loadStatus()
 // re-renders it with fresh counts on every successful tick after this.
-renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length, loadClientLatencyHistory().length, loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY).length, loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY).length, loadClientSizingModeHistory().length);
+renderBrowserDiagnostics(loadClientConnHistory().length, loadClientRegimeHistory().length, loadClientLatencyHistory().length, loadClientMeterHistory(CLIENT_DRAWDOWN_HISTORY_KEY).length, loadClientMeterHistory(CLIENT_ROBUSTNESS_HISTORY_KEY).length, loadClientSizingModeHistory().length, false, loadClientAnomalyHistory().length);
 // Same "render immediately, independent of the network fetch" reasoning as
 // the diagnostics call above: market open/closed has no dependency on
 // /api/alpha/live succeeding at all, so it shouldn't wait on it.

@@ -1060,6 +1060,14 @@ header.page-head .sub {
   margin-top: 4px;
 }
 
+/* Wraps an optional trend sparkline inside a stat tile (currently just
+   Active anomalies; see renderAnomalySparkline in app.js), same companion-
+   to-the-number placement as .meter-value-row gives drawdown/robustness. */
+.stat-tile-spark {
+  display: flex;
+  margin-top: 6px;
+}
+
 /* Static placeholder tiles shown in #statRow's own initial markup, replaced
    the moment the first real render sets its innerHTML (every load path,
    success or failure, already does this unconditionally). Without these,
