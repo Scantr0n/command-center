@@ -888,6 +888,7 @@ table.card-table {
    slot keeps that aspect ratio even before a real imageUrl exists on most
    rows, rather than the placeholder text sitting in a squat, un-card-shaped
    box. */
+.card-gallery[hidden] { display: none; }
 .card-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
