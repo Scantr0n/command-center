@@ -31,6 +31,7 @@ const {
   daysToSell, avgDaysToSell, sellThroughRate,
   buildEngagementCheckFlags,
   USPS_PEAK_SURCHARGE_START, USPS_PEAK_SURCHARGE_END, uspsPeakSurchargeStatus,
+  USPS_HAZMAT_NONCOMPLIANCE_FEE_REVISION_DATE, hazmatNoncomplianceFeeRevisionStatus,
   HOLIDAY_SHIP_BY_DATES, HOLIDAY_SHIP_BY_SEASON_YEAR, holidayShipByStatus, isHolidayShipBySeasonStale
 } = require('./garage-core.js');
 
@@ -960,6 +961,22 @@ test('uspsPeakSurchargeStatus: "past" the day after the real Jan 17, 2027 end da
 test('uspsPeakSurchargeStatus: null with no real today to judge from', () => {
   assert.equal(uspsPeakSurchargeStatus(null), null);
   assert.equal(uspsPeakSurchargeStatus(undefined), null);
+});
+
+test('hazmatNoncomplianceFeeRevisionStatus: "upcoming" before the real Nov 2, 2026 revision date, with a real day count', () => {
+  const status = hazmatNoncomplianceFeeRevisionStatus('2026-10-30');
+  assert.equal(status.state, 'upcoming');
+  assert.equal(status.daysUntil, 3);
+});
+
+test('hazmatNoncomplianceFeeRevisionStatus: "in-effect" on the revision date itself and after', () => {
+  assert.equal(hazmatNoncomplianceFeeRevisionStatus(USPS_HAZMAT_NONCOMPLIANCE_FEE_REVISION_DATE).state, 'in-effect');
+  assert.equal(hazmatNoncomplianceFeeRevisionStatus('2027-01-01').state, 'in-effect');
+});
+
+test('hazmatNoncomplianceFeeRevisionStatus: null with no real today to judge from', () => {
+  assert.equal(hazmatNoncomplianceFeeRevisionStatus(null), null);
+  assert.equal(hazmatNoncomplianceFeeRevisionStatus(undefined), null);
 });
 
 test('holidayShipByStatus: contiguous US region gives the real Dec 17/17/18/19 dates, with a signed day count', () => {

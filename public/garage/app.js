@@ -131,7 +131,8 @@ const {
   isSupplyLowStock, annotateEngagementTrend, daysBetweenDates, hasNewDueId, actualPostingPace,
   expectedBalanceDate, avgDaysToSell, sellThroughRate,
   ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,
-  uspsPeakSurchargeStatus, holidayShipByStatus, HOLIDAY_SHIP_BY_SEASON_YEAR, isHolidayShipBySeasonStale
+  uspsPeakSurchargeStatus, holidayShipByStatus, HOLIDAY_SHIP_BY_SEASON_YEAR, isHolidayShipBySeasonStale,
+  hazmatNoncomplianceFeeRevisionStatus
 } = GarageCore;
 
 // This is the exact reference that already drifted wrong twice on this page
@@ -647,7 +648,8 @@ const HOLIDAY_SHIP_BY_DUE_SOON_DAYS = 14;
 function renderShippingPeakStatus() {
   const surchargeEl = document.getElementById('peakSurchargeStatus');
   const shipByEl = document.getElementById('holidayShipByStatus');
-  if (!surchargeEl && !shipByEl) return;
+  const hazmatEl = document.getElementById('hazmatRevisionStatus');
+  if (!surchargeEl && !shipByEl && !hazmatEl) return;
   const today = todayDateStr();
 
   if (surchargeEl) {
@@ -691,6 +693,23 @@ function renderShippingPeakStatus() {
       shipByEl.textContent = next.daysUntil + ' day' + (next.daysUntil === 1 ? '' : 's') + ' until the ' + next.service + ' ship-by cutoff (' + next.date + ', contiguous US)';
       shipByEl.className = dueSoon ? 'tax-status-met' : 'cell-muted';
     }
+  }
+
+  if (hazmatEl) {
+    const status = hazmatNoncomplianceFeeRevisionStatus(today);
+    let text = 'Status unknown';
+    let tone = 'cell-muted';
+    if (status) {
+      if (status.state === 'in-effect') {
+        text = 'That revision took effect on or before today, re-verify the Noncompliance Fee assessment details above.';
+        tone = 'tax-status-met';
+      } else {
+        text = status.daysUntil + ' day' + (status.daysUntil === 1 ? '' : 's') + ' until that revision takes effect (Nov 2, 2026)';
+        tone = status.daysUntil <= PEAK_SURCHARGE_DUE_SOON_DAYS ? 'tax-status-met' : 'cell-muted';
+      }
+    }
+    hazmatEl.textContent = text;
+    hazmatEl.className = tone;
   }
 }
 

@@ -685,6 +685,24 @@
     return { state: 'past' };
   }
 
+  // The real date USPS starts revising how the $50 Hazmat Noncompliance Fee
+  // gets assessed (see the "Electronics & battery-item rules by platform"
+  // reference table's eBay row for the real source), called out there as
+  // static prose with "worth re-checking this row again after that date"
+  // and nothing actually checking it against today's real date, same gap
+  // the peak-surcharge/holiday-ship-by callouts above used to have before
+  // uspsPeakSurchargeStatus/holidayShipByStatus replaced the static claim
+  // with a real computed one. Two states: 'upcoming' (not reached yet,
+  // daysUntil > 0) or 'in-effect' (at or after the revision date).
+  const USPS_HAZMAT_NONCOMPLIANCE_FEE_REVISION_DATE = '2026-11-02';
+
+  function hazmatNoncomplianceFeeRevisionStatus(todayStr) {
+    const days = daysUntil(USPS_HAZMAT_NONCOMPLIANCE_FEE_REVISION_DATE, todayStr);
+    if (days == null) return null;
+    if (days > 0) return { state: 'upcoming', daysUntil: days };
+    return { state: 'in-effect' };
+  }
+
   // USPS's own Sept 22, 2026 recommended last-acceptance dates for
   // delivery by Dec 25. The two regions genuinely differ on the
   // ground/first-class services, not the air ones (both land on the same
@@ -1000,6 +1018,7 @@
     ebayTrsProgress, depopTopSellerProgress,
     USPS_PEAK_SURCHARGE_START, USPS_PEAK_SURCHARGE_END, uspsPeakSurchargeStatus,
     HOLIDAY_SHIP_BY_DATES, HOLIDAY_SHIP_BY_SEASON_YEAR, holidayShipByStatus, isHolidayShipBySeasonStale,
+    USPS_HAZMAT_NONCOMPLIANCE_FEE_REVISION_DATE, hazmatNoncomplianceFeeRevisionStatus,
     isSupplyLowStock,
     sortEngagementSnapshots, annotateEngagementTrend,
     ENGAGEMENT_CHECK_DUE_DAYS, buildEngagementCheckFlags,
