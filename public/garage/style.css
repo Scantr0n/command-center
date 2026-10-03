@@ -609,6 +609,10 @@ section { margin-bottom: 36px; }
   background: var(--panelLight);
   padding: 2px 11px 4px;
 }
+/* WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA): a pointer target needs at
+   least 24x24 CSS px. This select is the keyboard/screen-reader equivalent
+   of the drag-to-restage gesture above, and it was rendering at 22px tall,
+   2px under the minimum. */
 .kanban-card-move {
   width: 100%;
   background: transparent;
@@ -617,6 +621,8 @@ section { margin-bottom: 36px; }
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.68rem;
   padding: 3px 0;
+  min-height: 24px;
+  box-sizing: border-box;
   cursor: pointer;
 }
 .kanban-card-move:hover, .kanban-card-move:focus-visible { color: var(--ink); }
