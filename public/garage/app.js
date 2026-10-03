@@ -523,7 +523,13 @@ function wireHomeOfficeCalc() {
 // Fixed the row text to match; this badge exists so that class of reversed
 // claim gets caught faster next time instead of sitting live on a real
 // battery-item listing's shipping requirements.
-const ELECTRONICS_RULES_REVIEWED_ON = '2026-09-24';
+// Re-verified 2026-10-03 against USPS's own Postal Bulletin: added the
+// Hazmat Handling Fee ($7.50, Priority Mail/Express only) and Hazmat
+// Noncompliance Fee ($50/package, any class, undeclared or mislabeled
+// hazmat) USPS started charging 2026-07-12, neither of which was on this
+// page before, both directly relevant to the one real battery item live
+// right now.
+const ELECTRONICS_RULES_REVIEWED_ON = '2026-10-03';
 const ELECTRONICS_RULES_STALE_AFTER_DAYS = 45;
 
 function renderElectronicsRulesFreshness() {
