@@ -47,13 +47,14 @@ function infoTexts(steps) { return steps.filter(s => !s.urgent).map(s => s.text)
 
 // A goal with no targetDate and the default currentMetricValue stub (which
 // returns null) never reaches either the target-date-passed or the pace
-// branch, so it adds no step of its own; used below to isolate a single
-// section under test from the "no goals set" and "no downloads logged"
-// steps that would otherwise always fire on data this test isn't about.
+// branch, so it adds no step of its own; a real setDate keeps it out of the
+// no-setDate check too. Used below to isolate a single section under test
+// from the "no goals set", "no downloads logged", and "no setDate" steps
+// that would otherwise always fire on data this test isn't about.
 function quietData(overrides) {
   return Object.assign({
     downloadsData: { metric: { label: 'downloads', source: 'gh api', checks: [{ date: TODAY, count: 1 }] } },
-    goalsData: { goals: [{ id: 'quiet', label: 'quiet', metric: 'downloads', target: 100 }] }
+    goalsData: { goals: [{ id: 'quiet', label: 'quiet', metric: 'downloads', target: 100, setDate: '2026-09-01' }] }
   }, overrides);
 }
 
@@ -307,6 +308,33 @@ test('flags a tracked channel with no linkedMetric wired up', () => {
 test('flags having no goals set at all', () => {
   const steps = computeNextSteps({ goalsData: { goals: [] } }, baseDeps());
   assert.ok(infoTexts(steps).some(t => t.startsWith('Set a real target in goals.json')));
+});
+
+test('flags a single goal with no setDate by label, non-urgent', () => {
+  const steps = computeNextSteps(
+    { goalsData: { goals: [{ id: 'g', label: '150 downloads', metric: 'downloads', target: 150, targetDate: '2026-12-31' }] } },
+    baseDeps()
+  );
+  assert.ok(infoTexts(steps).some(t => t.includes('"150 downloads" was actually set') && t.includes('no setDate is on record')));
+});
+
+test('flags multiple goals with no setDate by count', () => {
+  const steps = computeNextSteps(
+    { goalsData: { goals: [
+      { id: 'g1', label: 'a', metric: 'downloads', target: 10 },
+      { id: 'g2', label: 'b', metric: 'leads', target: 5 }
+    ] } },
+    baseDeps()
+  );
+  assert.ok(infoTexts(steps).some(t => t.startsWith('Log the real date 2 goals were actually set')));
+});
+
+test('does not flag a goal that already has a setDate', () => {
+  const steps = computeNextSteps(
+    quietData({ goalsData: { goals: [{ id: 'g', label: 'quiet', metric: 'downloads', target: 100, setDate: '2026-09-01' }] } }),
+    baseDeps()
+  );
+  assert.ok(!infoTexts(steps).some(t => t.includes('no setDate is on record')));
 });
 
 test('flags a goal whose target date has passed and is not yet met, urgent', () => {

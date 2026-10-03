@@ -239,6 +239,23 @@
       });
     }
 
+    // Same validate.js warning this function already mirrors for releases
+    // and leads with no real date on record, applied to a goal with no
+    // setDate: computeGoalPaceStatus below silently returns null without
+    // one (no crash, no wrong number), which is exactly why this was easy
+    // to miss, nothing on the page said why the pace line just never shows
+    // up for that goal.
+    const noSetDateGoals = goals.filter(g => !g.setDate);
+    if (noSetDateGoals.length > 0) {
+      steps.push({
+        urgent: false,
+        text: 'Log the real date ' +
+          (noSetDateGoals.length === 1 ? '"' + noSetDateGoals[0].label + '" was' : noSetDateGoals.length + ' goals were') +
+          ' actually set, no setDate is on record.',
+        href: '#goalsSection'
+      });
+    }
+
     // The Goals card already computes both of these (see renderGoals: the
     // "TARGET DATE PASSED" pace line and the BEHIND PACE tier from
     // computeGoalPaceStatus), but only ever showed them to someone who
