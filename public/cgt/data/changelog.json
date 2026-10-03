@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-10-02T13:33:43.375Z",
+  "generatedAt": "2026-10-03T09:35:42.653Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "493cdd2",
+      "fullHash": "493cdd261c0cfd728c63b8087223ea9998b43330",
+      "date": "2026-10-03",
+      "author": "Claude",
+      "subject": "CGT: add a return tracking number field for submissions",
+      "historyReset": false,
+      "files": [
+        "submissions.json"
+      ]
+    },
     {
       "hash": "b6a8d80",
       "fullHash": "b6a8d80ed92818f7b7538dd30b1ee26c6fa52482",
