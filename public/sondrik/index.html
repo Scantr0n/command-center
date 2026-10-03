@@ -347,6 +347,53 @@
     </details>
   </section>
 
+  <section id="gatekeeperNormsSection">
+    <details class="schema-help">
+      <summary>What happens after someone downloads the DMG (general guidance, not Sondrik data)
+        <span class="reference-freshness" id="gatekeeperNormsFreshness"></span>
+      </summary>
+      <div class="schema-help-body">
+        <p>General background on a real step between the download count above and anyone actually running
+          Sondrik, reviewed October 2026 from Apple's own notarization docs and outside write-ups of how
+          Gatekeeper behaves on an unsigned download (sources linked below). This is <strong>not</strong> a claim
+          about whether Sondrik's own DMG is signed or notarized, that's a real fact to confirm separately, it's
+          context for why a download count on its own may overstate how many people actually got the app open.</p>
+        <div class="schema-table-wrap">
+        <table class="schema-table">
+          <tbody>
+            <tr><th>An unsigned DMG gets<br>flagged on first launch</th><td>Browsers and the Finder attach a
+              quarantine flag to anything fetched from the internet. The first time the person tries to open an
+              app carrying that flag, Gatekeeper checks for a valid Developer ID signature and a notarization
+              ticket; without both, macOS shows a warning that the app "cannot be opened because the developer
+              cannot be verified," not a one-time notice, that same block happens on every unnotarized copy, for
+              every person who downloads it.</td></tr>
+            <tr><th>The old right-click<br>workaround no longer works</th><td>Control-click &rarr; Open used to
+              let a user bypass that warning on older macOS versions. As of macOS Sequoia (15.x), that shortcut no
+              longer works by default: the real path now is System Settings &rarr; Privacy &amp; Security &rarr;
+              scroll to the blocked app &rarr; Open Anyway, and that Open Anyway option itself disappears again
+              after about an hour if it isn't used. That is a meaningfully higher-friction ask than a single
+              right-click, for someone who is already just curious enough to have downloaded a DMG from a GitHub
+              release.</td></tr>
+            <tr><th>The real fix is<br>notarization, not a workaround</th><td>Documenting the Open Anyway steps in
+              a README or release note removes none of the friction, it just explains it. The actual fix is
+              submitting the build to Apple's notary service with a Developer ID Application certificate (part of
+              the paid Apple Developer Program) via <code>notarytool</code>, then stapling the resulting ticket to
+              the DMG, after which Gatekeeper opens it with no warning at all. That is a real, concrete step, not
+              a vague "add code signing" note, and it is independent of anything this hub can verify from here.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="schema-help-body" style="margin-top:.75rem; padding:0;">
+          Sources:
+          <a href="https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution" target="_blank" rel="noopener noreferrer">Apple Developer docs, notarizing macOS software before distribution</a>,
+          <a href="https://en.wikipedia.org/wiki/Gatekeeper_(macOS)" target="_blank" rel="noopener noreferrer">Wikipedia, Gatekeeper (macOS)</a>,
+          <a href="https://www.macworld.com/article/672947/how-to-open-a-mac-app-from-an-unidentified-developer.html" target="_blank" rel="noopener noreferrer">Macworld, how to open a Mac app from an unidentified developer</a>,
+          <a href="https://lapcatsoftware.com/articles/unsigned.html" target="_blank" rel="noopener noreferrer">Lapcat Software, can't you just right click?</a>.
+        </p>
+      </div>
+    </details>
+  </section>
+
   <section>
     <div class="section-toolbar">
       <h2 class="section-title">Goal</h2>
