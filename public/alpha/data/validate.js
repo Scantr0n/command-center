@@ -279,6 +279,25 @@ function main() {
         if (typeof entry.connected !== 'boolean') {
           errors.push(where + '.connected: required, must be true or false (a real connectivity result, never null/unknown)');
         }
+        // server.js's appendAlphaConnHistory is the only real writer of this
+        // array (see its own comment: `const pausedNow = connected ? !!paused
+        // : null`), so this is a true invariant of the real data, not just a
+        // documentation convention: every connected:true entry always carries
+        // a real boolean kill-switch reading from that same check, and every
+        // connected:false entry always carries null, since an unreachable
+        // daemon has no kill-switch reading to attach. killSwitchStateEvents/
+        // lastKillSwitchTriggerAt in live-core.js only compare non-null
+        // readings between adjacent entries, so a malformed entry here (a
+        // stray hand-edit, a future writer that doesn't honor the invariant)
+        // would silently vanish from the Kill switch history and could skip a
+        // real trigger instead of erroring loudly on a real-money system.
+        if (entry.paused != null && typeof entry.paused !== 'boolean') {
+          errors.push(where + '.paused: must be true, false, or null');
+        } else if (entry.connected === false && entry.paused != null) {
+          errors.push(where + '.paused: must be null when connected is false (an unreachable daemon has no real kill-switch reading to attach)');
+        } else if (entry.connected === true && entry.paused == null) {
+          errors.push(where + '.paused: required (true or false) when connected is true (that same check always reads a real kill-switch state)');
+        }
       });
     }
   }
