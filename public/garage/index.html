@@ -33,6 +33,7 @@
       <button type="button" id="notifyBtn" class="print-btn font-mono" hidden aria-live="polite"></button>
       <button type="button" id="testAlertBtn" class="print-btn font-mono" hidden>Send test alert</button>
       <button type="button" id="shortcutsBtn" class="print-btn font-mono" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
+      <a href="/garage/import.html" class="print-btn font-mono">Import CSV</a>
       <a href="/" class="back-link">&larr; Command Center</a>
     </div>
   </header>
@@ -125,7 +126,8 @@
         the JSON object to paste into the <code>listings</code> array yourself. <code>soldOn</code> and
         <code>listingUrls</code> always come out empty, a brand-new listing hasn't sold or been posted anywhere
         yet; fill those in by hand once they're real. This never writes a file or sends anything, it only puts
-        text on your clipboard.</p>
+        text on your clipboard. For more than one listing at a time (e.g. the 48-item Depop drafts backlog), use
+        <a href="/garage/import.html">Import CSV</a> instead.</p>
 
       <div id="nlDraftBanner" class="quick-log-draft-banner" hidden>
         <span>Restored an unsaved draft from <span id="nlDraftBannerTime"></span>, this form is autosaved to this

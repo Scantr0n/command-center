@@ -90,32 +90,17 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const {
-  PLATFORMS, TITLE_HARD_LIMITS, findDuplicateListings, isSuspiciousEbayReturnPolicy, missingItemSpecifics, isDepopIneligible,
-  emDashFields
-} = require('./validate-core.js');
+const { PLATFORMS, emDashFields, validateListings } = require('./validate-core.js');
 const { irsMileageRateForDate } = require('./garage-core.js');
 
 const DATA_DIR = __dirname;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const STATUSES = ['draft', 'ready-to-post', 'live', 'sold'];
 const STAGES = ['draft', 'ready-to-post', 'live', 'sold'];
 const EVENT_TYPES = ['bug-fix', 'photo-audit', 'other'];
 const EXPENSE_CATEGORIES = ['mileage', 'supplies', 'platform-fees', 'subscriptions', 'other'];
-// eBay category classifier. "shoes" drives real eBay fee math: Clothing,
-// Shoes & Accessories charges a 15.3% final value fee, not the 13.6%
-// standard rate most other categories (including Consumer Electronics) get
-// (see EBAY_CATEGORY_RATES in garage-core.js). "shoes" also drives which
-// itemSpecifics fields get checked below (size and color only matter for
-// something you wear). "electronics" drives the real Depop platform ban
-// checked below instead (Depop prohibits battery-powered/electronic items
-// outright, see the Electronics & battery-item rules reference on the
-// page); everything else stays null.
-const LISTING_CATEGORIES = ['shoes', 'electronics'];
 const DISPUTE_TYPES = ['return', 'not-as-described', 'damaged', 'never-arrived', 'other'];
 const DISPUTE_STATUSES = ['open', 'resolved-seller', 'resolved-buyer', 'resolved-split'];
 const SUPPLY_CATEGORIES = ['box', 'mailer', 'envelope', 'tape', 'label', 'other'];
-const ITEM_SPECIFIC_KEYS = ['brand', 'size', 'color', 'condition'];
 const ACQUISITION_SOURCES = ['thrift-store', 'estate-sale', 'garage-sale', 'wholesale-lot', 'online-marketplace', 'personal-item', 'other'];
 const OFFER_RESPONSES = ['pending', 'accepted', 'declined', 'countered', 'expired'];
 
@@ -172,194 +157,9 @@ function main() {
   }
 
   const listings = listingsData.listings || [];
-  const seenIds = new Set();
-
-  listings.forEach((l, idx) => {
-    const where = 'listings[' + idx + ']' + (l && l.id ? ' (' + l.id + ')' : '');
-
-    if (!l.id) errors.push(where + ': missing "id"');
-    else if (seenIds.has(l.id)) errors.push(where + ': duplicate id "' + l.id + '"');
-    else seenIds.add(l.id);
-
-    if (!l.title) {
-      errors.push(where + ': missing "title"');
-    } else if (typeof l.title !== 'string') {
-      // findDuplicateListings' own `!l.title` guard only catches a falsy
-      // value, so a truthy non-string reaches its unguarded
-      // `.trim().toLowerCase()` and throws, and that function runs
-      // unconditionally from both this file and app.js's own panel.
-      errors.push(where + ': "title" must be a string, got ' + typeof l.title);
-    }
-
-    if (l.notes !== null && l.notes !== undefined && typeof l.notes !== 'string') {
-      errors.push(where + ': "notes" must be a string or null, got ' + typeof l.notes);
-    }
-
-    if (l.price !== null && l.price !== undefined) {
-      if (typeof l.price !== 'number' || l.price < 0) {
-        errors.push(where + ': "price" must be a non-negative number or null');
-      }
-    }
-
-    if (l.costBasis !== null && l.costBasis !== undefined) {
-      if (typeof l.costBasis !== 'number' || l.costBasis < 0) {
-        errors.push(where + ': "costBasis" must be a non-negative number or null');
-      }
-    }
-
-    if (l.category !== null && l.category !== undefined && !LISTING_CATEGORIES.includes(l.category)) {
-      errors.push(where + ': category "' + l.category + '" is not one of ' + LISTING_CATEGORIES.join(', ') + ' (omit or use null for the standard eBay rate)');
-    }
-
-    if (!Array.isArray(l.platforms) || l.platforms.length === 0) {
-      errors.push(where + ': "platforms" must be a non-empty array');
-    } else {
-      l.platforms.forEach(p => {
-        if (!PLATFORMS.includes(p)) {
-          errors.push(where + ': platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
-        }
-      });
-      if (isDepopIneligible(l) && l.platforms.includes('depop')) {
-        errors.push(where + ': "platforms" includes "depop" but category is "electronics", Depop bans battery-' +
-          'powered/electronic items outright (see the Electronics & battery-item rules reference on the page), ' +
-          'this really risks account suspension if actually published, remove depop from platforms and listingUrls');
-      }
-    }
-
-    if (l.listingUrls !== undefined && l.listingUrls !== null) {
-      if (typeof l.listingUrls !== 'object' || Array.isArray(l.listingUrls)) {
-        errors.push(where + ': "listingUrls" must be an object keyed by platform, or omitted');
-      } else {
-        Object.keys(l.listingUrls).forEach(p => {
-          const v = l.listingUrls[p];
-          if (!PLATFORMS.includes(p)) {
-            errors.push(where + ': listingUrls platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
-          } else if (Array.isArray(l.platforms) && !l.platforms.includes(p)) {
-            errors.push(where + ': listingUrls platform "' + p + '" is not in this listing\'s "platforms"');
-          }
-          if (v !== null && v !== undefined) {
-            if (typeof v !== 'string' || !/^https?:\/\//.test(v)) {
-              errors.push(where + ': listingUrls.' + p + ' must be a real http(s) URL string, or null until logged');
-            }
-          }
-        });
-      }
-    }
-
-    if (l.soldOn !== undefined) {
-      if (!Array.isArray(l.soldOn)) {
-        errors.push(where + ': "soldOn" must be an array');
-      } else {
-        l.soldOn.forEach(p => {
-          if (!PLATFORMS.includes(p)) {
-            errors.push(where + ': soldOn platform "' + p + '" is not one of ' + PLATFORMS.join(', '));
-          } else if (Array.isArray(l.platforms) && !l.platforms.includes(p)) {
-            errors.push(where + ': soldOn platform "' + p + '" is not in this listing\'s "platforms"');
-          }
-        });
-      }
-    }
-
-    if (!l.status) {
-      errors.push(where + ': missing "status"');
-    } else if (!STATUSES.includes(l.status)) {
-      errors.push(where + ': status "' + l.status + '" is not one of ' + STATUSES.join(', '));
-    }
-
-    if (!isDateOrNull(l.datePublished)) {
-      errors.push(where + ': "datePublished" is not a YYYY-MM-DD date or null: ' + JSON.stringify(l.datePublished));
-    }
-
-    if (l.location !== null && l.location !== undefined && typeof l.location !== 'string') {
-      errors.push(where + ': "location" must be a string (real bin/shelf label) or null');
-    }
-
-    if (l.ebayReturnPolicy !== null && l.ebayReturnPolicy !== undefined && typeof l.ebayReturnPolicy !== 'string') {
-      errors.push(where + ': "ebayReturnPolicy" must be a string (the real policy name set on the eBay listing) or null');
-    }
-
-    // eBay's own real handling-time setting only accepts a whole number of
-    // business days from 1 to 30 (same unit garage-core.js's shipDeadline
-    // now computes eBay's real late-shipment rate against, see the comment
-    // above EBAY_TRS_WINDOW_DAYS there), so a value outside that range could
-    // never actually be what's set on the real listing.
-    if (l.handlingTimeDays !== null && l.handlingTimeDays !== undefined) {
-      if (!Number.isInteger(l.handlingTimeDays) || l.handlingTimeDays < 1 || l.handlingTimeDays > 30) {
-        errors.push(where + ': "handlingTimeDays" must be a whole number of business days from 1 to 30 (eBay\'s own real range), or null');
-      }
-    }
-
-    if (l.itemSpecifics !== undefined && l.itemSpecifics !== null) {
-      if (typeof l.itemSpecifics !== 'object' || Array.isArray(l.itemSpecifics)) {
-        errors.push(where + ': "itemSpecifics" must be an object keyed by brand/size/color/condition, or omitted');
-      } else {
-        Object.keys(l.itemSpecifics).forEach(k => {
-          if (!ITEM_SPECIFIC_KEYS.includes(k)) {
-            errors.push(where + ': itemSpecifics key "' + k + '" is not one of ' + ITEM_SPECIFIC_KEYS.join(', '));
-          } else if (l.itemSpecifics[k] !== null && typeof l.itemSpecifics[k] !== 'string') {
-            errors.push(where + ': itemSpecifics.' + k + ' must be a string or null');
-          }
-        });
-      }
-    }
-    if (l.status === 'live' && Array.isArray(l.platforms) && l.platforms.includes('ebay')) {
-      if (!l.ebayReturnPolicy) {
-        warnings.push(where + ': live on eBay with no "ebayReturnPolicy" logged, confirm the real listing isn\'t ' +
-          'silently carrying a wrong inherited policy (the exact bug already caught once, see activity.json)');
-      } else if (isSuspiciousEbayReturnPolicy(l.ebayReturnPolicy)) {
-        warnings.push(where + ': "ebayReturnPolicy" is "' + l.ebayReturnPolicy + '", which mentions parts/' +
-          'accessories/auto, the same wrong-template pattern as the real bug already caught once. Confirm this ' +
-          'listing\'s actual eBay return policy and fix it if it really did inherit that template again.');
-      }
-      if (l.handlingTimeDays == null) {
-        warnings.push(where + ': live on eBay with no "handlingTimeDays" logged, the real Seller status & ' +
-          'standards table on the page can\'t judge eBay\'s late-shipment-rate requirement pass/fail for any ' +
-          'sale of this item until the real handling time set on the listing is logged here');
-      }
-    }
-    // Not eBay-only: Poshmark, Vinted, and Depop all expose brand/size/
-    // condition/color as buyer search filters too (see the comment above
-    // ITEM_SPECIFIC_LABELS in validate-core.js), so this fires for a
-    // listing missing a required field on any platform it's actually live
-    // on, not only eBay.
-    if (l.status === 'live' && Array.isArray(l.platforms) && l.platforms.length) {
-      const missingSpecifics = missingItemSpecifics(l);
-      if (missingSpecifics.length) {
-        warnings.push(where + ': live on ' + l.platforms.join(', ') + ' with no "' + missingSpecifics.join('", "') +
-          '" logged in "itemSpecifics". Each of those platforms lets a buyer filter search results by that ' +
-          'field (eBay calls its search Cassini), and a listing missing the field drops out of the filtered ' +
-          'results entirely there, it doesn\'t just rank lower.');
-      }
-    }
-
-    if (l.title && Array.isArray(l.platforms)) {
-      l.platforms.forEach(p => {
-        const limit = TITLE_HARD_LIMITS[p];
-        if (limit && l.title.length > limit) {
-          warnings.push(where + ': title is ' + l.title.length + ' chars, over ' +
-            p + '\'s ' + limit + '-char cap, it will get rejected or truncated there');
-        }
-      });
-    }
-
-    emDashFields(l, ['title', 'location', 'notes']).forEach(f =>
-      warnings.push(where + ': "' + f + '" contains an em dash, this tracker never uses one, check for a paste-in'));
-    emDashFields(l.itemSpecifics, ITEM_SPECIFIC_KEYS).forEach(f =>
-      warnings.push(where + ': itemSpecifics.' + f + ' contains an em dash, this tracker never uses one, check for a paste-in'));
-  });
-
-  // Mirrors the "Possible duplicates" panel in app.js: the same physical item
-  // can end up logged twice (a re-add after a platform sync, or copy-pasting
-  // an existing listing as a starting point and forgetting to change the id),
-  // and nothing else here catches it since each id is otherwise valid on its
-  // own. Grouping logic shared via validate-core.js so the two can never
-  // drift.
-  findDuplicateListings(listings).forEach(group => {
-    const ids = group.map(l => l.id || '(missing id)');
-    warnings.push('possible duplicate listing: "' + group[0].title + '" at $' + group[0].price +
-      ' appears on ' + ids.length + ' live listings (' + ids.join(', ') + '). Confirm these are really ' +
-      'separate items, not the same one logged twice.');
-  });
+  const listingResults = validateListings(listings);
+  errors.push(...listingResults.errors);
+  warnings.push(...listingResults.warnings);
 
   const stages = pipelineData.stages || [];
   const seenStages = new Set();

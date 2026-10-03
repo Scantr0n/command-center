@@ -21,7 +21,8 @@ const {
   requiredItemSpecificFields,
   missingItemSpecifics,
   isDepopIneligible,
-  emDashFields
+  emDashFields,
+  validateListings
 } = require('./validate-core.js');
 
 test('PLATFORMS is the real 4-platform list, the single source validate.js and app.js both read', () => {
@@ -149,4 +150,110 @@ test('the real listings.json on disk has no em dash pasted into a title or locat
   const listings = data.listings || [];
   const hits = listings.filter(l => emDashFields(l, ['title', 'location']).length);
   assert.deepEqual(hits, []);
+});
+
+// validateListings pulls the same per-listing rules validate.js's CLI runs
+// out into a shared function (see the comment above it in validate-core.js),
+// so import.js's own CSV preview can run them in the browser. These mirror
+// the exact fixtures/messages validate.js's own inline checks used to cover
+// before the extraction, so the behavior stays provably unchanged.
+function baseListing(overrides) {
+  return Object.assign({
+    id: 'black-boots', title: 'Black Boots', price: 85, costBasis: null, category: null,
+    platforms: ['ebay'], soldOn: [], listingUrls: {}, status: 'draft', datePublished: null,
+    notes: null, location: null, ebayReturnPolicy: null, handlingTimeDays: null,
+    itemSpecifics: { brand: null, size: null, color: null, condition: null }
+  }, overrides);
+}
+
+test('validateListings accepts a minimal real draft listing with no errors or warnings', () => {
+  const { errors, warnings } = validateListings([baseListing()]);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('validateListings flags a missing id and a duplicate id', () => {
+  const { errors } = validateListings([
+    baseListing({ id: undefined }),
+    baseListing({ id: 'dup' }),
+    baseListing({ id: 'dup' })
+  ]);
+  assert.ok(errors.some(e => e.includes('missing "id"')));
+  assert.ok(errors.some(e => e.includes('duplicate id "dup"')));
+});
+
+test('validateListings requires a non-empty platforms array and rejects an unknown platform', () => {
+  const { errors } = validateListings([baseListing({ platforms: [] }), baseListing({ id: 'b', platforms: ['mercari'] })]);
+  assert.ok(errors.some(e => e.includes('"platforms" must be a non-empty array')));
+  assert.ok(errors.some(e => e.includes('platform "mercari" is not one of')));
+});
+
+test('validateListings blocks an electronics listing from being published to Depop', () => {
+  const { errors } = validateListings([baseListing({ category: 'electronics', platforms: ['ebay', 'depop'] })]);
+  assert.ok(errors.some(e => e.includes('Depop bans battery-powered/electronic items outright')));
+});
+
+test('validateListings rejects a listingUrls platform not in this listing\'s own platforms', () => {
+  const { errors } = validateListings([baseListing({ platforms: ['ebay'], listingUrls: { vinted: 'https://vinted.com/x' } })]);
+  assert.ok(errors.some(e => e.includes('listingUrls platform "vinted" is not in this listing\'s "platforms"')));
+});
+
+test('validateListings rejects a non-http(s) listingUrls value instead of accepting a placeholder', () => {
+  const { errors } = validateListings([baseListing({ platforms: ['ebay'], listingUrls: { ebay: 'TBD' } })]);
+  assert.ok(errors.some(e => e.includes('must be a real http(s) URL string')));
+});
+
+test('validateListings rejects an unknown status and a malformed datePublished', () => {
+  const { errors } = validateListings([baseListing({ status: 'listed' }), baseListing({ id: 'b', datePublished: '2026-13-40' })]);
+  assert.ok(errors.some(e => e.includes('status "listed" is not one of')));
+  assert.ok(errors.some(e => e.includes('"datePublished" is not a YYYY-MM-DD date or null')));
+});
+
+test('validateListings warns about a live eBay listing missing ebayReturnPolicy and handlingTimeDays, same real bug this guards against', () => {
+  const { warnings } = validateListings([baseListing({ status: 'live', platforms: ['ebay'], itemSpecifics: { brand: 'Timberland', size: null, color: null, condition: 'Pre-owned' } })]);
+  assert.ok(warnings.some(w => w.includes('no "ebayReturnPolicy" logged')));
+  assert.ok(warnings.some(w => w.includes('no "handlingTimeDays" logged')));
+});
+
+test('validateListings warns when a live eBay listing\'s return policy still looks like the inherited auto-parts template', () => {
+  const { warnings } = validateListings([baseListing({
+    status: 'live', platforms: ['ebay'], handlingTimeDays: 2,
+    ebayReturnPolicy: '30-Day Seller-Paid Returns (Parts & Accessories)',
+    itemSpecifics: { brand: 'Timberland', size: null, color: null, condition: 'Pre-owned' }
+  })]);
+  assert.ok(warnings.some(w => w.includes('mentions parts/accessories/auto')));
+});
+
+test('validateListings warns about missing itemSpecifics only for fields actually required on a live listing\'s category', () => {
+  const { warnings } = validateListings([baseListing({
+    status: 'live', platforms: ['ebay'], handlingTimeDays: 2, ebayReturnPolicy: 'No Return Accepted', category: 'shoes'
+  })]);
+  const specificsWarning = warnings.find(w => w.includes('logged in "itemSpecifics"'));
+  assert.ok(specificsWarning);
+  assert.ok(specificsWarning.includes('"brand", "condition", "size", "color"'));
+});
+
+test('validateListings warns once per platform a title busts that platform\'s own hard character cap', () => {
+  const longTitle = 'X'.repeat(90);
+  const { warnings } = validateListings([baseListing({ title: longTitle, platforms: ['ebay', 'poshmark'] })]);
+  assert.equal(warnings.filter(w => w.includes("char cap")).length, 2);
+});
+
+test('validateListings warns on an em dash in a title, same rule emDashFields already covers', () => {
+  const { warnings } = validateListings([baseListing({ title: 'Nice Boots ' + String.fromCharCode(8212) + ' barely worn' })]);
+  assert.ok(warnings.some(w => w.includes('"title" contains an em dash')));
+});
+
+test('validateListings warns about two live listings sharing the same title and price, same rule findDuplicateListings already covers', () => {
+  const { warnings } = validateListings([
+    baseListing({ id: 'a', status: 'live', handlingTimeDays: 2, ebayReturnPolicy: 'No Return Accepted', itemSpecifics: { brand: 'Timberland', size: null, color: null, condition: 'Pre-owned' } }),
+    baseListing({ id: 'b', status: 'live', handlingTimeDays: 2, ebayReturnPolicy: 'No Return Accepted', itemSpecifics: { brand: 'Timberland', size: null, color: null, condition: 'Pre-owned' } })
+  ]);
+  assert.ok(warnings.some(w => w.includes('possible duplicate listing')));
+});
+
+test('the real listings.json on disk has no validateListings errors', () => {
+  const data = require('./listings.json');
+  const { errors } = validateListings(data.listings || []);
+  assert.deepEqual(errors, []);
 });
