@@ -63,11 +63,28 @@ const CSP = [
   "base-uri 'self'",
   "frame-ancestors 'none'"
 ].join('; ');
+// Permissions-Policy is the one standard security header the block above
+// was still missing. A repo-wide grep for the browser APIs it gates found
+// only navigator.clipboard.writeText (Copy link, Copy outreach brief, etc.
+// across every hub) and the Notification API (the hub's "Enable alerts"
+// button); clipboard-write's own default allowlist is already 'self' with
+// nothing here that needs cross-origin use, so it's left out rather than
+// redeclared, and Notifications has no Permissions-Policy directive at all
+// (it's gated by the regular browser permission prompt instead). Every
+// directive actually listed below is for a feature this app has zero real
+// use of anywhere in the codebase, so disabling it outright costs nothing
+// and shrinks what a future injected script could ever reach for.
+const PERMISSIONS_POLICY = [
+  'camera=()', 'microphone=()', 'geolocation=()', 'payment=()', 'usb=()',
+  'bluetooth=()', 'midi=()', 'magnetometer=()', 'gyroscope=()',
+  'accelerometer=()', 'display-capture=()', 'fullscreen=()',
+].join(', ');
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy', CSP);
+  res.setHeader('Permissions-Policy', PERMISSIONS_POLICY);
   next();
 });
 // Every hub's app.js/style.css is hand-written, uncompressed text (up to
