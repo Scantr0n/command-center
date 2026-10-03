@@ -1908,6 +1908,13 @@ test('compareWithBackup detects a nested contactChannel field change', () => {
   assert.deepEqual(result.prospects.changed[0].fields, ['contactChannel']);
 });
 
+test('compareWithBackup treats a nested object field as unchanged when only its key order differs', () => {
+  const current = { prospects: [{ id: 'a', name: 'Ann', contactChannel: { type: 'named-decision-maker', detail: 'CEO' } }] };
+  const backup = backupFile([{ id: 'a', name: 'Ann', contactChannel: { detail: 'CEO', type: 'named-decision-maker' } }]);
+  const result = compareWithBackup(current, { stages: [] }, backup);
+  assert.deepEqual(result.prospects.changed, []);
+});
+
 test('compareWithBackup detects a new entry appended to an array field like stageHistory', () => {
   const current = { prospects: [{ id: 'a', name: 'Ann', stageHistory: [{ date: '2026-01-01', stage: 'researched' }, { date: '2026-02-01', stage: 'outreach-sent' }] }] };
   const backup = backupFile([{ id: 'a', name: 'Ann', stageHistory: [{ date: '2026-01-01', stage: 'researched' }] }]);

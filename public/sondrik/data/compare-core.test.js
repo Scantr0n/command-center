@@ -30,6 +30,11 @@ test('fieldValuesDiffer treats undefined and explicit null as equal', () => {
   assert.equal(fieldValuesDiffer(null, null), false);
 });
 
+test('fieldValuesDiffer treats an object-valued field as equal regardless of key order', () => {
+  assert.equal(fieldValuesDiffer({ a: 1, b: 2 }, { b: 2, a: 1 }), false);
+  assert.equal(fieldValuesDiffer({ a: 1, b: 2 }, { b: 3, a: 1 }), true);
+});
+
 test('fieldValuesDiffer flags a real scalar and nested-object change', () => {
   assert.equal(fieldValuesDiffer('a', 'b'), true);
   assert.equal(fieldValuesDiffer({ a: 1 }, { a: 2 }), true);

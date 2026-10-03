@@ -33,10 +33,26 @@
   // dropped/skipped entry with no further reason), so they compare equal
   // here rather than flagging a field as changed just because one side's
   // key was omitted and the other's was explicitly null.
+  // Plain JSON.stringify serializes object keys in insertion order, so an
+  // object-valued field with the exact same keys/values in a different
+  // order was reported as "changed" when nothing real changed, a real
+  // false positive (verified against the hub page's own relationReasons
+  // field, which shares this exact fieldValuesDiffer shape). stableStringify
+  // sorts object keys (never array order/items, which stay meaningfully
+  // ordered) before serializing so key order alone can never flip the diff
+  // result.
+  function stableStringify(value) {
+    if (value === undefined) return 'undefined';
+    if (value === null || typeof value !== 'object') return JSON.stringify(value);
+    if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+    const keys = Object.keys(value).filter(k => value[k] !== undefined).sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
+  }
+
   function fieldValuesDiffer(a, b) {
     const na = a === undefined ? null : a;
     const nb = b === undefined ? null : b;
-    return JSON.stringify(na) !== JSON.stringify(nb);
+    return stableStringify(na) !== stableStringify(nb);
   }
 
   function diffByKey(currentList, backupList, keyFn, fields) {

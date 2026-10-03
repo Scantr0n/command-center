@@ -37,6 +37,14 @@ test('fieldValuesDiffer treats undefined and explicit null as equal', () => {
   assert.equal(fieldValuesDiffer(null, null), false);
 });
 
+test('fieldValuesDiffer treats an object-valued field as equal regardless of key order, real itemSpecifics shape', () => {
+  assert.equal(
+    fieldValuesDiffer({ brand: null, size: null, color: 'Black', condition: null }, { condition: null, color: 'Black', size: null, brand: null }),
+    false
+  );
+  assert.equal(fieldValuesDiffer({ color: 'Black' }, { color: 'White' }), true);
+});
+
 test('fieldValuesDiffer flags a real scalar and nested-array change', () => {
   assert.equal(fieldValuesDiffer('a', 'b'), true);
   assert.equal(fieldValuesDiffer(['ebay'], ['ebay', 'poshmark']), true);

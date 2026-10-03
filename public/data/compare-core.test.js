@@ -37,6 +37,14 @@ test('fieldValuesDiffer flags a real change inside a nested object field like re
   assert.equal(fieldValuesDiffer({ lastRunStatus: 'succeeded' }, { lastRunStatus: 'succeeded' }), false);
 });
 
+test('fieldValuesDiffer treats an object-valued field as equal regardless of key order, real relationReasons shape', () => {
+  assert.equal(
+    fieldValuesDiffer({ sondrik: 'shared lead pipeline', csm: 'same outreach channel' }, { csm: 'same outreach channel', sondrik: 'shared lead pipeline' }),
+    false
+  );
+  assert.equal(fieldValuesDiffer({ a: 1, b: 2 }, { b: 3, a: 1 }), true);
+});
+
 test('diffByKey reports an item only in the current list as added', () => {
   const result = diffByKey([{ id: 'alpha' }], [], x => x.id, ['name']);
   assert.equal(result.added.length, 1);
