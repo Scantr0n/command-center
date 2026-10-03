@@ -42,8 +42,8 @@ function shellUrlToFile(url) {
 
 const HUBS = ['', 'alpha', 'cgt', 'csm', 'garage', 'sondrik', 'job-search'];
 
-function hubLocalAssetRefs(hub) {
-  const html = fs.readFileSync(path.join(PUBLIC_DIR, hub, 'index.html'), 'utf8');
+function hubLocalAssetRefs(hub, page) {
+  const html = fs.readFileSync(path.join(PUBLIC_DIR, hub, page), 'utf8');
   const scriptSrcs = [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map(m => m[1]);
   const stylesheetHrefs = [...html.matchAll(/<link[^>]*rel="stylesheet"[^>]*\shref="([^"]+)"/g)].map(m => m[1]);
   return [...scriptSrcs, ...stylesheetHrefs].filter(ref => !ref.startsWith('http')); // same-origin only, no CDN refs
@@ -60,10 +60,30 @@ test('every SHELL_URLS entry resolves to a real file that still exists', () => {
 
 test('every hub index.html\'s own local <script src>/<link stylesheet> is cached in SHELL_URLS', () => {
   HUBS.forEach(hub => {
-    hubLocalAssetRefs(hub).forEach(ref => {
+    hubLocalAssetRefs(hub, 'index.html').forEach(ref => {
       assert.ok(
         SHELL_URLS.includes(ref),
         `${hub || 'root'} index.html loads "${ref}" but SHELL_URLS does not list it, offline mode for this hub would silently miss it`
+      );
+    });
+  });
+});
+
+// Every hub's own import.html is a second real page (the bulk CSV importer),
+// not just a script the main index.html pulls in, so the test above never
+// sees it or the scripts it loads on its own. CSM's and job-search's own
+// import.html/import.js/import-core.js went uncached in SHELL_URLS this way
+// for a real stretch, while CGT's and Garage's identical pages were already
+// covered, the same silent-drift bug class this file's header describes,
+// one layer deeper.
+test('every hub\'s own import.html, and its local <script src>/<link stylesheet>, is cached in SHELL_URLS', () => {
+  HUBS.filter(hub => hub && fs.existsSync(path.join(PUBLIC_DIR, hub, 'import.html'))).forEach(hub => {
+    const importHtml = `/${hub}/import.html`;
+    assert.ok(SHELL_URLS.includes(importHtml), `SHELL_URLS is missing "${importHtml}"`);
+    hubLocalAssetRefs(hub, 'import.html').forEach(ref => {
+      assert.ok(
+        SHELL_URLS.includes(ref),
+        `${hub} import.html loads "${ref}" but SHELL_URLS does not list it, offline mode for this importer would silently miss it`
       );
     });
   });

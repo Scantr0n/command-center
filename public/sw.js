@@ -3,7 +3,7 @@
 // drop the previous cache. The dashboard is otherwise "installable" (see the
 // manifest) but was never actually usable offline: this is what closes that
 // gap, without touching how any page talks to /api or its own /data files.
-const CACHE_VERSION = 'v77';
+const CACHE_VERSION = 'v78';
 const SHELL_CACHE = 'cc-shell-' + CACHE_VERSION;
 const RUNTIME_CACHE = 'cc-runtime-' + CACHE_VERSION;
 
@@ -27,7 +27,7 @@ const SHELL_URLS = [
   '/cgt/data/turnaround-core.js', '/cgt/data/import-core.js', '/cgt/data/export-core.js',
   '/cgt/data/compare-core.js', '/cgt/data/html-core.js',
   '/csm/', '/csm/index.html', '/csm/app.js', '/csm/style.css', '/csm/data/validate-core.js',
-  '/csm/data/csm-core.js',
+  '/csm/data/csm-core.js', '/csm/import.html', '/csm/import.js', '/csm/data/import-core.js',
   '/garage/', '/garage/index.html', '/garage/app.js', '/garage/style.css', '/garage/data/validate-core.js',
   '/garage/data/garage-core.js', '/garage/data/export-core.js', '/garage/data/compare-core.js', '/garage/data/html-core.js',
   '/garage/data/crop-core.js', '/garage/import.html', '/garage/import.js', '/garage/data/import-core.js',
@@ -38,7 +38,8 @@ const SHELL_URLS = [
   '/sondrik/data/funnel-core.js',
   '/job-search/', '/job-search/index.html', '/job-search/app.js', '/job-search/style.css',
   '/job-search/data/validate-core.js', '/job-search/data/export-core.js', '/job-search/data/compare-core.js',
-  '/job-search/data/html-core.js', '/job-search/data/followup-core.js'
+  '/job-search/data/html-core.js', '/job-search/data/followup-core.js',
+  '/job-search/import.html', '/job-search/import.js', '/job-search/data/import-core.js'
 ];
 
 self.addEventListener('install', event => {
