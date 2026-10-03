@@ -67,15 +67,28 @@
     return Number.isInteger(year) && year >= 1860 && year <= new Date().getFullYear() + 1;
   }
 
-  // BGS (and, per its own public standards, SGC) publish four subgrades per
-  // card -- centering, corners, edges, surface -- each on a 1-10 scale in
-  // half-point steps, independent of the overall grade shown on the slab
-  // label (grade is a separate, sometimes-rounded-down number, not just the
-  // lowest subgrade). A card with all four at 10 is BGS's "Black Label",
-  // a real, well-documented designation worth surfacing since it carries a
-  // large real-world value premium over a plain BGS 10. Multiplying by 2 and
-  // checking for a whole number is the standard way to test "is this a
-  // multiple of 0.5" without floating-point equality problems.
+  // BGS prints four individual subgrades on the slab label itself --
+  // centering, corners, edges, surface -- each on a 1-10 scale in half-point
+  // steps, independent of the overall grade shown (grade is a separate,
+  // sometimes-rounded-down number, not just the lowest subgrade). CGC
+  // Trading Cards offered the identical optional add-on on the same scale
+  // until discontinuing it in its mid-2023 merger into CGC Cards, so an
+  // older real CGC slab can legitimately carry these too -- a card graded
+  // since then never will, but this validator has no submittedDate-vs-2023
+  // check to tell old from new, and a false "not BGS" warning on a real
+  // pre-2023 CGC subgrade is worse than staying silent on one. SGC, by
+  // contrast, evaluates the same four factors internally but has never
+  // printed per-card subgrade numbers on the slab (real-world sources
+  // checked 2026-10-03), so it's the one company still excluded without a
+  // guess -- see the "has a subgrade logged but gradingCompany is neither
+  // BGS nor CGC" warning a few lines below, which depends on that being
+  // true. A card with all four at 10 is BGS's "Black Label", a real,
+  // well-documented designation worth surfacing since it carries a large
+  // real-world value premium over a plain BGS 10 -- CGC's now-discontinued
+  // subgrades had no equivalent named tier, so Black Label stays BGS-only.
+  // Multiplying by 2 and checking for a whole number is the standard way to
+  // test "is this a multiple of 0.5" without floating-point equality
+  // problems.
   const SUBGRADE_FIELDS = ['subgradeCentering', 'subgradeCorners', 'subgradeEdges', 'subgradeSurface'];
   function isValidSubgradeOrNull(v) {
     if (v === null || v === undefined) return true;
@@ -210,9 +223,10 @@
           GRADING_COMPANIES.join(', ') + '). Not an error, just double-check it is not a typo.');
       }
 
-      // Subgrades are optional even on a real BGS card (Jack may not have
-      // bothered logging them for a low-value common), so only the ones
-      // actually present get checked; a card with none set is not an error.
+      // Subgrades are optional even on a real BGS or pre-2023 CGC card (Jack
+      // may not have bothered logging them for a low-value common), so only
+      // the ones actually present get checked; a card with none set is not
+      // an error.
       let anySubgradeSet = false;
       SUBGRADE_FIELDS.forEach(f => {
         if (c[f] === null || c[f] === undefined) return;
@@ -221,9 +235,9 @@
           errors.push(where + ': "' + f + '" must be a number from 1 to 10 in half-point steps (e.g. 9, 9.5, 10) or null, got ' + JSON.stringify(c[f]));
         }
       });
-      if (anySubgradeSet && c.gradingCompany !== 'BGS') {
+      if (anySubgradeSet && c.gradingCompany !== 'BGS' && c.gradingCompany !== 'CGC') {
         warnings.push(where + ': has a subgrade logged but "gradingCompany" is "' + (c.gradingCompany || 'null') +
-          '", not "BGS". Subgrades are a BGS-specific concept, double-check this is not logged against the wrong row.');
+          '", not "BGS" or "CGC". Subgrades are a BGS/pre-2023-CGC concept, double-check this is not logged against the wrong row.');
       }
 
       if (c.estimatedValue !== null && c.estimatedValue !== undefined) {

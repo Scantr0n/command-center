@@ -494,9 +494,20 @@ test('validateCards accepts real BGS subgrades in half-point steps, rejects out-
   assert.ok(offStep.errors.some(e => e.includes('subgradeCorners')));
 });
 
-test('validateCards warns when a subgrade is logged against a non-BGS card', () => {
+test('validateCards warns when a subgrade is logged against a non-BGS, non-CGC card', () => {
   const { warnings } = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'PSA', subgradeSurface: 10 }]);
   assert.ok(warnings.some(w => w.includes('subgrade') && w.includes('BGS')));
+
+  const sgc = validateCards([{ id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'SGC', subgradeSurface: 10 }]);
+  assert.ok(sgc.warnings.some(w => w.includes('subgrade')));
+});
+
+test('validateCards does not warn on a real subgrade logged against a CGC card (CGC Trading Cards offered the identical optional subgrade add-on until discontinuing it in its mid-2023 merger into CGC Cards, so an older real CGC slab can legitimately carry one)', () => {
+  const { warnings } = validateCards([
+    { id: 'a', cardName: 'X', sport: 'hockey', gradingCompany: 'CGC', grade: '9.5',
+      subgradeCentering: 9.5, subgradeCorners: 10, subgradeEdges: 9.5, subgradeSurface: 9.5 }
+  ]);
+  assert.ok(!warnings.some(w => w.includes('subgrade')));
 });
 
 test('validateSubmissions requires returnedDate once status is returned', () => {

@@ -168,12 +168,16 @@ function isExample(c) {
   return c.id === 'example-row-not-real';
 }
 
-// BGS's own four subgrades (centering, corners, edges, surface), each 1-10
-// in half-point steps, independent of the overall grade on the slab label.
-// SUBGRADE_FIELDS/label pairs kept together so every place that needs to
-// list them (detail view, edit form, quick-log form, CSV export) reads from
-// one source instead of four field names getting typed out separately each
-// time and drifting if one is ever renamed.
+// Four subgrades (centering, corners, edges, surface), each 1-10 in
+// half-point steps, independent of the overall grade on the slab label. BGS
+// prints these on every slab; CGC Trading Cards offered the identical
+// optional add-on until discontinuing it in its mid-2023 merger into CGC
+// Cards, so an older real CGC card can carry them too (see validate-core.js
+// for the full real-world sourcing). SUBGRADE_FIELDS/label pairs kept
+// together so every place that needs to list them (detail view, edit form,
+// quick-log form, CSV export) reads from one source instead of four field
+// names getting typed out separately each time and drifting if one is ever
+// renamed.
 const SUBGRADE_LABELS = [
   ['subgradeCentering', 'Centering'],
   ['subgradeCorners', 'Corners'],
@@ -3229,7 +3233,7 @@ function cardEditFormHtml(c) {
     ceSelectRow('ceGradingCompany', 'Grading company', c.gradingCompany, [['', 'Not graded / raw'], ['PSA', 'PSA'], ['BGS', 'BGS'], ['SGC', 'SGC'], ['CGC', 'CGC'], ['HGA', 'HGA'], ['KSA', 'KSA']]) +
     ceInputInner('ceGrade', 'Grade', c.grade) +
     '</div>' +
-    '<p class="field-note">BGS subgrades (optional, BGS only): centering, corners, edges, surface, each 1-10 in half-point steps. All four at 10 is BGS\'s real "Black Label".</p>' +
+    '<p class="field-note">Subgrades (optional, BGS or pre-2023 CGC): centering, corners, edges, surface, each 1-10 in half-point steps. All four at 10 is BGS\'s real "Black Label".</p>' +
     '<div class="form-row-split">' +
     ceInputInner('ceSubgradeCentering', 'Centering', c.subgradeCentering, 'number', '0.5') +
     ceInputInner('ceSubgradeCorners', 'Corners', c.subgradeCorners, 'number', '0.5') +
@@ -4297,8 +4301,8 @@ const CSV_COLUMNS = [
   [c => c.cardName, 'Card'], [c => c.year, 'Year'], [c => c.sport, 'Sport'], [c => c.gradingCompany, 'Grading company'],
   [c => c.grade, 'Grade'],
   [c => c.setName, 'Set/manufacturer'], [c => c.cardNumber, 'Card number'],
-  [c => c.subgradeCentering, 'BGS centering'], [c => c.subgradeCorners, 'BGS corners'],
-  [c => c.subgradeEdges, 'BGS edges'], [c => c.subgradeSurface, 'BGS surface'],
+  [c => c.subgradeCentering, 'Centering subgrade'], [c => c.subgradeCorners, 'Corners subgrade'],
+  [c => c.subgradeEdges, 'Edges subgrade'], [c => c.subgradeSurface, 'Surface subgrade'],
   [c => isBgsBlackLabel(c) ? 'yes' : '', 'Black Label'],
   [c => c.certNumber, 'Cert number'], [c => c.storageLocation, 'Storage location'],
   [c => c.submissionId, 'From submission id'],
