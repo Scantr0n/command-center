@@ -13,7 +13,9 @@
     reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
     computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness,
     computeReplyLatency, CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled,
-    escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
+    escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+    DRAFT_MESSAGE_SITUATIONS, suggestedDraftSituation, buildDraftOutreachMessage,
+    stageEntryCriteriaStatus,
     channelSortRank, listComparator, computeDataQualityFlags, computePriorityQueue,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     findContactDetailReuseMatch,
@@ -2854,6 +2856,7 @@
     rows.push(fieldRow('Send date', p.sendDate ? fmtDate(p.sendDate) : 'Not logged yet', !p.sendDate));
     const outreachLogHtml = renderOutreachLog(p);
     rows.push(fieldRow('Outreach touch log', outreachLogHtml.html + outreachLogGeneratorHtml(), outreachLogHtml.empty));
+    rows.push(fieldRow('Draft outreach message', draftMessageGeneratorHtml(), false));
     const firstReplyDays = daysToFirstReply(p);
     rows.push(fieldRow('Time to first reply',
       firstReplyDays == null
@@ -2923,6 +2926,7 @@
     wireStageMoveGenerator(p);
     wireIdeaGenerator(p);
     wireOutreachLogGenerator(p);
+    wireDraftMessageGenerator(p);
     wireSocialSnapshotGenerator(p);
     lockBodyScroll();
     modalClose.focus();
@@ -3022,6 +3026,50 @@
       '<pre class="np-output font-mono" id="modalTouchSuggestOutput"></pre>' +
       '</div>' +
       '</div></div>';
+  }
+
+  // Distinct from the "Copy outreach brief" button in the modal header
+  // (buildProspectBriefText, background *about* this prospect for Jack's
+  // own reference) and from outreachReadinessWarnings (a go/no-go check
+  // already run elsewhere): this is a starting draft of the actual message
+  // *to* the prospect, built from buildDraftOutreachMessage in csm-core.js
+  // so the merge-field/placeholder logic has real regression coverage, the
+  // same shared-core-with-tests pattern as every other generator here.
+  // Plain copy-to-clipboard text only, same as the rest of this modal, no
+  // send step exists anywhere in this board per the standing "planning
+  // tool, not a send tool" rule in the page's own callout.
+  function draftMessageGeneratorHtml() {
+    const options = DRAFT_MESSAGE_SITUATIONS.map(s =>
+      '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.label) + '</option>').join('');
+    return '<div class="inline-gen">' +
+      '<div class="inline-gen-row">' +
+      '<label class="sr-only" for="modalDraftSituation">Message situation</label>' +
+      '<select id="modalDraftSituation" class="np-input inline-gen-select">' + options + '</select>' +
+      '<button type="button" id="modalDraftGenerate" class="print-btn font-mono">+ Draft message</button>' +
+      '</div>' +
+      '<p class="section-note" style="margin:4px 0 0">Starting draft only, addressed to the prospect. Every ' +
+      'bracketed line is something real not yet decided, fill it in and edit the rest before sending it ' +
+      'yourself anywhere, nothing on this page sends or submits anything.</p>' +
+      '<div id="modalDraftResult" class="inline-gen-result" hidden>' +
+      '<div class="np-output-head">' +
+      '<span class="field-label" style="margin:0">Draft, copy and send from your own email/DM client</span>' +
+      '<button type="button" id="modalDraftCopy" class="print-btn font-mono" aria-live="polite">Copy</button>' +
+      '</div>' +
+      '<pre class="np-output font-mono" id="modalDraftOutput"></pre>' +
+      '</div></div>';
+  }
+
+  function wireDraftMessageGenerator(p) {
+    const situationSelect = document.getElementById('modalDraftSituation');
+    situationSelect.value = suggestedDraftSituation(p);
+    const resultEl = document.getElementById('modalDraftResult');
+    const outputEl = document.getElementById('modalDraftOutput');
+    document.getElementById('modalDraftGenerate').addEventListener('click', () => {
+      const draft = buildDraftOutreachMessage(p, situationSelect.value, { fmtDate });
+      outputEl.textContent = draft.body;
+      resultEl.hidden = false;
+    });
+    wireCopyButton(document.getElementById('modalDraftCopy'), outputEl);
   }
 
   function wireCopyButton(btn, sourceEl) {

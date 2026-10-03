@@ -24,7 +24,9 @@ const {
   reachedActiveExploration, computeStageVelocity, computeColdSignal, COLD_TOUCH_THRESHOLD,
   computeFunnel, computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness, computeReplyLatency,
   CHANNEL_EFF_MIN_N_FOR_RATE, computeStalled, hasNudgePlan, computeDataQualityFlags, computePriorityQueue,
-  escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings, stageEntryCriteriaStatus,
+  escapeHtml, csvField, icsEscapeText, icsFoldLine, outreachReadinessWarnings,
+  DRAFT_MESSAGE_SITUATIONS, suggestedDraftSituation, buildDraftOutreachMessage,
+  stageEntryCriteriaStatus,
   channelSortRank, listComparator, slugifyProspectId, nextAvailableId,
   findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch, findContactDetailReuseMatch,
   missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
@@ -1104,6 +1106,91 @@ test('outreachReadinessWarnings still flags a missing channel type when contactC
   const warnings = outreachReadinessWarnings(p);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /contactChannel\.type/);
+});
+
+test('suggestedDraftSituation returns initial for a prospect with no real touches logged', () => {
+  assert.equal(suggestedDraftSituation({}), 'initial');
+  assert.equal(suggestedDraftSituation({ outreachLog: [] }), 'initial');
+});
+
+test('suggestedDraftSituation returns nudge once at least one real touch is logged', () => {
+  const p = { outreachLog: [{ date: '2026-09-01', type: 'initial-send' }] };
+  assert.equal(suggestedDraftSituation(p), 'nudge');
+});
+
+test('suggestedDraftSituation returns re-engagement only once computeColdSignal would call this prospect parked', () => {
+  const today = todayIso();
+  const past = addDaysIso(today, -1);
+  const future = addDaysIso(today, 5);
+  const manyTouches = Array.from({ length: COLD_TOUCH_THRESHOLD }, (_, i) => ({ date: '2026-09-0' + (i + 1), type: 'nudge' }));
+  assert.equal(
+    suggestedDraftSituation({ outreachLog: manyTouches, nudgeSchedule: { doNotNudgeBefore: past } }),
+    're-engagement',
+    'threshold touches plus a doNotNudgeBefore date that has already arrived'
+  );
+  assert.equal(
+    suggestedDraftSituation({ outreachLog: manyTouches, nudgeSchedule: { doNotNudgeBefore: future } }),
+    'nudge',
+    'still parked (doNotNudgeBefore in the future), not due for re-engagement yet'
+  );
+  assert.equal(
+    suggestedDraftSituation({ outreachLog: [{ date: '2026-09-01', type: 'initial-send' }], nudgeSchedule: { doNotNudgeBefore: past } }),
+    'nudge',
+    'a passed doNotNudgeBefore date alone is not enough without the real cold-signal touch count too'
+  );
+});
+
+test('DRAFT_MESSAGE_SITUATIONS lists exactly the three situations buildDraftOutreachMessage understands', () => {
+  assert.deepEqual(DRAFT_MESSAGE_SITUATIONS.map(s => s.id), ['initial', 'nudge', 're-engagement']);
+});
+
+test('buildDraftOutreachMessage leaves a bracketed placeholder instead of inventing an unlogged hook', () => {
+  const draft = buildDraftOutreachMessage({ name: 'Jane Doe' }, 'initial');
+  assert.match(draft.body, /\[VERIFIED HOOK NOT LOGGED YET/);
+  assert.equal(draft.situation, 'initial');
+});
+
+test('buildDraftOutreachMessage uses the real logged verifiedHook and first name when present', () => {
+  const draft = buildDraftOutreachMessage({ name: 'Jane Doe', verifiedHook: 'Runs a real expat community brand' }, 'initial');
+  assert.match(draft.body, /^Hi Jane,/);
+  assert.match(draft.body, /Runs a real expat community brand/);
+  assert.ok(!draft.body.includes('NOT LOGGED YET'));
+});
+
+test('buildDraftOutreachMessage never invents a name when one was never logged', () => {
+  const draft = buildDraftOutreachMessage({}, 'initial');
+  assert.match(draft.body, /\[name not logged\]/);
+});
+
+test('buildDraftOutreachMessage references the real touch number on a nudge draft', () => {
+  const p = { name: 'Jane Doe', outreachLog: [{ date: '2026-09-01', type: 'initial-send' }, { date: '2026-09-10', type: 'nudge' }] };
+  const draft = buildDraftOutreachMessage(p, 'nudge');
+  assert.match(draft.body, /touch #3/);
+});
+
+test('buildDraftOutreachMessage omits a touch number on the first nudge, a plain "following up" reads better than "touch #2"', () => {
+  const p = { name: 'Jane Doe', outreachLog: [{ date: '2026-09-01', type: 'initial-send' }] };
+  const draft = buildDraftOutreachMessage(p, 'nudge');
+  assert.ok(!draft.body.includes('touch #'));
+});
+
+test('buildDraftOutreachMessage references the real doNotNudgeBefore date on a re-engagement draft, formatted through the injected fmtDate', () => {
+  const p = { name: 'Jane Doe', nudgeSchedule: { doNotNudgeBefore: '2026-09-01' } };
+  const draft = buildDraftOutreachMessage(p, 're-engagement', { fmtDate: iso => 'FMT(' + iso + ')' });
+  assert.match(draft.body, /parking this one on FMT\(2026-09-01\)/);
+});
+
+test('buildDraftOutreachMessage includes the real latest content idea verbatim when one is logged', () => {
+  const p = {
+    name: 'Jane Doe',
+    contentIdeas: [
+      { date: '2026-08-01', idea: 'Older idea' },
+      { date: '2026-09-15', idea: 'Newest real idea' }
+    ]
+  };
+  const draft = buildDraftOutreachMessage(p, 'initial');
+  assert.match(draft.body, /Newest real idea/);
+  assert.ok(!draft.body.includes('Older idea'));
 });
 
 test('stageEntryCriteriaStatus returns an empty list for a stage with no entryCriteria', () => {

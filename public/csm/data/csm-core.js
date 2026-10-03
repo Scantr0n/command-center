@@ -1141,6 +1141,76 @@
     return warnings;
   }
 
+  // Distinct from buildProspectBriefText in app.js (background *about* a
+  // prospect, for Jack's own reference before writing something himself)
+  // and from outreachReadinessWarnings above (a go/no-go check): this
+  // builds the actual starting draft *addressed to* the prospect, the words
+  // that would get pasted into a real DM or email. Same rule
+  // SondrikPostsCore's CHANNEL_POST_BUILDERS already applies to its own
+  // per-channel draft posts: state only an already-logged real fact, leave
+  // a bracketed placeholder for anything not yet decided (the real ask,
+  // the real new angle, the signature), never invent one. Nothing built
+  // here is ever sent from this module, only ever handed back as a string
+  // for a human to copy, edit, and send themselves elsewhere, same as
+  // every other generator in this file.
+  const DRAFT_MESSAGE_SITUATIONS = [
+    { id: 'initial', label: 'Initial outreach (first message)' },
+    { id: 'nudge', label: 'Follow-up (already sent at least once)' },
+    { id: 're-engagement', label: 'Re-engagement (after a parked cold signal)' }
+  ];
+
+  // Suggests the situation that actually matches this prospect's own logged
+  // state, a starting point only, always overridable in the UI. Mirrors
+  // computeColdSignal's own "parked" definition exactly (COLD_TOUCH_THRESHOLD
+  // real touches, plus a doNotNudgeBefore date that has now arrived or
+  // passed) rather than inventing a separate threshold, so this never
+  // suggests "re-engagement" for a prospect computeColdSignal itself would
+  // not call parked.
+  function suggestedDraftSituation(p) {
+    const touches = touchCount(p);
+    const ns = (p && p.nudgeSchedule) || {};
+    const notBefore = ns.doNotNudgeBefore;
+    if (touches >= COLD_TOUCH_THRESHOLD && notBefore && isValidDateStr(notBefore) && daysUntil(notBefore) <= 0) {
+      return 're-engagement';
+    }
+    return touches > 0 ? 'nudge' : 'initial';
+  }
+
+  function buildDraftOutreachMessage(p, situationId, opts) {
+    const fmtDate = (opts && opts.fmtDate) || (iso => iso);
+    const firstName = (p && typeof p.name === 'string' && p.name.trim()) ? p.name.trim().split(/\s+/)[0] : '[name not logged]';
+    const hookLine = (p && p.verifiedHook)
+      ? p.verifiedHook
+      : '[VERIFIED HOOK NOT LOGGED YET, do not send until this is a real, checked reason they fit]';
+    const touches = touchCount(p);
+    const ideas = (p && Array.isArray(p.contentIdeas)) ? p.contentIdeas : [];
+    const lastIdea = ideas.filter(e => e && e.idea).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+    const ideaLine = lastIdea
+      ? ' (you logged this content idea on ' + (lastIdea.date ? fmtDate(lastIdea.date) : 'an unlogged date') + ': "' + lastIdea.idea + '")'
+      : '';
+    const greeting = 'Hi ' + firstName + ',';
+
+    let body;
+    if (situationId === 'nudge') {
+      body = greeting + '\n\n' +
+        'Following up on my last message' + (touches > 1 ? ' (touch #' + (touches + 1) + ')' : '') + '. ' + hookLine + ideaLine + '\n\n' +
+        '[Add what is actually new since your last touch, a near-identical repeat follow-up is one of the lowest-reply-rate patterns in cold outreach.]\n\n' +
+        '[Your name]';
+    } else if (situationId === 're-engagement') {
+      const notBefore = p && p.nudgeSchedule && p.nudgeSchedule.doNotNudgeBefore;
+      const parkedNote = notBefore && isValidDateStr(notBefore) ? ' since parking this one on ' + fmtDate(notBefore) : '';
+      body = greeting + '\n\n' +
+        'It has been a while since I last reached out' + parkedNote + '. ' + hookLine + ideaLine + '\n\n' +
+        '[Add the real different angle you decided on before parking this one, that is the actual point of a re-engagement message, not a repeat of the first ask.]\n\n' +
+        '[Your name]';
+    } else {
+      body = greeting + '\n\n' + hookLine + ideaLine + '\n\n' +
+        '[Add your actual ask or pitch before sending.]\n\n' +
+        '[Your name]';
+    }
+    return { situation: situationId, body };
+  }
+
   // Generalizes the same "not ready yet" idea above (outreachReadinessWarnings
   // is the outreach-sent-specific case of this, kept as-is since it already
   // has its own tests and callers) to every other stage: a real, well-known
@@ -1309,7 +1379,8 @@
     computeSocialReach, computeChannelEffectiveness, computeCategoryEffectiveness, computeReplyLatency,
     computeStalled, hasNudgePlan, computeDataQualityFlags, computePriorityQueue,
     escapeHtml, csvField, icsEscapeText, icsFoldLine,
-    outreachReadinessWarnings, stageEntryCriteriaStatus, channelSortRank, listComparator,
+    outreachReadinessWarnings, DRAFT_MESSAGE_SITUATIONS, suggestedDraftSituation, buildDraftOutreachMessage,
+    stageEntryCriteriaStatus, channelSortRank, listComparator,
     slugifyProspectId, nextAvailableId, findCategoryCasingClash, findProspectByNameCompany, findHookReuseMatch,
     findContactDetailReuseMatch,
     missingContactChannelType, missingVerifiedHook, channelTypeLoggedWithNoDetail, missingFollowUpPlan,
