@@ -1,7 +1,18 @@
 {
-  "generatedAt": "2026-10-03T09:35:42.653Z",
+  "generatedAt": "2026-10-03T17:41:22.111Z",
   "generatedFrom": "git log over public/cgt/data/{cards.json,submissions.json,candidates.json}, run node public/cgt/data/changelog.js to refresh",
   "entries": [
+    {
+      "hash": "bc007ed",
+      "fullHash": "bc007ed8f86bffbaac45de1f091ab2ca0fe053eb",
+      "date": "2026-10-03",
+      "author": "Claude",
+      "subject": "CGT: let a reviewed listing-price mismatch stop re-flagging itself",
+      "historyReset": false,
+      "files": [
+        "cards.json"
+      ]
+    },
     {
       "hash": "493cdd2",
       "fullHash": "493cdd261c0cfd728c63b8087223ea9998b43330",
