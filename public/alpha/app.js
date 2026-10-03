@@ -2065,23 +2065,65 @@ function lineageCard(l) {
 // history/Sizing mode history above: the Genealogy wall was the one list-
 // shaped section on this page with no CSV button, purely because the wall
 // itself was built after those. Captured here so the button can export
-// exactly the real lineages just rendered, never a second read of data.live.
+// exactly the real lineages just rendered (i.e. after the status filter
+// below is applied), never a second read of data.live.
 let lastLineagesSnapshot = [];
 
-function renderGenealogy(data) {
-  const g = data.live.genealogy;
+// Full, unfiltered set of real lineages from the most recent render, kept
+// separately from lastLineagesSnapshot above so changing the status filter
+// can re-render instantly from already-fetched data, same split already
+// proven at the Activity log's lastEventLogAllSorted/lastEventLogSnapshot.
+let lastLineagesAllSnapshot = [];
+
+const GENEALOGY_STATUS_LABELS = { active: 'Active', retired: 'Retired', unknown: 'Unknown' };
+function genealogyStatusLabel(status) {
+  return GENEALOGY_STATUS_LABELS[status] || 'Unknown';
+}
+
+// A lineage with no real status field (validate.js allows null) is neither
+// active nor retired, just not yet reported, so it gets its own real
+// "unknown" bucket here rather than being silently dropped from the filter
+// or miscounted as one of the two real statuses.
+function lineageStatusKey(l) {
+  return l.status === 'active' || l.status === 'retired' ? l.status : 'unknown';
+}
+
+// Rebuilds the filter's own <option> list from whichever statuses are
+// actually present in this real wall right now, same "never show a control
+// for data that doesn't exist" rule the Activity log's own type filter
+// already follows. Preserves the currently-selected filter across a data
+// refresh when that status is still present, so a 30s poll landing mid-read
+// never silently resets what Jack was just looking at.
+function populateGenealogyStatusFilter(lineages) {
+  const select = document.getElementById('genealogyStatusFilter');
+  if (!select) return;
+  const previous = select.value;
+  const statuses = [...new Set(lineages.map(lineageStatusKey))].sort();
+  select.innerHTML = '<option value="">All statuses</option>' +
+    statuses.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(genealogyStatusLabel(s))}</option>`).join('');
+  select.value = statuses.includes(previous) ? previous : '';
+  select.disabled = statuses.length === 0;
+}
+
+// Renders whichever subset of lastLineagesAllSnapshot the status filter
+// above currently selects, plus the aggregate summary row, which always
+// reflects the real totals regardless of the filter, same as the Activity
+// log's own count-vs-filtered-list split. Split out from renderGenealogy so
+// moving the filter can re-render instantly without waiting on the next 30s
+// poll or re-fetching anything.
+function renderFilteredGenealogy(g, hasAggregate) {
   const panel = document.getElementById('genealogyPanel');
-  const lineages = (g && Array.isArray(g.lineages)) ? g.lineages : [];
-  const hasAggregate = g && (g.generation != null || g.lastBreedingEventAt != null);
-  lastLineagesSnapshot = lineages;
+  const select = document.getElementById('genealogyStatusFilter');
+  const filterStatus = select ? select.value : '';
+  const all = lastLineagesAllSnapshot;
+  const filtered = filterStatus ? all.filter(l => lineageStatusKey(l) === filterStatus) : all;
+  lastLineagesSnapshot = filtered;
+
   const csvBtn = document.getElementById('genealogyCsvBtn');
   if (csvBtn) {
-    csvBtn.disabled = !lineages.length;
-    csvBtn.title = lineages.length ? '' : 'No lineage data to export yet.';
+    csvBtn.disabled = !filtered.length;
+    csvBtn.title = filtered.length ? '' : (all.length ? 'No lineages match this filter.' : 'No lineage data to export yet.');
   }
-  if (!hasAggregate && !lineages.length) return; // keep the built-in "awaiting live connection" empty state
-
-  panel.classList.remove('empty-panel');
 
   // No "Active lineages" tile: the daemon's real data has no
   // parentage/lineage-grouping field, only per-agent strategy metadata, so
@@ -2099,12 +2141,42 @@ function renderGenealogy(data) {
   // an empty lineages[] with aggregate counts set (today's real server.js
   // mapping, see its own genealogy comment) just keeps the summary row above,
   // same as before this feature existed, rather than showing an empty grid.
-  const wallHtml = lineages.length ? `
+  const wallHtml = all.length ? (filtered.length ? `
     <div class="lineage-wall-label font-mono">LINEAGES</div>
-    <div class="lineage-wall">${lineages.map(lineageCard).join('')}</div>
-  ` : '';
+    <div class="lineage-wall">${filtered.map(lineageCard).join('')}</div>
+  ` : `
+    <div class="lineage-wall-label font-mono">LINEAGES</div>
+    <div class="empty-panel">
+      <div class="empty-panel-title font-mono">NO ${escapeHtml(genealogyStatusLabel(filterStatus).toUpperCase())} LINEAGES</div>
+      <div class="empty-panel-sub">
+        None of the ${all.length} real lineage(s) have this status. Choose "All statuses" above to see the rest
+        of the wall again.
+      </div>
+    </div>
+  `) : '';
 
   panel.innerHTML = summaryHtml + wallHtml;
+}
+
+function renderGenealogy(data) {
+  const g = data.live.genealogy;
+  const panel = document.getElementById('genealogyPanel');
+  const lineages = (g && Array.isArray(g.lineages)) ? g.lineages : [];
+  const hasAggregate = g && (g.generation != null || g.lastBreedingEventAt != null);
+  lastLineagesAllSnapshot = lineages;
+  populateGenealogyStatusFilter(lineages);
+  if (!hasAggregate && !lineages.length) {
+    lastLineagesSnapshot = [];
+    const csvBtn = document.getElementById('genealogyCsvBtn');
+    if (csvBtn) {
+      csvBtn.disabled = true;
+      csvBtn.title = 'No lineage data to export yet.';
+    }
+    return; // keep the built-in "awaiting live connection" empty state
+  }
+
+  panel.classList.remove('empty-panel');
+  renderFilteredGenealogy(g, hasAggregate);
 }
 
 // A status-only page loses the "what changed and when" that makes a status
@@ -3218,6 +3290,17 @@ document.getElementById('positionsCsvBtn').addEventListener('click', () => {
 // last real fetch), never a re-fetch: picking a type is a pure view change,
 // not a new read of Alpha's real data.
 document.getElementById('eventLogTypeFilter').addEventListener('change', renderFilteredEventLog);
+
+// Same instant, no-refetch re-render as the Activity log's own type filter
+// above, reading whatever genealogy data was last actually fetched
+// (lastStatusData, set to the same effectiveData renderGenealogy itself was
+// last called with).
+document.getElementById('genealogyStatusFilter').addEventListener('change', () => {
+  if (!lastStatusData) return;
+  const g = lastStatusData.live && lastStatusData.live.genealogy;
+  const hasAggregate = g && (g.generation != null || g.lastBreedingEventAt != null);
+  renderFilteredGenealogy(g, hasAggregate);
+});
 
 const EVENT_LOG_CSV_COLUMNS = [
   ['at', 'When'], ['type', 'Type'], ['tone', 'Tone'], ['label', 'Label'], ['detail', 'Detail']
