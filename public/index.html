@@ -33,6 +33,32 @@
     --sub: #9A9FA6;
     --faint: #7C838C;
   }
+  /* prefers-contrast: more (Safari 14.1+/iOS 14.5+, ~93% global support):
+     this is the page Jack actually leaves open, and it leans on --sub and
+     --faint for a lot of real information, not just decoration, status
+     summaries, last-updated timestamps, grid-card detail text, every card's
+     --hairline border, and both read noticeably faint against
+     --panel/--void by design. A reader who has asked their system for more
+     contrast gets that faint text and those barely-there borders boosted
+     along with everything else on their screen; this page should not be
+     the one place that stays flat. Pure custom-property overrides: every
+     rule elsewhere in this file already reads these four through var(), so
+     this is the one place that needs to change. Verified against --panel
+     (#101215): --faint moves from 4.9:1 to 8.2:1, --sub from 7.0:1 to
+     10.9:1, both clearing WCAG AAA's 7:1, not just AA's 4.5:1, same values
+     already verified against this exact pair on Alpha/CGT/Sondrik's own
+     prefers-contrast blocks. Independent of the forced-colors and
+     reduced-transparency blocks elsewhere on this page, a different real
+     OS/browser signal (Windows High Contrast triggers forced-colors, not
+     this), so this page now answers all three the same honest way. */
+  @media (prefers-contrast: more) {
+    :root {
+      --hairline: rgba(255,255,255,0.22);
+      --hairlineHover: rgba(255,255,255,0.38);
+      --sub: #C2C6CB;
+      --faint: #A7ACB3;
+    }
+  }
   /* Real diagnosis after Jack called the whole app "a website from 2000":
      it wasn't the type system (Manrope/Inter/JetBrains Mono already had a
      real hierarchy) - it was that every surface sat on one flat, solid

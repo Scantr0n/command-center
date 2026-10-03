@@ -31,6 +31,31 @@
   --accent: #D97B41;
 }
 
+/* prefers-contrast: more (Safari 14.1+/iOS 14.5+, ~93% global support):
+   this page leans on --dim and --sub for a lot of real information, not
+   just decoration, engagement-check/dispute timestamps, estimated-tax and
+   holiday ship-by notes, CSV import placeholder text, every section's
+   --hairline card border, and both read noticeably faint against
+   --panel/--void by design. A reader who has asked their system for more
+   contrast gets that faint text and those barely-there borders boosted
+   along with everything else on their screen; this page should not be the
+   one place that stays flat. Pure custom-property overrides: every rule
+   elsewhere in this file already reads these four through var(), so this
+   is the one place that needs to change, same values already verified
+   against this exact --panel/--void pair on Alpha/CGT/Sondrik's own
+   prefers-contrast blocks. Independent of the forced-colors and
+   reduced-transparency blocks further down this file, a different real
+   OS/browser signal (Windows High Contrast triggers forced-colors, not
+   this), so this page now answers all three the same honest way. */
+@media (prefers-contrast: more) {
+  :root {
+    --hairline: rgba(255,255,255,0.22);
+    --hairlineHover: rgba(255,255,255,0.38);
+    --sub: #C2C6CB;
+    --dim: #A7ACB3;
+  }
+}
+
 * { box-sizing: border-box; }
 
 body {
