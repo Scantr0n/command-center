@@ -10,8 +10,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications
+  isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications,
+  validateApplications
 } = require('./validate-core.js');
+
+const STATUS_LABELS = { interview: 'Interviewing', offer: 'Offer', rejected: 'Rejected', withdrawn: 'Withdrawn' };
 
 test('isDateOrNull accepts null and undefined', () => {
   assert.equal(isDateOrNull(null), true);
@@ -100,4 +103,55 @@ test('findDuplicateApplications skips a truthy non-string company or role instea
     { num: 2, company: 'Acme', role: 42 }
   ];
   assert.doesNotThrow(() => findDuplicateApplications(apps));
+});
+
+test('validateApplications accepts a fully real, complete application with no errors or warnings', () => {
+  const apps = [{ num: 1, role: 'Marketing Intern', company: 'Acme', location: 'NY (Remote)', pay: '$20/hr', appliedDate: '2026-08-11' }];
+  const { errors, warnings } = validateApplications(apps, STATUS_LABELS);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('validateApplications flags a missing "num" and a missing required string field', () => {
+  const apps = [{ role: 'Intern', company: 'Acme', location: '', pay: '$20/hr', appliedDate: '2026-08-11' }];
+  const { errors } = validateApplications(apps, STATUS_LABELS);
+  assert.ok(errors.some(e => e.includes('missing numeric "num"')));
+  assert.ok(errors.some(e => e.includes('missing "location"')));
+});
+
+test('validateApplications flags a duplicate "num" across two rows', () => {
+  const apps = [
+    { num: 1, role: 'Intern', company: 'Acme', location: 'NY', pay: '$20/hr', appliedDate: '2026-08-11' },
+    { num: 1, role: 'Analyst', company: 'Widgets', location: 'CA', pay: '$22/hr', appliedDate: '2026-08-12' }
+  ];
+  const { errors } = validateApplications(apps, STATUS_LABELS);
+  assert.ok(errors.some(e => e.includes('duplicate "num" 1')));
+});
+
+test('validateApplications rejects a status outside the real taxonomy', () => {
+  const apps = [{ num: 1, role: 'Intern', company: 'Acme', location: 'NY', pay: '$20/hr', appliedDate: '2026-08-11', status: 'ghosted' }];
+  const { errors } = validateApplications(apps, STATUS_LABELS);
+  assert.ok(errors.some(e => e.includes('"status" must be one of')));
+});
+
+test('validateApplications accepts a real status from the taxonomy', () => {
+  const apps = [{ num: 1, role: 'Intern', company: 'Acme', location: 'NY', pay: '$20/hr', appliedDate: '2026-08-11', status: 'interview' }];
+  const { errors } = validateApplications(apps, STATUS_LABELS);
+  assert.deepEqual(errors, []);
+});
+
+test('validateApplications warns on a company+role duplicate across two real rows', () => {
+  const apps = [
+    { num: 1, role: 'Growth Intern', company: 'Acme Inc', location: 'NY', pay: '$20/hr', appliedDate: '2026-08-11' },
+    { num: 2, role: 'Growth Intern', company: 'Acme Inc', location: 'NY', pay: '$20/hr', appliedDate: '2026-08-12' }
+  ];
+  const { warnings } = validateApplications(apps, STATUS_LABELS);
+  assert.ok(warnings.some(w => w.includes('entries match on company + role')));
+});
+
+test('validateApplications warns on an em dash in a transcription field without blocking on it', () => {
+  const apps = [{ num: 1, role: 'Intern' + String.fromCharCode(8212) + 'Marketing', company: 'Acme', location: 'NY', pay: '$20/hr', appliedDate: '2026-08-11' }];
+  const { errors, warnings } = validateApplications(apps, STATUS_LABELS);
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some(w => w.includes('"role" contains an em dash')));
 });

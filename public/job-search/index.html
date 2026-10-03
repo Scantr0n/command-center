@@ -29,6 +29,7 @@
       <button type="button" id="backupBtn" class="print-btn font-mono" disabled title="Loading data...">Download backup (.json)</button>
       <button type="button" id="compareBackupBtn" class="print-btn font-mono" disabled title="Loading applications data...">Compare with backup&hellip;</button>
       <button type="button" id="csvBtn" class="print-btn font-mono" disabled title="Loading data...">Export CSV</button>
+      <a href="/job-search/import.html" class="print-btn font-mono">Import CSV</a>
       <button type="button" id="printBtn" class="print-btn font-mono">Print / export PDF</button>
       <button type="button" id="notifyBtn" class="print-btn font-mono" hidden aria-live="polite"></button>
       <button type="button" id="testAlertBtn" class="print-btn font-mono" hidden>Send test alert</button>
@@ -174,7 +175,10 @@
       <p>Fills in the same fields as the Applications table above, then builds the exact JSON object to paste into
         <code>applications.json</code>'s <code>applications</code> array yourself. This never writes a file or
         sends anything, it only puts text on your clipboard, the same "generate paste-ready JSON, save nothing"
-        pattern CSM's, CGT's, Garage's, and Sondrik's own quick-log tools already use.</p>
+        pattern CSM's, CGT's, Garage's, and Sondrik's own quick-log tools already use. If logging a whole batch
+        of applications submitted in the same sitting, use <a href="/job-search/import.html">Import CSV</a> in
+        the header instead: it maps your own column headers to this schema, validates the whole batch against
+        the same rules as <code>validate.js</code>, and hands back a ready-to-save <code>applications.json</code>.</p>
 
       <div class="quick-log-grid">
         <form class="quick-log-form" id="quickApplicationForm">

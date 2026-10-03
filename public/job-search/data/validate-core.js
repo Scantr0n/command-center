@@ -87,5 +87,48 @@
     return [...byKey.values()].filter(group => group.length > 1);
   }
 
-  return { isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications };
+  // The same per-application field rules validate.js's own applications.json
+  // loop already runs, pulled out so the CSV importer (import.js, which
+  // needs the real application objects to render a preview/validation panel,
+  // not just a pass/fail string) can run the exact same checks against an
+  // imported batch before it's downloaded, rather than a second, possibly
+  // drifted copy of the same rules. statusLabels is passed in rather than
+  // required from followup-core.js directly, so this file never has to know
+  // that file exists, same split CSM's validateProspects uses for `stages`.
+  function validateApplications(applications, statusLabels) {
+    const errors = [];
+    const warnings = [];
+    const seenNums = new Set();
+    (applications || []).forEach((a, idx) => {
+      const where = 'applications[' + idx + ']' + (a && a.company ? ' (' + a.company + ')' : '');
+      if (typeof a.num !== 'number') errors.push(where + ': missing numeric "num"');
+      else if (seenNums.has(a.num)) errors.push(where + ': duplicate "num" ' + a.num);
+      else seenNums.add(a.num);
+      ['role', 'company', 'location', 'pay'].forEach(f => {
+        if (!a[f]) {
+          errors.push(where + ': missing "' + f + '"');
+        } else if (typeof a[f] !== 'string') {
+          errors.push(where + ': "' + f + '" must be a string, got ' + typeof a[f]);
+        }
+      });
+      if (!isDateOrNull(a.appliedDate)) errors.push(where + ': "appliedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(a.appliedDate));
+      else if (!a.appliedDate) warnings.push(where + ': no appliedDate logged, an application row with no real date reads as unconfirmed');
+      else if (isFutureDate(a.appliedDate)) warnings.push(where + ': "appliedDate" (' + a.appliedDate + ') is in the future, check for a typo');
+      if (a.status != null && statusLabels && !Object.prototype.hasOwnProperty.call(statusLabels, a.status)) {
+        errors.push(where + ': "status" must be one of ' + Object.keys(statusLabels).join(', ') + ' or omitted, got ' + JSON.stringify(a.status));
+      }
+      emDashFields(a, ['role', 'company', 'location', 'pay']).forEach(f =>
+        warnings.push(where + ': "' + f + '" contains an em dash, this is a transcription field, check it against the source tracker'));
+    });
+    findDuplicateApplications(applications || []).forEach(group => {
+      warnings.push('applications: ' + group.length + ' entries match on company + role (' +
+        group.map(a => '#' + a.num).join(', ') + '), check for a duplicate transcription');
+    });
+    return { errors, warnings };
+  }
+
+  return {
+    isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications,
+    validateApplications
+  };
 });

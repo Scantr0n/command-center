@@ -18,7 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, findDuplicateApplications } = require('./validate-core.js');
+const { isDateOrNull, isFutureDate, emDashFields, isValidSourceUrlOrNull, validateApplications } = require('./validate-core.js');
 const { STATUS_LABELS } = require('./followup-core.js');
 
 const DATA_DIR = __dirname;
@@ -60,33 +60,13 @@ function main() {
     process.exit(1);
   }
 
-  // applications.json
-  const seenNums = new Set();
-  (applicationsData.applications || []).forEach((a, idx) => {
-    const where = 'applications[' + idx + ']' + (a && a.company ? ' (' + a.company + ')' : '');
-    if (typeof a.num !== 'number') errors.push(where + ': missing numeric "num"');
-    else if (seenNums.has(a.num)) errors.push(where + ': duplicate "num" ' + a.num);
-    else seenNums.add(a.num);
-    ['role', 'company', 'location', 'pay'].forEach(f => {
-      if (!a[f]) {
-        errors.push(where + ': missing "' + f + '"');
-      } else if (typeof a[f] !== 'string') {
-        // findDuplicateApplications' own `(a.company || '').trim()` only
-        // guards a falsy value; a truthy non-string for company or role
-        // reaches that .trim() unguarded and throws, and the function runs
-        // unconditionally from both this file and app.js.
-        errors.push(where + ': "' + f + '" must be a string, got ' + typeof a[f]);
-      }
-    });
-    if (!isDateOrNull(a.appliedDate)) errors.push(where + ': "appliedDate" is not a YYYY-MM-DD date or null: ' + JSON.stringify(a.appliedDate));
-    else if (!a.appliedDate) warnings.push(where + ': no appliedDate logged, an application row with no real date reads as unconfirmed');
-    else if (isFutureDate(a.appliedDate)) warnings.push(where + ': "appliedDate" (' + a.appliedDate + ') is in the future, check for a typo');
-    if (a.status != null && !Object.prototype.hasOwnProperty.call(STATUS_LABELS, a.status)) {
-      errors.push(where + ': "status" must be one of ' + Object.keys(STATUS_LABELS).join(', ') + ' or omitted, got ' + JSON.stringify(a.status));
-    }
-    emDashFields(a, ['role', 'company', 'location', 'pay']).forEach(f =>
-      warnings.push(where + ': "' + f + '" contains an em dash, this is a transcription field, check it against the source tracker'));
-  });
+  // applications.json: the real per-row field rules (and the company+role
+  // duplicate scan) now live in validateApplications, shared with the CSV
+  // importer (import.js) so the two can never drift apart, same pattern as
+  // CSM's own validateProspects.
+  const appResult = validateApplications(applicationsData.applications || [], STATUS_LABELS);
+  errors.push(...appResult.errors);
+  warnings.push(...appResult.warnings);
   (applicationsData.dropped || []).forEach((d, idx) => {
     const where = 'dropped[' + idx + ']';
     if (!d.company) errors.push(where + ': missing "company"');
@@ -96,15 +76,6 @@ function main() {
     const where = 'skipped[' + idx + ']';
     if (!s.company) errors.push(where + ': missing "company"');
     if (!s.reason) errors.push(where + ': missing "reason", a skipped application with no real reason logged reads as unexplained');
-  });
-  // Catches the same real risk every other hub's own duplicate check already
-  // guards against: applications.json's only uniqueness check above is on
-  // "num" (auto-incrementing, so it can't naturally collide except by
-  // mistake), so the same tracker entry hand-transcribed twice under two
-  // different "num" values would otherwise go undetected.
-  findDuplicateApplications(applicationsData.applications || []).forEach(group => {
-    warnings.push('applications: ' + group.length + ' entries match on company + role (' +
-      group.map(a => '#' + a.num).join(', ') + '), check for a duplicate transcription');
   });
   const savedCount = applicationsData.savedCount || {};
   if (typeof savedCount.count !== 'number' || savedCount.count < 0) {
